@@ -77,9 +77,14 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlSkippedObjectDiscovery.cs"));
 
-    private static string ReadStaticEntityScaffoldSource()
+    private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"));
+
+    private static string ReadStaticEntityScaffoldSource()
+        => string.Concat(
+            ReadDatabaseScaffolderSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceInfo.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
@@ -155,7 +160,7 @@ public class ScaffoldingContractDocTests
         var snapshot = ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs");
         var entityTypeBuilder = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
         var entityTypeConfiguration = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
-        var scaffolder = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        var scaffolder = ReadDatabaseScaffolderSource();
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
         var sqlServerMigration = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
         var postgresMigration = ReadRepoFile("src", "nORM", "Migration", "PostgresMigrationSqlGenerator.cs");
@@ -1137,7 +1142,7 @@ public class ScaffoldingContractDocTests
     public void Doc_pins_inverse_many_to_many_scaffolding()
     {
         var doc = ReadDoc();
-        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        var source = ReadDatabaseScaffolderSource();
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
         var manyToManyDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyJoinDiscovery.cs");
         var sqlServerMigration = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
@@ -1173,7 +1178,7 @@ public class ScaffoldingContractDocTests
     public void Doc_and_source_pin_deterministic_scaffold_output()
     {
         var doc = ReadDoc();
-        var source = ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs");
+        var source = ReadDatabaseScaffolderSource();
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var checkFeatureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCheckFeatureConfigurationBuilder.cs");
@@ -1821,7 +1826,7 @@ public class ScaffoldingContractDocTests
         var doc = ReadDoc();
         var cliSource = ReadRepoFile("src", "dotnet-norm", "Program.cs");
         var scaffolderSource = string.Concat(
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
+            ReadDatabaseScaffolderSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"));
         var tableFilterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs");
         var contextWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs");
