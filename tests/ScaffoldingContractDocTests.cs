@@ -96,7 +96,12 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Names.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.TypeMapping.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Context.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Relationships.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.FeatureConfigurations.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.EntityFiles.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.SchemaMaps.cs"));
 
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
