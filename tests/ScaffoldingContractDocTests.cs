@@ -110,7 +110,8 @@ public class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldCliOutputFilterTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliDiagnosticsTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCoreShapeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliRoutineSequenceTests.cs"));
+            ReadRepoFile("tests", "LiveProviderScaffoldCliRoutineSequenceTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliQueryArtifactTests.cs"));
 
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
