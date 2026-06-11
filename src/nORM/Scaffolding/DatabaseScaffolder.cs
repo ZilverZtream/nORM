@@ -1011,147 +1011,11 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable)
-        {
-            var featureInputs = ConvertFeatureInputs(unsupportedFeatures);
-            var configurations = ScaffoldFeatureConfigurationBuilder.BuildFeatureConfigurations(
-                featureInputs,
+            => ScaffoldFeatureConfigurationAdapter.BuildFeatureConfigurations(
+                unsupportedFeatures,
                 entityByTable,
                 columnPropertiesByTable,
                 stringBinaryFacetsByTable);
-            var generatedFeatureIndexes = configurations.GeneratedFeatureIndexes.ToArray();
-            var generatedFeatureIndexSet = generatedFeatureIndexes.ToHashSet();
-            var generatedModelFeatureDiagnostics = generatedFeatureIndexes
-                .Select(index => unsupportedFeatures[index])
-                .ToArray();
-            for (var i = unsupportedFeatures.Count - 1; i >= 0; i--)
-            {
-                if (generatedFeatureIndexSet.Contains(i))
-                    unsupportedFeatures.RemoveAt(i);
-            }
-
-            return ConvertFeatureConfigurations(configurations, generatedModelFeatureDiagnostics);
-        }
-
-        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IReadOnlyList<ScaffoldUnsupportedFeature> features)
-        {
-            var converted = new ScaffoldFeatureInput[features.Count];
-            for (var i = 0; i < features.Count; i++)
-            {
-                converted[i] = new ScaffoldFeatureInput(i, ConvertUnsupportedFeatureInputInfo(features[i]));
-            }
-
-            return converted;
-        }
-
-        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IEnumerable<ScaffoldUnsupportedFeature> features)
-        {
-            var featureList = features as IReadOnlyList<ScaffoldUnsupportedFeature> ?? features.ToArray();
-            return ConvertFeatureInputs(featureList);
-        }
-
-        private static ScaffoldUnsupportedFeatureInfo ConvertUnsupportedFeatureInputInfo(ScaffoldUnsupportedFeature feature)
-            => new(feature.TableKey, feature.Kind, feature.Name, feature.Detail)
-            {
-                Metadata = feature.Metadata
-            };
-
-        private static ScaffoldFeatureInput ConvertFeatureInput(ScaffoldUnsupportedFeature feature)
-            => new(0, ConvertUnsupportedFeatureInputInfo(feature));
-
-        private static ScaffoldFeatureConfigurations ConvertFeatureConfigurations(
-            ScaffoldFeatureConfigurationsInfo configurations,
-            IReadOnlyList<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
-            => new(
-                generatedModelFeatureDiagnostics,
-                configurations.ProviderSpecificColumnTypesByTable,
-                configurations.DefaultValuesByTable,
-                configurations.ProviderSpecificDefaultTableKeys,
-                ConvertCheckConstraintConfigurations(configurations.CheckConstraints),
-                ConvertExpressionIndexConfigurations(configurations.ExpressionIndexConfigurations),
-                ConvertCollationConfigurations(configurations.CollationConfigurations),
-                ConvertComputedColumnConfigurations(configurations.ComputedColumnConfigurations),
-                configurations.ComputedColumnsByTable,
-                ConvertDecimalPrecisionMap(configurations.DecimalPrecisionByTable),
-                ConvertPrecisionConfigurations(configurations.PrecisionConfigurations),
-                ConvertColumnFacetConfigurations(configurations.ColumnFacetConfigurations),
-                configurations.RowVersionColumnsByTable,
-                configurations.ProviderNativeTemporalTableKeys,
-                configurations.ProviderOwnedTriggerTableKeys,
-                ConvertIdentityOptionConfigurations(configurations.IdentityOptionConfigurations),
-                configurations.ProviderSpecificIdentityStrategyTableKeys,
-                configurations.ProviderOwnedWriteBlockedTableKeys);
-
-        private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> ConvertCheckConstraintConfigurations(
-            IReadOnlyList<ScaffoldCheckConstraintConfigurationInfo> checks)
-            => checks
-                .Select(static check => new ScaffoldCheckConstraintConfiguration(check.TableKey, check.EntityName, check.Name, check.Sql))
-                .ToArray();
-
-        private static ScaffoldCheckConstraintConfigurationInfo ConvertCheckConstraintConfiguration(
-            ScaffoldCheckConstraintConfiguration check)
-            => new(check.TableKey, check.EntityName, check.Name, check.Sql);
-
-        private static IReadOnlyList<ScaffoldDefaultValueConfiguration> ConvertDefaultValueConfigurations(
-            IReadOnlyList<ScaffoldDefaultValueConfigurationInfo> defaultValues)
-            => defaultValues
-                .Select(static value => new ScaffoldDefaultValueConfiguration(value.TableKey, value.EntityName, value.ColumnName, value.PropertyName, value.DefaultValueSql))
-                .ToArray();
-
-        private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> ConvertExpressionIndexConfigurations(
-            IReadOnlyList<ScaffoldExpressionIndexConfigurationInfo> expressionIndexes)
-            => expressionIndexes
-                .Select(static index => new ScaffoldExpressionIndexConfiguration(index.TableKey, index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql))
-                .ToArray();
-
-        private static IReadOnlyList<ScaffoldCollationConfiguration> ConvertCollationConfigurations(
-            IReadOnlyList<ScaffoldCollationConfigurationInfo> collations)
-            => collations
-                .Select(static collation => new ScaffoldCollationConfiguration(collation.TableKey, collation.EntityName, collation.ColumnName, collation.PropertyName, collation.Collation))
-                .ToArray();
-
-        private static IReadOnlyList<ScaffoldComputedColumnConfiguration> ConvertComputedColumnConfigurations(
-            IReadOnlyList<ScaffoldComputedColumnConfigurationInfo> computedColumns)
-            => computedColumns
-                .Select(static computed => new ScaffoldComputedColumnConfiguration(computed.TableKey, computed.EntityName, computed.ColumnName, computed.PropertyName, computed.Sql, computed.Stored))
-                .ToArray();
-
-        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> ConvertDecimalPrecisionMap(
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>> decimalPrecisionByTable)
-            => decimalPrecisionByTable.ToDictionary(
-                table => table.Key,
-                table => (IReadOnlyDictionary<string, ScaffoldDecimalPrecision>)table.Value.ToDictionary(
-                    column => column.Key,
-                    column => new ScaffoldDecimalPrecision(column.Value.Precision, column.Value.Scale),
-                    StringComparer.OrdinalIgnoreCase),
-                StringComparer.OrdinalIgnoreCase);
-
-        private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>> ConvertDecimalPrecisionInfoMap(
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> decimalPrecisionByTable)
-            => decimalPrecisionByTable.ToDictionary(
-                table => table.Key,
-                table => (IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>)table.Value.ToDictionary(
-                    column => column.Key,
-                    column => new ScaffoldDecimalPrecisionInfo(column.Value.Precision, column.Value.Scale),
-                    StringComparer.OrdinalIgnoreCase),
-                StringComparer.OrdinalIgnoreCase);
-
-        private static IReadOnlyList<ScaffoldPrecisionConfiguration> ConvertPrecisionConfigurations(
-            IReadOnlyList<ScaffoldPrecisionConfigurationInfo> precisionConfigurations)
-            => precisionConfigurations
-                .Select(static precision => new ScaffoldPrecisionConfiguration(precision.TableKey, precision.EntityName, precision.ColumnName, precision.PropertyName, precision.Precision, precision.Scale))
-                .ToArray();
-
-        private static IReadOnlyList<ScaffoldColumnFacetConfiguration> ConvertColumnFacetConfigurations(
-            IReadOnlyList<ScaffoldColumnFacetConfigurationInfo> columnFacetConfigurations)
-            => columnFacetConfigurations
-                .Select(static facet => new ScaffoldColumnFacetConfiguration(facet.TableKey, facet.EntityName, facet.ColumnName, facet.PropertyName, facet.MaxLength, facet.IsUnicode, facet.IsFixedLength))
-                .ToArray();
-
-        private static IReadOnlyList<ScaffoldIdentityOptionConfiguration> ConvertIdentityOptionConfigurations(
-            IReadOnlyList<ScaffoldIdentityOptionConfigurationInfo> identityOptions)
-            => identityOptions
-                .Select(static identity => new ScaffoldIdentityOptionConfiguration(identity.TableKey, identity.EntityName, identity.ColumnName, identity.PropertyName, identity.Seed, identity.Increment))
-                .ToArray();
 
         private static void RestoreGeneratedManyToManyUnsupportedFeatures(
             List<ScaffoldUnsupportedFeature> unsupportedFeatures,
@@ -1717,59 +1581,53 @@ namespace nORM.Scaffolding
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildScaffoldDefaultValueMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
-            => ScaffoldFeatureConfigurationBuilder.BuildScaffoldDefaultValueMap(
-                ConvertFeatureInputs(features),
-                columnPropertiesByTable);
+            => ScaffoldFeatureConfigurationAdapter.BuildScaffoldDefaultValueMap(features, columnPropertiesByTable);
 
         private static IReadOnlyList<ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable)
-            => ConvertDefaultValueConfigurations(ScaffoldFeatureConfigurationBuilder.BuildDefaultValueConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildDefaultValueConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                defaultValuesByTable));
+                defaultValuesByTable);
 
         private static IReadOnlyList<ScaffoldPrecisionConfiguration> BuildPrecisionConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> decimalPrecisionByTable)
-            => ConvertPrecisionConfigurations(ScaffoldFeatureConfigurationBuilder.BuildPrecisionConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildPrecisionConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                ConvertDecimalPrecisionInfoMap(decimalPrecisionByTable)));
+                decimalPrecisionByTable);
 
         private static IReadOnlyList<ScaffoldColumnFacetConfiguration> BuildColumnFacetConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> columnFacetsByTable)
-            => ConvertColumnFacetConfigurations(ScaffoldFeatureConfigurationBuilder.BuildColumnFacetConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildColumnFacetConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                columnFacetsByTable));
+                columnFacetsByTable);
 
         private static IReadOnlyList<ScaffoldIdentityOptionConfiguration> BuildIdentityOptionConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertIdentityOptionConfigurations(ScaffoldFeatureConfigurationBuilder.BuildIdentityOptionConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildIdentityOptionConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                ConvertFeatureInputs(features)));
+                features);
 
         private static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildCheckConstraintConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertCheckConstraintConfigurations(ScaffoldFeatureConfigurationBuilder.BuildCheckConstraintConfigurations(
-                entityByTable,
-                ConvertFeatureInputs(features)));
+            => ScaffoldFeatureConfigurationAdapter.BuildCheckConstraintConfigurations(entityByTable, features);
 
         private static bool CheckConstraintConfigurationMatchesFeature(
             ScaffoldCheckConstraintConfiguration check,
             ScaffoldUnsupportedFeature feature)
-            => ScaffoldFeatureConfigurationBuilder.CheckConstraintConfigurationMatchesFeature(
-                ConvertCheckConstraintConfiguration(check),
-                ConvertUnsupportedFeatureInputInfo(feature));
+            => ScaffoldFeatureConfigurationAdapter.CheckConstraintConfigurationMatchesFeature(check, feature);
 
         private static string BuildGeneratedCheckConstraintName(string entityName, string sql)
             => ScaffoldFeatureConfigurationBuilder.BuildGeneratedCheckConstraintName(entityName, sql);
@@ -1778,10 +1636,10 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertCheckConstraintConfigurations(ScaffoldFeatureConfigurationBuilder.BuildEnumCheckConstraintConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildEnumCheckConstraintConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                ConvertFeatureInputs(features)));
+                features);
 
         private static bool TryBuildProviderValueCheckSql(
             string columnName,
@@ -1814,9 +1672,7 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertExpressionIndexConfigurations(ScaffoldFeatureConfigurationBuilder.BuildExpressionIndexConfigurations(
-                entityByTable,
-                ConvertFeatureInputs(features)));
+            => ScaffoldFeatureConfigurationAdapter.BuildExpressionIndexConfigurations(entityByTable, features);
 
         private static bool IsProviderOwnedExpressionIndexDetail(string detail)
             => ScaffoldFeatureConfigurationBuilder.IsProviderOwnedExpressionIndexDetail(detail);
@@ -1825,10 +1681,10 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertCollationConfigurations(ScaffoldFeatureConfigurationBuilder.BuildCollationConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildCollationConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                ConvertFeatureInputs(features)));
+                features);
 
         private static string? ExtractCreateIndexWhereClause(string sql)
             => ScaffoldSqlMetadataParser.ExtractCreateIndexWhereClause(sql);
@@ -1852,10 +1708,10 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertComputedColumnConfigurations(ScaffoldFeatureConfigurationBuilder.BuildComputedColumnConfigurations(
+            => ScaffoldFeatureConfigurationAdapter.BuildComputedColumnConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                ConvertFeatureInputs(features)));
+                features);
 
         private static (string Sql, bool Stored) NormalizeScaffoldComputedSql(string raw)
             => ScaffoldSqlMetadataParser.NormalizeScaffoldComputedSql(raw);
@@ -1875,11 +1731,11 @@ namespace nORM.Scaffolding
         private static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
-            => ScaffoldFeatureConfigurationBuilder.BuildFeatureNameMap(ConvertFeatureInputs(features), kinds);
+            => ScaffoldFeatureConfigurationAdapter.BuildFeatureNameMap(features, kinds);
 
         private static HashSet<string> BuildProviderNativeTemporalTableKeys(
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ScaffoldFeatureConfigurationBuilder.BuildProviderNativeTemporalTableKeys(ConvertFeatureInputs(features));
+            => ScaffoldFeatureConfigurationAdapter.BuildProviderNativeTemporalTableKeys(features);
 
         private static HashSet<string> BuildProviderOwnedWriteBlockedTableKeys(
             IReadOnlySet<string> providerNativeTemporalTableKeys,
@@ -1887,7 +1743,7 @@ namespace nORM.Scaffolding
             IReadOnlySet<string> providerSpecificIdentityStrategyTableKeys,
             IReadOnlySet<string> providerSpecificDefaultTableKeys,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> providerSpecificColumnTypesByTable)
-            => ScaffoldFeatureConfigurationBuilder.BuildProviderOwnedWriteBlockedTableKeys(
+            => ScaffoldFeatureConfigurationAdapter.BuildProviderOwnedWriteBlockedTableKeys(
                 providerNativeTemporalTableKeys,
                 providerOwnedTriggerTableKeys,
                 providerSpecificIdentityStrategyTableKeys,
@@ -1897,16 +1753,16 @@ namespace nORM.Scaffolding
         private static HashSet<string> BuildFeatureTableKeys(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
-            => ScaffoldFeatureConfigurationBuilder.BuildFeatureTableKeys(ConvertFeatureInputs(features), kinds);
+            => ScaffoldFeatureConfigurationAdapter.BuildFeatureTableKeys(features, kinds);
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildFeatureDetailMap(
             IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
-            => ScaffoldFeatureConfigurationBuilder.BuildFeatureDetailMap(ConvertFeatureInputs(features), kinds);
+            => ScaffoldFeatureConfigurationAdapter.BuildFeatureDetailMap(features, kinds);
 
         private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> BuildDecimalPrecisionMap(
             IEnumerable<ScaffoldUnsupportedFeature> features)
-            => ConvertDecimalPrecisionMap(ScaffoldFeatureConfigurationBuilder.BuildDecimalPrecisionMap(ConvertFeatureInputs(features)));
+            => ScaffoldFeatureConfigurationAdapter.BuildDecimalPrecisionMap(features);
 
         private static bool TryParseDecimalPrecision(string? typeName, out int precision, out int? scale)
             => ScaffoldSqlMetadataParser.TryParseDecimalPrecision(typeName, out precision, out scale);
@@ -2311,7 +2167,7 @@ namespace nORM.Scaffolding
         private static string Pluralize(string name)
             => ScaffoldNameHelper.Pluralize(name);
 
-        private sealed record ScaffoldFeatureConfigurations(
+        internal sealed record ScaffoldFeatureConfigurations(
             IReadOnlyList<ScaffoldUnsupportedFeature> GeneratedModelFeatureDiagnostics,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ProviderSpecificColumnTypesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultValuesByTable,
@@ -2349,14 +2205,14 @@ namespace nORM.Scaffolding
             string[] PropertyNames,
             string? ConstraintName);
 
-        private readonly record struct ScaffoldDefaultValueConfiguration(
+        internal readonly record struct ScaffoldDefaultValueConfiguration(
             string TableKey,
             string EntityName,
             string ColumnName,
             string PropertyName,
             string DefaultValueSql);
 
-        private readonly record struct ScaffoldIdentityOptionConfiguration(
+        internal readonly record struct ScaffoldIdentityOptionConfiguration(
             string TableKey,
             string EntityName,
             string ColumnName,
@@ -2364,7 +2220,7 @@ namespace nORM.Scaffolding
             long Seed,
             long Increment);
 
-        private readonly record struct ScaffoldPrecisionConfiguration(
+        internal readonly record struct ScaffoldPrecisionConfiguration(
             string TableKey,
             string EntityName,
             string ColumnName,
@@ -2372,7 +2228,7 @@ namespace nORM.Scaffolding
             int Precision,
             int? Scale);
 
-        private readonly record struct ScaffoldColumnFacetConfiguration(
+        internal readonly record struct ScaffoldColumnFacetConfiguration(
             string TableKey,
             string EntityName,
             string ColumnName,
@@ -2381,13 +2237,13 @@ namespace nORM.Scaffolding
             bool? IsUnicode,
             bool IsFixedLength);
 
-        private readonly record struct ScaffoldCheckConstraintConfiguration(
+        internal readonly record struct ScaffoldCheckConstraintConfiguration(
             string TableKey,
             string EntityName,
             string Name,
             string Sql);
 
-        private readonly record struct ScaffoldComputedColumnConfiguration(
+        internal readonly record struct ScaffoldComputedColumnConfiguration(
             string TableKey,
             string EntityName,
             string ColumnName,
@@ -2395,7 +2251,7 @@ namespace nORM.Scaffolding
             string Sql,
             bool Stored);
 
-        private readonly record struct ScaffoldExpressionIndexConfiguration(
+        internal readonly record struct ScaffoldExpressionIndexConfiguration(
             string TableKey,
             string EntityName,
             string Name,
@@ -2403,7 +2259,7 @@ namespace nORM.Scaffolding
             bool IsUnique,
             string? FilterSql);
 
-        private readonly record struct ScaffoldCollationConfiguration(
+        internal readonly record struct ScaffoldCollationConfiguration(
             string TableKey,
             string EntityName,
             string ColumnName,
@@ -2492,11 +2348,11 @@ namespace nORM.Scaffolding
             string TargetEntityName,
             string CollectionNavigationName);
 
-        private readonly record struct ScaffoldDecimalPrecision(
+        internal readonly record struct ScaffoldDecimalPrecision(
             int Precision,
             int? Scale);
 
-        private readonly record struct ScaffoldUnsupportedFeature(
+        internal readonly record struct ScaffoldUnsupportedFeature(
             string TableKey,
             string Kind,
             string Name,
