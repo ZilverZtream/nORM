@@ -162,7 +162,7 @@ public class ProviderCapabilityContractTests
     [Fact]
     public void Portability_certify_target_probe_exercises_representative_floor_features()
     {
-        var program = File.ReadAllText(Path.Combine(RepoRoot(), "src", "dotnet-norm", "Program.cs"));
+        var program = File.ReadAllText(Path.Combine(RepoRoot(), "src", "dotnet-norm", "Program.Portability.Probes.cs"));
 
         foreach (var required in new[]
         {
