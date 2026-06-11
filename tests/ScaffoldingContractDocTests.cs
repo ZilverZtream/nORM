@@ -81,6 +81,7 @@ public class ScaffoldingContractDocTests
     private static string ReadDynamicEntitySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeGenerator.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaDescriptorBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityComputedColumnReader.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityReadOnlyClassifier.cs"),

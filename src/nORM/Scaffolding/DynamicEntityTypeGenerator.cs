@@ -145,43 +145,7 @@ namespace nORM.Scaffolding
         }
 
         private static string BuildSchemaDescriptor(string? schemaName, string tableName, IReadOnlyList<ColumnInfo> columns, bool isReadOnlyEntity)
-        {
-            var sb = new StringBuilder();
-            AppendDescriptorPart(sb, schemaName ?? string.Empty);
-            AppendDescriptorPart(sb, tableName);
-            AppendDescriptorPart(sb, isReadOnlyEntity ? "RO" : "RW");
-            foreach (var column in columns)
-            {
-                AppendDescriptorPart(sb, column.ColumnName);
-                AppendDescriptorPart(sb, column.PropertyType.FullName ?? string.Empty);
-                AppendDescriptorPart(sb, column.IsKey ? "PK" : "C");
-                AppendDescriptorPart(sb, column.IsKey ? column.KeyOrdinal.ToString(System.Globalization.CultureInfo.InvariantCulture) : "-");
-                AppendDescriptorPart(sb, column.AllowsNull ? "N" : "NN");
-                AppendDescriptorPart(sb, column.IsAuto ? "AI" : "NA");
-                AppendDescriptorPart(sb, column.IsComputed ? "CMP" : "NCMP");
-                AppendDescriptorPart(sb, column.ComputedColumn?.Sql ?? "-");
-                AppendDescriptorPart(sb, column.ComputedColumn is { } computedColumn ? computedColumn.Stored ? "STORED" : "VIRTUAL" : "-");
-                AppendDescriptorPart(sb, column.IsRowVersion ? "RV" : "NRV");
-                AppendDescriptorPart(sb, column.MaxLength?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-");
-                AppendDescriptorPart(sb, column.IsUnicode.HasValue ? column.IsUnicode.Value ? "U" : "NU" : "-");
-                AppendDescriptorPart(sb, column.IsFixedLength ? "FIX" : "VAR");
-                AppendDescriptorPart(
-                    sb,
-                    column.DecimalPrecision is { } decimalPrecision
-                        ? FormatDecimalTypeName(decimalPrecision)
-                        : "-");
-            }
-
-            return sb.ToString();
-        }
-
-        private static void AppendDescriptorPart(StringBuilder builder, string value)
-        {
-            builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            builder.Append(':');
-            builder.Append(value);
-            builder.Append(';');
-        }
+            => DynamicEntitySchemaDescriptorBuilder.BuildDescriptor(schemaName, tableName, columns, isReadOnlyEntity);
 
         private static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)
         {
@@ -328,14 +292,6 @@ namespace nORM.Scaffolding
                     static pair => pair.Key,
                     static pair => new ScaffoldDecimalPrecision(pair.Value.Precision, pair.Value.Scale),
                     StringComparer.OrdinalIgnoreCase);
-
-        private static string FormatDecimalTypeName(ScaffoldDecimalPrecision decimalPrecision)
-        {
-            var precision = decimalPrecision.Precision.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            return decimalPrecision.Scale.HasValue
-                ? $"decimal({precision},{decimalPrecision.Scale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
-                : $"decimal({precision})";
-        }
 
         private static IReadOnlyDictionary<string, ScaffoldComputedColumn> GetComputedColumns(DbConnection connection, string? schemaName, string tableName)
             => DynamicEntityComputedColumnReader.GetComputedColumns(connection, schemaName, tableName);
