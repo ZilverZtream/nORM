@@ -92,7 +92,8 @@ public class ScaffoldingContractDocTests
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Names.cs"));
 
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
