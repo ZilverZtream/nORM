@@ -13,7 +13,7 @@ namespace nORM.Tests;
 [Xunit.Trait("Category", "Fast")]
 public class CliIntegrationTests
 {
-    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(3);
 
     [Fact]
     public void Database_update_missing_assembly_returns_nonzero_without_leaking_connection_secret()
@@ -3901,9 +3901,20 @@ public class CliIntegrationTests
 
     private static void RunDotNet(string arguments, string workingDirectory)
     {
-        var result = RunProcess("dotnet", arguments, workingDirectory);
+        var result = RunProcess("dotnet", AddBuildStabilitySwitches(arguments), workingDirectory);
         Assert.True(result.ExitCode == 0,
             $"dotnet {arguments} failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+    }
+
+    private static string AddBuildStabilitySwitches(string arguments)
+    {
+        if (!arguments.StartsWith("build", StringComparison.OrdinalIgnoreCase) ||
+            arguments.Contains("--disable-build-servers", StringComparison.Ordinal))
+        {
+            return arguments;
+        }
+
+        return arguments + " --disable-build-servers";
     }
 
     private static CliResult RunProcess(string fileName, string arguments, string workingDirectory)
