@@ -1,9 +1,9 @@
 #nullable enable
 using System;
-using System.Data;
 using System.Data.Common;
 using nORM.Core;
 using nORM.Migration;
+using static nORM.Scaffolding.DynamicEntitySchemaMetadataQuery;
 using static nORM.Scaffolding.DynamicEntitySchemaResolver;
 
 namespace nORM.Scaffolding
@@ -522,15 +522,6 @@ namespace nORM.Scaffolding
             AddStringParameter(cmd, "@tableName", tableName);
             AddStringParameter(cmd, "@schemaName", string.IsNullOrWhiteSpace(schemaName) ? null : schemaName);
             return cmd.ExecuteScalar() is not null;
-        }
-
-        private static void AddStringParameter(DbCommand command, string name, string? value)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.DbType = DbType.String;
-            parameter.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value;
-            command.Parameters.Add(parameter);
         }
 
         private static bool HasBalancedOuterParentheses(string value)
