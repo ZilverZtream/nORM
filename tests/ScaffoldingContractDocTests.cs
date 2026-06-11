@@ -178,6 +178,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.TypeMapping.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Context.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.Probes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.Selection.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.FeatureDiagnostics.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Relationships.cs"),

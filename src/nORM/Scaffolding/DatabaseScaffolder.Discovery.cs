@@ -11,61 +11,6 @@ namespace nORM.Scaffolding
 {
     public static partial class DatabaseScaffolder
     {
-        private static string BuildSchemaProbeSql(
-            DatabaseProvider provider,
-            string? schemaName,
-            string tableName,
-            IReadOnlyDictionary<string, string>? columnPropertyNames,
-            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes,
-            IReadOnlySet<string>? postgresTextCastColumns = null)
-            => ScaffoldEntitySourceBuilder.BuildSchemaProbeSql(
-                provider,
-                schemaName,
-                tableName,
-                columnPropertyNames,
-                providerSpecificColumnTypes,
-                postgresTextCastColumns);
-
-        private static Task<IReadOnlySet<string>> GetPostgresUserDefinedColumnNamesAsync(
-            DbConnection connection,
-            DatabaseProvider provider,
-            string? schemaName,
-            string tableName)
-            => ScaffoldEntitySourceBuilder.GetPostgresUserDefinedColumnNamesAsync(connection, provider, schemaName, tableName);
-
-        private static bool RequiresPostgresSchemaProbeCast(string detail)
-            => ScaffoldProviderSpecificTypeClassifier.RequiresPostgresSchemaProbeCast(detail);
-
-        private static bool TryGetPostgresSchemaProbeCastType(string detail, out string castType)
-            => ScaffoldProviderSpecificTypeClassifier.TryGetPostgresSchemaProbeCastType(detail, out castType);
-
-        private static string GetPostgresDomainProbeCastType(string detail)
-            => ScaffoldProviderSpecificTypeClassifier.GetPostgresDomainProbeCastType(detail);
-
-        private static bool TryGetPostgresDomainBaseTypeText(string? detail, out string typeText)
-            => ScaffoldProviderSpecificTypeClassifier.TryGetPostgresDomainBaseTypeText(detail, out typeText);
-
-        private static string NormalizePostgresDomainProbeCastType(string typeText)
-            => ScaffoldProviderSpecificTypeClassifier.NormalizePostgresDomainProbeCastType(typeText);
-
-        private static bool TryNormalizeSafePostgresDomainProbeCastType(string typeText, out string castType)
-            => ScaffoldProviderSpecificTypeClassifier.TryNormalizeSafePostgresDomainProbeCastType(typeText, out castType);
-
-        private static bool TryNormalizePostgresParameterizedProbeCastType(string normalized, out string castType)
-            => ScaffoldProviderSpecificTypeClassifier.TryNormalizePostgresParameterizedProbeCastType(normalized, out castType);
-
-        private static bool TryParsePostgresTypeArguments(string normalized, string typeName, out string[] args)
-            => ScaffoldProviderSpecificTypeClassifier.TryParsePostgresTypeArguments(normalized, typeName, out args);
-
-        private static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
-            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out castType);
-
-        private static string? GetScaffoldFilterCatalog(DbConnection connection, DatabaseProvider provider)
-            => IsMySqlProvider(provider) ? NullIfWhiteSpace(connection.Database) : null;
-
-        private static bool IsMySqlProvider(DatabaseProvider provider)
-            => provider.GetType().Name.Contains("MySql", StringComparison.OrdinalIgnoreCase);
-
         private static async Task<IReadOnlyList<ScaffoldTable>> GetTablesAsync(DbConnection connection, DatabaseProvider provider)
             => await ScaffoldSchemaDiscoveryAdapter.GetTablesAsync(connection, provider).ConfigureAwait(false);
 
@@ -123,73 +68,6 @@ namespace nORM.Scaffolding
 
         private static ScaffoldSkippedObject ToScaffoldSkippedObject(ScaffoldSkippedObjectInfo obj)
             => ScaffoldSchemaDiscoveryAdapter.ToScaffoldSkippedObject(obj);
-
-        private static (IReadOnlyList<ScaffoldTable> Tables, IReadOnlyList<ScaffoldSkippedObject> SkippedObjects, IReadOnlySet<string> QueryArtifactTableKeys) BuildScaffoldObjectSelection(
-            IReadOnlyList<ScaffoldTable> discoveredTables,
-            IReadOnlyList<ScaffoldSkippedObject> discoveredSkippedObjects,
-            ScaffoldOptions options,
-            DatabaseProvider provider,
-            string? filterCatalog)
-        {
-            var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
-                discoveredTables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray(),
-                ConvertSkippedObjectInfos(discoveredSkippedObjects),
-                options,
-                provider,
-                filterCatalog);
-            return (
-                selection.Tables.Select(ToScaffoldTable).ToArray(),
-                selection.SkippedObjects.Select(ToScaffoldSkippedObject).ToArray(),
-                selection.QueryArtifactTableKeys);
-        }
-
-        private static IReadOnlyList<ScaffoldTable> FilterTables(
-            IReadOnlyList<ScaffoldTable> tables,
-            IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
-            ScaffoldOptions options,
-            DatabaseProvider provider,
-            string? filterCatalog)
-            => ScaffoldTableFilter.FilterTables(
-                    ToScaffoldTableInfos(tables),
-                    ToSkippedObjectInfos(skippedObjects),
-                    options,
-                    provider,
-                    filterCatalog)
-                .Select(ToScaffoldTable)
-                .ToArray();
-
-        private static void EnsureNoTableKeyCollisions(IReadOnlyList<ScaffoldTable> tables)
-            => ScaffoldTableFilter.EnsureNoTableKeyCollisions(ToScaffoldTableInfos(tables));
-
-        private static IReadOnlyList<ScaffoldSkippedObject> FilterSkippedObjects(
-            IReadOnlyList<ScaffoldSkippedObject> skippedObjects,
-            ScaffoldOptions options,
-            DatabaseProvider provider,
-            string? filterCatalog,
-            IReadOnlyList<ScaffoldSkippedObject>? emittedQueryArtifacts = null)
-            => ScaffoldTableFilter.FilterSkippedObjects(
-                    ToSkippedObjectInfos(skippedObjects),
-                    options,
-                    provider,
-                    filterCatalog,
-                    emittedQueryArtifacts is null ? null : ToSkippedObjectInfos(emittedQueryArtifacts))
-                .Select(ToScaffoldSkippedObject)
-                .ToArray();
-
-        private static bool IsQueryArtifactObject(ScaffoldSkippedObject obj)
-            => ScaffoldTableFilter.IsQueryArtifactObject(ToSkippedObjectInfo(obj));
-
-        private static bool ShouldEmitQueryArtifactObject(ScaffoldSkippedObject obj, ScaffoldOptions options, DatabaseProvider provider, string? filterCatalog)
-            => ScaffoldTableFilter.ShouldEmitQueryArtifactObject(ToSkippedObjectInfo(obj), options, provider, filterCatalog);
-
-        private static bool IsTableLikeSqlServerSynonym(string detail)
-            => ScaffoldSkippedObjectMetadataBuilder.IsTableLikeSqlServerSynonym(detail);
-
-        private static string[] GetRequestedTableFilters(ScaffoldOptions options)
-            => ScaffoldTableFilter.GetRequestedTableFilters(options);
-
-        private static string[] GetRequestedSchemaFilters(ScaffoldOptions options)
-            => ScaffoldTableFilter.GetRequestedSchemaFilters(options);
 
         private static string NormalizeContextNamespace(string entityNamespaceName, string? contextNamespaceName)
             => ScaffoldOutputManager.NormalizeContextNamespace(entityNamespaceName, contextNamespaceName);
