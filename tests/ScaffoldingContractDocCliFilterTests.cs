@@ -20,6 +20,9 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.EfToolConfig.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Project.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Names.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.ContextNaming.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.ProjectMetadata.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Configuration.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.FiltersAndResults.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Shared.cs"));
