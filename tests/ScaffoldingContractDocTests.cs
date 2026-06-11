@@ -52,6 +52,8 @@ public partial class ScaffoldingContractDocTests
     private static string ReadManyToManyDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyJoinDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyJoinDiscovery.Shape.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyJoinDiscovery.Principals.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyNavigationNameBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableShape.cs"));
