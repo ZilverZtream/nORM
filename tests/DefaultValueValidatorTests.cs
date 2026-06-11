@@ -98,6 +98,11 @@ public class DefaultValueValidatorTests
         new object[] { "nextval('public.orders; DROP')" },
         new object[] { "nextval('public.orders_id_seq'::text)" },
         new object[] { "nextval('public.orders_id_seq'); DROP TABLE Users" },
+        new object[] { "0xDEADBEEF; DROP TABLE Users" },
+        new object[] { "0x" },
+        new object[] { "X'DEADBEEF'; DROP TABLE Users" },
+        new object[] { "X'DEADZ0'" },
+        new object[] { "X'DEA'" },
         new object[] { "now() AT TIME ZONE 'utc'; DROP TABLE Users" },
         new object[] { "now() AT TIME ZONE current_user" },
         new object[] { "timezone('utc', unsafe())" },
@@ -129,6 +134,10 @@ public class DefaultValueValidatorTests
         new object[] { "42" },
         new object[] { "3.14" },
         new object[] { "-99.9" },
+        new object[] { "0xDEADBEEF" },
+        new object[] { "0x0" },
+        new object[] { "X'DEADBEEF'" },
+        new object[] { "x''" },
         new object[] { "NULL" },
         new object[] { "null" },
         new object[] { "TRUE" },
@@ -181,6 +190,7 @@ public class DefaultValueValidatorTests
         new object[] { "'draft'::character varying" },
         new object[] { "'draft'::character varying(32)" },
         new object[] { "'{}'::jsonb" },
+        new object[] { "'\\xDEADBEEF'::bytea" },
         new object[] { "'00000000-0000-0000-0000-000000000000'::uuid" },
         new object[] { "42::integer" },
         new object[] { "3.14::numeric(10, 2)" },
@@ -302,6 +312,7 @@ public class DefaultValueValidatorTests
     [InlineData("0")]
     [InlineData("'default_val'")]
     [InlineData("CURRENT_TIMESTAMP")]
+    [InlineData("X'DEADBEEF'")]
     public void SqliteGenerator_AddColumn_LegitimateDefault_SqlContainsValue(string defaultValue)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", defaultValue));
@@ -313,6 +324,7 @@ public class DefaultValueValidatorTests
     [InlineData("0")]
     [InlineData("'default_val'")]
     [InlineData("NOW()")]
+    [InlineData("'\\xDEADBEEF'::bytea")]
     public void PostgresGenerator_AddColumn_LegitimateDefault_SqlContainsValue(string defaultValue)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", defaultValue));
@@ -324,6 +336,7 @@ public class DefaultValueValidatorTests
     [InlineData("0")]
     [InlineData("'default_val'")]
     [InlineData("GETDATE()")]
+    [InlineData("0xDEADBEEF")]
     public void SqlServerGenerator_AddColumn_LegitimateDefault_SqlContainsValue(string defaultValue)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", defaultValue));
@@ -335,6 +348,7 @@ public class DefaultValueValidatorTests
     [InlineData("0")]
     [InlineData("'default_val'")]
     [InlineData("NOW()")]
+    [InlineData("0xDEADBEEF")]
     public void MySqlGenerator_AddColumn_LegitimateDefault_SqlContainsValue(string defaultValue)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", defaultValue));

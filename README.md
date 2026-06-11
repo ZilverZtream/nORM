@@ -352,9 +352,9 @@ PostgreSQL domains over safe scalar/array/enum base types remain diagnostics for
 provider-mobility review, but generated writes stay enabled because nORM binds
 the safe base CLR type, preserves bounded string/numeric facets where provider
 metadata exposes them, and the database enforces the domain constraint.
-Safe SQL defaults, including vetted PostgreSQL typed-cast defaults, are emitted
-as `HasDefaultValueSql(...)`; only unmodeled complex/provider-specific defaults
-make the generated entity read-only.
+Safe SQL defaults, including vetted hex/binary literals and PostgreSQL
+typed-cast defaults, are emitted as `HasDefaultValueSql(...)`; only unmodeled
+complex/provider-specific defaults make the generated entity read-only.
 Foreign keys from keyless dependent tables are reported as relationship
 diagnostics instead of generating navigations that cannot be safely included or
 tracked.

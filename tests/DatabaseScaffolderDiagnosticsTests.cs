@@ -219,6 +219,40 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSqliteBinaryLiteralDefault_PromotesDefaultAndKeepsTypeWritable()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE BinaryDefaultOwned (
+                Id INTEGER PRIMARY KEY,
+                Payload BLOB NOT NULL DEFAULT X'DEADBEEF'
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "BinaryDefaultOwnedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "BinaryDefaultOwned.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "BinaryDefaultOwnedCtx.cs"));
+
+            Assert.DoesNotContain("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
+            Assert.Contains("public byte[] Payload { get; set; } = Array.Empty<byte>();", entityCode, StringComparison.Ordinal);
+            Assert.Contains("mb.Entity<BinaryDefaultOwned>().Property(e => e.Payload).HasDefaultValueSql(\"X'DEADBEEF'\");", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSqliteIntegerPrimaryKey_EmitsIdentityMetadata()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

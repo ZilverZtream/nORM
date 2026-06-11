@@ -51,8 +51,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("one-to-one reference navigations when the dependent FK columns are exact unique", cliReadme, StringComparison.Ordinal);
         Assert.Contains("complex/provider-specific defaults", rootReadme, StringComparison.Ordinal);
         Assert.Contains("unmodeled complex/provider-specific defaults", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("Safe SQL defaults, including vetted PostgreSQL typed-cast defaults", rootReadme, StringComparison.Ordinal);
-        Assert.Contains("Safe SQL defaults, including vetted PostgreSQL typed-cast defaults", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("Safe SQL defaults, including vetted hex/binary literals and PostgreSQL", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("Safe SQL defaults, including vetted hex/binary literals and PostgreSQL", cliReadme, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL domains over safe scalar/array/enum base types remain diagnostics", rootReadme, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL domains over safe scalar/array/enum base types remain diagnostics", cliReadme, StringComparison.Ordinal);
         Assert.Contains("SQL Server alias types over scaffoldable scalar/binary bases remain diagnostics", rootReadme, StringComparison.Ordinal);
@@ -467,10 +467,15 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Unsupported/provider-specific FK referential action discovered", doc, StringComparison.Ordinal);
         Assert.Contains("Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted", doc, StringComparison.Ordinal);
         Assert.Contains("'draft'::text", doc, StringComparison.Ordinal);
+        Assert.Contains("0xDEADBEEF", doc, StringComparison.Ordinal);
+        Assert.Contains("X'DEADBEEF'", doc, StringComparison.Ordinal);
         Assert.Contains("now()::timestamp without time zone", doc, StringComparison.Ordinal);
         Assert.Contains("now() AT TIME ZONE 'utc'", doc, StringComparison.Ordinal);
         Assert.Contains("timezone('utc', now())", doc, StringComparison.Ordinal);
         Assert.Contains("Safe PostgreSQL cast suffixes", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("Hex/binary literals", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("0x[0-9a-f]+", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("x'(?:[0-9a-f]{2})*'", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("Strict PostgreSQL UTC timestamp defaults", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("at\\s+time\\s+zone\\s+'utc'", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("timezone\\s*\\(", defaultValidator, StringComparison.Ordinal);

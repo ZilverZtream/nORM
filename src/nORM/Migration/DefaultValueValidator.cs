@@ -16,6 +16,7 @@ namespace nORM.Migration
     ///   <item>SQL NULL literal</item>
     ///   <item>Boolean keywords: TRUE, FALSE</item>
     ///   <item>Integer and decimal numeric literals (optional leading minus)</item>
+    ///   <item>Hex/binary literals: 0xDEADBEEF and X'DEADBEEF'</item>
     ///   <item>Single-quoted ANSI/Unicode string literals with SQL-escaped interior quotes</item>
     ///   <item>Standard SQL no-argument functions: CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME,
     ///         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(6), CURRENT_DATE(),
@@ -44,6 +45,7 @@ namespace nORM.Migration
             @"null" +                                                   // SQL NULL
             @"|true|false" +                                            // boolean keywords
             @"|-?[0-9]+(?:\.[0-9]+)?" +                                 // numeric literal (int or decimal)
+            @"|0x[0-9a-f]+|x'(?:[0-9a-f]{2})*'" +                       // provider binary/hex literals
             @"|n?'(?:[^']|'')*'" +                                       // single-quoted ANSI/Unicode string literal
             @"|current_timestamp(?:\([0-6]?\))?|current_date(?:\(\))?|current_time(?:\([0-6]?\))?" + // ANSI standard date/time functions
             @"|localtime(?:\([0-6]?\))?|localtimestamp(?:\([0-6]?\))?" + // H: ANSI local date/time keywords
@@ -90,6 +92,7 @@ namespace nORM.Migration
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
                     "Only numeric literals, single-quoted ANSI/Unicode strings, boolean literals (TRUE/FALSE), NULL, " +
+                    "safe hex/binary literals, " +
                     "standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), SYSUTCDATETIME(), NEWID(), UUID(), etc.), " +
                     "and safe PostgreSQL cast suffixes on those values are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");
