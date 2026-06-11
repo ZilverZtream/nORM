@@ -108,6 +108,11 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.Relationships.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexFeatureMetadataBuilder.cs"));
 
+    private static string ReadFeatureConfigurationBuilderSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.cs"));
+
     private static string ReadDiagnosticsWriterSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs"),
@@ -654,7 +659,7 @@ public partial class ScaffoldingContractDocTests
         var doc = ReadDoc();
         var source = ReadStaticEntityScaffoldSource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
-        var featureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.cs");
+        var featureConfigurationBuilderSource = ReadFeatureConfigurationBuilderSource();
         var expressionIndexConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.cs");
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
