@@ -139,6 +139,14 @@ provider-generation smoke checks, and CLR type resolution remain separate
 responsibilities. `RepositoryHygieneTests` enforces this boundary for
 `src/dotnet-norm/ProviderMobilitySchemaInspector*.cs`.
 
+## Provider Mobility Translation Size
+
+Provider mobility translation files stay below 250 lines so public mobility
+contract models, finding classification, runtime strict checks, provider
+capability/version decisions, implementation strategy groups, and SQL probes
+remain separate responsibilities. `RepositoryHygieneTests` enforces this
+boundary for `src/nORM/Configuration/ProviderMobility*.cs`.
+
 ## Scaffolding Contract Test Sources
 
 Scaffolding contract source-reader helpers stay in
