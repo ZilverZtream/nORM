@@ -337,6 +337,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public byte[] Payload { get; set; } = Array.Empty<byte>();", entityCode, StringComparison.Ordinal);
             Assert.Contains("mb.Entity<BinaryDefaultOwned>().Property(e => e.Payload).HasDefaultValueSql(\"X'DEADBEEF'\");", contextCode, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "BinaryDefaultOwned");
+            Assert.Equal(typeof(byte[]), dynamicType.GetProperty("Payload")!.PropertyType);
+            Assert.Null(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
