@@ -11,8 +11,8 @@ namespace nORM.Tests;
 /// <summary>
 /// Pins the scaffolding scope documented in <c>docs/scaffolding.md</c> against the public
 /// surface in <c>nORM.Scaffolding.*</c>. The doc is the consumer-facing scope statement;
-/// runtime evidence lives in <c>ScaffoldingAndNavigationCoverageTests</c> and the per-provider
-/// scaffolder tests inside the CLI suite.
+/// runtime evidence lives in the focused <c>DatabaseScaffolder*</c> test files and the
+/// per-provider scaffolder tests inside the CLI suite.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public partial class ScaffoldingContractDocTests

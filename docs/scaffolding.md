@@ -660,7 +660,7 @@ must be reviewed and edited like handwritten model code.
 
 ## Evidence
 
-- `ScaffoldingAndNavigationCoverageTests` covers identifier normalization,
+- The focused `DatabaseScaffolder*` coverage files cover identifier normalization,
   duplicate generated-name handling, table filtering, overwrite protection,
   deterministic repeated output, nullable initialization, SQLite FK navigation generation, SQLite
   composite-FK navigation/model configuration generation, and SQLite
@@ -689,14 +689,14 @@ must be reviewed and edited like handwritten model code.
 - `CliIntegrationTests.Scaffold_sqlite_output_builds_as_consumer_project`
   proves `dotnet-norm scaffold` output builds in a consumer project, including
   quoted/backslash/XML-sensitive table and column identifiers.
-- `ScaffoldingAndNavigationCoverageTests` also proves opt-in routine wrapper
+- `DatabaseScaffolderContextWriterTests` proves opt-in routine wrapper
   output compiles as a consumer project, keeps the provider-bound routine
   warning/metadata contract explicit, including SQL Server first-result-set
   metadata parsing, and emits SQL Server/PostgreSQL/MySQL functions as `SELECT`
   wrappers instead of stored-procedure calls, including buffered and streaming
   table-valued function wrappers. Procedures with explicit no-result-set
   metadata emit non-query wrappers instead of fake row-materialization stubs.
-- `ScaffoldingAndNavigationCoverageTests` proves opt-in SQL Server/PostgreSQL
+- `DatabaseScaffolderContextWriterTests` proves opt-in SQL Server/PostgreSQL
   sequence wrappers generate typed next-value methods and compile in a consumer
   project. `LiveProviderScaffoldingParityTests` proves those sequence wrappers
   are discovered and emitted from live SQL Server and PostgreSQL catalogs.
@@ -706,7 +706,7 @@ must be reviewed and edited like handwritten model code.
   It also pins `ON DELETE RESTRICT` plus `ON UPDATE CASCADE` on the providers
   whose DDL accepts that shape (SQLite, PostgreSQL, and MySQL), and `SET
   DEFAULT` delete/update actions on SQLite, SQL Server, and PostgreSQL.
-- `ScaffoldingAndNavigationCoverageTests` proves opt-in query-artifact
+- `DatabaseScaffolderDiagnosticsTests` and `DatabaseScaffolderOutputFilterTests` prove opt-in query-artifact
   scaffolding converts SQLite views and SQLite virtual tables into compiling
   query artifacts while preserving missing-primary-key/shadow-table diagnostics.
 - `LiveProviderScaffoldingParityTests` proves opt-in view entity scaffolding

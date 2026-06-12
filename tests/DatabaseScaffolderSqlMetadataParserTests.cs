@@ -1,0 +1,189 @@
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using nORM.Configuration;
+using nORM.Scaffolding;
+using Xunit;
+
+namespace nORM.Tests;
+
+public partial class DatabaseScaffolderPrivateMethodTests
+{
+    [Fact]
+    public void UniqueIndexShape_DistinguishesColumnSetFromOrderedAlternateKey()
+    {
+        var indexes = new[]
+        {
+            new ScaffoldIndexInfo(
+                "Order",
+                "ExternalNo",
+                "UX_Order_ExternalNo_TenantId",
+                IsUnique: true,
+                ColumnCount: 2,
+                Ordinal: 0,
+                IsDescending: false,
+                IsIncluded: false,
+                NullSortOrder: IndexNullSortOrder.Default,
+                NullsNotDistinct: false,
+                FilterSql: null),
+            new ScaffoldIndexInfo(
+                "Order",
+                "TenantId",
+                "UX_Order_ExternalNo_TenantId",
+                IsUnique: true,
+                ColumnCount: 2,
+                Ordinal: 1,
+                IsDescending: false,
+                IsIncluded: false,
+                NullSortOrder: IndexNullSortOrder.Default,
+                NullsNotDistinct: false,
+                FilterSql: null)
+        };
+
+        Assert.True(ScaffoldForeignKeyShape.HasExactUniqueColumnSet(
+            indexes,
+            "Order",
+            new HashSet<string>(new[] { "TenantId", "ExternalNo" }, StringComparer.OrdinalIgnoreCase)));
+        Assert.False(ScaffoldForeignKeyShape.HasExactOrderedUniqueIndex(
+            indexes,
+            "Order",
+            new[] { "TenantId", "ExternalNo" }));
+        Assert.True(ScaffoldForeignKeyShape.HasExactOrderedUniqueIndex(
+            indexes,
+            "Order",
+            new[] { "ExternalNo", "TenantId" }));
+    }
+
+    [Theory]
+    [InlineData("length(Name) VIRTUAL", "length(Name)", false)]
+    [InlineData("length(Name) STORED", "length(Name)", true)]
+    [InlineData("([Total]+[Tax]) PERSISTED", "[Total]+[Tax]", true)]
+    [InlineData("GENERATED ALWAYS AS (Price * Quantity) STORED", "Price * Quantity", true)]
+    [InlineData("GENERATED ALWAYS AS (Price * Quantity) VIRTUAL", "Price * Quantity", false)]
+    [InlineData("' STORED' VIRTUAL", "' STORED'", false)]
+    [InlineData("GENERATED ALWAYS AS (' STORED') VIRTUAL", "' STORED'", false)]
+    [InlineData("CONCAT(Name, ' PERSISTED')", "CONCAT(Name, ' PERSISTED')", false)]
+    [InlineData("PERSISTED", "PERSISTED", false)]
+    public void NormalizeScaffoldComputedSql_StripsStorageTokensAndPreservesStoredFlag(
+        string raw,
+        string expectedSql,
+        bool expectedStored)
+    {
+        var (sql, stored) = InvokeNormalizeScaffoldComputedSql(raw);
+
+        Assert.Equal(expectedSql, sql);
+        Assert.Equal(expectedStored, stored);
+    }
+
+    [Theory]
+    [InlineData("(length(\"Paren)Name\") + 1)", "length(\"Paren)Name\") + 1")]
+    [InlineData("([Paren)Name] + 1) PERSISTED", "[Paren)Name] + 1")]
+    [InlineData("(length(`Paren)Name`) + 1) STORED", "length(`Paren)Name`) + 1")]
+    public void NormalizeScaffoldComputedSql_StripsOuterParenthesesAroundQuotedIdentifiers(
+        string raw,
+        string expectedSql)
+    {
+        var (sql, _) = InvokeNormalizeScaffoldComputedSql(raw);
+
+        Assert.Equal(expectedSql, sql);
+    }
+
+    [Fact]
+    public void DynamicExtractSqliteGeneratedColumns_UsesSharedQuoteAwareParser()
+    {
+        var columns = InvokeDynamicExtractSqliteGeneratedColumns("""
+            CREATE TABLE "Metrics" (
+                "Note" TEXT DEFAULT 'GENERATED ALWAYS AS (ignored) STORED',
+                "Total" INTEGER GENERATED ALWAYS AS (([Quantity] * [Price])) PERSISTED,
+                "Virtual" TEXT GENERATED ALWAYS AS ('PERSISTED') VIRTUAL
+            )
+            """);
+
+        Assert.False(columns.ContainsKey("Note"));
+        Assert.Equal("[Quantity] * [Price]", columns["Total"].Sql);
+        Assert.True(columns["Total"].Stored);
+        Assert.Equal("'PERSISTED'", columns["Virtual"].Sql);
+        Assert.False(columns["Virtual"].Stored);
+    }
+
+    [Theory]
+    [InlineData("CHECK ((length(\"Paren)Name\") > 0))", "length(\"Paren)Name\") > 0")]
+    [InlineData("CHECK (([Paren)Name] > 0))", "[Paren)Name] > 0")]
+    [InlineData("CHECK (CHECKSUM([Name]) > 0)", "CHECKSUM([Name]) > 0")]
+    [InlineData("CHECKSUM([Name]) > 0", "CHECKSUM([Name]) > 0")]
+    public void NormalizeScaffoldCheckSql_StripsOuterParenthesesAroundQuotedIdentifiers(
+        string raw,
+        string expectedSql)
+    {
+        var sql = InvokeNormalizeScaffoldCheckSql(raw);
+
+        Assert.Equal(expectedSql, sql);
+    }
+
+    [Theory]
+    [InlineData("'active'::text")]
+    [InlineData("'draft'::character varying")]
+    [InlineData("'{}'::jsonb")]
+    [InlineData("0xDEADBEEF")]
+    [InlineData("X'DEADBEEF'")]
+    [InlineData("x''")]
+    [InlineData("'\\xDEADBEEF'::bytea")]
+    [InlineData("'00000000-0000-0000-0000-000000000000'::uuid")]
+    [InlineData("42::integer")]
+    [InlineData("3.14::numeric(10, 2)")]
+    [InlineData("true::boolean")]
+    [InlineData("now()::timestamp without time zone")]
+    [InlineData("CURRENT_TIMESTAMP::timestamp with time zone")]
+    [InlineData("now() AT TIME ZONE 'utc'")]
+    [InlineData("CURRENT_TIMESTAMP(6) AT TIME ZONE 'utc'::text")]
+    [InlineData("timezone('utc'::text, now())")]
+    public void NormalizeDefaultSql_StaticAndDynamic_AcceptSafePostgresCasts(string raw)
+    {
+        var staticResult = InvokeTryNormalizeScaffoldDefaultSql(raw);
+        var dynamicResult = InvokeTryNormalizeDynamicDefaultSql(raw);
+
+        Assert.True(staticResult.Normalized);
+        Assert.Equal(raw, staticResult.Sql);
+        Assert.True(dynamicResult.Normalized);
+        Assert.Equal(raw, dynamicResult.Sql);
+    }
+
+    [Theory]
+    [InlineData("'active'::text; DROP TABLE Users")]
+    [InlineData("'active'::text -- comment")]
+    [InlineData("0::integer /* comment */")]
+    [InlineData("0xDEADBEEF; DROP TABLE Users")]
+    [InlineData("X'DEADBEEF'; DROP TABLE Users")]
+    [InlineData("X'DEADZ0'")]
+    [InlineData("X'DEA'")]
+    [InlineData("now()::timestamp without time zone; DELETE FROM Users")]
+    [InlineData("now() AT TIME ZONE current_user")]
+    [InlineData("timezone('utc', unsafe())")]
+    [InlineData("timezone('utc', now()); DROP TABLE Users")]
+    [InlineData("'active'::\"quoted\"")]
+    public void NormalizeDefaultSql_StaticAndDynamic_RejectUnsafePostgresCasts(string raw)
+    {
+        Assert.False(InvokeTryNormalizeScaffoldDefaultSql(raw).Normalized);
+        Assert.False(InvokeTryNormalizeDynamicDefaultSql(raw).Normalized);
+    }
+
+    [Theory]
+    [InlineData("IDENTITY(1000,25)", true, 1000L, 25L)]
+    [InlineData(" IDENTITY ( -5 , 2 ) NOT FOR REPLICATION", true, -5L, 2L)]
+    [InlineData("GENERATED BY DEFAULT AS IDENTITY (START WITH 1 INCREMENT BY 1)", false, 0L, 0L)]
+    [InlineData("sequence(1000,25)", false, 0L, 0L)]
+    [InlineData("IDENTITY_COMMENT(1000,25)", false, 0L, 0L)]
+    public void TryParseIdentityOptions_OnlyAcceptsSqlServerIdentityMetadata(
+        string detail,
+        bool expectedParsed,
+        long expectedSeed,
+        long expectedIncrement)
+    {
+        var (parsed, seed, increment) = InvokeTryParseIdentityOptions(detail);
+
+        Assert.Equal(expectedParsed, parsed);
+        Assert.Equal(expectedSeed, seed);
+        Assert.Equal(expectedIncrement, increment);
+    }
+}
