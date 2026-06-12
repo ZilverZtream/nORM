@@ -189,7 +189,12 @@ public partial class ScaffoldingContractDocTests
     private static string ReadFeatureConfigurationBuilderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.Checks.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.GeneratedColumns.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.Indexes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.Removal.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.Scalar.cs"));
 
     private static string ReadDiagnosticsWriterSource()
         => string.Concat(
