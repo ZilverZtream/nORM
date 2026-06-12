@@ -23,6 +23,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxDbContextPartialFileLines = 1500;
     private const int MaxSchemaSnapshotFileLines = 1500;
     private const int MaxEntityTypeBuilderFileLines = 1500;
+    private const int MaxMaterializerFactoryFileLines = 1500;
 
     [Fact]
     public void Test_project_does_not_suppress_async_warning_as_release_exception()
@@ -316,6 +317,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split EntityTypeBuilder code by configuration storage, core entity API, property builders, reference builders, and collection/many-to-many builders before it becomes a god file: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Materializer_factory_files_stay_split_by_query_pipeline_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `MaterializerFactory*.cs` file stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "MaterializerFactory*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxMaterializerFactoryFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split MaterializerFactory code by cache state, compiled guards, IL precompile, public APIs, schema-aware mapping, core materialization, constructor/projection helpers, projection-column extraction, reader emitters, conversions, and support types before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]

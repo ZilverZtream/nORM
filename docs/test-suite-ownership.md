@@ -194,3 +194,12 @@ Every `EntityTypeBuilder*.cs` file stays below 1500 lines so configuration
 storage, core entity-level API, property builders, reference builders, and
 collection/many-to-many builders remain separate model-configuration
 responsibilities. `RepositoryHygieneTests` enforces this boundary.
+
+## Materializer Factory Source Size
+
+Every `MaterializerFactory*.cs` file stays below 1500 lines so cache state,
+compiled-materializer guards, IL precompile emitters, public factory APIs,
+schema-aware mapping, core materialization, constructor/projection helpers,
+projection-column extraction, reader emitters, conversions, and support types
+remain separate query-pipeline responsibilities. `RepositoryHygieneTests`
+enforces this boundary.
