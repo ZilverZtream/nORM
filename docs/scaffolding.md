@@ -879,9 +879,10 @@ must be reviewed and edited like handwritten model code.
   Explicit `--provider <EF Core provider package>` scaffolds and EF-style
   `dbcontext scaffold <connection> <provider-package>` both run against live
   schemas with accepted EF provider package names. Mixed connection/provider
-  parser precedence is fail-fast rather than EF-ambiguous: duplicate named and
-  positional connection/provider values are rejected, while a single positional
-  provider after `--connection` is accepted as the provider value. These live gates also include the
+  parser precedence is explicit and EF-compatible: `--connection` and
+  `--provider` options take precedence over EF-style positional values when
+  both forms are supplied. A single positional provider after `--connection`
+  is accepted as the provider value. These live gates also include the
   compatibility design-time switch bundle `--no-build`,
   `--target-framework`/`--framework`, `--configuration`, `--runtime`, and
   `--msbuildprojectextensionspath`.
