@@ -315,10 +315,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("--fail-on-warnings --json", doc, StringComparison.Ordinal);
         Assert.Contains("Explicit `--provider <EF Core provider package>`", doc, StringComparison.Ordinal);
         Assert.Contains("parser precedence", doc, StringComparison.Ordinal);
-        Assert.Contains("`--connection` and `--provider` values", doc, StringComparison.Ordinal);
-        Assert.Contains("override conflicting positional", doc, StringComparison.Ordinal);
-        Assert.Contains("values, and a single positional provider", doc, StringComparison.Ordinal);
-        Assert.Contains("single positional provider after `--connection`", doc, StringComparison.Ordinal);
+        Assert.Contains("duplicate named and", doc, StringComparison.Ordinal);
+        Assert.Contains("positional connection/provider values are rejected", doc, StringComparison.Ordinal);
+        Assert.Contains("provider after `--connection`", doc, StringComparison.Ordinal);
         Assert.Contains("dbcontext scaffold <connection> <provider-package>", doc, StringComparison.Ordinal);
         Assert.Contains("compatibility design-time switch bundle", doc, StringComparison.Ordinal);
         Assert.Contains("`--no-build`, `--framework`", doc, StringComparison.Ordinal);

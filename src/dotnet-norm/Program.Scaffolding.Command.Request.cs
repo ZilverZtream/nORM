@@ -19,6 +19,12 @@ partial class Program
             connectionPosition = null;
         }
 
+        ValidateScaffoldConnectionAndProviderInputs(
+            connectionOption,
+            providerOption,
+            connectionPosition,
+            providerPosition);
+
         var connectionReference = FirstNonBlank(connectionOption, connectionPosition)
             ?? throw new NormConfigurationException("Scaffold requires a database connection string. Pass --connection <CONNECTION> or the EF-style positional <CONNECTION> argument.");
         var providerName = FirstNonBlank(providerOption, providerPosition)
