@@ -157,6 +157,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public string Payload { get; set; } = default!;", entityCode);
             Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
             Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
+            var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "ProviderTyped");
+            Assert.Equal(typeof(string), dynamicType.GetProperty("Payload")!.PropertyType);
+            Assert.Equal(typeof(Guid), dynamicType.GetProperty("ExternalUuid")!.PropertyType);
+            Assert.Equal(typeof(string), dynamicType.GetProperty("XmlPayload")!.PropertyType);
+            Assert.NotNull(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
 
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item =>
@@ -167,6 +172,50 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
                 !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean() &&
                 item.GetProperty("metadata").GetProperty("reason").GetString() == "provider-specific-column-type");
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithSafeSqliteProviderSpecificDeclaredTypes_MapsStaticAndDynamicWritableTypes()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE SafeProviderTyped (
+                Id INTEGER PRIMARY KEY,
+                Payload JSON NOT NULL,
+                ExternalUuid UUID NOT NULL,
+                XmlPayload XML NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "SafeProviderTypedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "SafeProviderTyped.cs"));
+            Assert.Contains("using System;", entityCode);
+            Assert.DoesNotContain("using nORM.Configuration;", entityCode);
+            Assert.DoesNotContain("[ReadOnlyEntity]", entityCode);
+            Assert.Contains("public string Payload { get; set; } = default!;", entityCode);
+            Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
+            Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+
+            var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "SafeProviderTyped");
+            Assert.Equal(typeof(string), dynamicType.GetProperty("Payload")!.PropertyType);
+            Assert.Equal(typeof(Guid), dynamicType.GetProperty("ExternalUuid")!.PropertyType);
+            Assert.Equal(typeof(string), dynamicType.GetProperty("XmlPayload")!.PropertyType);
+            Assert.Null(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
