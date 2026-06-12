@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 using nORM.Cli;
+using nORM.Security;
 
 partial class Program
 {
@@ -19,33 +20,7 @@ partial class Program
     /// with [REDACTED] so that passwords and secrets are not printed to stderr on error.
     /// </summary>
     static string RedactConnectionStrings(string message)
-    {
-        if (string.IsNullOrEmpty(message))
-            return message;
-
-        // Sensitive keys whose values must be redacted (case-insensitive).
-        var sensitiveKeys = new[] { "password", "pwd", "user password", "access token", "accesstoken", "token", "secret" };
-
-        // Replace patterns of the form  key=somevalue;  or  key=somevalue (end of string).
-        // Use a simple approach: for each sensitive key, replace the value portion.
-        var result = message;
-        foreach (var key in sensitiveKeys)
-        {
-            var pattern = key + "=";
-            int idx = 0;
-            while (true)
-            {
-                var pos = result.IndexOf(pattern, idx, StringComparison.OrdinalIgnoreCase);
-                if (pos < 0) break;
-                var valStart = pos + pattern.Length;
-                var valEnd = result.IndexOf(';', valStart);
-                if (valEnd < 0) valEnd = result.Length;
-                result = result.Substring(0, valStart) + "[REDACTED]" + result.Substring(valEnd);
-                idx = valStart + "[REDACTED]".Length;
-            }
-        }
-        return result;
-    }
+        => ConnectionStringRedactor.RedactMessage(message);
 
     static string ToCSharpIdentifier(string value)
     {

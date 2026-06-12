@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using nORM.Security;
 using Xunit;
 
 namespace nORM.Tests;
@@ -65,7 +66,7 @@ public class CliDesignTimeTests
     public void RedactConnectionStrings_replaces_sensitive_values(string key, string value, string expectedFragment)
     {
         var input = $"Server=localhost;{key}={value};Database=test";
-        var result = RedactConnectionStrings(input);
+        var result = ConnectionStringRedactor.RedactMessage(input);
         Assert.Contains(expectedFragment, result, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(value, result, StringComparison.Ordinal);
     }
@@ -73,17 +74,18 @@ public class CliDesignTimeTests
     [Fact]
     public void RedactConnectionStrings_does_not_touch_non_sensitive_keys()
     {
-        var input = "Server=myserver;Database=mydb;User ID=sa";
-        var result = RedactConnectionStrings(input);
+        var input = "Server=myserver;Database=mydb;Application Name=norm";
+        var result = ConnectionStringRedactor.RedactMessage(input);
         Assert.Contains("myserver", result, StringComparison.Ordinal);
         Assert.Contains("mydb", result, StringComparison.Ordinal);
+        Assert.Contains("Application Name=norm", result, StringComparison.Ordinal);
     }
 
     [Fact]
     public void RedactConnectionStrings_handles_null_and_empty()
     {
-        Assert.Equal("", RedactConnectionStrings(""));
-        Assert.Equal("no sensitive info here", RedactConnectionStrings("no sensitive info here"));
+        Assert.Equal("", ConnectionStringRedactor.RedactMessage(""));
+        Assert.Equal("no sensitive info here", ConnectionStringRedactor.RedactMessage("no sensitive info here"));
     }
 
     // ─── Missing assembly gives clear error ───────────────────────────────
@@ -170,31 +172,6 @@ public class CliDesignTimeTests
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Runtime config file", result.Stderr, StringComparison.Ordinal);
         Assert.Contains("not found", result.Stderr, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string RedactConnectionStrings(string message)
-    {
-        if (string.IsNullOrEmpty(message))
-            return message;
-
-        var sensitiveKeys = new[] { "password", "pwd", "user password", "access token", "accesstoken", "token", "secret" };
-        var result = message;
-        foreach (var key in sensitiveKeys)
-        {
-            var pattern = key + "=";
-            int idx = 0;
-            while (true)
-            {
-                var pos = result.IndexOf(pattern, idx, StringComparison.OrdinalIgnoreCase);
-                if (pos < 0) break;
-                var valStart = pos + pattern.Length;
-                var valEnd = result.IndexOf(';', valStart);
-                if (valEnd < 0) valEnd = result.Length;
-                result = result.Substring(0, valStart) + "[REDACTED]" + result.Substring(valEnd);
-                idx = valStart + "[REDACTED]".Length;
-            }
-        }
-        return result;
     }
 
     // ─── CLI invocation helpers ───────────────────────────────────────────

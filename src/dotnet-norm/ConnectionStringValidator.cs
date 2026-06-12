@@ -63,26 +63,7 @@ namespace nORM.Security
         }
 
         private static string Redact(DbConnectionStringBuilder builder)
-        {
-            var redacted = new DbConnectionStringBuilder();
-            foreach (string key in builder.Keys)
-            {
-                redacted[key] = IsSensitiveKey(key) ? "***" : builder[key];
-            }
-
-            return redacted.ConnectionString;
-        }
-
-        private static bool IsSensitiveKey(string key)
-        {
-            return key.ToLowerInvariant() switch
-            {
-                "password" or "pwd" or "user id" or "uid"
-                    or "user password" or "access token" or "accesstoken"
-                    or "token" or "secret" => true,
-                _ => false
-            };
-        }
+            => ConnectionStringRedactor.RedactBuilder(builder);
 
         private static bool IsSqlServerProvider(string provider)
         {
