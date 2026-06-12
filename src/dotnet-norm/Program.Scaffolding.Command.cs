@@ -1,11 +1,5 @@
 using System;
 using System.CommandLine;
-using System.CommandLine.Parsing;
-using System.IO;
-using System.Threading;
-using nORM.Core;
-using nORM.Scaffolding;
-using nORM.Security;
 
 partial class Program
 {
@@ -88,168 +82,42 @@ partial class Program
         scaffold.Add(emitSequenceStubsOpt);
         scaffold.Add(emitViewEntitiesOpt);
         scaffold.Add(emitQueryArtifactsOpt);
-        scaffold.SetAction(async (ParseResult result, CancellationToken cancellationToken) =>
+        var bindings = new ScaffoldCommandBindings
         {
-            var jsonOutput = result.GetValue(scaffoldJsonOpt);
-            var outputForJson = result.GetValue(outputOpt) ?? ".";
-            var dryRunForJson = result.GetValue(scaffoldDryRunOpt);
-
-            try
-            {
-                ValidateScaffoldUnmatchedTokens(result);
-                var connectionOption = GetOptionalNonBlankScaffoldOption(result, connOpt, "--connection");
-                var providerOption = GetOptionalNonBlankScaffoldOption(result, providerOpt, "--provider");
-                var connectionPosition = NullIfWhiteSpace(result.GetValue(connectionArg));
-                var providerPosition = NullIfWhiteSpace(result.GetValue(providerArg));
-                if (connectionOption is not null && providerOption is null && providerPosition is null && connectionPosition is not null)
-                {
-                    providerPosition = connectionPosition;
-                    connectionPosition = null;
-                }
-
-                var connectionReference = FirstNonBlank(connectionOption, connectionPosition)
-                    ?? throw new NormConfigurationException("Scaffold requires a database connection string. Pass --connection <CONNECTION> or the EF-style positional <CONNECTION> argument.");
-                var prov = FirstNonBlank(providerOption, providerPosition)
-                    ?? throw new NormConfigurationException("Scaffold requires a database provider. Pass --provider <PROVIDER> or the EF-style positional <PROVIDER> argument.");
-                prov = NormalizeProviderName(prov);
-                var efToolConfig = LoadEfToolConfig();
-                _ = FirstNonBlank(result.GetValue(scaffoldFrameworkOpt), efToolConfig?.Framework);
-                _ = FirstNonBlank(result.GetValue(scaffoldConfigurationOpt), efToolConfig?.Configuration);
-                _ = FirstNonBlank(result.GetValue(scaffoldRuntimeOpt), efToolConfig?.Runtime);
-                _ = result.GetValue(scaffoldVerboseOpt) || efToolConfig?.Verbose == true;
-                _ = result.GetValue(scaffoldNoColorOpt) || efToolConfig?.NoColor == true;
-                _ = result.GetValue(scaffoldPrefixOutputOpt) || efToolConfig?.PrefixOutput == true;
-                var projectInfo = ResolveScaffoldProject(FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, scaffoldProjectOpt, "--project"), efToolConfig?.Project), inferCurrentDirectory: true);
-                var startupProjectInfo = IsNamedConnectionReference(connectionReference)
-                    ? ResolveScaffoldProject(FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, scaffoldStartupProjectOpt, "--startup-project"), efToolConfig?.StartupProject))
-                    : null;
-                var scaffoldEnvironment = GetScaffoldPassThroughEnvironment();
-                var connectionString = ResolveScaffoldConnectionString(connectionReference, projectInfo, startupProjectInfo, scaffoldEnvironment);
-                var validated = ConnectionStringValidator.Validate(connectionString, prov);
-                var output = ResolveScaffoldOutputPath(GetRequiredNonBlankScaffoldOption(result, outputOpt, "--output"), projectInfo);
-                outputForJson = output;
-                var explicitNamespace = GetOptionalNonBlankScaffoldOption(result, nsOpt, "--namespace");
-                var ns = ValidateScaffoldNamespaceName(ResolveScaffoldNamespace(explicitNamespace, projectInfo, output), "--namespace");
-                var contextDirectory = GetOptionalNonBlankScaffoldOption(result, contextDirOpt, "--context-dir");
-                var contextOutputDirectory = ResolveScaffoldContextOutputDirectory(contextDirectory, projectInfo);
-                var explicitContextName = FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, ctxOpt, "--context"), efToolConfig?.Context);
-                var contextName = explicitContextName
-                    ?? InferScaffoldContextName(validated.ConnectionString, connectionReference, prov);
-                var explicitContextNamespace = GetOptionalNonBlankScaffoldOption(result, contextNamespaceOpt, "--context-namespace");
-                var (ctx, contextNamespace) = ResolveScaffoldContextNameAndNamespace(contextName, explicitContextNamespace, ns, contextDirectory, explicitNamespace, projectInfo);
-                if (explicitContextName is not null)
-                    ctx = ValidateScaffoldContextClassName(ctx);
-                if (contextNamespace is not null)
-                    contextNamespace = ValidateScaffoldNamespaceName(contextNamespace, explicitContextNamespace is null ? "context namespace" : "--context-namespace");
-                var forceOverwrite = result.GetValue(forceOpt);
-                var noOverwrite = result.GetValue(noOverwriteOpt);
-                if (forceOverwrite && noOverwrite)
-                    throw new NormConfigurationException("Use either --force or --no-overwrite for scaffold output conflicts, not both.");
-                using var connection = CreateConnection(prov, validated.ConnectionString);
-                await connection.OpenAsync();
-                var provider = CreateProvider(prov);
-                var options = new ScaffoldOptions
-                {
-                    Schemas = ParseSchemaFilters(result.GetValue(schemasOpt), result.GetValue(schemaOpt)),
-                    Tables = ParseTableFilters(result.GetValue(tablesOpt), result.GetValue(tableOpt)),
-                    PluralizeQueryProperties = !result.GetValue(noPluralizeOpt),
-                    UseDatabaseNames = result.GetValue(useDatabaseNamesOpt),
-                    UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true,
-                    ContextOutputDirectory = contextOutputDirectory,
-                    ContextNamespace = contextNamespace,
-                    OverwriteFiles = forceOverwrite,
-                    DryRun = result.GetValue(scaffoldDryRunOpt),
-                    FailOnWarnings = result.GetValue(failOnWarningsOpt),
-                    EmitRoutineStubs = result.GetValue(emitRoutineStubsOpt),
-                    EmitSequenceStubs = result.GetValue(emitSequenceStubsOpt),
-                    EmitViewEntities = result.GetValue(emitViewEntitiesOpt),
-                    EmitQueryArtifacts = result.GetValue(emitQueryArtifactsOpt)
-                };
-                string? dryRunTempOutput = null;
-                var scaffoldOutput = output;
-                var scaffoldOptions = options;
-                if (options.DryRun)
-                {
-                    dryRunTempOutput = Path.Combine(Path.GetTempPath(), "norm_scaffold_dryrun_" + Guid.NewGuid().ToString("N"));
-                    scaffoldOutput = dryRunTempOutput;
-                    scaffoldOptions = new ScaffoldOptions
-                    {
-                        Schemas = options.Schemas,
-                        Tables = options.Tables,
-                        PluralizeQueryProperties = options.PluralizeQueryProperties,
-                        UseDatabaseNames = options.UseDatabaseNames,
-                        UseNullableReferenceTypes = options.UseNullableReferenceTypes,
-                        ContextDirectory = options.ContextDirectory,
-                        ContextOutputDirectory = options.ContextOutputDirectory is null
-                            ? null
-                            : Path.Combine(dryRunTempOutput, "__context"),
-                        ContextNamespace = options.ContextNamespace,
-                        OverwriteFiles = true,
-                        DryRun = false,
-                        FailOnWarnings = options.FailOnWarnings,
-                        EmitRoutineStubs = options.EmitRoutineStubs,
-                        EmitSequenceStubs = options.EmitSequenceStubs,
-                        EmitViewEntities = options.EmitViewEntities,
-                        EmitQueryArtifacts = options.EmitQueryArtifacts
-                    };
-                }
-
-                try
-                {
-                    try
-                    {
-                        await DatabaseScaffolder.ScaffoldAsync(connection, provider, scaffoldOutput, ns, ctx, scaffoldOptions);
-                    }
-                    catch (NormConfigurationException ex) when (IsScaffoldWarningsFailure(ex, scaffoldOutput))
-                    {
-                        if (jsonOutput)
-                            WriteScaffoldResultJson("failed", output, options.DryRun, reportsWritten: !options.DryRun, ReadScaffoldWarningSummary(scaffoldOutput), ex);
-                        else
-                            PrintScaffoldWarningSummary(scaffoldOutput);
-                        return jsonOutput ? 1 : Fail(ex);
-                    }
-
-                    var warningSummary = ReadScaffoldWarningSummary(scaffoldOutput);
-                    if (jsonOutput)
-                    {
-                        WriteScaffoldResultJson("succeeded", output, options.DryRun, reportsWritten: !options.DryRun && warningSummary.TotalWarnings > 0, warningSummary);
-                    }
-                    else if (options.DryRun)
-                    {
-                        if (warningSummary.TotalWarnings > 0 || warningSummary.Error is not null)
-                            PrintScaffoldWarningSummary(scaffoldOutput);
-                        Console.WriteLine($"Scaffolding dry run completed. No files were written to {output}.");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Scaffolding completed. Files written to {output}.");
-                    }
-
-                    if (!jsonOutput && !options.DryRun && warningSummary.TotalWarnings > 0)
-                    {
-                        Console.WriteLine("Scaffolding warnings were written to nORM.ScaffoldWarnings.md and nORM.ScaffoldWarnings.json.");
-                        PrintScaffoldWarningSummary(output);
-                    }
-                }
-                finally
-                {
-                    if (dryRunTempOutput is not null)
-                        TryDeleteDirectory(dryRunTempOutput);
-                }
-
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                if (jsonOutput)
-                {
-                    WriteScaffoldResultJson("failed", outputForJson, dryRunForJson, reportsWritten: false, ScaffoldWarningSummary.Empty, ex);
-                    return 1;
-                }
-
-                return Fail(ex);
-            }
-        });
+            ConnectionArgument = connectionArg,
+            ProviderArgument = providerArg,
+            ConnectionOption = connOpt,
+            ProviderOption = providerOpt,
+            OutputOption = outputOpt,
+            NamespaceOption = nsOpt,
+            ContextOption = ctxOpt,
+            ProjectOption = scaffoldProjectOpt,
+            StartupProjectOption = scaffoldStartupProjectOpt,
+            FrameworkOption = scaffoldFrameworkOpt,
+            ConfigurationOption = scaffoldConfigurationOpt,
+            RuntimeOption = scaffoldRuntimeOpt,
+            JsonOption = scaffoldJsonOpt,
+            VerboseOption = scaffoldVerboseOpt,
+            NoColorOption = scaffoldNoColorOpt,
+            PrefixOutputOption = scaffoldPrefixOutputOpt,
+            ContextDirectoryOption = contextDirOpt,
+            ContextNamespaceOption = contextNamespaceOpt,
+            SchemasOption = schemasOpt,
+            SchemaOption = schemaOpt,
+            TablesOption = tablesOpt,
+            TableOption = tableOpt,
+            NoPluralizeOption = noPluralizeOpt,
+            UseDatabaseNamesOption = useDatabaseNamesOpt,
+            ForceOption = forceOpt,
+            NoOverwriteOption = noOverwriteOpt,
+            DryRunOption = scaffoldDryRunOpt,
+            FailOnWarningsOption = failOnWarningsOpt,
+            EmitRoutineStubsOption = emitRoutineStubsOpt,
+            EmitSequenceStubsOption = emitSequenceStubsOpt,
+            EmitViewEntitiesOption = emitViewEntitiesOpt,
+            EmitQueryArtifactsOption = emitQueryArtifactsOpt
+        };
+        scaffold.SetAction((result, cancellationToken) => RunScaffoldCommandAsync(result, bindings, cancellationToken));
         return scaffold;
     }
 }

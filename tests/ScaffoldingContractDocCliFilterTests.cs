@@ -17,6 +17,7 @@ public partial class ScaffoldingContractDocTests
         var cliSource = string.Concat(
             ReadRepoFile("src", "dotnet-norm", "Program.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Handler.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.EfToolConfig.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Project.cs"),
@@ -184,7 +185,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("providerPosition = connectionPosition;", cliSource, StringComparison.Ordinal);
         Assert.Contains("FirstNonBlank(connectionOption, connectionPosition)", cliSource, StringComparison.Ordinal);
         Assert.Contains("FirstNonBlank(providerOption, providerPosition)", cliSource, StringComparison.Ordinal);
-        Assert.Contains("NormalizeProviderName(prov)", cliSource, StringComparison.Ordinal);
+        Assert.Contains("NormalizeProviderName(providerName)", cliSource, StringComparison.Ordinal);
         Assert.Contains("\"microsoft.entityframeworkcore.sqlite\"", cliSource, StringComparison.Ordinal);
         Assert.Contains("\"npgsql.entityframeworkcore.postgresql\"", cliSource, StringComparison.Ordinal);
         Assert.Contains("\"pomelo.entityframeworkcore.mysql\"", cliSource, StringComparison.Ordinal);
@@ -198,8 +199,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("OverwriteFiles = forceOverwrite", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--context-dir\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--context-namespace\")", cliSource, StringComparison.Ordinal);
-        Assert.Contains("PluralizeQueryProperties = !result.GetValue(noPluralizeOpt)", cliSource, StringComparison.Ordinal);
-        Assert.Contains("UseDatabaseNames = result.GetValue(useDatabaseNamesOpt)", cliSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldCommandBindings", cliSource, StringComparison.Ordinal);
+        Assert.Contains("RunScaffoldCommandAsync", cliSource, StringComparison.Ordinal);
+        Assert.Contains("PluralizeQueryProperties = !result.GetValue(bindings.NoPluralizeOption)", cliSource, StringComparison.Ordinal);
+        Assert.Contains("UseDatabaseNames = result.GetValue(bindings.UseDatabaseNamesOption)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true", cliSource, StringComparison.Ordinal);
         Assert.Contains("options.UseDatabaseNames", scaffolderSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldRoutineStubWriter.AppendRoutineStubs(sb, context.RoutineStubs, queryPropertyNames, context.UseNullableReferenceTypes, context.UseDatabaseNames)", contextWriterSource, StringComparison.Ordinal);
