@@ -116,6 +116,14 @@ dependency probing, runtimeconfig probing, context creation, and project
 resolution remain separate responsibilities. `RepositoryHygieneTests` enforces
 this boundary for `src/dotnet-norm/Program.DesignTime*.cs`.
 
+## Provider Mobility Certification Source Size
+
+Provider mobility certification files stay below 200 lines so report models,
+orchestration, provider-target decisions, schema-snapshot inspection, findings,
+recommendations, and report writers remain separate responsibilities.
+`RepositoryHygieneTests` enforces this boundary for
+`src/dotnet-norm/ProviderMobilityCertification*.cs`.
+
 ## Scaffolding Contract Test Sources
 
 Scaffolding contract source-reader helpers stay in
