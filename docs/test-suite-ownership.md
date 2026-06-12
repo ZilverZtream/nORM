@@ -181,3 +181,9 @@ connection/command infrastructure, mapping/query roots, transactions,
 tenant/temporal APIs, disposal, raw SQL, prepared statements, change tracking,
 and write operations remain separate responsibilities. `RepositoryHygieneTests`
 enforces this boundary.
+
+## Schema Snapshot Source Size
+
+Every `SchemaSnapshot*.cs` file stays below 1500 lines so snapshot DTOs, model
+scanning, destructive-change diagnostics, and diffing remain separate migration
+responsibilities. `RepositoryHygieneTests` enforces this boundary.
