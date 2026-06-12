@@ -1004,6 +1004,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("<table>_chk_<n>", doc, StringComparison.Ordinal);
         Assert.Contains("CK_<Entity>_<hash>", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite autoindex", doc, StringComparison.Ordinal);
+        Assert.Contains("<table>_<columns>_key", doc, StringComparison.Ordinal);
+        Assert.Contains("first key column", doc, StringComparison.Ordinal);
+        Assert.Contains("<column>_UNIQUE", doc, StringComparison.Ordinal);
         Assert.Contains("UX_<Table>_<Columns>", doc, StringComparison.Ordinal);
         Assert.Contains("action-aware `UsingTable` overload", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server and PostgreSQL primary-key constraint names", doc, StringComparison.Ordinal);
@@ -1027,6 +1030,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("LeftOnDelete", snapshotSource, StringComparison.Ordinal);
         Assert.Contains("sqlite_autoindex_", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("kc.unique_index_id = i.index_id", indexDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("unique_constraint.conname", indexDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("FIRST_VALUE(s.column_name)", indexDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("_UNIQUE", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("GetPrimaryKeyConstraintNamesAsync", source, StringComparison.Ordinal);
         Assert.Contains("kc.is_system_named = 0", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("cls.relname || '_pkey'", keyDiscoverySource, StringComparison.Ordinal);

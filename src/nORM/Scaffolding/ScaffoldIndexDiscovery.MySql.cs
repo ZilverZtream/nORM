@@ -15,7 +15,7 @@ namespace nORM.Scaffolding
             DatabaseProvider provider,
             IReadOnlyList<ScaffoldTableInfo> tables)
         {
-            var indexes = await QueryIndexesAsync(connection, MySqlIndexSql).ConfigureAwait(false);
+            var indexes = await QueryIndexesAsync(connection, MySqlIndexSql, tables).ConfigureAwait(false);
             var expressionIndexKeys = (await ScaffoldMySqlUnsupportedFeatureDiscovery.GetExpressionIndexFeaturesAsync(connection, provider, tables).ConfigureAwait(false))
                 .Select(static feature => feature.TableKey + "\u001f" + feature.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);

@@ -18,10 +18,10 @@ namespace nORM.Scaffolding
                 return await ScaffoldSqliteIndexDiscovery.GetIndexesAsync(connection, provider, tables).ConfigureAwait(false);
 
             if (ScaffoldProviderKind.IsSqlServer(provider))
-                return await QueryIndexesAsync(connection, SqlServerIndexSql).ConfigureAwait(false);
+                return await QueryIndexesAsync(connection, SqlServerIndexSql, tables).ConfigureAwait(false);
 
             if (ScaffoldProviderKind.IsPostgres(provider))
-                return await QueryIndexesAsync(connection, PostgresIndexSql).ConfigureAwait(false);
+                return await QueryIndexesAsync(connection, PostgresIndexSql, tables).ConfigureAwait(false);
 
             if (ScaffoldProviderKind.IsMySql(provider))
                 return await GetMySqlIndexesAsync(connection, provider, tables).ConfigureAwait(false);

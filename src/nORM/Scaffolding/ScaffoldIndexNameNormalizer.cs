@@ -9,11 +9,14 @@ namespace nORM.Scaffolding
 {
     internal static class ScaffoldIndexNameNormalizer
     {
-        public static IReadOnlyList<ScaffoldIndexInfo> NormalizeSyntheticIndexNames(IReadOnlyList<ScaffoldIndexInfo> indexes)
+        public static IReadOnlyList<ScaffoldIndexInfo> NormalizeSyntheticIndexNames(
+            IReadOnlyList<ScaffoldIndexInfo> indexes,
+            IReadOnlyList<ScaffoldTableInfo>? tables = null)
         {
             if (!indexes.Any(static index => index.IsSyntheticName))
                 return indexes;
 
+            var canonicalTableKeys = BuildCanonicalTableKeyMap(tables);
             var generatedNames = indexes
                 .Where(static index => index.IsSyntheticName)
                 .GroupBy(index => index.TableKey + "\u001f" + index.IndexName, StringComparer.OrdinalIgnoreCase)
@@ -22,12 +25,15 @@ namespace nORM.Scaffolding
                     group =>
                     {
                         var first = group.First();
+                        var tableKey = canonicalTableKeys.TryGetValue(first.TableKey, out var canonicalTableKey)
+                            ? canonicalTableKey
+                            : first.TableKey;
                         var keyColumns = group
                             .Where(static index => !index.IsIncluded)
                             .OrderBy(static index => index.Ordinal)
                             .Select(static index => index.ColumnName)
                             .ToArray();
-                        return BuildGeneratedIndexName(first.TableKey, keyColumns, first.IsUnique);
+                        return BuildGeneratedIndexName(tableKey, keyColumns, first.IsUnique);
                     },
                     StringComparer.OrdinalIgnoreCase);
 
@@ -36,6 +42,21 @@ namespace nORM.Scaffolding
                     ? index with { IndexName = generatedName, IsSyntheticName = false }
                     : index)
                 .ToArray();
+        }
+
+        private static Dictionary<string, string> BuildCanonicalTableKeyMap(IReadOnlyList<ScaffoldTableInfo>? tables)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (tables is null)
+                return map;
+
+            foreach (var table in tables)
+            {
+                var tableKey = ScaffoldForeignKeyShape.TableKey(table.Schema, table.Name);
+                map.TryAdd(tableKey, tableKey);
+            }
+
+            return map;
         }
 
         private static string BuildGeneratedIndexName(string tableKey, IReadOnlyList<string> columnNames, bool isUnique)

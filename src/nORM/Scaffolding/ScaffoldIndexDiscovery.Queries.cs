@@ -10,7 +10,10 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldIndexDiscovery
     {
-        private static async Task<IReadOnlyList<ScaffoldIndexInfo>> QueryIndexesAsync(DbConnection connection, string sql)
+        private static async Task<IReadOnlyList<ScaffoldIndexInfo>> QueryIndexesAsync(
+            DbConnection connection,
+            string sql,
+            IReadOnlyList<ScaffoldTableInfo> tables)
         {
             var indexes = new List<ScaffoldIndexInfo>();
             await using var cmd = connection.CreateCommand();
@@ -48,7 +51,7 @@ namespace nORM.Scaffolding
                         && Convert.ToBoolean(reader["IsSyntheticName"], CultureInfo.InvariantCulture)));
             }
 
-            return ScaffoldIndexNameNormalizer.NormalizeSyntheticIndexNames(indexes);
+            return ScaffoldIndexNameNormalizer.NormalizeSyntheticIndexNames(indexes, tables);
         }
 
         private static IndexNullSortOrder ParseIndexNullSortOrder(string? value)

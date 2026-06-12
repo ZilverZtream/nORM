@@ -48,7 +48,7 @@ namespace nORM.Scaffolding
                 }
             }
 
-            return ScaffoldIndexNameNormalizer.NormalizeSyntheticIndexNames(indexes);
+            return ScaffoldIndexNameNormalizer.NormalizeSyntheticIndexNames(indexes, tables);
         }
 
         private static async Task AddSqliteIndexAsync(

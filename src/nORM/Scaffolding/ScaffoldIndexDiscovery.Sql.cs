@@ -42,6 +42,19 @@ namespace nORM.Scaffolding
                 CASE WHEN key.ord <= ix.indnkeyatts AND (ix.indoption[key.ord - 1] & 1) = 1 THEN 1 ELSE 0 END AS IsDescending,
                 CASE WHEN key.ord > ix.indnkeyatts THEN 1 ELSE 0 END AS IsIncluded,
                 CASE
+                    WHEN unique_constraint.conname = LEFT(
+                        tbl.relname || '_' ||
+                        (
+                            SELECT string_agg(unique_att.attname, '_' ORDER BY unique_key.ord)
+                            FROM unnest(unique_constraint.conkey) WITH ORDINALITY AS unique_key(attnum, ord)
+                            INNER JOIN pg_attribute unique_att
+                                ON unique_att.attrelid = tbl.oid
+                               AND unique_att.attnum = unique_key.attnum
+                        ) || '_key',
+                        63)
+                    THEN true ELSE false
+                END AS IsSyntheticName,
+                CASE
                     WHEN key.ord <= ix.indnkeyatts
                      AND (ix.indoption[key.ord - 1] & 1) = 0
                      AND (ix.indoption[key.ord - 1] & 2) = 2 THEN 'First'
@@ -59,6 +72,7 @@ namespace nORM.Scaffolding
             INNER JOIN pg_am am ON am.oid = idx.relam
             INNER JOIN unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ord) ON true
             INNER JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = key.attnum
+            LEFT JOIN pg_constraint unique_constraint ON unique_constraint.conindid = ix.indexrelid AND unique_constraint.contype = 'u'
             WHERE ix.indisprimary = false
               AND ix.indexprs IS NULL
               AND am.amname = 'btree'
@@ -92,7 +106,15 @@ namespace nORM.Scaffolding
                 CASE WHEN s.non_unique = 0 THEN 1 ELSE 0 END AS IsUnique,
                 COUNT(*) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name) AS ColumnCount,
                 s.seq_in_index - 1 AS Ordinal,
-                CASE WHEN UPPER(COALESCE(s.collation, 'A')) = 'D' THEN 1 ELSE 0 END AS IsDescending
+                CASE WHEN UPPER(COALESCE(s.collation, 'A')) = 'D' THEN 1 ELSE 0 END AS IsDescending,
+                CASE
+                    WHEN s.non_unique = 0
+                     AND (
+                         LOWER(s.index_name) = LOWER(FIRST_VALUE(s.column_name) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name ORDER BY s.seq_in_index))
+                         OR LOWER(s.index_name) = LOWER(CONCAT(FIRST_VALUE(s.column_name) OVER (PARTITION BY s.table_schema, s.table_name, s.index_name ORDER BY s.seq_in_index), '_UNIQUE'))
+                     )
+                    THEN 1 ELSE 0
+                END AS IsSyntheticName
             FROM information_schema.statistics s
             INNER JOIN information_schema.columns c
                 ON c.table_schema = s.table_schema

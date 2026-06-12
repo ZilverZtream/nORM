@@ -213,18 +213,11 @@ public sealed partial class LiveProviderScaffoldCliParityTests
 
             var entityCode = File.ReadAllText(Path.Combine(output, tableName + ".cs"));
             Assert.Contains("IsUnique = true", entityCode, StringComparison.Ordinal);
-            if (kind is ProviderKind.Sqlite or ProviderKind.SqlServer)
-            {
-                Assert.Contains($"[Index(\"UX_{tableName}_Code\", IsUnique = true)]", entityCode, StringComparison.Ordinal);
-            }
-            if (kind == ProviderKind.Sqlite)
-            {
-                Assert.DoesNotContain("sqlite_autoindex", entityCode, StringComparison.OrdinalIgnoreCase);
-            }
-            if (kind == ProviderKind.SqlServer)
-            {
-                Assert.DoesNotContain("UQ__", entityCode, StringComparison.Ordinal);
-            }
+            Assert.Contains($"[Index(\"UX_{tableName}_Code\", IsUnique = true)]", entityCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("sqlite_autoindex", entityCode, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("UQ__", entityCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(tableName + "_Code_key", entityCode, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("[Index(\"Code\"", entityCode, StringComparison.OrdinalIgnoreCase);
 
             WriteConsumerProject(root, output);
             RunDotNet("build -c Release --nologo", output);
