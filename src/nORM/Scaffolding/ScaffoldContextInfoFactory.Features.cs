@@ -15,7 +15,7 @@ namespace nORM.Scaffolding
         private static ScaffoldContextDefaultValueInfo[] ConvertContextDefaultValueInfos(
             IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration> defaultValues)
             => defaultValues
-                .Select(defaultValue => new ScaffoldContextDefaultValueInfo(defaultValue.EntityName, defaultValue.PropertyName, defaultValue.DefaultValueSql))
+                .Select(defaultValue => new ScaffoldContextDefaultValueInfo(defaultValue.EntityName, defaultValue.PropertyName, defaultValue.DefaultValueSql, defaultValue.ConstraintName))
                 .ToArray();
 
         private static ScaffoldContextCheckConstraintInfo[] ConvertContextCheckConstraintInfos(

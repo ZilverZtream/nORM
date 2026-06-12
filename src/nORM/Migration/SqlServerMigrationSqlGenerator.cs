@@ -131,11 +131,34 @@ namespace nORM.Migration
         private static string GetUniqueConstraintName(TableSchema table, ColumnSchema column)
             => $"UQ_{table.Name}_{column.Name}";
 
+        private static string GetDefaultConstraintName(TableSchema table, ColumnSchema column)
+            => !string.IsNullOrWhiteSpace(column.DefaultConstraintName)
+                ? column.DefaultConstraintName!
+                : $"DF_{table.Name}_{column.Name}";
+
         private static string BuildPrimaryKeyConstraintSql(TableSchema table, IReadOnlyList<ColumnSchema> pkCols)
             => $"CONSTRAINT {Esc(GetPrimaryKeyConstraintName(table, pkCols))} PRIMARY KEY ({string.Join(", ", pkCols.Select(c => Esc(c.Name)))})";
 
         private static string BuildUniqueConstraintSql(TableSchema table, ColumnSchema column)
             => $"CONSTRAINT {Esc(GetUniqueConstraintName(table, column))} UNIQUE ({Esc(column.Name)})";
+
+        private static string FormatInlineDefaultClause(TableSchema table, ColumnSchema column)
+        {
+            if (string.IsNullOrEmpty(column.DefaultValue))
+                return string.Empty;
+
+            var value = DefaultValueValidator.Validate(column.DefaultValue);
+            return !string.IsNullOrWhiteSpace(column.DefaultConstraintName)
+                ? $" CONSTRAINT {Esc(GetDefaultConstraintName(table, column))} DEFAULT ({value})"
+                : $" DEFAULT {value}";
+        }
+
+        private static string BuildAddDefaultConstraintSql(TableSchema table, ColumnSchema column)
+            => $"ALTER TABLE {EscTable(table.Name)} ADD CONSTRAINT {Esc(GetDefaultConstraintName(table, column))} DEFAULT ({DefaultValueValidator.Validate(column.DefaultValue)}) FOR {Esc(column.Name)}";
+
+        private static bool DefaultBindingChanged(ColumnSchema oldColumn, ColumnSchema newColumn)
+            => !string.Equals(oldColumn.DefaultValue, newColumn.DefaultValue, StringComparison.Ordinal)
+               || !string.Equals(oldColumn.DefaultConstraintName, newColumn.DefaultConstraintName, StringComparison.OrdinalIgnoreCase);
 
         private static void ValidateUnsupportedIdentityOperations(SchemaDiff diff)
         {
@@ -240,7 +263,7 @@ namespace nORM.Migration
                     }
 
                     var columnDefinitionChanged = ColumnDefinitionChanged(oldCol, newCol);
-                    var defaultChanged = !string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal);
+                    var defaultChanged = DefaultBindingChanged(oldCol, newCol);
                     var needsDefaultRebind = defaultChanged || (columnDefinitionChanged && oldCol.DefaultValue != null);
                     if (IsImplicitUniqueColumn(oldCol) && !IsImplicitUniqueColumn(newCol))
                         up.Add($"ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT {Esc(GetUniqueConstraintName(table, oldCol))}");
@@ -259,7 +282,7 @@ namespace nORM.Migration
                         up.Add($"ALTER TABLE {EscTable(table.Name)} ALTER COLUMN {newDef}");
                     }
                     if (needsDefaultRebind && newCol.DefaultValue != null)
-                        up.Add($"ALTER TABLE {EscTable(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{newCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(newCol.DefaultValue)}) FOR {Esc(newCol.Name)}");
+                        up.Add(BuildAddDefaultConstraintSql(table, newCol));
                     if (!IsImplicitUniqueColumn(oldCol) && IsImplicitUniqueColumn(newCol))
                         up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, newCol)}");
 
@@ -278,11 +301,8 @@ namespace nORM.Migration
                 {
                     if (IsComputedColumn(c))
                         return BuildComputedColumnDefinition(c);
-                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
-                        : "";
                     var identityPart = FormatIdentityPart(c);
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{FormatInlineDefaultClause(table, c)}";
                 }).ToList();
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
@@ -322,8 +342,8 @@ namespace nORM.Migration
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
+                var nullPart = column.IsNullable ? "NULL" : "NOT NULL";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}{FormatInlineDefaultClause(table, column)}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {colDef}");
             }
             foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
@@ -393,7 +413,7 @@ namespace nORM.Migration
                     }
 
                     var columnDefinitionChanged = ColumnDefinitionChanged(oldCol, newCol);
-                    var defaultChanged = !string.Equals(oldCol.DefaultValue, newCol.DefaultValue, StringComparison.Ordinal);
+                    var defaultChanged = DefaultBindingChanged(oldCol, newCol);
                     var needsDefaultRebind = defaultChanged || (columnDefinitionChanged && newCol.DefaultValue != null);
                     if (IsImplicitUniqueColumn(newCol) && !IsImplicitUniqueColumn(oldCol))
                         down.Add($"ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT {Esc(GetUniqueConstraintName(table, newCol))}");
@@ -410,7 +430,7 @@ namespace nORM.Migration
                         down.Add($"ALTER TABLE {EscTable(table.Name)} ALTER COLUMN {oldDef}");
                     }
                     if (needsDefaultRebind && oldCol.DefaultValue != null)
-                        down.Add($"ALTER TABLE {EscTable(table.Name)} ADD CONSTRAINT {Esc($"DF_{table.Name}_{oldCol.Name}")} DEFAULT ({DefaultValueValidator.Validate(oldCol.DefaultValue)}) FOR {Esc(oldCol.Name)}");
+                        down.Add(BuildAddDefaultConstraintSql(table, oldCol));
                     if (!IsImplicitUniqueColumn(newCol) && IsImplicitUniqueColumn(oldCol))
                         down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, oldCol)}");
 
@@ -430,10 +450,7 @@ namespace nORM.Migration
                     down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildComputedColumnDefinition(column)}");
                     continue;
                 }
-                var restoreDefault = !string.IsNullOrEmpty(column.DefaultValue)
-                    ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
-                    : "";
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{FormatInlineDefaultClause(table, column)}";
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {colDef}");
             }
             foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
@@ -454,11 +471,8 @@ namespace nORM.Migration
                 {
                     if (IsComputedColumn(c))
                         return BuildComputedColumnDefinition(c);
-                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
-                        : "";
                     var identityPart = FormatIdentityPart(c);
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)}{identityPart} {(c.IsNullable ? "NULL" : "NOT NULL")}{FormatInlineDefaultClause(table, c)}";
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)

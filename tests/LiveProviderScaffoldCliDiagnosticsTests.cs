@@ -60,7 +60,10 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode, StringComparison.Ordinal);
             Assert.Contains("NameLength { get; set; }", entityCode, StringComparison.Ordinal);
             Assert.DoesNotContain("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
-            Assert.Contains($".Entity<{tableName}>().Property(e => e.Name).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
+            if (kind == ProviderKind.SqlServer)
+                Assert.Contains($".Entity<{tableName}>().Property(e => e.Name).HasDefaultValueSql(\"'new'\", constraintName: \"{defaultName}\");", contextCode, StringComparison.Ordinal);
+            else
+                Assert.Contains($".Entity<{tableName}>().Property(e => e.Name).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
             Assert.Contains($".Entity<{tableName}>().Property(e => e.Payload).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
             if (kind == ProviderKind.Postgres)
                 Assert.Contains($".Entity<{tableName}>().Property(e => e.CreatedAt).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);

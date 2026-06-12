@@ -39,10 +39,47 @@ namespace nORM.Scaffolding
                 StringComparer.OrdinalIgnoreCase);
         }
 
+        public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildScaffoldDefaultConstraintNameMap(
+            IEnumerable<ScaffoldFeatureInput> features,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
+        {
+            var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var input in features)
+            {
+                var feature = input.Feature;
+                if (!string.Equals(feature.Kind, "Default", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(feature.Name)
+                    || !columnPropertiesByTable.TryGetValue(feature.TableKey, out var properties)
+                    || !properties.ContainsKey(feature.Name)
+                    || !ScaffoldSqlMetadataParser.TryNormalizeScaffoldDefaultSql(feature.Detail, out _)
+                    || feature.Metadata is null
+                    || !feature.Metadata.TryGetValue("defaultConstraintName", out var constraintNameValue)
+                    || constraintNameValue is not string constraintName
+                    || string.IsNullOrWhiteSpace(constraintName))
+                {
+                    continue;
+                }
+
+                if (!result.TryGetValue(feature.TableKey, out var table))
+                {
+                    table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    result[feature.TableKey] = table;
+                }
+
+                table[feature.Name] = constraintName.Trim();
+            }
+
+            return result.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyDictionary<string, string>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
         public static IReadOnlyList<ScaffoldDefaultValueConfigurationInfo> BuildDefaultValueConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultConstraintNamesByTable)
         {
             var result = new List<ScaffoldDefaultValueConfigurationInfo>();
             foreach (var (tableKey, defaults) in defaultValuesByTable)
@@ -53,8 +90,12 @@ namespace nORM.Scaffolding
 
                 foreach (var (columnName, defaultValueSql) in defaults)
                 {
+                    defaultConstraintNamesByTable.TryGetValue(tableKey, out var constraintNames);
+                    var constraintName = constraintNames is not null && constraintNames.TryGetValue(columnName, out var resolvedConstraintName)
+                        ? resolvedConstraintName
+                        : null;
                     if (properties.TryGetValue(columnName, out var propertyName))
-                        result.Add(new ScaffoldDefaultValueConfigurationInfo(tableKey, entityName, columnName, propertyName, defaultValueSql));
+                        result.Add(new ScaffoldDefaultValueConfigurationInfo(tableKey, entityName, columnName, propertyName, defaultValueSql, constraintName));
                 }
             }
 

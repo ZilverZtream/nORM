@@ -53,6 +53,12 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> DefaultValueSql { get; }
 
         /// <summary>
+        /// Gets optional provider default-constraint names configured for properties.
+        /// These names are provider DDL metadata; providers without named defaults may ignore them.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, string> DefaultValueConstraintNames { get; }
+
+        /// <summary>
         /// Gets provider identity seed/increment metadata configured for database-generated properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptions { get; }

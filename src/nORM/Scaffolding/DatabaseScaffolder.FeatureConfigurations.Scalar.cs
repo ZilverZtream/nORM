@@ -13,11 +13,13 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultConstraintNamesByTable)
             => ScaffoldFeatureConfigurationAdapter.BuildDefaultValueConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
-                defaultValuesByTable);
+                defaultValuesByTable,
+                defaultConstraintNamesByTable);
 
         private static IReadOnlyList<ScaffoldPrecisionConfiguration> BuildPrecisionConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,

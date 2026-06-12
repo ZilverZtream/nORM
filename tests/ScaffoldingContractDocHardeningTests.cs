@@ -53,6 +53,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("unmodeled complex/provider-specific defaults", cliReadme, StringComparison.Ordinal);
         Assert.Contains("Safe SQL defaults, including vetted hex/binary literals and PostgreSQL", rootReadme, StringComparison.Ordinal);
         Assert.Contains("Safe SQL defaults, including vetted hex/binary literals and PostgreSQL", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("explicit non-system default-constraint names are preserved", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("explicit non-system default-constraint names are preserved", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("HasDefaultValueSql(..., constraintName: ...)", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("HasDefaultValueSql(..., constraintName: ...)", cliReadme, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL domains over safe scalar/array/enum base types remain diagnostics", rootReadme, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL domains over safe scalar/array/enum base types remain diagnostics", cliReadme, StringComparison.Ordinal);
         Assert.Contains("SQL Server alias types over scaffoldable scalar/binary bases remain diagnostics", rootReadme, StringComparison.Ordinal);

@@ -20,6 +20,7 @@ namespace nORM.Scaffolding
             ScaffoldFeatureConfigurationBuilder.RemoveSupportedProviderSpecificColumnTypeDiagnostics(remainingFeatures, columnPropertiesByTable, generatedFeatureIndexes);
 
             var defaultValuesByTable = ScaffoldFeatureConfigurationBuilder.BuildScaffoldDefaultValueMap(remainingFeatures, columnPropertiesByTable);
+            var defaultConstraintNamesByTable = ScaffoldFeatureConfigurationBuilder.BuildScaffoldDefaultConstraintNameMap(remainingFeatures, columnPropertiesByTable);
             ScaffoldFeatureConfigurationBuilder.RemoveDefaultDiagnostics(remainingFeatures, defaultValuesByTable, generatedFeatureIndexes);
             var providerSpecificDefaultTableKeys = ScaffoldFeatureConfigurationBuilder.BuildFeatureTableKeys(remainingFeatures, "Default");
 
@@ -62,6 +63,7 @@ namespace nORM.Scaffolding
                 generatedFeatureIndexes,
                 providerSpecificColumnTypesByTable,
                 defaultValuesByTable,
+                defaultConstraintNamesByTable,
                 providerSpecificDefaultTableKeys,
                 checkConstraints,
                 expressionIndexConfigurations,

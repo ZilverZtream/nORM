@@ -24,6 +24,13 @@ public class MigrationDefaultValueDriftTests
         return table;
     }
 
+    private static TableSchema MakeTable(string tableName, string colName, string? defaultValue, string? defaultConstraintName)
+    {
+        var table = MakeTable(tableName, colName, defaultValue);
+        table.Columns[0].DefaultConstraintName = defaultConstraintName;
+        return table;
+    }
+
     private static (SchemaSnapshot old, SchemaSnapshot @new) MakeSnapshots(string? oldDefault, string? newDefault)
     {
         var oldSnap = new SchemaSnapshot();
@@ -67,6 +74,17 @@ public class MigrationDefaultValueDriftTests
     {
         var (old, @new) = MakeSnapshots("0", "42");
         var diff = SchemaDiffer.Diff(old, @new);
+        Assert.Single(diff.AlteredColumns);
+    }
+
+    [Fact]
+    public void SchemaDiff_DefaultConstraintNameChanged_ProducesAlteredColumn()
+    {
+        var oldSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", "0", "DF_Widgets_Score_Old") } };
+        var newSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", "0", "DF_Widgets_Score_New") } };
+
+        var diff = SchemaDiffer.Diff(oldSnap, newSnap);
+
         Assert.Single(diff.AlteredColumns);
     }
 
@@ -135,6 +153,44 @@ public class MigrationDefaultValueDriftTests
         var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
         Assert.Contains(sql.Up, s => s.Contains("ADD CONSTRAINT") && s.Contains("DEFAULT (0)"));
         Assert.DoesNotContain(sql.Up, s => s.Contains("ALTER COLUMN"));
+    }
+
+    [Fact]
+    public void SqlServer_DefaultValueAdded_WithConstraintName_EmitsNamedConstraint()
+    {
+        var oldSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", null, null) } };
+        var newSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", "0", "DF_Widgets_Score_Custom") } };
+
+        var diff = SchemaDiffer.Diff(oldSnap, newSnap);
+        var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.Contains("ADD CONSTRAINT [DF_Widgets_Score_Custom]") && s.Contains("DEFAULT (0)"));
+    }
+
+    [Fact]
+    public void SqlServer_DefaultConstraintNameChanged_RebindsNamedConstraint()
+    {
+        var oldSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", "0", "DF_Widgets_Score_Old") } };
+        var newSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", "0", "DF_Widgets_Score_New") } };
+
+        var diff = SchemaDiffer.Diff(oldSnap, newSnap);
+        var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.Contains("DROP CONSTRAINT") || s.Contains("IF @__df_"));
+        Assert.Contains(sql.Up, s => s.Contains("ADD CONSTRAINT [DF_Widgets_Score_New]") && s.Contains("DEFAULT (0)"));
+        Assert.Contains(sql.Down, s => s.Contains("ADD CONSTRAINT [DF_Widgets_Score_Old]") && s.Contains("DEFAULT (0)"));
+        Assert.DoesNotContain(sql.Up, s => s.Contains("ALTER COLUMN"));
+    }
+
+    [Fact]
+    public void SqlServer_AddedTable_WithNamedDefault_EmitsInlineNamedConstraint()
+    {
+        var newSnap = new SchemaSnapshot { Tables = { MakeTable("Widgets", "Score", "0", "DF_Widgets_Score_Custom") } };
+
+        var diff = SchemaDiffer.Diff(new SchemaSnapshot(), newSnap);
+        var sql = new SqlServerMigrationSqlGenerator().GenerateSql(diff);
+
+        Assert.Contains(sql.Up, s => s.Contains("CONSTRAINT [DF_Widgets_Score_Custom] DEFAULT (0)"));
     }
 
     [Fact]

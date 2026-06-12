@@ -153,6 +153,8 @@ namespace nORM.Migration
         public List<ColumnIndexSchema> Indexes { get; } = new();
         /// <summary>SQL literal default value for ADD COLUMN NOT NULL migrations (e.g. "''" or "0").</summary>
         public string? DefaultValue { get; set; }
+        /// <summary>Optional provider default-constraint name associated with <see cref="DefaultValue"/>.</summary>
+        public string? DefaultConstraintName { get; set; }
         /// <summary>Provider collation identifier applied to text comparison and ordering for this column.</summary>
         public string? Collation { get; set; }
         /// <summary>True when the column has identity/autoincrement semantics (e.g. [DatabaseGenerated(Identity)]).</summary>
@@ -478,6 +480,9 @@ namespace nORM.Migration
                         DefaultValue = columnConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
                             ? defaultValue
                             : null,
+                        DefaultConstraintName = columnConfiguration?.DefaultValueConstraintNames.TryGetValue(col.Prop, out var defaultConstraintName) == true
+                            ? defaultConstraintName
+                            : null,
                         Collation = collation,
                     };
                     ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
@@ -702,6 +707,9 @@ namespace nORM.Migration
                 IsStoredComputedColumn = computedColumn?.Stored == true,
                 DefaultValue = configuration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
                     ? defaultValue
+                    : null,
+                DefaultConstraintName = configuration?.DefaultValueConstraintNames.TryGetValue(col.Prop, out var defaultConstraintName) == true
+                    ? defaultConstraintName
                     : null,
                 Collation = collation
             };
@@ -1530,6 +1538,7 @@ namespace nORM.Migration
                         || oldCol.IsUnique != col.IsUnique
                         || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
                         || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
+                        || !string.Equals(oldCol.DefaultConstraintName, col.DefaultConstraintName, StringComparison.OrdinalIgnoreCase)
                         || !string.Equals(oldCol.Collation, col.Collation, StringComparison.OrdinalIgnoreCase)
                         || oldCol.IsIdentity != col.IsIdentity
                         || oldCol.IdentitySeed != col.IdentitySeed

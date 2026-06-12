@@ -26,6 +26,7 @@ namespace nORM.Configuration
             public string? PrimaryKeyConstraintName { get; private set; }
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
+            public Dictionary<PropertyInfo, string> DefaultValueConstraintNameValues { get; } = new();
             public Dictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptionValues { get; } = new();
             public Dictionary<PropertyInfo, int> MaxLengthValues { get; } = new();
             public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
@@ -47,6 +48,7 @@ namespace nORM.Configuration
             bool IEntityTypeConfiguration.IsReadOnly => IsReadOnly;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
+            IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueConstraintNames => DefaultValueConstraintNameValues;
             IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IEntityTypeConfiguration.IdentityOptions => IdentityOptionValues;
             IReadOnlyDictionary<PropertyInfo, int> IEntityTypeConfiguration.MaxLengths => MaxLengthValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
@@ -139,11 +141,21 @@ namespace nORM.Configuration
             /// <exception cref="ArgumentNullException">Thrown when <paramref name="prop"/> is null.</exception>
             /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is null or whitespace.</exception>
             public void SetDefaultValueSql(PropertyInfo prop, string sql)
+                => SetDefaultValueSql(prop, sql, constraintName: null);
+
+            /// <summary>
+            /// Sets SQL default metadata and an optional provider default-constraint name for the specified property.
+            /// </summary>
+            public void SetDefaultValueSql(PropertyInfo prop, string sql, string? constraintName)
             {
                 ArgumentNullException.ThrowIfNull(prop);
                 if (string.IsNullOrWhiteSpace(sql))
                     throw new ArgumentException("Default SQL cannot be null or whitespace.", nameof(sql));
                 DefaultValues[prop] = sql.Trim();
+                if (string.IsNullOrWhiteSpace(constraintName))
+                    DefaultValueConstraintNameValues.Remove(prop);
+                else
+                    DefaultValueConstraintNameValues[prop] = NormalizeConstraintName(constraintName)!;
             }
 
             /// <summary>
@@ -854,6 +866,20 @@ namespace nORM.Configuration
             public PropertyBuilder HasDefaultValueSql(string sql)
             {
                 _parent._config.SetDefaultValueSql(_property, sql);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures SQL default metadata and preserves an optional provider default-constraint name.
+            /// This does not mark the property as database-generated and does not cause nORM to omit the column from INSERT statements.
+            /// </summary>
+            /// <param name="sql">A SQL literal or no-argument function accepted by migration default validation.</param>
+            /// <param name="constraintName">Optional provider default-constraint name to preserve in migration DDL.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is null or whitespace.</exception>
+            public PropertyBuilder HasDefaultValueSql(string sql, string? constraintName)
+            {
+                _parent._config.SetDefaultValueSql(_property, sql, constraintName);
                 return this;
             }
 

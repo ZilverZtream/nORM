@@ -714,7 +714,10 @@ public partial class ScaffoldingContractDocTests
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var builderSource = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
         var configurationSource = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
+        var scalarDefaultConfigurationSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldScalarFeatureConfigurationBuilder.Defaults.cs");
+        var sqlServerMigrationSource = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
         var snapshotSource = ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs");
+        var liveCliSource = ReadLiveProviderScaffoldCliParitySource();
 
         Assert.Contains("generated output are ordered deterministically", doc, StringComparison.Ordinal);
         Assert.Contains("Relationship navigations and fluent relationship", doc, StringComparison.Ordinal);
@@ -734,6 +737,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("action-aware `UsingTable` overload", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server and PostgreSQL primary-key constraint names", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server system-generated names", doc, StringComparison.Ordinal);
+        Assert.Contains("explicit non-system default-constraint names", doc, StringComparison.Ordinal);
+        Assert.Contains("HasDefaultValueSql(..., constraintName: ...)", doc, StringComparison.Ordinal);
         Assert.Contains("ConstraintName", source, StringComparison.Ordinal);
         Assert.Contains("fk.is_system_named AS IsSyntheticConstraintName", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("dep.relname || '_'", foreignKeyDiscoverySource, StringComparison.Ordinal);
@@ -741,6 +746,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("REGEXP '^[0-9]+$'", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("foreignKey.IsSyntheticConstraintName ? null", relationshipDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("MarkSystemNamedCheckConstraintFeaturesAsync", sqlServerUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("MarkNamedDefaultConstraintFeaturesAsync", sqlServerUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("SqlServerNamedDefaultConstraintSql", sqlServerUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("dc.is_system_named = 0", sqlServerUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("defaultConstraintName", sqlServerUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("MarkDefaultNamedCheckConstraintFeaturesAsync", postgresUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("MarkDefaultNamedCheckConstraintFeaturesAsync", mySqlUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldSyntheticFeatureNameMarker", syntheticFeatureNameMarkerSource, StringComparison.Ordinal);
@@ -748,9 +757,17 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("BuildGeneratedCheckConstraintName", checkFeatureConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("NormalizeSyntheticIndexNames", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("RequiresExplicitManyToManyReferentialActions", contextWriterSource, StringComparison.Ordinal);
+        Assert.Contains("constraintName:", contextWriterSource, StringComparison.Ordinal);
+        Assert.Contains("BuildScaffoldDefaultConstraintNameMap", scalarDefaultConfigurationSource, StringComparison.Ordinal);
         Assert.Contains("LeftOnDelete", builderSource, StringComparison.Ordinal);
+        Assert.Contains("HasDefaultValueSql(string sql, string? constraintName)", builderSource, StringComparison.Ordinal);
         Assert.Contains("LeftOnDelete", configurationSource, StringComparison.Ordinal);
+        Assert.Contains("DefaultValueConstraintNames", configurationSource, StringComparison.Ordinal);
         Assert.Contains("LeftOnDelete", snapshotSource, StringComparison.Ordinal);
+        Assert.Contains("DefaultConstraintName", snapshotSource, StringComparison.Ordinal);
+        Assert.Contains("DefaultConstraintName", sqlServerMigrationSource, StringComparison.Ordinal);
+        Assert.Contains("BuildAddDefaultConstraintSql", sqlServerMigrationSource, StringComparison.Ordinal);
+        Assert.Contains("constraintName:", liveCliSource, StringComparison.Ordinal);
         Assert.Contains("sqlite_autoindex_", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("kc.unique_index_id = i.index_id", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("unique_constraint.conname", indexDiscoverySource, StringComparison.Ordinal);

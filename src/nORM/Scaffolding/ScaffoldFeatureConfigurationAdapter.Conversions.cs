@@ -38,6 +38,7 @@ namespace nORM.Scaffolding
                 generatedModelFeatureDiagnostics,
                 configurations.ProviderSpecificColumnTypesByTable,
                 configurations.DefaultValuesByTable,
+                configurations.DefaultConstraintNamesByTable,
                 configurations.ProviderSpecificDefaultTableKeys,
                 ConvertCheckConstraintConfigurations(configurations.CheckConstraints),
                 ConvertExpressionIndexConfigurations(configurations.ExpressionIndexConfigurations),
@@ -67,7 +68,7 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration> ConvertDefaultValueConfigurations(
             IReadOnlyList<ScaffoldDefaultValueConfigurationInfo> defaultValues)
             => defaultValues
-                .Select(static value => new DatabaseScaffolder.ScaffoldDefaultValueConfiguration(value.TableKey, value.EntityName, value.ColumnName, value.PropertyName, value.DefaultValueSql))
+                .Select(static value => new DatabaseScaffolder.ScaffoldDefaultValueConfiguration(value.TableKey, value.EntityName, value.ColumnName, value.PropertyName, value.DefaultValueSql, value.ConstraintName))
                 .ToArray();
 
         private static IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration> ConvertExpressionIndexConfigurations(

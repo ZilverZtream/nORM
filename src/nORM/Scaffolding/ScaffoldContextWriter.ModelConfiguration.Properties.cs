@@ -19,7 +19,10 @@ namespace nORM.Scaffolding
                 var entity = ScaffoldNameHelper.EscapeCSharpIdentifier(defaultValue.EntityName);
                 var property = ScaffoldNameHelper.EscapeCSharpIdentifier(defaultValue.PropertyName);
                 var sql = EscapeStringLiteral(defaultValue.DefaultValueSql);
-                sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasDefaultValueSql(\"{sql}\");");
+                var constraintSuffix = string.IsNullOrWhiteSpace(defaultValue.ConstraintName)
+                    ? string.Empty
+                    : $", constraintName: \"{EscapeStringLiteral(defaultValue.ConstraintName!)}\"";
+                sb.AppendLine($"            mb.Entity<{entity}>().Property(e => e.{property}).HasDefaultValueSql(\"{sql}\"{constraintSuffix});");
             }
         }
 

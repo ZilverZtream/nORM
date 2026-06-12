@@ -15,6 +15,7 @@ namespace nORM.Scaffolding
             var features = new List<ScaffoldUnsupportedFeatureInfo>();
             await AddCatalogFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             await MarkSystemNamedCheckConstraintFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
+            await MarkNamedDefaultConstraintFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             return features;
         }
 

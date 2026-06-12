@@ -44,7 +44,8 @@ namespace nORM.Scaffolding
             var defaultValueConfigurations = ScaffoldFeatureConfigurationAdapter.BuildDefaultValueConfigurations(
                 discovery.EntityByTable,
                 discovery.ColumnPropertiesByTable,
-                featureConfigurations.DefaultValuesByTable);
+                featureConfigurations.DefaultValuesByTable,
+                featureConfigurations.DefaultConstraintNamesByTable);
 
             RestoreGeneratedManyToManyUnsupportedFeatures(
                 discovery.UnsupportedFeatures,

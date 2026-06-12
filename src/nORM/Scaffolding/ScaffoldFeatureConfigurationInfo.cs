@@ -12,6 +12,7 @@ namespace nORM.Scaffolding
         IReadOnlyList<int> GeneratedFeatureIndexes,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ProviderSpecificColumnTypesByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultValuesByTable,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultConstraintNamesByTable,
         IReadOnlySet<string> ProviderSpecificDefaultTableKeys,
         IReadOnlyList<ScaffoldCheckConstraintConfigurationInfo> CheckConstraints,
         IReadOnlyList<ScaffoldExpressionIndexConfigurationInfo> ExpressionIndexConfigurations,
@@ -33,7 +34,8 @@ namespace nORM.Scaffolding
         string EntityName,
         string ColumnName,
         string PropertyName,
-        string DefaultValueSql);
+        string DefaultValueSql,
+        string? ConstraintName);
 
     internal readonly record struct ScaffoldIdentityOptionConfigurationInfo(
         string TableKey,

@@ -47,7 +47,8 @@ namespace nORM.Scaffolding
     internal readonly record struct ScaffoldContextDefaultValueInfo(
         string EntityName,
         string PropertyName,
-        string DefaultValueSql);
+        string DefaultValueSql,
+        string? ConstraintName);
 
     internal readonly record struct ScaffoldContextIdentityOptionInfo(
         string EntityName,
