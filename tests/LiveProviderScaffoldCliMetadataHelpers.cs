@@ -196,6 +196,56 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             $"CREATE TABLE {table} ({id} {idType} NOT NULL PRIMARY KEY, {amount} DECIMAL(28,6) NOT NULL, {code} {codeType} NOT NULL, {fixedCode} {fixedCodeType} NOT NULL, {token} {tokenType} NOT NULL)");
     }
 
+    private static void SetupTemporalStoreTypes(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind,
+        string tableName)
+    {
+        CleanupTemporalStoreTypes(connection, provider, kind, tableName);
+
+        var table = kind switch
+        {
+            ProviderKind.SqlServer => SqlServerQualified(provider, tableName),
+            ProviderKind.Postgres => Qualified(provider, "public", tableName),
+            _ => provider.Escape(tableName)
+        };
+        var id = provider.Escape("Id");
+        var businessDate = provider.Escape("BusinessDate");
+        var startsAt = provider.Escape("StartsAt");
+        var createdAt = provider.Escape("CreatedAt");
+        var offsetAt = provider.Escape("OffsetAt");
+        var sql = kind switch
+        {
+            ProviderKind.SqlServer =>
+                $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {businessDate} date NOT NULL, {startsAt} time NULL, {createdAt} datetime2 NOT NULL, {offsetAt} datetimeoffset NULL)",
+            ProviderKind.Postgres =>
+                $"CREATE TABLE {table} ({id} integer NOT NULL PRIMARY KEY, {businessDate} date NOT NULL, {startsAt} time without time zone NULL, {createdAt} timestamp without time zone NOT NULL, {offsetAt} timestamp with time zone NULL)",
+            ProviderKind.MySql =>
+                $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {businessDate} DATE NOT NULL, {startsAt} TIME NULL, {createdAt} DATETIME NOT NULL)",
+            ProviderKind.Sqlite =>
+                $"CREATE TABLE {table} ({id} INTEGER PRIMARY KEY, {businessDate} DATE NOT NULL, {startsAt} TIME NULL, {createdAt} DATETIME NOT NULL, {offsetAt} DATETIMEOFFSET NULL)",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
+        };
+
+        Execute(connection, sql);
+    }
+
+    private static void CleanupTemporalStoreTypes(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind,
+        string tableName)
+    {
+        var table = kind switch
+        {
+            ProviderKind.SqlServer => SqlServerQualified(provider, tableName),
+            ProviderKind.Postgres => Qualified(provider, "public", tableName),
+            _ => provider.Escape(tableName)
+        };
+        Execute(connection, $"DROP TABLE IF EXISTS {table}");
+    }
+
     private static void CleanupScalarFacets(
         DbConnection connection,
         DatabaseProvider provider,
