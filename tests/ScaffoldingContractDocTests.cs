@@ -223,6 +223,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFunctionRoutineStubWriter.Streaming.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoredProcedureRoutineStubWriter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoredProcedureOutputRoutineStubWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoredProcedureOutputRoutineStubWriter.Parameters.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoredProcedureOutputRoutineStubWriter.Scaffolded.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Postgres.cs"),
