@@ -484,4 +484,48 @@ public partial class ScaffoldingContractDocTests
         Assert.Equal("dbo.OrdersHistory", temporal["historyTable"]);
     }
 
+    [Fact]
+    public void Precision_scale_warning_uses_stable_code_and_action()
+    {
+        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
+        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
+        var indexType = scaffolder.GetNestedType("ScaffoldIndex", BindingFlags.NonPublic)!;
+        var features = Array.CreateInstance(featureType, 1);
+        features.SetValue(
+            Activator.CreateInstance(
+                featureType,
+                "dbo.Orders",
+                "PrecisionScale",
+                "Amount",
+                "decimal(provider)")!,
+            0);
+        var method = scaffolder.GetMethod("ScaffoldDiagnosticsJson", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var json = (string)method.Invoke(
+            null,
+            new object[]
+            {
+                Array.CreateInstance(foreignKeyType, 0),
+                features,
+                Array.CreateInstance(skippedObjectType, 0),
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+                Array.CreateInstance(indexType, 0),
+                new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                null!
+            })!;
+
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var diagnostic = Assert.Single(doc.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray());
+        Assert.Equal("SCF105", diagnostic.GetProperty("code").GetString());
+        Assert.Equal("schema-feature", diagnostic.GetProperty("category").GetString());
+        Assert.Equal("PrecisionScale", diagnostic.GetProperty("kind").GetString());
+        Assert.Contains("HasPrecision", diagnostic.GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
+        Assert.Equal(1, doc.RootElement.GetProperty("summary").GetProperty("codes").GetProperty("SCF105").GetInt32());
+    }
+
 }

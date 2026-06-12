@@ -18,6 +18,7 @@ namespace nORM.Scaffolding
                 "CheckConstraint" => "Use explicit HasCheckConstraint model configuration or keep the provider-specific CHECK predicate in migrations.",
                 "Collation" => "Keep collation-sensitive behavior in provider migrations and add explicit application/query tests before relying on generated code for comparisons or ordering.",
                 "ProviderSpecificColumnType" => "Keep this provider-specific type behind explicit provider migrations/converters or remodel it to a portable CLR/database shape before claiming provider mobility.",
+                "PrecisionScale" => "Parsed decimal precision/scale is emitted with HasPrecision. Review this unparsed numeric facet and add explicit model configuration or provider migration DDL before relying on generated decimal semantics.",
                 "ReferentialAction" => "Generated navigations are suppressed for this FK. Review the provider-specific referential action token and add explicit relationship configuration only after preserving its semantics.",
                 "RelationshipPrincipalKey" => "Add a primary key or exact ordered unfiltered unique index for the referenced principal columns, or configure the relationship manually before relying on generated navigations.",
                 "RelationshipDependentKey" => "Add a primary key to the dependent table before relying on generated navigations/includes, or keep the keyless type read-only and configure explicit query projections.",

@@ -21,6 +21,7 @@ namespace nORM.Scaffolding
                 "CheckConstraint" => "SCF102",
                 "Collation" => "SCF103",
                 "ProviderSpecificColumnType" => "SCF104",
+                "PrecisionScale" => "SCF105",
                 "ReferentialAction" => "SCF106",
                 "RelationshipPrincipalKey" => "SCF107",
                 "RelationshipDependentKey" => "SCF118",
