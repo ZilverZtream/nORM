@@ -37,6 +37,8 @@ public partial class ScaffoldingContractDocTests
     private static string ReadJoinTableDiagnosticSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableDiagnosticBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableDiagnosticBuilder.Composite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableDiagnosticBuilder.PossibleJoins.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableReasonBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCompositeForeignKeyMetadataBuilder.cs"),
