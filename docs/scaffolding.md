@@ -463,10 +463,10 @@ must be reviewed and edited like handwritten model code.
 - EF-style `.config/dotnet-ef.json` defaults are read for `project`,
   `startupProject`, `outputDir`/`output`, `namespace`, `context`,
   `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
-  `framework`, `configuration`, `runtime`, `verbose`, `noColor`,
-  `prefixOutput`, `noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`,
-  `dryRun`, `failOnWarnings`, `emitRoutineStubs`, `emitSequenceStubs`,
-  `emitViewEntities`, and `emitQueryArtifacts`. Relative project paths are
+  `framework`, `configuration`, `runtime`, `msbuildProjectExtensionsPath`,
+  `verbose`, `noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`,
+  `force`, `noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
+  `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`. Relative project paths are
   resolved relative to the parent directory of `.config`, comma-separated or
   array table/schema defaults are accepted, and explicit CLI options take
   precedence over configuration file values. When any CLI table/schema filter

@@ -12,6 +12,7 @@ public sealed class RepositoryHygieneTests
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
     private const int MaxProductionScaffoldingFileLines = 250;
     private const int MaxCliScaffoldingFileLines = 200;
+    private const int MaxCliDesignTimeFileLines = 200;
     private const int MaxCliIntegrationFileLines = 1500;
     private const int MaxCoreQueryTranslatorFileLines = 1500;
     private const int MaxQueryTranslatorPartialFileLines = 1500;
@@ -150,6 +151,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split CLI scaffold command code before it becomes a god object: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Cli_design_time_files_stay_split_by_loader_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("CLI design-time loading files stay below 200 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "dotnet-norm"), "Program.DesignTime*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxCliDesignTimeFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split CLI design-time loading code before it becomes a god object: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]

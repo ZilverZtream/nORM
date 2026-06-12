@@ -380,6 +380,7 @@ public partial class CliIntegrationTests
                   "framework": "net8.0",
                   "configuration": "Release",
                   "runtime": "win-x64",
+                  "msbuildProjectExtensionsPath": "obj/custom",
                   "verbose": true,
                   "noColor": true,
                   "prefixOutput": false

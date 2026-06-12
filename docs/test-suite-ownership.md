@@ -109,6 +109,13 @@ resolution, execution, output handling, and project/configuration helpers remain
 separate responsibilities. `RepositoryHygieneTests` enforces this boundary for
 `src/dotnet-norm/Program.Scaffolding*.cs`.
 
+## CLI Design-Time Source Size
+
+CLI design-time loading files stay below 200 lines so assembly loading,
+dependency probing, runtimeconfig probing, context creation, and project
+resolution remain separate responsibilities. `RepositoryHygieneTests` enforces
+this boundary for `src/dotnet-norm/Program.DesignTime*.cs`.
+
 ## Scaffolding Contract Test Sources
 
 Scaffolding contract source-reader helpers stay in

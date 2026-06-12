@@ -96,6 +96,7 @@ partial class Program
             FrameworkOption = scaffoldFrameworkOpt,
             ConfigurationOption = scaffoldConfigurationOpt,
             RuntimeOption = scaffoldRuntimeOpt,
+            MsbuildProjectExtensionsPathOption = scaffoldMsbuildProjectExtensionsPathOpt,
             JsonOption = scaffoldJsonOpt,
             VerboseOption = scaffoldVerboseOpt,
             NoColorOption = scaffoldNoColorOpt,

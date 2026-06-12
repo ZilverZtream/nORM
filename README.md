@@ -462,10 +462,10 @@ Unmatched scaffold tokens before `--` still fail fast.
 EF-style `.config/dotnet-ef.json` defaults are read for `project`,
 `startupProject`, `outputDir`/`output`, `namespace`, `context`, `contextDir`,
 `contextNamespace`, `schema`/`schemas`, `table`/`tables`, `framework`,
-`configuration`, `runtime`, `verbose`, `noColor`, `prefixOutput`,
-`noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`, `dryRun`,
-`failOnWarnings`, `emitRoutineStubs`, `emitSequenceStubs`, `emitViewEntities`,
-and `emitQueryArtifacts`; relative project paths are resolved relative to the
+`configuration`, `runtime`, `msbuildProjectExtensionsPath`, `verbose`,
+`noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`, `force`,
+`noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
+`emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`; relative project paths are resolved relative to the
 parent of `.config`, comma-separated or array table/schema defaults are
 accepted, and explicit CLI options override config values. When any CLI
 table/schema filter is supplied, config table/schema defaults are ignored so

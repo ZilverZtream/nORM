@@ -105,10 +105,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`outputDir`/`output`", doc, StringComparison.Ordinal);
         Assert.Contains("`schema`/`schemas`", doc, StringComparison.Ordinal);
         Assert.Contains("`table`/`tables`", doc, StringComparison.Ordinal);
-        Assert.Contains("`framework`, `configuration`, `runtime`", doc, StringComparison.Ordinal);
+        Assert.Contains("`framework`, `configuration`, `runtime`, `msbuildProjectExtensionsPath`", doc, StringComparison.Ordinal);
         Assert.Contains("`verbose`, `noColor`", doc, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", doc, StringComparison.Ordinal);
-        Assert.Contains("`noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`", doc, StringComparison.Ordinal);
+        Assert.Contains("`noPluralize`, `useDatabaseNames`", doc, StringComparison.Ordinal);
+        Assert.Contains("`force`, `noOverwrite`", doc, StringComparison.Ordinal);
         Assert.Contains("`dryRun`, `failOnWarnings`, `emitRoutineStubs`", doc, StringComparison.Ordinal);
         Assert.Contains("`emitSequenceStubs`", doc, StringComparison.Ordinal);
         Assert.Contains("`emitViewEntities`", doc, StringComparison.Ordinal);
@@ -142,6 +143,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Option<string?>(\"--project\", \"-p\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--startup-project\", \"-s\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--msbuildprojectextensionspath\")", cliSource, StringComparison.Ordinal);
+        Assert.Contains("MsbuildProjectExtensionsPathOption = scaffoldMsbuildProjectExtensionsPathOpt", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--no-build\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--json\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--verbose\", \"-v\")", cliSource, StringComparison.Ordinal);
@@ -172,6 +174,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ReadEfToolConfigStringList", cliSource, StringComparison.Ordinal);
         Assert.Contains("AddEfToolConfigListValue", cliSource, StringComparison.Ordinal);
         Assert.Contains("ReadEfToolConfigBool", cliSource, StringComparison.Ordinal);
+        Assert.Contains("ReadEfToolConfigString(document.RootElement, \"msbuildProjectExtensionsPath\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("must be a string or string array", cliSource, StringComparison.Ordinal);
         Assert.Contains("must be a boolean", cliSource, StringComparison.Ordinal);
         Assert.Contains("ResolveEfToolConfigPath", cliSource, StringComparison.Ordinal);
@@ -241,6 +244,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("efToolConfig?.EmitSequenceStubs", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.EmitViewEntities", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.EmitQueryArtifacts", cliSource, StringComparison.Ordinal);
+        Assert.Contains("efToolConfig?.MsbuildProjectExtensionsPath", cliSource, StringComparison.Ordinal);
         Assert.Contains("PluralizeQueryProperties = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames)", cliSource, StringComparison.Ordinal);
         Assert.Contains("DryRun = GetScaffoldBoolOptionOrConfig(result, bindings.DryRunOption, efToolConfig?.DryRun)", cliSource, StringComparison.Ordinal);
@@ -278,8 +282,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`outputDir`/`output`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`schema`/`schemas`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`table`/`tables`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`msbuildProjectExtensionsPath`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("`noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`noPluralize`, `useDatabaseNames`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`force`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`noOverwrite`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`dryRun`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`failOnWarnings`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`emitRoutineStubs`", cliReadme, StringComparison.Ordinal);
@@ -340,8 +347,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`outputDir`/`output`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`schema`/`schemas`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`table`/`tables`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("`msbuildProjectExtensionsPath`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", rootReadme, StringComparison.Ordinal);
-        Assert.Contains("`noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("`noPluralize`, `useDatabaseNames`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("`force`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("`noOverwrite`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`dryRun`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`failOnWarnings`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`emitRoutineStubs`", rootReadme, StringComparison.Ordinal);

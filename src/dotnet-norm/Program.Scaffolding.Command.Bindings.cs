@@ -17,6 +17,7 @@ partial class Program
         public required Option<string?> FrameworkOption { get; init; }
         public required Option<string?> ConfigurationOption { get; init; }
         public required Option<string?> RuntimeOption { get; init; }
+        public required Option<string?> MsbuildProjectExtensionsPathOption { get; init; }
         public required Option<bool> JsonOption { get; init; }
         public required Option<bool> VerboseOption { get; init; }
         public required Option<bool> NoColorOption { get; init; }

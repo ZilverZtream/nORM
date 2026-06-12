@@ -29,6 +29,7 @@ partial class Program
         _ = FirstNonBlank(result.GetValue(bindings.FrameworkOption), efToolConfig?.Framework);
         _ = FirstNonBlank(result.GetValue(bindings.ConfigurationOption), efToolConfig?.Configuration);
         _ = FirstNonBlank(result.GetValue(bindings.RuntimeOption), efToolConfig?.Runtime);
+        _ = FirstNonBlank(result.GetValue(bindings.MsbuildProjectExtensionsPathOption), efToolConfig?.MsbuildProjectExtensionsPath);
         _ = result.GetValue(bindings.VerboseOption) || efToolConfig?.Verbose == true;
         _ = result.GetValue(bindings.NoColorOption) || efToolConfig?.NoColor == true;
         _ = result.GetValue(bindings.PrefixOutputOption) || efToolConfig?.PrefixOutput == true;
