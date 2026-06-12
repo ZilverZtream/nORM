@@ -177,6 +177,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Contains(FeatureOwnedCheckName, contextCode, StringComparison.Ordinal);
                 Assert.Contains("HasComputedColumnSql(", contextCode, StringComparison.Ordinal);
                 Assert.Contains("HasCollation(", contextCode, StringComparison.Ordinal);
+                var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(connection, FeatureOwnedTable);
+                Assert.Null(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
 
                 if (File.Exists(warningJsonPath))
                 {
@@ -242,6 +244,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Contains("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
                 Assert.Contains("Touched { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.True(File.Exists(warningJsonPath), "Trigger diagnostics must write the scaffold warning JSON report.");
+                var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(connection, TriggerDiagnosticsTable);
+                Assert.NotNull(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
 
                 using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath));
                 var providerOwned = warningJson.RootElement
