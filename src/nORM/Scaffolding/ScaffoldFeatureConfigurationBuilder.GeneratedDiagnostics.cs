@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldFeatureConfigurationBuilder
     {
-        private static void RemoveSupportedProviderSpecificColumnTypeDiagnostics(
+        internal static void RemoveSupportedProviderSpecificColumnTypeDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             ICollection<int> generatedFeatureIndexes)
@@ -19,7 +19,7 @@ namespace nORM.Scaffolding
                 && properties.ContainsKey(input.Feature.Name));
         }
 
-        private static void RemoveDefaultDiagnostics(
+        internal static void RemoveDefaultDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable,
             ICollection<int> generatedFeatureIndexes)
@@ -28,7 +28,7 @@ namespace nORM.Scaffolding
                 && defaultValuesByTable.TryGetValue(input.Feature.TableKey, out var defaults)
                 && defaults.ContainsKey(input.Feature.Name));
 
-        private static void RemoveCheckConstraintDiagnostics(
+        internal static void RemoveCheckConstraintDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyList<ScaffoldCheckConstraintConfigurationInfo> checkConstraints,
             ICollection<int> generatedFeatureIndexes)
@@ -36,7 +36,7 @@ namespace nORM.Scaffolding
                 string.Equals(input.Feature.Kind, "CheckConstraint", StringComparison.OrdinalIgnoreCase)
                 && checkConstraints.Any(check => CheckConstraintConfigurationMatchesFeature(check, input.Feature)));
 
-        private static void RemoveGeneratedProviderValueCheckDiagnostics(
+        internal static void RemoveGeneratedProviderValueCheckDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyList<ScaffoldCheckConstraintConfigurationInfo> enumCheckConstraintConfigurations,
@@ -50,7 +50,7 @@ namespace nORM.Scaffolding
                     string.Equals(check.TableKey, input.Feature.TableKey, StringComparison.OrdinalIgnoreCase)
                     && check.Name.EndsWith("_" + propertyName + "_Enum", StringComparison.Ordinal)));
 
-        private static void RemoveExpressionIndexDiagnostics(
+        internal static void RemoveExpressionIndexDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyList<ScaffoldExpressionIndexConfigurationInfo> expressionIndexConfigurations,
             ICollection<int> generatedFeatureIndexes)
@@ -73,7 +73,7 @@ namespace nORM.Scaffolding
                     && string.Equals(index.Name, input.Feature.Name, StringComparison.OrdinalIgnoreCase)));
         }
 
-        private static void RemoveCollationDiagnostics(
+        internal static void RemoveCollationDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyList<ScaffoldCollationConfigurationInfo> collationConfigurations,
             ICollection<int> generatedFeatureIndexes)
@@ -83,7 +83,7 @@ namespace nORM.Scaffolding
                     string.Equals(collation.TableKey, input.Feature.TableKey, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(collation.ColumnName, input.Feature.Name, StringComparison.OrdinalIgnoreCase)));
 
-        private static void RemoveComputedColumnDiagnostics(
+        internal static void RemoveComputedColumnDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyList<ScaffoldComputedColumnConfigurationInfo> computedColumnConfigurations,
             ICollection<int> generatedFeatureIndexes)
@@ -93,14 +93,14 @@ namespace nORM.Scaffolding
                     string.Equals(computed.TableKey, input.Feature.TableKey, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(computed.ColumnName, input.Feature.Name, StringComparison.OrdinalIgnoreCase)));
 
-        private static void RemoveDecimalPrecisionDiagnostics(
+        internal static void RemoveDecimalPrecisionDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             ICollection<int> generatedFeatureIndexes)
             => RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedFeatureIndexes, static input =>
                 string.Equals(input.Feature.Kind, "PrecisionScale", StringComparison.OrdinalIgnoreCase)
                 && ScaffoldSqlMetadataParser.TryParseDecimalPrecision(input.Feature.Detail, out _, out _));
 
-        private static void RemoveIdentityOptionDiagnostics(
+        internal static void RemoveIdentityOptionDiagnostics(
             List<ScaffoldFeatureInput> unsupportedFeatures,
             IReadOnlyList<ScaffoldIdentityOptionConfigurationInfo> identityOptionConfigurations,
             ICollection<int> generatedFeatureIndexes)

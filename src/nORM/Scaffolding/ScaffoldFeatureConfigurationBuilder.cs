@@ -1,7 +1,5 @@
 #nullable enable
-using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace nORM.Scaffolding
 {
@@ -12,73 +10,11 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable)
-        {
-            var remainingFeatures = unsupportedFeatures.ToList();
-            var generatedFeatureIndexes = new List<int>();
-
-            var providerSpecificColumnTypesByTable = BuildFeatureDetailMap(remainingFeatures, "ProviderSpecificColumnType");
-            var enumCheckConstraintConfigurations = BuildEnumCheckConstraintConfigurations(entityByTable, columnPropertiesByTable, remainingFeatures);
-            RemoveSupportedProviderSpecificColumnTypeDiagnostics(remainingFeatures, columnPropertiesByTable, generatedFeatureIndexes);
-
-            var defaultValuesByTable = BuildScaffoldDefaultValueMap(remainingFeatures, columnPropertiesByTable);
-            RemoveDefaultDiagnostics(remainingFeatures, defaultValuesByTable, generatedFeatureIndexes);
-            var providerSpecificDefaultTableKeys = BuildFeatureTableKeys(remainingFeatures, "Default");
-
-            var checkConstraints = BuildCheckConstraintConfigurations(entityByTable, remainingFeatures)
-                .Concat(enumCheckConstraintConfigurations)
-                .ToArray();
-            RemoveCheckConstraintDiagnostics(remainingFeatures, checkConstraints, generatedFeatureIndexes);
-            RemoveGeneratedProviderValueCheckDiagnostics(remainingFeatures, columnPropertiesByTable, enumCheckConstraintConfigurations, generatedFeatureIndexes);
-
-            var expressionIndexConfigurations = BuildExpressionIndexConfigurations(entityByTable, remainingFeatures);
-            RemoveExpressionIndexDiagnostics(remainingFeatures, expressionIndexConfigurations, generatedFeatureIndexes);
-
-            var collationConfigurations = BuildCollationConfigurations(entityByTable, columnPropertiesByTable, remainingFeatures);
-            RemoveCollationDiagnostics(remainingFeatures, collationConfigurations, generatedFeatureIndexes);
-
-            var computedColumnConfigurations = BuildComputedColumnConfigurations(entityByTable, columnPropertiesByTable, remainingFeatures);
-            var computedColumnsByTable = BuildFeatureNameMap(remainingFeatures, "Computed", "RowVersion");
-            RemoveComputedColumnDiagnostics(remainingFeatures, computedColumnConfigurations, generatedFeatureIndexes);
-
-            var decimalPrecisionByTable = BuildDecimalPrecisionMap(remainingFeatures);
-            RemoveDecimalPrecisionDiagnostics(remainingFeatures, generatedFeatureIndexes);
-            var precisionConfigurations = BuildPrecisionConfigurations(entityByTable, columnPropertiesByTable, decimalPrecisionByTable);
-            var columnFacetConfigurations = BuildColumnFacetConfigurations(entityByTable, columnPropertiesByTable, stringBinaryFacetsByTable);
-
-            var rowVersionColumnsByTable = BuildFeatureNameMap(remainingFeatures, "RowVersion");
-            var providerNativeTemporalTableKeys = BuildProviderNativeTemporalTableKeys(remainingFeatures);
-            var providerOwnedTriggerTableKeys = BuildFeatureTableKeys(remainingFeatures, "Trigger");
-
-            var identityOptionConfigurations = BuildIdentityOptionConfigurations(entityByTable, columnPropertiesByTable, remainingFeatures);
-            RemoveIdentityOptionDiagnostics(remainingFeatures, identityOptionConfigurations, generatedFeatureIndexes);
-            var providerSpecificIdentityStrategyTableKeys = BuildFeatureTableKeys(remainingFeatures, "IdentityStrategy");
-            var providerOwnedWriteBlockedTableKeys = BuildProviderOwnedWriteBlockedTableKeys(
-                providerNativeTemporalTableKeys,
-                providerOwnedTriggerTableKeys,
-                providerSpecificIdentityStrategyTableKeys,
-                providerSpecificDefaultTableKeys,
-                providerSpecificColumnTypesByTable);
-
-            return new ScaffoldFeatureConfigurationsInfo(
-                generatedFeatureIndexes,
-                providerSpecificColumnTypesByTable,
-                defaultValuesByTable,
-                providerSpecificDefaultTableKeys,
-                checkConstraints,
-                expressionIndexConfigurations,
-                collationConfigurations,
-                computedColumnConfigurations,
-                computedColumnsByTable,
-                decimalPrecisionByTable,
-                precisionConfigurations,
-                columnFacetConfigurations,
-                rowVersionColumnsByTable,
-                providerNativeTemporalTableKeys,
-                providerOwnedTriggerTableKeys,
-                identityOptionConfigurations,
-                providerSpecificIdentityStrategyTableKeys,
-                providerOwnedWriteBlockedTableKeys);
-        }
+            => ScaffoldFeatureConfigurationPipeline.Build(
+                unsupportedFeatures,
+                entityByTable,
+                columnPropertiesByTable,
+                stringBinaryFacetsByTable);
 
         public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildScaffoldDefaultValueMap(
             IEnumerable<ScaffoldFeatureInput> features,
