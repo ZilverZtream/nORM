@@ -544,6 +544,10 @@ public partial class ScaffoldingContractDocTests
         Assert.DoesNotContain("non-default FK referential actions", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("ExtractCreateIndexWhereClause(feature.Detail)", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("IsCreateIndexUnique(feature.Detail)", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("ExtractCreateIndexIncludedColumnNames", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("TryApplyProviderSpecificExpressionIndexFacets", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("providerSpecificIndexes", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("includedColumnIndexes", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("FindCreateIndexKeyListOpen", source, StringComparison.Ordinal);
         Assert.Contains("FindSqlKeywordOutsideQuotes", source, StringComparison.Ordinal);
         Assert.Contains("GetSqliteIndexFilterSqlAsync(connection, provider, table.Schema, name)", indexDiscoverySource, StringComparison.Ordinal);
@@ -567,15 +571,15 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Mixed functional indexes are not partially emitted", doc, StringComparison.Ordinal);
         Assert.Contains("ordinary PostgreSQL B-tree expression indexes", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL expression indexes exposed by `SHOW INDEX`", doc, StringComparison.Ordinal);
-        Assert.Contains("provider-specific access methods or non-default B-tree key options", doc, StringComparison.Ordinal);
+        Assert.Contains("provider-specific access methods, non-default operator classes, or index collations", doc, StringComparison.Ordinal);
         Assert.Contains("`NULLS NOT DISTINCT` unique column indexes are preserved", doc, StringComparison.Ordinal);
-        Assert.Contains("Expression indexes with included columns or `NULLS NOT DISTINCT` uniqueness also", doc, StringComparison.Ordinal);
-        Assert.Contains("including descending expression keys and filtered/partial predicates", doc, StringComparison.Ordinal);
-        Assert.Contains("`NULLS NOT DISTINCT` uniqueness also", doc, StringComparison.Ordinal);
-        Assert.Contains("unrepresentableExpressionIndexes", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL B-tree expression indexes with DDL-exposed", doc, StringComparison.Ordinal);
+        Assert.Contains("including descending expression keys, filtered/partial predicates", doc, StringComparison.Ordinal);
+        Assert.Contains("`NULLS NOT DISTINCT` uniqueness are emitted with expanded", doc, StringComparison.Ordinal);
+        Assert.Contains("includedColumnNames", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("pg_get_indexdef(ix.indexrelid)::text", postgresUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("provider-specific B-tree operator classes/collations", doc, StringComparison.Ordinal);
-        Assert.Contains("expression indexes with non-default B-tree key options", doc, StringComparison.Ordinal);
+        Assert.Contains("expression indexes with non-default operator classes or index collations", doc, StringComparison.Ordinal);
         Assert.Contains("LEFT JOIN pg_attribute option_att", postgresUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("option_att.attnum IS NOT NULL", postgresUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("option_opclass.opcdefault = false", postgresUnsupportedSource, StringComparison.Ordinal);
@@ -583,7 +587,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL B-tree indexes with non-default", doc, StringComparison.Ordinal);
         Assert.Contains("with non-default `NULLS FIRST/LAST` ordering", doc, StringComparison.Ordinal);
         Assert.Contains("indnullsnotdistinct", postgresUnsupportedSource, StringComparison.Ordinal);
-        Assert.Contains("PostgreSQL expression-index `NULLS NOT DISTINCT` uniqueness remain provider-owned diagnostics", doc, StringComparison.Ordinal);
+        Assert.Contains("representable PostgreSQL B-tree expression-index null ordering and `NULLS NOT DISTINCT` uniqueness are emitted through `HasExpressionIndex`", doc, StringComparison.Ordinal);
         Assert.Contains("hasNullsNotDistinct", postgresUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("NullsNotDistinct", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("IndexNullSortOrder", indexDiscoverySource, StringComparison.Ordinal);
@@ -592,7 +596,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("hasNonDefaultOperatorClass", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("hasIndexCollation", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("hasNonDefaultNullOrdering", unsupportedMetadataSource, StringComparison.Ordinal);
-        Assert.Contains("unrepresentableExpressionIndexes.Contains", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("unrepresentableExpressionIndexes", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
     }
 
     [Fact]

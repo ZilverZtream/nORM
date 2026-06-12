@@ -290,8 +290,9 @@ SQL Server `IDENTITY(seed, increment)` metadata is emitted with
 DDL.
 SQLite expression indexes, ordinary PostgreSQL B-tree expression indexes, and
 MySQL expression indexes exposed by `SHOW INDEX` are emitted with
-`HasExpressionIndex`; SQL Server expression-index shapes stay on the safer
-generated-column path.
+`HasExpressionIndex`, including representable PostgreSQL expression-index
+`INCLUDE` and null-semantics metadata; SQL Server expression-index shapes stay
+on the safer generated-column path.
 Opt-in routine stubs include SQL Server scalar/table-valued functions plus
 PostgreSQL and MySQL functions as provider-bound `SELECT` wrappers instead of
 stored-procedure calls. Stored-procedure stubs include buffered and streaming

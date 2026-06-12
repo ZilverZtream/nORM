@@ -261,13 +261,61 @@ namespace nORM.Configuration
             /// Adds a provider-specific index over a SQL expression.
             /// </summary>
             public void AddExpressionIndex(string name, string expressionSql, bool isUnique, string? filterSql)
+                => AddExpressionIndex(
+                    name,
+                    expressionSql,
+                    isUnique,
+                    filterSql,
+                    includedColumnNames: null,
+                    nullsNotDistinct: false,
+                    nullSortOrder: IndexNullSortOrder.Default);
+
+            /// <summary>
+            /// Adds a provider-specific index over a SQL expression.
+            /// </summary>
+            public void AddExpressionIndex(
+                string name,
+                string expressionSql,
+                bool isUnique,
+                string? filterSql,
+                IReadOnlyList<string>? includedColumnNames,
+                bool nullsNotDistinct,
+                IndexNullSortOrder nullSortOrder)
             {
                 if (string.IsNullOrWhiteSpace(name))
                     throw new ArgumentException("Expression index name cannot be null or whitespace.", nameof(name));
                 if (string.IsNullOrWhiteSpace(expressionSql))
                     throw new ArgumentException("Expression index SQL cannot be null or whitespace.", nameof(expressionSql));
+                if (!Enum.IsDefined(nullSortOrder))
+                    throw new ArgumentOutOfRangeException(nameof(nullSortOrder), $"Unsupported null sort order '{nullSortOrder}'.");
+
+                var included = NormalizeExpressionIndexIncludedColumns(includedColumnNames);
                 ExpressionIndexList.RemoveAll(i => string.Equals(i.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
-                ExpressionIndexList.Add(new ExpressionIndexConfiguration(name.Trim(), expressionSql.Trim(), isUnique, string.IsNullOrWhiteSpace(filterSql) ? null : filterSql.Trim()));
+                ExpressionIndexList.Add(new ExpressionIndexConfiguration(name.Trim(), expressionSql.Trim(), isUnique, string.IsNullOrWhiteSpace(filterSql) ? null : filterSql.Trim())
+                {
+                    IncludedColumnNames = included,
+                    NullsNotDistinct = nullsNotDistinct,
+                    NullSortOrder = nullSortOrder
+                });
+            }
+
+            private static string[] NormalizeExpressionIndexIncludedColumns(IReadOnlyList<string>? includedColumnNames)
+            {
+                if (includedColumnNames is null || includedColumnNames.Count == 0)
+                    return Array.Empty<string>();
+
+                var normalized = includedColumnNames
+                    .Select(static column =>
+                    {
+                        if (string.IsNullOrWhiteSpace(column))
+                            throw new ArgumentException("Expression index included column names cannot be null or whitespace.", nameof(includedColumnNames));
+                        return column.Trim();
+                    })
+                    .ToArray();
+                if (normalized.Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalized.Length)
+                    throw new ArgumentException("Expression index included column names must be unique.", nameof(includedColumnNames));
+
+                return normalized;
             }
 
             /// <summary>
@@ -501,6 +549,29 @@ namespace nORM.Configuration
         public EntityTypeBuilder<TEntity> HasExpressionIndex(string name, string expressionSql, bool isUnique = false, string? filterSql = null)
         {
             _config.AddExpressionIndex(name, expressionSql, isUnique, filterSql);
+            return this;
+        }
+
+        /// <summary>
+        /// Configures a provider-specific expression index with optional covering columns and PostgreSQL null semantics.
+        /// </summary>
+        /// <param name="name">Database index name.</param>
+        /// <param name="expressionSql">Provider SQL expression used as the index key.</param>
+        /// <param name="isUnique">Whether the index enforces uniqueness.</param>
+        /// <param name="filterSql">Optional provider SQL predicate for a filtered/partial expression index.</param>
+        /// <param name="includedColumnNames">Provider column names included as non-key covering columns where supported.</param>
+        /// <param name="nullsNotDistinct">Whether a unique PostgreSQL index treats null values as equal.</param>
+        /// <param name="nullSortOrder">Explicit provider null ordering for the expression key.</param>
+        public EntityTypeBuilder<TEntity> HasExpressionIndex(
+            string name,
+            string expressionSql,
+            bool isUnique,
+            string? filterSql,
+            IReadOnlyList<string>? includedColumnNames,
+            bool nullsNotDistinct = false,
+            IndexNullSortOrder nullSortOrder = IndexNullSortOrder.Default)
+        {
+            _config.AddExpressionIndex(name, expressionSql, isUnique, filterSql, includedColumnNames, nullsNotDistinct, nullSortOrder);
             return this;
         }
 

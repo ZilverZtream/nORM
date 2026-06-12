@@ -174,7 +174,17 @@ namespace nORM.Configuration
     /// <summary>
     /// Describes a provider-specific index over a SQL expression rather than a mapped property.
     /// </summary>
-    public record ExpressionIndexConfiguration(string Name, string ExpressionSql, bool IsUnique = false, string? FilterSql = null);
+    public record ExpressionIndexConfiguration(string Name, string ExpressionSql, bool IsUnique = false, string? FilterSql = null)
+    {
+        /// <summary>Provider column names included as non-key covering columns where supported.</summary>
+        public string[] IncludedColumnNames { get; init; } = Array.Empty<string>();
+
+        /// <summary>Explicit provider null ordering for the expression key.</summary>
+        public IndexNullSortOrder NullSortOrder { get; init; } = IndexNullSortOrder.Default;
+
+        /// <summary>True when a unique PostgreSQL expression index treats null values as equal.</summary>
+        public bool NullsNotDistinct { get; init; }
+    }
 
     /// <summary>
     /// Configuration details for a relationship between entities including navigation and key information.

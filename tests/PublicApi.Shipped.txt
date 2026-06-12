@@ -182,6 +182,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.CollectionNavigationBuilder{`1}.WithM
 M:nORM.Configuration.EntityTypeBuilder{`0}.CollectionNavigationBuilder{`1}.WithOne(System.Linq.Expressions.Expression{System.Func{`1,`0}}):nORM.Configuration.EntityTypeBuilder{`0}.CollectionNavigationBuilder{`1}.ReferenceCollectionBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasCheckConstraint(System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasExpressionIndex(System.String,System.String,System.Boolean,System.String):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.HasExpressionIndex(System.String,System.String,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,nORM.Configuration.IndexNullSortOrder):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0}.CollectionNavigationBuilder{`0}
@@ -1090,8 +1091,11 @@ P:nORM.Configuration.DbContextOptions.UsePreciseChangeTracking:System.Boolean
 P:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.Builder:nORM.Configuration.EntityTypeBuilder{`0}
 P:nORM.Configuration.ExpressionIndexConfiguration.ExpressionSql:System.String
 P:nORM.Configuration.ExpressionIndexConfiguration.FilterSql:System.String
+P:nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames:System.String[]
 P:nORM.Configuration.ExpressionIndexConfiguration.IsUnique:System.Boolean
 P:nORM.Configuration.ExpressionIndexConfiguration.Name:System.String
+P:nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder:nORM.Configuration.IndexNullSortOrder
+P:nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct:System.Boolean
 P:nORM.Configuration.IEntityTypeConfiguration.CheckConstraints:System.Collections.Generic.IReadOnlyList{nORM.Configuration.CheckConstraintConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.Collations:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
@@ -1378,8 +1382,11 @@ P:nORM.Migration.ColumnSchema.PreviousName:System.String
 P:nORM.Migration.ColumnSchema.Scale:System.Nullable{System.Int32}
 P:nORM.Migration.ExpressionIndexSchema.ExpressionSql:System.String
 P:nORM.Migration.ExpressionIndexSchema.FilterSql:System.String
+P:nORM.Migration.ExpressionIndexSchema.IncludedColumnNames:System.String[]
 P:nORM.Migration.ExpressionIndexSchema.IsUnique:System.Boolean
 P:nORM.Migration.ExpressionIndexSchema.Name:System.String
+P:nORM.Migration.ExpressionIndexSchema.NullSortOrder:nORM.Configuration.IndexNullSortOrder
+P:nORM.Migration.ExpressionIndexSchema.NullsNotDistinct:System.Boolean
 P:nORM.Migration.ForeignKeySchema.ConstraintName:System.String
 P:nORM.Migration.ForeignKeySchema.DependentColumns:System.String[]
 P:nORM.Migration.ForeignKeySchema.OnDelete:System.String

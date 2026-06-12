@@ -591,6 +591,9 @@ namespace nORM.Migration
 
         private static string BuildExpressionIndexSql(TableSchema table, ExpressionIndexSchema expressionIndex)
         {
+            EnsureNoIncludedColumns(expressionIndex.IncludedColumnNames ?? Array.Empty<string>(), expressionIndex.Name);
+            EnsureNoNullsNotDistinct(expressionIndex.NullsNotDistinct, expressionIndex.Name);
+            EnsureNoNullSortOrders(new[] { expressionIndex.NullSortOrder }, expressionIndex.Name);
             EnsureNoFilter(expressionIndex.FilterSql, expressionIndex.Name);
             var unique = expressionIndex.IsUnique ? "UNIQUE " : string.Empty;
             return $"CREATE {unique}INDEX {Esc(expressionIndex.Name)} ON {EscTable(table.Name)} ({expressionIndex.ExpressionSql.Trim()})";

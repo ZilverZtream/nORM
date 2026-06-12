@@ -288,7 +288,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_reports_postgres_expression_index_with_include_as_provider_owned()
+    public async Task ScaffoldAsync_emits_postgres_expression_index_with_include_metadata()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
         if (Skip.If(live is null, "Live provider PostgreSQL not configured")) return;
@@ -310,17 +310,13 @@ public sealed partial class LiveProviderScaffoldingParityTests
 
                 var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderIndexTable + ".cs"));
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresExpressionIncludeContext.cs"));
-                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
-                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
 
                 Assert.DoesNotContain(ProviderExpressionIncludedIndex, entityCode, StringComparison.Ordinal);
-                Assert.DoesNotContain($"HasExpressionIndex(\"{ProviderExpressionIncludedIndex}\"", contextCode, StringComparison.Ordinal);
-                Assert.Contains(providerOwned, item =>
-                    item.GetProperty("kind").GetString() == "ExpressionIndex" &&
-                    item.GetProperty("name").GetString() == ProviderExpressionIncludedIndex);
-                Assert.Contains(providerOwned, item =>
-                    item.GetProperty("kind").GetString() == "IncludedColumnIndex" &&
-                    item.GetProperty("name").GetString() == ProviderExpressionIncludedIndex);
+                Assert.Contains($"HasExpressionIndex(\"{ProviderExpressionIncludedIndex}\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains("includedColumnNames:", contextCode, StringComparison.Ordinal);
+                Assert.Contains(provider.Escape("Score"), contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(warningJsonPath), "Supported PostgreSQL expression INCLUDE indexes should scaffold as expression-index metadata.");
             }
             finally
             {

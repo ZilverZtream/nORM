@@ -67,6 +67,12 @@ namespace nORM.Migration
         public bool IsUnique { get; set; }
         /// <summary>Optional provider SQL predicate for a filtered/partial expression index.</summary>
         public string? FilterSql { get; set; }
+        /// <summary>Provider column names included as non-key covering columns where supported.</summary>
+        public string[] IncludedColumnNames { get; set; } = Array.Empty<string>();
+        /// <summary>Explicit provider null ordering for the expression key.</summary>
+        public IndexNullSortOrder NullSortOrder { get; set; }
+        /// <summary>True when a unique PostgreSQL expression index treats null values as equal.</summary>
+        public bool NullsNotDistinct { get; set; }
     }
 
     /// <summary>
@@ -737,7 +743,10 @@ namespace nORM.Migration
                     Name = expressionIndex.Name,
                     ExpressionSql = expressionIndex.ExpressionSql,
                     IsUnique = expressionIndex.IsUnique,
-                    FilterSql = expressionIndex.FilterSql
+                    FilterSql = expressionIndex.FilterSql,
+                    IncludedColumnNames = expressionIndex.IncludedColumnNames,
+                    NullSortOrder = expressionIndex.NullSortOrder,
+                    NullsNotDistinct = expressionIndex.NullsNotDistinct
                 });
             }
         }
@@ -1691,6 +1700,14 @@ namespace nORM.Migration
                 throw new ArgumentException($"Expression index on table '{owningTableName}' has no Name.");
             if (string.IsNullOrWhiteSpace(expressionIndex.ExpressionSql))
                 throw new ArgumentException($"Expression index '{expressionIndex.Name}' on table '{owningTableName}' has no SQL expression.");
+            if (expressionIndex.IncludedColumnNames is null)
+                throw new ArgumentException($"Expression index '{expressionIndex.Name}' on table '{owningTableName}' has null IncludedColumnNames.");
+            if (expressionIndex.IncludedColumnNames.Any(string.IsNullOrWhiteSpace))
+                throw new ArgumentException($"Expression index '{expressionIndex.Name}' on table '{owningTableName}' has a null or whitespace included column name.");
+            if (expressionIndex.IncludedColumnNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != expressionIndex.IncludedColumnNames.Length)
+                throw new ArgumentException($"Expression index '{expressionIndex.Name}' on table '{owningTableName}' has duplicate included column names.");
+            if (!Enum.IsDefined(expressionIndex.NullSortOrder))
+                throw new ArgumentOutOfRangeException(nameof(expressionIndex.NullSortOrder), $"Unsupported null sort order '{expressionIndex.NullSortOrder}' in expression index '{expressionIndex.Name}'.");
         }
 
         /// <summary>
@@ -1741,6 +1758,9 @@ namespace nORM.Migration
 
         private static bool ExpressionIndexEqual(ExpressionIndexSchema a, ExpressionIndexSchema b) =>
             a.IsUnique == b.IsUnique
+            && a.NullsNotDistinct == b.NullsNotDistinct
+            && a.NullSortOrder == b.NullSortOrder
+            && a.IncludedColumnNames.SequenceEqual(b.IncludedColumnNames, StringComparer.OrdinalIgnoreCase)
             && string.Equals(NormalizeCheckSql(a.ExpressionSql), NormalizeCheckSql(b.ExpressionSql), StringComparison.OrdinalIgnoreCase)
             && string.Equals(NormalizeCheckSql(a.FilterSql ?? string.Empty), NormalizeCheckSql(b.FilterSql ?? string.Empty), StringComparison.OrdinalIgnoreCase);
 

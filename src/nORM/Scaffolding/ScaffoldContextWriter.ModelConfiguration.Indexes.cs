@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using nORM.Configuration;
 using static nORM.Scaffolding.ScaffoldCodeText;
 
 namespace nORM.Scaffolding
@@ -20,8 +21,27 @@ namespace nORM.Scaffolding
                 var expressionSql = EscapeStringLiteral(expressionIndex.ExpressionSql);
                 var uniqueSuffix = expressionIndex.IsUnique ? ", isUnique: true" : string.Empty;
                 var filterSuffix = string.IsNullOrWhiteSpace(expressionIndex.FilterSql) ? string.Empty : $", filterSql: \"{EscapeStringLiteral(expressionIndex.FilterSql)}\"";
-                sb.AppendLine($"            mb.Entity<{entity}>().HasExpressionIndex(\"{name}\", \"{expressionSql}\"{uniqueSuffix}{filterSuffix});");
+                var includedColumnNames = expressionIndex.IncludedColumnNames ?? Array.Empty<string>();
+                if (includedColumnNames.Length == 0
+                    && expressionIndex.NullSortOrder == IndexNullSortOrder.Default
+                    && !expressionIndex.NullsNotDistinct)
+                {
+                    sb.AppendLine($"            mb.Entity<{entity}>().HasExpressionIndex(\"{name}\", \"{expressionSql}\"{uniqueSuffix}{filterSuffix});");
+                    continue;
+                }
+
+                var filterArg = string.IsNullOrWhiteSpace(expressionIndex.FilterSql)
+                    ? "null"
+                    : $"\"{EscapeStringLiteral(expressionIndex.FilterSql)}\"";
+                var nullsNotDistinctSuffix = expressionIndex.NullsNotDistinct ? ", nullsNotDistinct: true" : string.Empty;
+                var nullSortOrderSuffix = expressionIndex.NullSortOrder == IndexNullSortOrder.Default ? string.Empty : $", nullSortOrder: IndexNullSortOrder.{expressionIndex.NullSortOrder}";
+                sb.AppendLine($"            mb.Entity<{entity}>().HasExpressionIndex(\"{name}\", \"{expressionSql}\", isUnique: {expressionIndex.IsUnique.ToString().ToLowerInvariant()}, filterSql: {filterArg}, includedColumnNames: {FormatIncludedColumnNamesArgument(includedColumnNames)}{nullsNotDistinctSuffix}{nullSortOrderSuffix});");
             }
         }
+
+        private static string FormatIncludedColumnNamesArgument(IReadOnlyList<string> includedColumnNames)
+            => includedColumnNames.Count == 0
+                ? "new string[] { }"
+                : "new[] { " + string.Join(", ", includedColumnNames.Select(column => $"\"{EscapeStringLiteral(column)}\"")) + " }";
     }
 }

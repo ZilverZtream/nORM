@@ -650,6 +650,15 @@ namespace nORM.Migration
             };
         }
 
+        private static string FormatNullSortOrder(IndexNullSortOrder nullSortOrder, string indexName)
+            => nullSortOrder switch
+            {
+                IndexNullSortOrder.Default => string.Empty,
+                IndexNullSortOrder.First => " NULLS FIRST",
+                IndexNullSortOrder.Last => " NULLS LAST",
+                _ => throw new ArgumentOutOfRangeException(nameof(nullSortOrder), $"Unsupported null sort order '{nullSortOrder}' in expression index '{indexName}'.")
+            };
+
         private static string FormatIncludedColumns(string[] includedColumnNames)
             => includedColumnNames.Length == 0
                 ? string.Empty
@@ -670,7 +679,7 @@ namespace nORM.Migration
         private static string BuildExpressionIndexSql(TableSchema table, ExpressionIndexSchema expressionIndex)
         {
             var unique = expressionIndex.IsUnique ? "UNIQUE " : string.Empty;
-            return $"CREATE {unique}INDEX {EscIndexName(table.Name, expressionIndex.Name)} ON {EscTable(table.Name)} ({expressionIndex.ExpressionSql.Trim()}){FormatFilter(expressionIndex.FilterSql)}";
+            return $"CREATE {unique}INDEX {EscIndexName(table.Name, expressionIndex.Name)} ON {EscTable(table.Name)} ({expressionIndex.ExpressionSql.Trim()}{FormatNullSortOrder(expressionIndex.NullSortOrder, expressionIndex.Name)}){FormatIncludedColumns(expressionIndex.IncludedColumnNames ?? Array.Empty<string>())}{FormatNullsNotDistinct(expressionIndex.NullsNotDistinct, expressionIndex.IsUnique, expressionIndex.Name)}{FormatFilter(expressionIndex.FilterSql)}";
         }
 
         /// <summary>

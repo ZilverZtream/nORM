@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Linq;
 
 namespace nORM.Scaffolding
 {
@@ -56,6 +57,44 @@ namespace nORM.Scaffolding
             return createIndexSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
         }
 
+        public static string[] ExtractCreateIndexIncludedColumnNames(string? createIndexSql)
+        {
+            if (string.IsNullOrWhiteSpace(createIndexSql))
+                return Array.Empty<string>();
+
+            var onIndex = createIndexSql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
+            if (onIndex < 0)
+                return Array.Empty<string>();
+
+            var openIndex = FindCreateIndexKeyListOpen(createIndexSql, onIndex);
+            if (openIndex < 0)
+                return Array.Empty<string>();
+
+            var closeIndex = ScaffoldSqliteDdlParser.FindMatchingParenthesis(createIndexSql, openIndex);
+            if (closeIndex <= openIndex)
+                return Array.Empty<string>();
+
+            var includeIndex = FindSqlKeywordOutsideQuotes(createIndexSql, "INCLUDE", closeIndex + 1);
+            if (includeIndex < 0)
+                return Array.Empty<string>();
+
+            var index = includeIndex + "INCLUDE".Length;
+            while (index < createIndexSql.Length && char.IsWhiteSpace(createIndexSql[index]))
+                index++;
+            if (index >= createIndexSql.Length || createIndexSql[index] != '(')
+                return Array.Empty<string>();
+
+            var includeCloseIndex = ScaffoldSqliteDdlParser.FindMatchingParenthesis(createIndexSql, index);
+            if (includeCloseIndex <= index)
+                return Array.Empty<string>();
+
+            var body = createIndexSql.Substring(index + 1, includeCloseIndex - index - 1);
+            return ScaffoldSqliteDdlParser.SplitTopLevelCommaSeparated(body)
+                .Select(UnquoteCreateIndexIdentifier)
+                .Where(static name => name.Length > 0)
+                .ToArray();
+        }
+
         public static int FindCreateIndexKeyListOpen(string sql, int startIndex)
         {
             char? quote = null;
@@ -90,6 +129,22 @@ namespace nORM.Scaffolding
             }
 
             return -1;
+        }
+
+        private static string UnquoteCreateIndexIdentifier(string identifier)
+        {
+            var trimmed = identifier.Trim();
+            if (trimmed.Length < 2)
+                return trimmed;
+
+            if (trimmed[0] == '[' && trimmed[^1] == ']')
+                return trimmed[1..^1].Replace("]]", "]", StringComparison.Ordinal);
+
+            var quote = trimmed[0];
+            if ((quote == '"' || quote == '`') && trimmed[^1] == quote)
+                return trimmed[1..^1].Replace(new string(quote, 2), quote.ToString(), StringComparison.Ordinal);
+
+            return trimmed;
         }
     }
 }

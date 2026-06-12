@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Providers;
 using nORM.Scaffolding;
 using Xunit;
@@ -217,6 +218,36 @@ public partial class DatabaseScaffolderPrivateMethodTests
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithExpressionIndexFacets_EmitsExtendedExpressionIndexCall()
+    {
+        var expressionIndex = new DatabaseScaffolder.ScaffoldExpressionIndexConfiguration(
+            "main.IndexedProviderSpecific",
+            "IndexedProviderSpecific",
+            "IX_IndexedProviderSpecific_LowerName",
+            "lower(Name)",
+            IsUnique: true,
+            FilterSql: "Active = 1")
+        {
+            IncludedColumnNames = new[] { "Score" },
+            NullSortOrder = IndexNullSortOrder.First,
+            NullsNotDistinct = true
+        };
+
+        var code = ScaffoldContextAdapter.Write(
+            "TestNs",
+            "ProviderIndexCtx",
+            new[] { "IndexedProviderSpecific" },
+            Array.Empty<DatabaseScaffolder.ScaffoldRelationship>(),
+            Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>(),
+            expressionIndexConfigurations: new[] { expressionIndex });
+
+        Assert.Contains(
+            "mb.Entity<IndexedProviderSpecific>().HasExpressionIndex(\"IX_IndexedProviderSpecific_LowerName\", \"lower(Name)\", isUnique: true, filterSql: \"Active = 1\", includedColumnNames: new[] { \"Score\" }, nullsNotDistinct: true, nullSortOrder: IndexNullSortOrder.First);",
+            code,
+            StringComparison.Ordinal);
     }
 
 }

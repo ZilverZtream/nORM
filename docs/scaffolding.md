@@ -273,7 +273,8 @@ must be reviewed and edited like handwritten model code.
   SQLite expression indexes, ordinary PostgreSQL B-tree expression indexes,
   and MySQL expression indexes exposed by `SHOW INDEX` are emitted as
   provider-bound `HasExpressionIndex(...)` metadata, including
-  filtered/partial predicates when the provider supports them.
+  filtered/partial predicates when the provider supports them and representable
+  PostgreSQL expression-index `INCLUDE`/null-semantics facets.
   SQLite attached-schema partial index predicates are read from the owning
   schema instead of assuming `main.sqlite_master`.
   MySQL prefix indexes are diagnostics and are not used as unique alternate-key
@@ -1072,8 +1073,12 @@ must be reviewed and edited like handwritten model code.
   and MySQL expression indexes exposed by `SHOW INDEX` are emitted as
   provider-bound `HasExpressionIndex` migration metadata, including
   filtered/partial predicates for the same expression index when the provider
-  supports them. SQL Server and PostgreSQL expression indexes that
-  depend on provider-specific access methods or non-default B-tree key options
+  supports them. PostgreSQL B-tree expression indexes with DDL-exposed
+  `INCLUDE` columns, non-default `NULLS FIRST/LAST` ordering, or
+  `NULLS NOT DISTINCT` uniqueness are emitted with expanded
+  `HasExpressionIndex` metadata when no non-default operator class or index
+  collation is present. SQL Server and PostgreSQL expression indexes that
+  depend on provider-specific access methods, non-default operator classes, or index collations
   require generated/computed columns plus ordinary indexes or provider-specific migration code. v1 scaffolding emits
   provider-neutral key-column indexes, including descending key order for ordinary column indexes, provider-bound
   filtered/partial index metadata for SQL Server, PostgreSQL, and SQLite, and
@@ -1082,13 +1087,9 @@ must be reviewed and edited like handwritten model code.
   ordinary PostgreSQL column-index `NULLS FIRST/LAST` metadata.
   Mixed functional indexes are not partially emitted as ordinary column indexes;
   the whole index remains provider-owned once any key part is expression-based.
-  Expression indexes with included columns or `NULLS NOT DISTINCT` uniqueness also
-  remain provider-owned because generated `HasExpressionIndex(...)` metadata
-  cannot preserve those facets.
   Provider-specific index implementations such as SQL Server columnstore/XML,
   PostgreSQL GIN/GiST/hash/BRIN, PostgreSQL B-tree indexes with non-default
-  operator classes or index-level collations, PostgreSQL expression indexes
-  with non-default `NULLS FIRST/LAST` ordering, and MySQL
+  operator classes or index-level collations, and MySQL
   FULLTEXT/SPATIAL/HASH indexes remain diagnostics instead of being flattened
   into portable `[Index]` attributes.
 
@@ -1244,14 +1245,14 @@ and scheduled-event ownership review. Do not parse `detail` or
 | `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
 | `SCF110` | `database-object` | Trigger discovered; the generated table type is read-only until trigger side effects are hand-modeled. |
 | `SCF111` | `index` | Filtered/partial index discovered. |
-| `SCF112` | `index` | Expression index discovered but not emitted. SQLite, ordinary PostgreSQL B-tree, and MySQL expression indexes are emitted as `HasExpressionIndex`, including descending expression keys and filtered/partial predicates when the provider supports them. SQL Server, provider-specific-access-method expression indexes, expression indexes with non-default B-tree key options, and expression indexes with included columns remain provider-owned diagnostics. |
-| `SCF113` | `index` | Included-column index discovered. Ordinary SQL Server/PostgreSQL included-column indexes are emitted with `IndexAttribute.IsIncluded`; this diagnostic remains for included-column facets that cannot be safely attached to generated column-index metadata, such as expression/provider-specific indexes. |
+| `SCF112` | `index` | Expression index discovered but not emitted. SQLite, ordinary PostgreSQL B-tree, and MySQL expression indexes are emitted as `HasExpressionIndex`, including descending expression keys, filtered/partial predicates, and representable PostgreSQL expression-index `INCLUDE`, `NULLS FIRST/LAST`, and `NULLS NOT DISTINCT` facets when the provider supports them. SQL Server, provider-specific-access-method expression indexes, and expression indexes with non-default operator classes or index collations remain provider-owned diagnostics. |
+| `SCF113` | `index` | Included-column index discovered. Ordinary SQL Server/PostgreSQL included-column indexes are emitted with `IndexAttribute.IsIncluded`; PostgreSQL expression-index INCLUDE columns are emitted through `HasExpressionIndex` when the DDL exposes exact included column names. This diagnostic remains for included-column facets that cannot be safely attached to generated index metadata. |
 | `SCF114` | `index` | Descending index key discovered. |
 | `SCF115` | `database-object` | Provider-native temporal table discovered. |
 | `SCF116` | `table-shape` | Table has no primary key. |
 | `SCF117` | `index` | MySQL prefix index discovered. Prefix indexes stay provider-owned and are not used as full-column unique alternate-key evidence unless every prefix covers the full declared column length. |
 | `SCF118` | `relationship` | FK dependent table has no primary key, so generated navigations are suppressed. |
-| `SCF119` | `index` | Provider-specific index implementation discovered. Non-rowstore/non-B-tree access methods, provider-specific B-tree operator classes/collations on column or expression indexes, expression-index non-default null ordering, and PostgreSQL expression-index `NULLS NOT DISTINCT` uniqueness remain provider-owned diagnostics. Ordinary PostgreSQL column indexes with non-default `NULLS FIRST/LAST` ordering are emitted with `IndexAttribute.NullSortOrder`; ordinary PostgreSQL unique column indexes with `NULLS NOT DISTINCT` are emitted with `IndexAttribute.NullsNotDistinct`. |
+| `SCF119` | `index` | Provider-specific index implementation discovered. Non-rowstore/non-B-tree access methods and provider-specific B-tree operator classes/collations on column or expression indexes remain provider-owned diagnostics. Ordinary PostgreSQL column indexes with non-default `NULLS FIRST/LAST` ordering are emitted with `IndexAttribute.NullSortOrder`; ordinary PostgreSQL unique column indexes with `NULLS NOT DISTINCT` are emitted with `IndexAttribute.NullsNotDistinct`; representable PostgreSQL B-tree expression-index null ordering and `NULLS NOT DISTINCT` uniqueness are emitted through `HasExpressionIndex`. |
 | `SCF199` | `schema-feature` | Unknown provider-owned schema feature. |
 | `SCF200` | `query-object` | View discovered but not emitted. Ordinary views are scaffolded by default as read-only query artifacts; this code is reserved for provider-specific skipped view metadata. |
 | `SCF201` | `routine` | Routine/stored procedure/function discovered; skipped unless provider-bound stubs are emitted through `--emit-routine-stubs`. |

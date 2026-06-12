@@ -87,6 +87,24 @@ public partial class DatabaseScaffolderPrivateMethodTests
             null,
             new object[] { entityByTable, includedExpressionFeatures })!;
 
+        var postgresNullSemanticsFeatures = Array.CreateInstance(featureType, 2);
+        postgresNullSemanticsFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "UX_Documents_LowerName_Nulls",
+            "CREATE UNIQUE INDEX \"UX_Documents_LowerName_Nulls\" ON public.\"Documents\" USING btree (lower(\"Name\") NULLS FIRST) NULLS NOT DISTINCT")!, 0);
+        postgresNullSemanticsFeatures.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ProviderSpecificIndex",
+            "UX_Documents_LowerName_Nulls",
+            "PostgreSQL btree index with provider-specific key options; accessMethod=btree; hasNullsNotDistinct=true; hasNonDefaultOperatorClass=false; hasIndexCollation=false; hasNonDefaultNullOrdering=true; indexSql=CREATE UNIQUE INDEX \"UX_Documents_LowerName_Nulls\" ON public.\"Documents\" USING btree (lower(\"Name\") NULLS FIRST) NULLS NOT DISTINCT")!, 1);
+
+        var postgresNullSemanticsResult = (System.Collections.ICollection)method.Invoke(
+            null,
+            new object[] { entityByTable, postgresNullSemanticsFeatures })!;
+
         var descendingExpressionFeatures = Array.CreateInstance(featureType, 2);
         descendingExpressionFeatures.SetValue(Activator.CreateInstance(
             featureType,
@@ -119,7 +137,22 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
         Assert.Single((System.Collections.IEnumerable)ordinaryResult);
         Assert.Empty((System.Collections.IEnumerable)providerSpecificResult);
-        Assert.Empty((System.Collections.IEnumerable)includedExpressionResult);
+        var includedExpression = Assert.Single((System.Collections.IEnumerable)includedExpressionResult);
+        Assert.NotNull(includedExpression);
+        Assert.Equal(
+            new[] { "Score" },
+            Assert.IsType<string[]>(includedExpression.GetType().GetProperty("IncludedColumnNames")!.GetValue(includedExpression)));
+        var postgresNullSemantics = Assert.Single((System.Collections.IEnumerable)postgresNullSemanticsResult);
+        Assert.NotNull(postgresNullSemantics);
+        Assert.Equal(
+            "lower(\"Name\")",
+            postgresNullSemantics.GetType().GetProperty("ExpressionSql")!.GetValue(postgresNullSemantics));
+        Assert.Equal(
+            IndexNullSortOrder.First,
+            postgresNullSemantics.GetType().GetProperty("NullSortOrder")!.GetValue(postgresNullSemantics));
+        Assert.Equal(
+            true,
+            postgresNullSemantics.GetType().GetProperty("NullsNotDistinct")!.GetValue(postgresNullSemantics));
         var descendingExpression = Assert.Single((System.Collections.IEnumerable)descendingExpressionResult);
         Assert.NotNull(descendingExpression);
         Assert.Equal(

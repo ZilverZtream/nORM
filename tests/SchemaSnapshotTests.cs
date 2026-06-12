@@ -579,6 +579,38 @@ public class SchemaSnapshotTests
     }
 
     [Fact]
+    public void BuildFromContext_IncludesExpressionIndexFacets()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        var options = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<SnapshotIndexedEntity>()
+                    .HasExpressionIndex(
+                        "IX_SnapshotIndexedEntity_LowerCode",
+                        "lower(Code)",
+                        isUnique: true,
+                        filterSql: "Code IS NOT NULL",
+                        includedColumnNames: new[] { "Code" },
+                        nullsNotDistinct: true,
+                        nullSortOrder: IndexNullSortOrder.Last)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), options);
+
+        var snapshot = SchemaSnapshotBuilder.Build(ctx);
+
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotIndexedEntity");
+        var expressionIndex = Assert.Single(table.ExpressionIndexes);
+        Assert.Equal("IX_SnapshotIndexedEntity_LowerCode", expressionIndex.Name);
+        Assert.Equal("lower(Code)", expressionIndex.ExpressionSql);
+        Assert.True(expressionIndex.IsUnique);
+        Assert.Equal("Code IS NOT NULL", expressionIndex.FilterSql);
+        Assert.Equal(new[] { "Code" }, expressionIndex.IncludedColumnNames);
+        Assert.True(expressionIndex.NullsNotDistinct);
+        Assert.Equal(IndexNullSortOrder.Last, expressionIndex.NullSortOrder);
+    }
+
+    [Fact]
     public void BuildFromContext_IncludesIndexAttributes()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

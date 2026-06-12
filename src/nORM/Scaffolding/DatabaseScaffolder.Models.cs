@@ -96,7 +96,14 @@ namespace nORM.Scaffolding
             string Name,
             string ExpressionSql,
             bool IsUnique,
-            string? FilterSql);
+            string? FilterSql)
+        {
+            public string[]? IncludedColumnNames { get; init; }
+
+            public IndexNullSortOrder NullSortOrder { get; init; }
+
+            public bool NullsNotDistinct { get; init; }
+        }
 
         internal readonly record struct ScaffoldCollationConfiguration(
             string TableKey,

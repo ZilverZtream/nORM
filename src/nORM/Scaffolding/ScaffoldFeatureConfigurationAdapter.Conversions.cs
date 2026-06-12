@@ -73,7 +73,12 @@ namespace nORM.Scaffolding
         private static IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration> ConvertExpressionIndexConfigurations(
             IReadOnlyList<ScaffoldExpressionIndexConfigurationInfo> expressionIndexes)
             => expressionIndexes
-                .Select(static index => new DatabaseScaffolder.ScaffoldExpressionIndexConfiguration(index.TableKey, index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql))
+                .Select(static index => new DatabaseScaffolder.ScaffoldExpressionIndexConfiguration(index.TableKey, index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql)
+                {
+                    IncludedColumnNames = index.IncludedColumnNames,
+                    NullSortOrder = index.NullSortOrder,
+                    NullsNotDistinct = index.NullsNotDistinct
+                })
                 .ToArray();
 
         private static IReadOnlyList<DatabaseScaffolder.ScaffoldCollationConfiguration> ConvertCollationConfigurations(

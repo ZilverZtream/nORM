@@ -28,6 +28,18 @@ namespace nORM.Scaffolding
                 && expressionIndexConfigurations.Any(index =>
                     string.Equals(index.TableKey, input.Feature.TableKey, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(index.Name, input.Feature.Name, StringComparison.OrdinalIgnoreCase)));
+            RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedFeatureIndexes, input =>
+                string.Equals(input.Feature.Kind, "IncludedColumnIndex", StringComparison.OrdinalIgnoreCase)
+                && expressionIndexConfigurations.Any(index =>
+                    index.IncludedColumnNames is { Length: > 0 }
+                    && string.Equals(index.TableKey, input.Feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(index.Name, input.Feature.Name, StringComparison.OrdinalIgnoreCase)));
+            RemoveGeneratedUnsupportedFeatures(unsupportedFeatures, generatedFeatureIndexes, input =>
+                string.Equals(input.Feature.Kind, "ProviderSpecificIndex", StringComparison.OrdinalIgnoreCase)
+                && expressionIndexConfigurations.Any(index =>
+                    (index.NullsNotDistinct || index.NullSortOrder != nORM.Configuration.IndexNullSortOrder.Default)
+                    && string.Equals(index.TableKey, input.Feature.TableKey, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(index.Name, input.Feature.Name, StringComparison.OrdinalIgnoreCase)));
         }
     }
 }

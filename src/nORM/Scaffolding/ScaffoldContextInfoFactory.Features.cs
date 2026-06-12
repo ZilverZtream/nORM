@@ -33,7 +33,12 @@ namespace nORM.Scaffolding
         private static ScaffoldContextExpressionIndexInfo[] ConvertContextExpressionIndexInfos(
             IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration> expressionIndexes)
             => expressionIndexes
-                .Select(index => new ScaffoldContextExpressionIndexInfo(index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql))
+                .Select(index => new ScaffoldContextExpressionIndexInfo(index.EntityName, index.Name, index.ExpressionSql, index.IsUnique, index.FilterSql)
+                {
+                    IncludedColumnNames = index.IncludedColumnNames,
+                    NullSortOrder = index.NullSortOrder,
+                    NullsNotDistinct = index.NullsNotDistinct
+                })
                 .ToArray();
 
         private static ScaffoldContextCollationInfo[] ConvertContextCollationInfos(
