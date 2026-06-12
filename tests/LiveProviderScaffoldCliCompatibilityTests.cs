@@ -206,7 +206,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 "-n CliLiveScaffolded " +
                 "-c CliLiveEfStyleCtx " +
                 "--no-build " +
-                "--framework net8.0 " +
+                "--target-framework net8.0 " +
                 "--configuration Release " +
                 "--runtime win-x64 " +
                 $"--msbuildprojectextensionspath {Quote(msbuildProjectExtensionsPath)} " +

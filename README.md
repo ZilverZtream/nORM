@@ -447,11 +447,12 @@ When `--context` is omitted, the CLI derives the context
 class name from the database name, SQLite file name, or final `Name=...`
 configuration-key segment and appends `Context`, falling back to `AppDbContext`
 when no stable name is available. EF common switches
-`--startup-project`/`-s`, `--framework`, `--configuration`, `--runtime`, and
-`--no-build` are accepted for command-line compatibility, but nORM scaffolding
-connects directly to the database and does not build or load a startup app for
-schema discovery. Legacy EF-style `--msbuildprojectextensionspath` is also
-accepted as a no-op because nORM scaffold does not invoke MSBuild.
+`--startup-project`/`-s`, `--framework`/`--target-framework`,
+`--configuration`, `--runtime`, and `--no-build` are accepted for command-line
+compatibility, but nORM scaffolding connects directly to the database and does
+not build or load a startup app for schema discovery. Legacy EF-style
+`--msbuildprojectextensionspath` is also accepted as a no-op because nORM
+scaffold does not invoke MSBuild.
 EF-style application arguments after `--` are accepted for command
 compatibility. `-- --environment Production` is used only to include
 `appsettings.Production.json` in named-connection lookup, with startup-project
@@ -463,10 +464,11 @@ pass-through environment is supplied, `ASPNETCORE_ENVIRONMENT` and then
 Unmatched scaffold tokens before `--` still fail fast.
 EF-style `.config/dotnet-ef.json` defaults are read for `project`,
 `startupProject`, `outputDir`/`output`, `namespace`, `context`, `contextDir`,
-`contextNamespace`, `schema`/`schemas`, `table`/`tables`, `framework`,
-`configuration`, `runtime`, `msbuildProjectExtensionsPath`, `verbose`,
-`noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`, `force`,
-`noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
+`contextNamespace`, `schema`/`schemas`, `table`/`tables`,
+`framework`/`targetFramework`, `configuration`, `runtime`,
+`msbuildProjectExtensionsPath`, `verbose`, `noColor`, `prefixOutput`,
+`noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`, `dryRun`,
+`failOnWarnings`, `emitRoutineStubs`,
 `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`; relative project paths are resolved relative to the
 parent of `.config`, comma-separated or array table/schema defaults are
 accepted, and explicit CLI options override config values. When any CLI

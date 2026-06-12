@@ -322,8 +322,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("provider after `--connection`", doc, StringComparison.Ordinal);
         Assert.Contains("dbcontext scaffold <connection> <provider-package>", doc, StringComparison.Ordinal);
         Assert.Contains("compatibility design-time switch bundle", doc, StringComparison.Ordinal);
-        Assert.Contains("`--no-build`, `--framework`", doc, StringComparison.Ordinal);
+        Assert.Contains("`--no-build`,", doc, StringComparison.Ordinal);
+        Assert.Contains("`--target-framework`/`--framework`", doc, StringComparison.Ordinal);
         Assert.Contains("`--msbuildprojectextensionspath`", doc, StringComparison.Ordinal);
+        Assert.Contains("\"--target-framework net8.0 \"", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Provider-bound routine stubs are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("--emit-routine-stubs", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server/PostgreSQL/MySQL routine comments", doc, StringComparison.Ordinal);

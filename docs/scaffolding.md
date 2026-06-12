@@ -448,12 +448,13 @@ must be reviewed and edited like handwritten model code.
   `--context-dir` is supplied without `--context-namespace`, a qualified
   `--context`, or an explicit `--namespace`, the context namespace defaults to
   the project's root namespace plus the sanitized context directory segments.
-- EF common design-time switches `--startup-project`/`-s`, `--framework`,
-  `--configuration`, `--runtime`, and `--no-build` are accepted for command-line
-  compatibility. nORM scaffolding connects directly to the database and does
-  not build the target project or load a startup application for schema
-  discovery. Legacy EF-style `--msbuildprojectextensionspath` is also accepted
-  as a no-op because nORM scaffold does not invoke MSBuild.
+- EF common design-time switches `--startup-project`/`-s`,
+  `--framework`/`--target-framework`, `--configuration`, `--runtime`, and
+  `--no-build` are accepted for command-line compatibility. nORM scaffolding
+  connects directly to the database and does not build the target project or
+  load a startup application for schema discovery. Legacy EF-style
+  `--msbuildprojectextensionspath` is also accepted as a no-op because nORM
+  scaffold does not invoke MSBuild.
 - EF-style application arguments after `--` are accepted for command
   compatibility. `-- --environment Production` is used only to include
   `appsettings.Production.json` in named-connection lookup; other application
@@ -464,7 +465,8 @@ must be reviewed and edited like handwritten model code.
 - EF-style `.config/dotnet-ef.json` defaults are read for `project`,
   `startupProject`, `outputDir`/`output`, `namespace`, `context`,
   `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
-  `framework`, `configuration`, `runtime`, `msbuildProjectExtensionsPath`,
+  `framework`/`targetFramework`, `configuration`, `runtime`,
+  `msbuildProjectExtensionsPath`,
   `verbose`, `noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`,
   `force`, `noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
   `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`. Relative project paths are
@@ -880,8 +882,9 @@ must be reviewed and edited like handwritten model code.
   parser precedence is fail-fast rather than EF-ambiguous: duplicate named and
   positional connection/provider values are rejected, while a single positional
   provider after `--connection` is accepted as the provider value. These live gates also include the
-  compatibility design-time switch bundle `--no-build`, `--framework`,
-  `--configuration`, `--runtime`, and `--msbuildprojectextensionspath`.
+  compatibility design-time switch bundle `--no-build`,
+  `--target-framework`/`--framework`, `--configuration`, `--runtime`, and
+  `--msbuildprojectextensionspath`.
   Provider-bound routine stubs are verified through the real CLI with `--emit-routine-stubs` on SQL Server, PostgreSQL, and MySQL.
   Provider-bound sequence stubs are verified through the real CLI with `--emit-sequence-stubs` on SQL Server and PostgreSQL.
   Explicit SQL Server/PostgreSQL primary-key constraint names are also verified

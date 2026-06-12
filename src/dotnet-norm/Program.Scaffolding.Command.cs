@@ -17,7 +17,7 @@ partial class Program
         var ctxOpt = new Option<string?>("--context", "-c") { Description = "DbContext class name or namespace-qualified name. Defaults to the database name plus Context when it can be inferred." };
         var scaffoldProjectOpt = new Option<string?>("--project", "-p") { Description = "Optional target .csproj or project directory. Relative output paths are resolved under this project and its namespace is used by default." };
         var scaffoldStartupProjectOpt = new Option<string?>("--startup-project", "-s") { Description = "Optional startup .csproj or project directory for EF-style named connection lookup; nORM scaffold does not execute startup code." };
-        var scaffoldFrameworkOpt = new Option<string?>("--framework") { Description = "Accepted for EF Core scaffold compatibility; nORM scaffold does not build the target project." };
+        var scaffoldFrameworkOpt = new Option<string?>("--framework", "--target-framework") { Description = "Accepted for EF Core scaffold compatibility and nORM design-time CLI consistency; nORM scaffold does not build the target project." };
         var scaffoldConfigurationOpt = new Option<string?>("--configuration") { Description = "Accepted for EF Core scaffold compatibility; nORM scaffold does not build the target project." };
         var scaffoldRuntimeOpt = new Option<string?>("--runtime") { Description = "Accepted for EF Core scaffold compatibility; nORM scaffold does not restore runtime-specific assets." };
         var scaffoldMsbuildProjectExtensionsPathOpt = new Option<string?>("--msbuildprojectextensionspath") { Description = "Accepted for legacy EF-style scaffold compatibility; nORM scaffold does not invoke MSBuild." };

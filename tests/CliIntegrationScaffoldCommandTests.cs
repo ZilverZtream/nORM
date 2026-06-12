@@ -27,6 +27,7 @@ public partial class CliIntegrationTests
         Assert.Contains("--startup-project", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("-s", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--framework", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--target-framework", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--configuration", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--runtime", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--msbuildprojectextensionspath", result.Stdout, StringComparison.Ordinal);

@@ -92,7 +92,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("project's root namespace plus", doc, StringComparison.Ordinal);
         Assert.Contains("nullable-reference defaults", doc, StringComparison.Ordinal);
         Assert.Contains("`Directory.Build.props`", doc, StringComparison.Ordinal);
-        Assert.Contains("`--startup-project`/`-s`, `--framework`", doc, StringComparison.Ordinal);
+        Assert.Contains("`--startup-project`/`-s`,", doc, StringComparison.Ordinal);
+        Assert.Contains("`--framework`/`--target-framework`", doc, StringComparison.Ordinal);
         Assert.Contains("`--msbuildprojectextensionspath`", doc, StringComparison.Ordinal);
         Assert.Contains("invoke MSBuild", doc, StringComparison.Ordinal);
         Assert.Contains("application arguments after `--`", doc, StringComparison.Ordinal);
@@ -105,7 +106,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`outputDir`/`output`", doc, StringComparison.Ordinal);
         Assert.Contains("`schema`/`schemas`", doc, StringComparison.Ordinal);
         Assert.Contains("`table`/`tables`", doc, StringComparison.Ordinal);
-        Assert.Contains("`framework`, `configuration`, `runtime`, `msbuildProjectExtensionsPath`", doc, StringComparison.Ordinal);
+        Assert.Contains("`framework`/`targetFramework`, `configuration`, `runtime`,", doc, StringComparison.Ordinal);
+        Assert.Contains("`msbuildProjectExtensionsPath`", doc, StringComparison.Ordinal);
         Assert.Contains("`verbose`, `noColor`", doc, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", doc, StringComparison.Ordinal);
         Assert.Contains("`noPluralize`, `useDatabaseNames`", doc, StringComparison.Ordinal);
@@ -142,6 +144,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Option<string?>(\"--context\", \"-c\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--project\", \"-p\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--startup-project\", \"-s\")", cliSource, StringComparison.Ordinal);
+        Assert.Contains("Option<string?>(\"--framework\", \"--target-framework\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--msbuildprojectextensionspath\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("MsbuildProjectExtensionsPathOption = scaffoldMsbuildProjectExtensionsPathOpt", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--no-build\")", cliSource, StringComparison.Ordinal);
@@ -174,6 +177,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ReadEfToolConfigStringList", cliSource, StringComparison.Ordinal);
         Assert.Contains("AddEfToolConfigListValue", cliSource, StringComparison.Ordinal);
         Assert.Contains("ReadEfToolConfigBool", cliSource, StringComparison.Ordinal);
+        Assert.Contains("ReadFirstEfToolConfigString(document.RootElement, \"framework\", \"targetFramework\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("ReadEfToolConfigString(document.RootElement, \"msbuildProjectExtensionsPath\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("must be a string or string array", cliSource, StringComparison.Ordinal);
         Assert.Contains("must be a boolean", cliSource, StringComparison.Ordinal);
@@ -274,7 +278,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("EF-style placement", cliReadme, StringComparison.Ordinal);
         Assert.Contains("namespace-qualified names such as", cliReadme, StringComparison.Ordinal);
         Assert.Contains("When `--context` is omitted", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("`--startup-project`/`-s`, `--framework`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`--startup-project`/`-s`, `--framework`/`--target-framework`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--msbuildprojectextensionspath`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("application arguments after `--`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`-- --environment Production`", cliReadme, StringComparison.Ordinal);
@@ -339,7 +343,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("project-relative paths", rootReadme, StringComparison.Ordinal);
         Assert.Contains("MyApp.Data.AppDbContext", rootReadme, StringComparison.Ordinal);
         Assert.Contains("When `--context` is omitted", rootReadme, StringComparison.Ordinal);
-        Assert.Contains("`--startup-project`/`-s`, `--framework`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("`--startup-project`/`-s`, `--framework`/`--target-framework`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`--msbuildprojectextensionspath`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("application arguments after `--`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`-- --environment Production`", rootReadme, StringComparison.Ordinal);

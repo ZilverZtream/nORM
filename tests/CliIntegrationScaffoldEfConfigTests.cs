@@ -30,7 +30,7 @@ public partial class CliIntegrationTests
                 {
                   "project": "src/App",
                   "context": "Configured.Contexts.ConfiguredCtx",
-                  "framework": "net8.0",
+                  "targetFramework": "net8.0",
                   "configuration": "Release",
                   "runtime": "win-x64",
                   "msbuildProjectExtensionsPath": "obj/custom",

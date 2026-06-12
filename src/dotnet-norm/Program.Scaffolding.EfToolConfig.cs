@@ -31,7 +31,7 @@ partial class Program
                 ReadEfToolConfigString(document.RootElement, "contextNamespace"),
                 ReadEfToolConfigStringList(document.RootElement, "schemas", "schema"),
                 ReadEfToolConfigStringList(document.RootElement, "tables", "table"),
-                ReadEfToolConfigString(document.RootElement, "framework"),
+                ReadFirstEfToolConfigString(document.RootElement, "framework", "targetFramework"),
                 ReadEfToolConfigString(document.RootElement, "configuration"),
                 ReadEfToolConfigString(document.RootElement, "runtime"),
                 ReadEfToolConfigString(document.RootElement, "msbuildProjectExtensionsPath"),
