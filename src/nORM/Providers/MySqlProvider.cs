@@ -29,7 +29,7 @@ namespace nORM.Providers
 
         internal override bool SupportsFastPathPreparedCommandCache => true;
 
-        // MySQL rejects self-referencing IN subqueries in DELETE/UPDATE — wrap in a derived table.
+        // MySQL rejects self-referencing IN subqueries in DELETE/UPDATE - wrap in a derived table.
         internal override bool CudWhereInSubqueryNeedsDoubleWrap => true;
 
         internal override bool SupportsCommandGeneratedKeyRetrieval => true;
@@ -238,7 +238,7 @@ namespace nORM.Providers
         /// <summary>
         /// Returns a SQL fragment that retrieves the last auto-incremented identity value.
         /// MySQL <c>LAST_INSERT_ID()</c> only supports numeric <c>AUTO_INCREMENT</c> columns.
-        /// Non-numeric generated keys (Guid, string, …) must be assigned by the application or a trigger
+        /// Non-numeric generated keys (Guid, string, etc.) must be assigned by the application or a trigger
         /// with <c>IsDbGenerated = false</c>.
         /// </summary>
         public override string GetIdentityRetrievalString(TableMapping m)
@@ -285,7 +285,7 @@ namespace nORM.Providers
 
         /// <summary>
         /// MySQL treats <c>\</c> as a string-literal escape so <c>ESCAPE '\'</c> generates a syntax error.
-        /// Use <c>!</c> — it has no special meaning in MySQL string literals and is safe as a LIKE escape character.
+        /// Use <c>!</c> - it has no special meaning in MySQL string literals and is safe as a LIKE escape character.
         /// </summary>
         public override char LikeEscapeChar => '!';
 
@@ -353,7 +353,7 @@ namespace nORM.Providers
             => $"(TIME_TO_SEC({timeSpanColumnSql}) + MICROSECOND({timeSpanColumnSql}) / 1000000.0)";
 
         /// <summary>
-        /// MySQL has no native DATETIMEOFFSET — MySqlConnector stores DateTimeOffset
+        /// MySQL has no native DATETIMEOFFSET - MySqlConnector stores DateTimeOffset
         /// as DATETIME normalised to UTC. Adding the new offset's seconds shifts the
         /// rendered wall clock; the trailing offset suffix completes the canonical
         /// text the materialiser parses.
@@ -383,7 +383,7 @@ namespace nORM.Providers
             // to UTC. UNIX_TIMESTAMP() interprets its argument in the session timezone,
             // so it gives wrong results when the session TZ is not UTC.
             // TIMESTAMPDIFF(SECOND, epoch, col) does pure arithmetic on the stored
-            // value without any TZ conversion — correct because the value IS UTC.
+            // value without any TZ conversion - correct because the value IS UTC.
             => $"TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', {dtoSql})";
 
         internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
@@ -455,7 +455,7 @@ namespace nORM.Providers
                 ? $"SUBTIME({timeOnlySql}, {timeSpanColumnSql})"
                 : $"ADDTIME({timeOnlySql}, {timeSpanColumnSql})";
 
-        /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts — `CAST(x AS INT)` is a syntax error.</summary>
+        /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts - `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
 
@@ -545,7 +545,7 @@ namespace nORM.Providers
             ?? TryTranslateTimeSpanFactory(node, args);
 
         /// <summary>
-        /// MySQL's <c>CAST(x AS VARCHAR(N))</c> is a syntax error — its CAST
+        /// MySQL's <c>CAST(x AS VARCHAR(N))</c> is a syntax error - its CAST
         /// target type is <c>CHAR(N)</c>. Used by the canonical-text
         /// <see cref="DatabaseProvider.GetDateTimeOffsetFromPartsSql"/> emit.
         /// </summary>
@@ -921,7 +921,7 @@ ORDER BY ORDINAL_POSITION";
             }
             catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
             {
-                // Table does not exist yet — return empty list.
+                // Table does not exist yet - return empty list.
             }
             return result;
         }
@@ -1096,7 +1096,7 @@ END;";
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken - a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var saveMethod = transaction.GetType().GetMethod("Save", new[] { typeof(string) }) ??
@@ -1118,7 +1118,7 @@ END;";
                     // Unwrap and rethrow the inner exception from reflection invoke.
                     // TargetInvocationException wraps the actual database exception, making it harder to handle.
                     // NotSupportedException from a base DbTransaction.Save indicates the transaction type
-                    // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
+                    // does not support savepoints - map to NormUnsupportedFeatureException for a stable API.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
                             $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
@@ -1140,7 +1140,7 @@ END;";
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken - a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             var rollbackMethod = transaction.GetType().GetMethod("Rollback", new[] { typeof(string) }) ??
@@ -1160,7 +1160,7 @@ END;";
                 {
                     // Unwrap and rethrow the inner exception from reflection invoke.
                     // NotSupportedException from a base DbTransaction.Rollback indicates the transaction type
-                    // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
+                    // does not support savepoints - map to NormUnsupportedFeatureException for a stable API.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
                             $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);

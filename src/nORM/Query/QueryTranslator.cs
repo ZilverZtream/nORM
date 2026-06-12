@@ -114,7 +114,7 @@ namespace nORM.Query
         // Records the SelectMany result selector that builds a transparent identifier
         // (e.g. `(l, r) => new { l, r }`). Used by ExpandProjection to inline `t.l` /
         // `t.r` references in downstream Where / Select lambdas back to the join's
-        // outer / inner parameters — separate from _projection so the outer Select's
+        // outer / inner parameters - separate from _projection so the outer Select's
         // materializer projection isn't clobbered by the TI lambda.
         private LambdaExpression? _transparentIdentifier;
         private Func<object, object>? _clientProjection;
@@ -144,7 +144,7 @@ namespace nORM.Query
         // GroupJoin's result selector lambda preserved so downstream Where/OrderBy can
         // expand `r.Member` references back to the underlying outer/group expressions.
         // _projection isn't used for GroupJoin (it has 2 params and the materializer
-        // uses _groupJoinInfo.ResultSelector — a compiled Func — instead), so we need
+        // uses _groupJoinInfo.ResultSelector - a compiled Func - instead), so we need
         // a separate channel for ExpandProjection.
         private LambdaExpression? _groupJoinResultSelector;
         private LambdaExpression? _groupJoinExpansionSelector;
@@ -196,7 +196,7 @@ namespace nORM.Query
         // SingleOrDefault / Last / LastOrDefault / ElementAt / ElementAtOrDefault) rather
         // than by a user-facing Take()/Skip(). Used by the post-Take/Skip silent-wrongness
         // pin family (bca0523 / 47acc83 / 54c16ae / 4fcd795 / c2cce55 / 3427495 / 3716e13 /
-        // f0ccf06 / b4f5ae4) to AVOID false-positives on `q.OrderBy(k).First()` —
+        // f0ccf06 / b4f5ae4) to AVOID false-positives on `q.OrderBy(k).First()` -
         // ordering BEFORE a terminal LIMIT is correct, and only ordering AFTER a USER
         // Take/Skip is the silent-wrongness shape the pins guard.
         private bool _takeSetByTerminal { get => _clauses.TakeSetByTerminal; set => _clauses.TakeSetByTerminal = value; }
@@ -206,7 +206,7 @@ namespace nORM.Query
         // EXCEPT arm. SQLite stores decimal as TEXT and the set-op dedup compares
         // strings, so '10.5' and '10.50' register as distinct rows. Coercing both
         // arms with CAST(col AS REAL) makes the dedup numeric. Same precision
-        // tradeoff as the rest of the decimal-cluster — see SCV.CoerceDecimalProjectionsToReal.
+        // tradeoff as the rest of the decimal-cluster - see SCV.CoerceDecimalProjectionsToReal.
         internal bool _coerceDecimalProjectionsToReal;
         private static readonly ObjectPool<QueryTranslator> _translatorPool =
             new DefaultObjectPool<QueryTranslator>(new QueryTranslatorPooledObjectPolicy());
@@ -465,7 +465,7 @@ namespace nORM.Query
                 _t.Visit(_expression);
 
                 // Streaming GroupBy: GroupBy(source, key) with no downstream projection,
-                // no aggregate terminal (Count/Sum/…), and no HAVING filter means the
+                // no aggregate terminal (Count/Sum/etc.), and no HAVING filter means the
                 // caller wants IGrouping<K, V> elements. Discard the SQL GROUP BY (which
                 // the entity materializer can't handle) and install a client-side grouping
                 // transform that groups the plain entity rows in memory.
@@ -522,7 +522,7 @@ namespace nORM.Query
                 {
                     var aggMethod = (_expression as MethodCallExpression)?.Method;
                     var aggMethodName = aggMethod?.Name ?? string.Empty;
-                    // Count/LongCount always return non-null integer — keep the fast path.
+                    // Count/LongCount always return non-null integer - keep the fast path.
                     if (aggMethodName is "Count" or "LongCount")
                     {
                         syncMaterializer = static (DbDataReader r) =>
@@ -680,7 +680,7 @@ namespace nORM.Query
                         try
                         {
                             // DISTINCT over a projected shape (e.g. `Select(anon).Distinct().Count()`)
-                            // must count rows of the distinct set — wrap as `SELECT COUNT(*) FROM
+                            // must count rows of the distinct set - wrap as `SELECT COUNT(*) FROM
                             // (SELECT DISTINCT <proj> FROM ...) AS T0`. Plain `SELECT COUNT(*) FROM
                             // table` would return the full row count and ignore the distinct.
                             if (_t._isDistinct && _t._projection != null)
@@ -927,7 +927,7 @@ namespace nORM.Query
                         var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctx);
                         var sql = visitor.Translate(arg);
-                        // AddLiteralParameter — see HandleAggregateExpression / OrderByTranslator.
+                        // AddLiteralParameter - see HandleAggregateExpression / OrderByTranslator.
                         foreach (var kvp in visitor.GetParameters())
                             AddLiteralParameter(kvp.Key, kvp.Value);
                         FastExpressionVisitorPool.Return(visitor);
@@ -954,7 +954,7 @@ namespace nORM.Query
                 var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var valueSql = visitor.Translate(wf.ValueSelector.Body);
-                // AddLiteralParameter — window-function value selectors with COALESCE / literal
+                // AddLiteralParameter - window-function value selectors with COALESCE / literal
                 // fallbacks must merge constants the same way as the rest of the family.
                 foreach (var kvp in visitor.GetParameters())
                     AddLiteralParameter(kvp.Key, kvp.Value);
@@ -971,7 +971,7 @@ namespace nORM.Query
                     var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
                     var visitor2 = FastExpressionVisitorPool.Get(in vctx2);
                     var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
-                    // AddLiteralParameter — see the value-selector branch above.
+                    // AddLiteralParameter - see the value-selector branch above.
                     foreach (var kv in visitor2.GetParameters())
                         AddLiteralParameter(kv.Key, kv.Value);
                     FastExpressionVisitorPool.Return(visitor2);
@@ -1164,8 +1164,8 @@ namespace nORM.Query
             // applies WHERE before LIMIT, so a flat rewrite `Where(Take(N, q), pred)`
             // would filter the full table first and the windowing semantics would
             // be lost. Detect the shape, translate the windowed source AS-IS, and
-            // wrap it as a derived table inside the EXISTS — `EXISTS(SELECT 1 FROM
-            // (windowedSource) AS t WHERE pred LIMIT 1)` — so the predicate runs
+            // wrap it as a derived table inside the EXISTS - `EXISTS(SELECT 1 FROM
+            // (windowedSource) AS t WHERE pred LIMIT 1)` - so the predicate runs
             // against the windowed rowset.
             bool sourceWindowed = node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All) or nameof(Queryable.Contains)
                 && SourceHasTakeOrSkip(source);
@@ -1174,8 +1174,8 @@ namespace nORM.Query
                 LambdaExpression? windowedPred = null;
                 var windowedSource = source;
                 // Predicate-bearing forms come in two shapes depending on the call site:
-                //   (a) 2-arg `Queryable.Any(source, pred)` — predicate at node.Arguments[1].
-                //   (b) 1-arg `Queryable.Any(Where(source, pred))` — async-extensions
+                //   (a) 2-arg `Queryable.Any(source, pred)` - predicate at node.Arguments[1].
+                //   (b) 1-arg `Queryable.Any(Where(source, pred))` - async-extensions
                 //       pre-inject a Where wrapper. Peel it off so we translate the
                 //       inner windowed source as a derived table.
                 if (node.Method.Name == nameof(Queryable.Any) && node.Arguments.Count > 1
@@ -1191,7 +1191,7 @@ namespace nORM.Query
                 }
                 else if (node.Method.Name == nameof(Queryable.Contains) && node.Arguments.Count == 2)
                 {
-                    // Contains over a projected source — `Select(Take(...), p => p.V).Contains(value)` —
+                    // Contains over a projected source - `Select(Take(...), p => p.V).Contains(value)` -
                     // peels the Select so we apply the predicate against the underlying entity in
                     // the derived table, where the column references resolve naturally.
                     if (source is MethodCallExpression projSel
@@ -1321,7 +1321,7 @@ namespace nORM.Query
                     return true;
                 case MemberExpression me:
                     // Static member access (DateTime.UtcNow, MyClass.StaticField). me.Expression
-                    // is null in this case — read directly from the type.
+                    // is null in this case - read directly from the type.
                     if (me.Expression == null)
                     {
                         value = me.Member switch
@@ -1392,7 +1392,7 @@ namespace nORM.Query
 
         /// <summary>
         /// Stores a parameter value without flagging it as compiled. Use when copying inline
-        /// constants from a sub-visitor — the sub-visitor's closure-capture path already
+        /// constants from a sub-visitor - the sub-visitor's closure-capture path already
         /// registers compiled entries in the shared list, so blindly re-flagging literals
         /// causes BindPlanParameters to skip them at execution time.
         /// </summary>
@@ -1767,7 +1767,7 @@ namespace nORM.Query
                 _correlatedParams[tail] = (mapping, alias);
         }        private LambdaExpression ExpandProjection(LambdaExpression lambda)
         {
-            // Prefer the transparent-identifier lambda when present — that's the one that
+            // Prefer the transparent-identifier lambda when present - that's the one that
             // unpacks `t.l` / `t.r` back into the join's outer/inner parameters. Fall back
             // to a normal _projection inline for non-join shapes.
             if (_transparentIdentifier != null &&
@@ -1787,7 +1787,7 @@ namespace nORM.Query
                 return Expression.Lambda(body, _projection.Parameters);
             }
             // GroupJoin's result selector isn't stored in _projection (materialiser
-            // limitation — see HandleGroupJoin), but downstream Where/OrderBy still
+            // limitation - see HandleGroupJoin), but downstream Where/OrderBy still
             // need to expand `r.Member` back to the outer/group expressions inside
             // the selector. Fall through to it here when no regular projection is set.
             if (_groupJoinExpansionSelector != null &&

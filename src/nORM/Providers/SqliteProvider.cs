@@ -25,7 +25,7 @@ namespace nORM.Providers
     public class SqliteProvider : DatabaseProvider
     {
         /// <summary>
-        /// SQLite has no true async I/O — all async methods are synchronous wrappers.
+        /// SQLite has no true async I/O - all async methods are synchronous wrappers.
         /// Using sync calls eliminates ~50-100ns of async state machine overhead per Read().
         /// </summary>
         public override bool PrefersSyncExecution => true;
@@ -125,7 +125,7 @@ namespace nORM.Providers
         /// <inheritdoc />
         public override string ForceCaseSensitiveStringComparison(string sql) => $"{sql} COLLATE BINARY";
 
-        /// <summary>SQLite has no XOR operator — synthesize via `(a | b) - (a &amp; b)`.</summary>
+        /// <summary>SQLite has no XOR operator - synthesize via `(a | b) - (a &amp; b)`.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"(({left} | {right}) - ({left} & {right}))";
 
         /// <summary>
@@ -385,7 +385,7 @@ namespace nORM.Providers
             return AddSecondsToTimeOnlySql(timeOnlySql, seconds);
         }
 
-        /// <summary>SQLite REAL handles both float and decimal — no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
+        /// <summary>SQLite REAL handles both float and decimal - no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
         public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
 
         /// <summary>SQLite supports INSERT OR IGNORE for idempotent join-table inserts.</summary>
@@ -1613,7 +1613,7 @@ namespace nORM.Providers
             }
             catch (DbException dbEx) when (IsObjectNotFoundError(dbEx))
             {
-                // Table does not exist yet — return empty list so caller falls back to CLR defaults.
+                // Table does not exist yet - return empty list so caller falls back to CLR defaults.
             }
             return result;
         }
@@ -1783,7 +1783,7 @@ END;";
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task CreateSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken - a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -1805,7 +1805,7 @@ END;";
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
         public override Task RollbackToSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
-            // Honour the CancellationToken — a pre-cancelled token must throw immediately.
+            // Honour the CancellationToken - a pre-cancelled token must throw immediately.
             ct.ThrowIfCancellationRequested();
 
             if (transaction is SqliteTransaction sqliteTransaction)
@@ -1846,7 +1846,7 @@ END;";
             {
                 if (cols.Length == 0)
                 {
-                    // All columns are DB-generated — use DEFAULT VALUES syntax.
+                    // All columns are DB-generated - use DEFAULT VALUES syntax.
                     // DEFAULT VALUES does not support batching so we loop per entity.
                     await using var cmd = ctx.RawConnection.CreateCommand();
                     cmd.Transaction = transaction;
@@ -1859,7 +1859,7 @@ END;";
                     // 2. Create ONE command and ONE set of parameters that will be reused.
                     await using var cmd = ctx.RawConnection.CreateCommand();
                     cmd.Transaction = transaction;
-                    // Use INSERT without RETURNING — bulk path uses ExecuteNonQuery
+                    // Use INSERT without RETURNING - bulk path uses ExecuteNonQuery
                     // and doesn't hydrate generated keys, so RETURNING output is wasted work.
                     cmd.CommandText = BuildInsert(m, hydrateGeneratedKeys: false);
 
@@ -1910,7 +1910,7 @@ END;";
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable — satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
             finally
             {
@@ -2044,7 +2044,7 @@ END;";
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable — satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
             finally
             {
@@ -2204,7 +2204,7 @@ END;";
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable — satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
             finally
             {

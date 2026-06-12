@@ -29,7 +29,7 @@ namespace nORM.Query
 
         // Overload that accepts pre-computed fixedParams to avoid:
         // 1. Expensive QueryPlan.GetHashCode() in _compiledParamSets ConcurrentDictionary on every call
-        //    (QueryPlan is a sealed record with 20+ properties � auto-generated GetHashCode costs ~200ns)
+        //    (QueryPlan is a sealed record with 20+ properties - auto-generated GetHashCode costs ~200ns)
         // 2. HashSet.Contains per parameter on every call (fixed params pre-filtered at compile time)
         internal Task<TResult> ExecuteCompiledAsync<TResult>(QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
         {
@@ -199,7 +199,7 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
             }
 
-            // Dispatch directly to materialization � avoids wrapping in another async method.
+            // Dispatch directly to materialization - avoids wrapping in another async method.
             // MaterializeAsObjectListAsync/MaterializeAsync handle cmd disposal via 'await using'.
             if (!plan.IsScalar && typeof(TResult) == typeof(List<object>) && plan.ElementType != typeof(object) && !plan.SingleResult)
             {
@@ -271,7 +271,7 @@ namespace nORM.Query
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCompiledPreparedSlowAsync<TResult>(ensureTask, plan, parameterValues, fixedParams, ct);
 
-            // Synchronous command setup � same as non-compiled ExecuteQueryFromPlanAsync
+            // Synchronous command setup - same as non-compiled ExecuteQueryFromPlanAsync
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -322,7 +322,7 @@ namespace nORM.Query
             var compiledParams = plan.CompiledParameters;
             if (fixedParams != null)
             {
-                // Fast path: pre-computed fixed params � no HashSet lookup needed
+                // Fast path: pre-computed fixed params - no HashSet lookup needed
                 for (int i = 0; i < fixedParams.Length; i++)
                     cmd.AddOptimizedParam(fixedParams[i].Key, fixedParams[i].Value);
             }
@@ -349,9 +349,9 @@ namespace nORM.Query
 
         /// <summary>
         /// Compiled query execution with command pooling. The DbCommand is created once
-        /// (with Prepare()) and reused across calls � only parameter values are updated.
-        /// This eliminates per-call costs of: DbCommand allocation (~0.5�s), DbParameter creation
-        /// (~0.3�s per param), and SQL compilation via sqlite3_prepare_v2 (~2-5�s).
+        /// (with Prepare()) and reused across calls - only parameter values are updated.
+        /// This eliminates per-call costs of: DbCommand allocation (~0.5us), DbParameter creation
+        /// (~0.3us per param), and SQL compilation via sqlite3_prepare_v2 (~2-5us).
         /// Falls back to standard path for retry policies, caching, and first-call initialization.
         /// </summary>
         internal Task<TResult> ExecuteCompiledPooledAsync<TResult>(
@@ -386,11 +386,11 @@ namespace nORM.Query
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, parameterValues, fixedParams, state);
 
-            // Only update compiled parameter values � fixed params are already set
+            // Only update compiled parameter values - fixed params are already set
             UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
             cmd.Transaction = _ctx.CurrentTransaction;
 
-            // Inline materialization � command returned to pool after use
+            // Inline materialization - command returned to pool after use
             if (plan.IsScalar)
                 return ReturnCommandToPool(state.CommandPool, cmd, ExecutePooledScalarAsync<TResult>(plan, cmd, ct));
             // Sync materialization for providers without true async I/O
@@ -491,8 +491,8 @@ namespace nORM.Query
                 cmd.Parameters.Add(p);
             }
 
-            // Prepare the command � compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
-            // Prepare() is optional � some providers (e.g., in-memory) throw NotSupportedException.
+            // Prepare the command - compiles SQL once, subsequent executions skip sqlite3_prepare_v2.
+            // Prepare() is optional - some providers (e.g., in-memory) throw NotSupportedException.
             ApplyPreparedParameterSizeHints(cmd);
             try { cmd.Prepare(); } catch (Exception) { }
 
@@ -650,7 +650,7 @@ namespace nORM.Query
                 return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
             }
 
-            // Sync materialization � no async state machine overhead
+            // Sync materialization - no async state machine overhead
             var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
             var list = _executor.CreateListForType(plan.ElementType, capacity);
             var materializer = plan.SyncMaterializer;

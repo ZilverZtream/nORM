@@ -104,7 +104,7 @@ namespace nORM.Core
             NormValidator.ValidateEntity(entity, nameof(entity));
 
             // Check if entity is already tracked before returning entry.
-            // Auto-attaching untracked entities is dangerous � it silently modifies tracking state.
+            // Auto-attaching untracked entities is dangerous - it silently modifies tracking state.
             // Uses O(1) identity-map lookup via _entriesByReference dictionary.
             var existingEntry = ChangeTracker.GetEntryOrDefault(entity);
             if (existingEntry == null)
@@ -230,7 +230,7 @@ namespace nORM.Core
                 }
                 catch (Exception ex) when (!commitAttempted && attempt < maxRetries - 1 && IsRetryableException(ex))
                 {
-                    // Only retry pre-commit transient failures � if commit was attempted, the outcome
+                    // Only retry pre-commit transient failures - if commit was attempted, the outcome
                     // is unknown and retrying could produce duplicate rows.
                     var backoffMs = baseDelay.TotalMilliseconds * Math.Pow(2, attempt);
                     var jitter = 1 + (rand.NextDouble() * 2 * RetryJitterRange - RetryJitterRange);
@@ -253,7 +253,7 @@ namespace nORM.Core
         /// <returns>The total number of state entries written to the database.</returns>
         private async Task<int> SaveChangesInternalAsync(bool detectChanges, CancellationToken ct, Action? onCommitAttempted = null)
         {
-            // Only detect changes if requested � DetectChanges is O(entities � properties).
+            // Only detect changes if requested - DetectChanges is O(entities x properties).
             if (detectChanges)
             {
                 ChangeTracker.DetectAllChanges();
@@ -449,7 +449,7 @@ namespace nORM.Core
                         originalEx, rollbackEx);
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable � satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
 
             // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch
@@ -537,7 +537,7 @@ namespace nORM.Core
 
                 if (ownerState == EntityState.Modified || ownerState == EntityState.Deleted)
                 {
-                    // DELETE existing owned items � use a dedicated command so that the
+                    // DELETE existing owned items - use a dedicated command so that the
                     // INSERT command below starts fully fresh (no prepared-statement residue).
                     await using var delScope = new CommandScope(RawConnection, transaction);
                     await using var delCmd = delScope.CreateCommand();
@@ -589,7 +589,7 @@ namespace nORM.Core
                     insertTenantId = GetRequiredTenantId(insertTenantCol, ownedMap.OwnedType, "owned collection insert");
                 }
 
-                // INSERT each item individually � avoids multi-statement batch issues
+                // INSERT each item individually - avoids multi-statement batch issues
                 // across providers (e.g. SQLite drivers that stop after the first statement).
                 foreach (var item in items)
                 {
@@ -718,7 +718,7 @@ namespace nORM.Core
                     }
                 }
 
-                // For Added entities, snapshot is irrelevant � insert everything.
+                // For Added entities, snapshot is irrelevant - insert everything.
                 // For Modified entities, use the snapshot to compute delta.
                 HashSet<object> snapshot;
                 if (entry.State == EntityState.Added ||
@@ -1025,7 +1025,7 @@ namespace nORM.Core
         /// <summary>
         /// Returns true when every DB-generated key column on the entity still holds its
         /// default value (0 for integer types, <see cref="Guid.Empty"/> for GUIDs, null
-        /// for nullable types) — meaning no INSERT has been committed for this entity yet.
+        /// for nullable types) - meaning no INSERT has been committed for this entity yet.
         /// </summary>
         private static bool IsDefaultDbGeneratedKey(object entity, TableMapping map)
         {
@@ -1138,7 +1138,7 @@ namespace nORM.Core
                 while (await reader.NextResultAsync(ct).ConfigureAwait(false) && i < batch.Count);
 
                 // If DB returned fewer keys than entities, identity map is corrupt.
-                // Throwing here triggers the SaveChanges catch block → rollback.
+                // Throwing here triggers the SaveChanges catch block -> rollback.
                 if (keysAssigned != batch.Count)
                 {
                     var identitySql = _p.GetIdentityRetrievalString(map);
@@ -1237,9 +1237,9 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // S1 � Optimistic-concurrency rowcount check.
+            // S1 - Optimistic-concurrency rowcount check.
             // For matched-row providers (UseAffectedRowsSemantics=false): 0 rows updated means
-            // the WHERE clause (pk + token) did not match, so the token was stale � throw.
+            // the WHERE clause (pk + token) did not match, so the token was stale - throw.
             // For affected-row providers (UseAffectedRowsSemantics=true, e.g. MySQL default):
             // 0 rows can mean either a genuine stale token OR a same-value update (no columns
             // actually changed). Disambiguate with a SELECT-then-verify: query for rows that
@@ -1309,10 +1309,10 @@ namespace nORM.Core
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-            // S1 � DELETE rowcount check. Unlike UPDATE, DELETE has no same-value ambiguity:
+            // S1 - DELETE rowcount check. Unlike UPDATE, DELETE has no same-value ambiguity:
             // a row is "deleted" only if it actually existed and was removed. Even on affected-row
             // providers (UseAffectedRowsSemantics=true), 0 deleted rows always means either the
-            // token was stale or the row was already gone � both are genuine conflicts. No
+            // token was stale or the row was already gone - both are genuine conflicts. No
             // SELECT-then-verify is needed; we always throw when deleted != batch.Count.
             if (map.TimestampColumn != null && deleted != batch.Count)
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
@@ -1321,15 +1321,15 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// S1 � SELECT-then-verify fallback for affected-row semantics providers (e.g. MySQL).
+        /// S1 - SELECT-then-verify fallback for affected-row semantics providers (e.g. MySQL).
         /// Called from <see cref="ExecuteUpdateBatch"/> when <c>UseAffectedRowsSemantics=true</c>
         /// and the UPDATE rowcount does not match the batch size. Queries the database for rows
         /// that still carry their original concurrency tokens:
         /// <list type="bullet">
         ///   <item>If all tokens still match (<c>count == batch.Count</c>): the UPDATE returned 0
-        ///     because no column values actually changed (same-value update). No conflict � return.</item>
+        ///     because no column values actually changed (same-value update). No conflict - return.</item>
         ///   <item>If any token is missing (<c>count &lt; batch.Count</c>): a competing writer
-        ///     changed the token. Genuine stale-row conflict � throw <see cref="DbConcurrencyException"/>.</item>
+        ///     changed the token. Genuine stale-row conflict - throw <see cref="DbConcurrencyException"/>.</item>
         /// </list>
         /// </summary>
         private async Task VerifyUpdateOccAsync(DbCommand batchCmd, TableMapping map, List<EntityEntry> batch, CancellationToken ct)
@@ -1387,7 +1387,7 @@ namespace nORM.Core
 
             cmd.CommandText = sb.ToString();
 
-            // Guard against null scalar result � Convert.ToInt32(null) throws ArgumentNullException
+            // Guard against null scalar result - Convert.ToInt32(null) throws ArgumentNullException
             // X2: route through interceptor pipeline so observability tools see verification queries.
             var scalarResult = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
             var matchCount = scalarResult == null || scalarResult is DBNull ? 0 : Convert.ToInt32(scalarResult);
@@ -1396,10 +1396,10 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// S1 � SELECT-then-verify for the single-entity direct UpdateAsync path on affected-row
+        /// S1 - SELECT-then-verify for the single-entity direct UpdateAsync path on affected-row
         /// semantics providers (e.g. MySQL). Called when <c>recordsAffected == 0</c> and
         /// <c>UseAffectedRowsSemantics=true</c> to distinguish a same-value update (token still
-        /// present ? no conflict) from a genuine stale-row conflict (token gone ? throw).
+        /// present -> no conflict) from a genuine stale-row conflict (token gone -> throw).
         /// </summary>
         private async Task VerifySingleUpdateOccAsync<T>(
             DbCommand writeCmd,
@@ -1459,7 +1459,7 @@ namespace nORM.Core
         {
             if (ex is DbException dbEx && Options.RetryPolicy != null)
                 return Options.RetryPolicy.ShouldRetry(dbEx);
-            return false;   // TimeoutException is excluded � retrying a timed-out write can duplicate data.
+            return false;   // TimeoutException is excluded - retrying a timed-out write can duplicate data.
         }
         /// <summary>
         /// Converts a <see cref="TimeSpan"/> to an integer number of seconds, clamping at

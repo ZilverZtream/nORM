@@ -2,13 +2,10 @@ param(
     [switch]$Fix
 )
 
-# Scan the repo for double-encoded UTF-8 (mojibake) in tracked source files. The release gate
-# calls this in scan-only mode. Pass -Fix to repair files in place by re-decoding their text as
-# Windows-1252 and re-encoding as UTF-8 - the inverse of the double-encoding that produces
-# sequences like 'a-tilde Euro-sign' for an em dash.
-#
-# Detection works at the BYTE level using known mojibake byte sequences so the script itself is
-# pure ASCII and cannot become double-encoded.
+# Scan the repo for double-encoded UTF-8 (mojibake) and replacement characters in tracked source
+# files. The release gate calls this in scan-only mode. Pass -Fix to repair files in place by
+# re-decoding repairable mojibake as Windows-1252 and re-encoding as UTF-8 - the inverse of the
+# common double-encoding that produces sequences like 'a-tilde Euro-sign' for an em dash.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -30,68 +27,81 @@ $targets = Get-ChildItem -Path $root -Recurse -File -Include '*.cs','*.md','*.ps
         return $_.FullName -notmatch '\\bin\\|\\obj\\|\\TestResults\\|\\\.git\\|\\BenchmarkDotNet\\|\\artifacts\\|node_modules|\\\.dotnet-home\\|\\\.claude\\'
     }
 
-# Mojibake byte signatures. The first byte 0xC3 (a-tilde in UTF-8) followed by other multi-byte
-# UTF-8 sequences from the 0xC2-0xC5 / 0xE2 ranges is the signature of Windows-1252 text
-# mis-decoded as UTF-8 then re-encoded. We look for the most common variants.
-function Test-FileHasMojibake {
-    param([byte[]]$Bytes)
-    # Build signatures as raw byte arrays (PowerShell array-of-arrays syntax is unreliable).
-    $sigA = [byte[]](0xC3, 0xA2, 0xE2, 0x82, 0xAC)      # 'a-tilde Euro' prefix of em dash, en dash, etc.
-    $sigB = [byte[]](0xC3, 0x83, 0xC2, 0xA9)            # mojibake e-acute
-    $sigC = [byte[]](0xC3, 0x83, 0xC2, 0xB6)            # mojibake o-umlaut
-    $sigD = [byte[]](0xC3, 0x83, 0xC2, 0xA4)            # mojibake a-umlaut
-    $sigE = [byte[]](0xC3, 0x83, 0xC2, 0xBC)            # mojibake u-umlaut
-    $signatures = @(,$sigA) + @(,$sigB) + @(,$sigC) + @(,$sigD) + @(,$sigE)
-    foreach ($sig in $signatures) {
-        if ($Bytes.Length -lt $sig.Length) { continue }
-        for ($i = 0; $i -le ($Bytes.Length - $sig.Length); $i++) {
-            $match = $true
-            for ($j = 0; $j -lt $sig.Length; $j++) {
-                if ($Bytes[$i + $j] -ne $sig[$j]) { $match = $false; break }
-            }
-            if ($match) { return $true }
-        }
+$replacementChar = [string][char]0xFFFD
+$replacementSequence = -join ([char]0x00EF, [char]0x00BF, [char]0x00BD)
+$repairableLeadChars = @(
+    [string][char]0x00E2, # a-tilde: common lead char for double-encoded dashes/arrows
+    [string][char]0x00C3  # A-tilde: common lead char for double-encoded accented letters
+)
+
+function Test-TextHasReplacementMarker {
+    param([string]$Text)
+
+    return $Text.IndexOf($replacementChar, [StringComparison]::Ordinal) -ge 0 -or
+        $Text.IndexOf($replacementSequence, [StringComparison]::Ordinal) -ge 0
+}
+
+function Test-TextHasRepairableMojibakeMarker {
+    param([string]$Text)
+
+    foreach ($lead in $repairableLeadChars) {
+        if ($Text.IndexOf($lead, [StringComparison]::Ordinal) -ge 0) { return $true }
     }
     return $false
+}
+
+function Test-TextHasMojibakeMarker {
+    param([string]$Text)
+
+    return (Test-TextHasReplacementMarker -Text $Text) -or
+        (Test-TextHasRepairableMojibakeMarker -Text $Text)
 }
 
 $hits = [System.Collections.Generic.List[string]]::new()
 
 foreach ($file in $targets) {
     $bytes = [IO.File]::ReadAllBytes($file.FullName)
-    if (-not (Test-FileHasMojibake -Bytes $bytes)) { continue }
+    $hadBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    if ($hadBom) {
+        $payloadBytes = New-Object byte[] ($bytes.Length - 3)
+        [Array]::Copy($bytes, 3, $payloadBytes, 0, $bytes.Length - 3)
+    } else {
+        $payloadBytes = $bytes
+    }
+
+    $text = [Text.Encoding]::UTF8.GetString($payloadBytes)
+    $hasRepairable = Test-TextHasRepairableMojibakeMarker -Text $text
+    $hasReplacement = Test-TextHasReplacementMarker -Text $text
+    if (-not $hasRepairable -and -not $hasReplacement) { continue }
 
     $relative = $file.FullName.Substring($root.Length + 1)
-    if ($Fix) {
+    if ($Fix -and $hasRepairable) {
         # Preserve a leading UTF-8 BOM (EF BB BF). Without this guard the round-trip via
         # Windows-1252 mangles the BOM bytes into a literal '?' character, which corrupts the
         # file's first line for compilers that distinguish BOM-as-marker from BOM-as-text.
-        $hadBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
-        if ($hadBom) {
-            # Copy [3..end] into a fresh byte[] using Array.Copy rather than PowerShell range
-            # slicing, which silently returned Object[] subsets that broke UTF-8 round-tripping.
-            $payloadBytes = New-Object byte[] ($bytes.Length - 3)
-            [Array]::Copy($bytes, 3, $payloadBytes, 0, $bytes.Length - 3)
-        } else {
-            $payloadBytes = $bytes
-        }
-        $text = [Text.Encoding]::UTF8.GetString($payloadBytes)
         $reinterpreted = [Text.Encoding]::GetEncoding(1252).GetBytes($text)
         $repaired = [Text.Encoding]::UTF8.GetString($reinterpreted)
         # Write back with the same BOM state the file had on disk.
         $encoding = [Text.UTF8Encoding]::new($hadBom)
         [IO.File]::WriteAllText($file.FullName, $repaired, $encoding)
-        Write-Host "FIXED $relative (BOM preserved: $hadBom)"
-    } else {
-        $hits.Add($relative)
+        $updatedText = [IO.File]::ReadAllText($file.FullName)
+        if (-not (Test-TextHasMojibakeMarker -Text $updatedText)) {
+            Write-Host "FIXED $relative (BOM preserved: $hadBom)"
+            continue
+        }
+        $hits.Add("$relative (manual cleanup required after repair)")
+        continue
     }
+
+    $hits.Add($relative)
+}
+
+if ($hits.Count -gt 0) {
+    Write-Host "Mojibake or replacement-character markers detected in:"
+    $hits | ForEach-Object { Write-Host "  $_" }
+    throw "Encoding check failed: $($hits.Count) file(s) contain mojibake or replacement characters. Run eng/scripts/check-encoding.ps1 -Fix for repairable double-encoding; replace U+FFFD markers manually."
 }
 
 if (-not $Fix) {
-    if ($hits.Count -gt 0) {
-        Write-Host "Mojibake sequences detected in:"
-        $hits | ForEach-Object { Write-Host "  $_" }
-        throw "Encoding check failed: $($hits.Count) file(s) contain double-encoded text. Run eng/scripts/check-encoding.ps1 -Fix to repair."
-    }
     Write-Host "Encoding check: no mojibake detected."
 }

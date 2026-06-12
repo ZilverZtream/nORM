@@ -466,8 +466,8 @@ public class DocumentationContractTests
         Assert.Contains("*.scratch.ps1", gitignore, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(root, "eng", "v1-release-gate.ps1")));
         Assert.Contains("PowerShell scripts are not globally ignored", policy, StringComparison.Ordinal);
-        Assert.DoesNotContain("â", ci, StringComparison.Ordinal);
-        Assert.DoesNotContain("─", ci, StringComparison.Ordinal);
+        Assert.DoesNotContain(((char)0x00E2).ToString(), ci, StringComparison.Ordinal);
+        Assert.DoesNotContain(((char)0x2500).ToString(), ci, StringComparison.Ordinal);
     }
 
     [Fact]

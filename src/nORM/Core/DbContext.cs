@@ -54,7 +54,7 @@ namespace nORM.Core
         private const int SqlServerDeadlockErrorNumber = 1205;
         /// <summary>Number of parameters reserved for internal use (e.g. tenant, timestamp) when computing batch sizes.</summary>
         private const int ParameterBudgetReserve = 10;
-        /// <summary>Jitter range (�) applied to retry backoff delays to prevent thundering herd.</summary>
+        /// <summary>Jitter range (+/-20%) applied to retry backoff delays to prevent thundering herd.</summary>
         private const double RetryJitterRange = 0.2;
         /// <summary>Maximum seconds to wait for the cleanup timer to drain during dispose.</summary>
         private const int CleanupTimerDrainTimeoutSeconds = 5;
@@ -160,7 +160,7 @@ namespace nORM.Core
 
         // Internal constructor that allows callers (e.g. migration runners) to pass an
         // externally-owned connection. When ownsConnection is false, Dispose/DisposeAsync will NOT
-        // close or dispose the connection � the caller retains full ownership.
+        // close or dispose the connection - the caller retains full ownership.
         internal DbContext(DbConnection cn, DatabaseProvider p, DbContextOptions? options, bool ownsConnection)
         {
             _cn = cn ?? throw new ArgumentNullException(nameof(cn));
@@ -265,7 +265,7 @@ namespace nORM.Core
             if (ct.IsCancellationRequested)
                 return Task.FromCanceled<DbConnection>(ct);
 
-            // Fast path � connection already open, provider initialized, and temporal init either
+            // Fast path - connection already open, provider initialized, and temporal init either
             // not needed or already complete. Returns a cached Task to avoid async state machine allocation.
             if (_cn.State == ConnectionState.Open && _providerInitialized &&
                 NativeTenantSessionIsCurrent() &&
@@ -361,7 +361,7 @@ namespace nORM.Core
                     }
                 }
             }
-            // A1/X1: Parity with EnsureConnectionSlowAsync � run temporal bootstrap on
+            // A1/X1: Parity with EnsureConnectionSlowAsync - run temporal bootstrap on
             // sync entry paths too.
             //
             // Sync-over-async (.GetAwaiter().GetResult()) is safe here because:
@@ -769,7 +769,7 @@ namespace nORM.Core
                 var mapping = GetMapping(typeof(T));
                 return _compiledQueryMaterializerFactory.CreateMaterializer<T>(mapping);
             }
-            // Entity not registered in this context � no runtime fluent config can override the
+            // Entity not registered in this context - no runtime fluent config can override the
             // compiled materializer, so use it directly without guards.
             if (SourceGeneration.CompiledMaterializerStore.TryGet(typeof(T), tableName, out var compiledUntyped))
             {
@@ -861,7 +861,7 @@ namespace nORM.Core
             int h = 0;
             foreach (var mapping in GetAllMappings())
             {
-                // Q1/C1/Cache1 fix: include full mapping shape � not just Type+TableName.
+                // Q1/C1/Cache1 fix: include full mapping shape - not just Type+TableName.
                 // Column names, converter fingerprint, shadow fingerprint, tenant column,
                 // and timestamp column all affect SQL generation and materialization.
                 // Without these, divergent fluent configurations sharing the same CLR type
@@ -891,7 +891,7 @@ namespace nORM.Core
         internal void RegisterEntityType(Type t) => _entityQueryRoots.TryAdd(t, 0);
 
         /// <summary>
-        /// Returns true when the type is a known entity root � either explicitly
+        /// Returns true when the type is a known entity root - either explicitly
         /// registered with the ModelBuilder OR used as a direct query root via Query&lt;T&gt;.
         /// DTO projection results (from .Select(x => new Dto {...})) are never query roots
         /// and will NOT be tracked, preventing ChangeTracker pollution.
@@ -1021,7 +1021,7 @@ namespace nORM.Core
             if (!IsSafeIdentifier(tableName))
                 throw new NormUsageException("Invalid table name.");
             // Gate C fix: Use normalized full connection string instead of 32-bit hash to
-            // eliminate key collision risk. GetHashCode() is a 32-bit projection � two
+            // eliminate key collision risk. GetHashCode() is a 32-bit projection - two
             // distinct connection strings can share the same hash, causing schema aliasing
             // where queries against different databases return stale type definitions.
             // Normalizing (sort key=value pairs, lowercase) also ensures that identical
@@ -1106,7 +1106,7 @@ namespace nORM.Core
             var tenantCol = RequireTenantColumn(map, operation.ToString());
             var tenantId = GetRequiredTenantId(map, operation.ToString());
             var entityTenant = tenantCol.Getter(entity);
-            // Auto-injecting tenant ID is dangerous � developers might intend null for global records.
+            // Auto-injecting tenant ID is dangerous - developers might intend null for global records.
             // Requiring explicit tenant ID setting prevents accidental data leakage.
             if (entityTenant == null)
             {
@@ -1442,7 +1442,7 @@ namespace nORM.Core
                 await ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
                 var p0 = _p.ParamPrefix + "p0";
                 var p1 = _p.ParamPrefix + "p1";
-                // Use provider-escaped identifiers � raw table/column names are not safe across all
+                // Use provider-escaped identifiers - raw table/column names are not safe across all
                 // providers (e.g. SQL Server reserves "Timestamp" as a type keyword).
                 await using var cmd = ctx.CreateCommand();
                 cmd.CommandText = _p.GetCreateTagSql(p0, p1);

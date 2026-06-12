@@ -259,7 +259,7 @@ namespace nORM.Query
         /// NOTE on the <c>ref parameters</c> pattern: the <paramref name="parameters"/> argument is passed
         /// by-ref so that this method can replace the caller's <see cref="_emptyParams"/> sentinel with a
         /// freshly-allocated dictionary when the predicate requires a parameter binding. Callers must not
-        /// cache the dictionary reference across calls — each invocation may replace it. The <c>out whereClause</c>
+        /// cache the dictionary reference across calls - each invocation may replace it. The <c>out whereClause</c>
         /// is always set (to <see cref="string.Empty"/> on failure) so callers can safely ignore it when the
         /// method returns <c>false</c>.
         /// </para>
@@ -365,7 +365,7 @@ namespace nORM.Query
 
         private Task<TResult> ExecuteCountFastAsync<TResult>(string sql, Dictionary<string, object> parameters, CancellationToken ct)
         {
-            // Non-async entry point — avoids state machine when connection is already open.
+            // Non-async entry point - avoids state machine when connection is already open.
             var ensureTask = _ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
                 return ExecuteCountFastSlowAsync<TResult>(ensureTask, sql, parameters, ct);
@@ -378,7 +378,7 @@ namespace nORM.Query
                 {
                     var c = ctx.CreateCommand();
                     c.CommandText = s;
-                    // Prepare() is optional — some providers throw NotSupportedException or InvalidOperationException.
+                    // Prepare() is optional - some providers throw NotSupportedException or InvalidOperationException.
                     try { c.Prepare(); } catch (NotSupportedException) { } catch (InvalidOperationException) { }
                     return (c, new object());
                 }, _ctx);
@@ -386,7 +386,7 @@ namespace nORM.Query
                 lock (entry.Lock)
                 {
                     ct.ThrowIfCancellationRequested();
-                    // Rebind CurrentTransaction on every use — CreateCommand() only binds the
+                    // Rebind CurrentTransaction on every use - CreateCommand() only binds the
                     // transaction at creation time; reuse across transaction changes would run
                     // the count against a stale (or null) transaction binding.
                     entry.Cmd.Transaction = _ctx.CurrentTransaction;

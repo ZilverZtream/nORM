@@ -42,8 +42,8 @@ namespace nORM.Core
                     && ReferenceEquals(prepared.BoundTransaction, null))
                 {
                     // Skip EnableLazyLoading on insert fast path.
-                    // Entities being inserted don't need lazy loading proxies � they're being
-                    // written to DB, not read from it. Saves ~2-5�s ConditionalWeakTable + reflection.
+                    // Entities being inserted don't need lazy loading proxies - they're being
+                    // written to DB, not read from it. Saves ~2-5us ConditionalWeakTable + reflection.
                     return prepared.ExecuteAsync(entity, ct);
                 }
             }
@@ -238,7 +238,7 @@ namespace nORM.Core
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable � satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
             finally
             {
@@ -310,7 +310,7 @@ namespace nORM.Core
                 WriteOperation.Delete => _p.BuildDelete(map, includeTenant),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             };
-            // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries � use base timeout
+            // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries - use base timeout
             // to avoid SQL string scanning in GetAdaptiveTimeout.
             cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
             var originalToken = ChangeTracker.GetEntryOrDefault(entity)?.OriginalToken;
@@ -331,7 +331,7 @@ namespace nORM.Core
                 // S1: On affected-row semantics providers (e.g. MySQL default), 0 rows affected from
                 // an UPDATE can mean either a stale OCC token OR a same-value update (no columns
                 // actually changed). Disambiguate with a SELECT-then-verify, mirroring ExecuteUpdateBatch.
-                // DELETE has no same-value ambiguity � always a genuine conflict.
+                // DELETE has no same-value ambiguity - always a genuine conflict.
                 if (Provider.UseAffectedRowsSemantics && operation == WriteOperation.Update)
                     await VerifySingleUpdateOccAsync(cmd, map, entity, originalToken, ct).ConfigureAwait(false);
                 else
@@ -370,7 +370,7 @@ namespace nORM.Core
                     {
                         // Use the original snapshot token (not the current possibly-mutated property value)
                         // to match the concurrency predicate parity of the batched SaveChanges path.
-                        // Fallback to current property value when originalToken is null � this happens
+                        // Fallback to current property value when originalToken is null - this happens
                         // for entities that were attached without going through full snapshot tracking
                         // (e.g. manual Attach() or first-time tracked entities where no snapshot was
                         // captured yet). In that case the current property value is the best available
@@ -379,7 +379,7 @@ namespace nORM.Core
                         cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     // X1: bind tenant param to match the WHERE predicate added by BuildUpdate(includeTenant=true).
-                    // Skip if TenantColumn is already in UpdateColumns � same @PropName is already bound
+                    // Skip if TenantColumn is already in UpdateColumns - same @PropName is already bound
                     // for the SET clause, and SQLite/ADO.NET providers reuse named params by name, so
                     // the SET-bound value is used for the WHERE predicate too. Adding it twice throws.
                     if (Options.TenantProvider != null)
@@ -400,7 +400,7 @@ namespace nORM.Core
                     if (map.TimestampColumn != null)
                     {
                         // Fallback: use current property value when originalToken is null (same
-                        // rationale as the Update case above � entities attached without snapshot).
+                        // rationale as the Update case above - entities attached without snapshot).
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
                         cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
@@ -674,7 +674,7 @@ namespace nORM.Core
 
             // Gate B fix: Always populate the parameter dictionary so that ValidateRawSql
             // receives accurate parameter metadata regardless of logging state.
-            // The dictionary is required for validation (not just logging) � decoupling the
+            // The dictionary is required for validation (not just logging) - decoupling the
             // two concerns ensures parameterized queries are never incorrectly flagged by
             // the validator when debug logging is disabled.
             if (parameters.Length == 0)

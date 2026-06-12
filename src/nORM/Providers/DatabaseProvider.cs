@@ -305,7 +305,7 @@ namespace nORM.Providers
         /// Builds SQL for <c>new DateTimeOffset(year, month, day, hour, minute, second, offset)</c>
         /// when at least one of the date/time parts is a column expression and the
         /// <paramref name="offset"/> is a compile-time constant. Producing canonical
-        /// ISO-8601 text (<c>yyyy-MM-ddTHH:mm:ss±HH:MM</c>) lets the materialiser
+        /// ISO-8601 text (<c>yyyy-MM-ddTHH:mm:ss+/-HH:MM</c>) lets the materialiser
         /// route through <c>DateTimeOffset.Parse</c> uniformly across providers.
         ///
         /// Default implementation uses CASE-based zero-padding so it works on every
@@ -359,7 +359,7 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// Renders a <see cref="TimeSpan"/> offset as the trailing <c>±HH:MM</c>
+        /// Renders a <see cref="TimeSpan"/> offset as the trailing <c>+/-HH:MM</c>
         /// suffix that <see cref="System.DateTimeOffset.Parse(string, System.IFormatProvider)"/>
         /// accepts.
         /// </summary>
@@ -569,7 +569,7 @@ namespace nORM.Providers
 
         /// <summary>
         /// Returns provider-specific SQL to probe for the existence of a history table.
-        /// Default uses SELECT 1 … LIMIT 1 (SQLite/MySQL/Postgres).
+        /// Default uses SELECT 1 ... LIMIT 1 (SQLite/MySQL/Postgres).
         /// SQL Server overrides this to use SELECT TOP 1.
         /// </summary>
         /// <param name="escapedHistoryTable">The already-escaped history table name.</param>
@@ -674,7 +674,7 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
-        /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation —
+        /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation -
         /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
         /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native
         /// text type (NVARCHAR(MAX) on SQL Server, TEXT on SQLite/Postgres, CHAR on MySQL).
@@ -692,7 +692,7 @@ namespace nORM.Providers
         /// <summary>
         /// Returns SQL that XORs two integer expressions. SQL Server and MySQL accept the
         /// `^` operator; PostgreSQL uses `#`; SQLite has no XOR operator and falls back to
-        /// `(a | b) - (a &amp; b)` — algebraically equivalent on integers.
+        /// `(a | b) - (a &amp; b)` - algebraically equivalent on integers.
         /// </summary>
         public virtual string GetBitwiseXorSql(string left, string right) => $"({left} ^ {right})";
 
@@ -720,7 +720,7 @@ namespace nORM.Providers
         /// <summary>
         /// Wraps a SQL operand for numeric TimeSpan comparison. SQL Server / Postgres /
         /// MySQL store TimeSpan in native TIME / INTERVAL types whose comparison operators
-        /// already use numeric ordering — the default is identity. SQLite stores TimeSpan
+        /// already use numeric ordering - the default is identity. SQLite stores TimeSpan
         /// as canonical 'c' TEXT (<c>"d.hh:mm:ss.fffffff"</c>) and lex-compares, which
         /// silently mis-orders multi-day durations ("10.00:00:00" &lt; "9.23:59:59"
         /// lexicographically but 10 days &gt; 9 days 23 hours). SqliteProvider overrides
@@ -854,8 +854,8 @@ namespace nORM.Providers
 
         /// <summary>
         /// Ordered variant: STRING_AGG with an ORDER BY clause inside the aggregate.
-        /// SQL Server uses <c>WITHIN GROUP (ORDER BY …)</c>; Postgres puts ORDER BY
-        /// inside the function; MySQL differs — those providers override.
+        /// SQL Server uses <c>WITHIN GROUP (ORDER BY expression)</c>; Postgres puts ORDER BY
+        /// inside the function; MySQL differs - those providers override.
         /// </summary>
         public virtual string GetStringAggregateSql(string expr, string sepLiteral, string orderBySql)
             => $"STRING_AGG({expr}, {sepLiteral}) WITHIN GROUP (ORDER BY {orderBySql})";
@@ -1090,7 +1090,7 @@ namespace nORM.Providers
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as the wall-clock DateTime at
-        /// <paramref name="localOffset"/> — i.e. the value of
+        /// <paramref name="localOffset"/> - i.e. the value of
         /// <see cref="DateTimeOffset.LocalDateTime"/> for one concrete local
         /// offset. Query translation composes this provider hook inside a
         /// generated timezone-offset range CASE expression so each row uses the
@@ -1142,7 +1142,7 @@ namespace nORM.Providers
         /// Returns SQL that parses <paramref name="innerSql"/> (a textual expression) as a
         /// 32- or 64-bit signed integer. Used to translate <c>int.Parse(col)</c> /
         /// <c>long.Parse(col)</c>. Most providers accept ANSI <c>CAST(x AS INTEGER)</c>;
-        /// MySQL requires <c>CAST(x AS SIGNED)</c> instead — override on the MySQL provider.
+        /// MySQL requires <c>CAST(x AS SIGNED)</c> instead - override on the MySQL provider.
         /// </summary>
         public virtual string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS {(asLong ? "BIGINT" : "INTEGER")})";
@@ -1546,7 +1546,7 @@ namespace nORM.Providers
         {
             ValidateConnection(ctx.RawConnection);
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
-            // All columns are DB-generated — use DEFAULT VALUES per row (no batching possible).
+            // All columns are DB-generated - use DEFAULT VALUES per row (no batching possible).
             if (cols.Count == 0)
             {
                 var inserted = 0;
@@ -1666,7 +1666,7 @@ namespace nORM.Providers
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable — satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
             finally
             {
@@ -1782,7 +1782,7 @@ namespace nORM.Providers
                     }
                 }
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
-                throw; // unreachable — satisfies compiler
+                throw; // unreachable - satisfies compiler
             }
             finally
             {
@@ -1859,7 +1859,7 @@ namespace nORM.Providers
                     whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                 }
                 // X1: include tenant column in WHERE so direct UpdateAsync cannot cross-write rows
-                // belonging to other tenants — parity with the batched SaveChangesAsync path.
+                // belonging to other tenants - parity with the batched SaveChangesAsync path.
                 if (includeTenant && m.TenantColumn != null)
                     whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
@@ -1890,7 +1890,7 @@ namespace nORM.Providers
                     whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
                 }
                 // X1: include tenant column in WHERE so direct DeleteAsync cannot cross-delete rows
-                // belonging to other tenants — parity with the batched SaveChangesAsync path.
+                // belonging to other tenants - parity with the batched SaveChangesAsync path.
                 if (includeTenant && m.TenantColumn != null)
                     whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);

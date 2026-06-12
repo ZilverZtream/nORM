@@ -74,6 +74,13 @@ Local and CI test outputs belong under ignored artifact paths:
 
 Release-gate TRX files are uploaded as CI artifacts, not committed source.
 
+## Encoding Gate
+
+`eng/scripts/check-encoding.ps1` runs in the v1 release gate and rejects
+replacement characters plus common double-encoded mojibake markers. Keep marker
+examples encoded as character codes or in the script's explicit excluded docs so
+the scan stays actionable.
+
 ## Legacy Coverage Files
 
 The `CoverageBoost*.cs` files are legacy regression suites that predate the v1

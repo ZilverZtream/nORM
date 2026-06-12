@@ -62,7 +62,7 @@ namespace nORM.Query
         private static readonly Timer _cacheLockCleanupTimer = new(CleanupCacheLocks, null, CacheLockCleanupInterval, CacheLockCleanupInterval);
         // Cache GetElementType results to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, Type> _elementTypeCache = new();
-        // Singleton MaterializerFactory � only wraps static caches, no instance state.
+        // Singleton MaterializerFactory - only wraps static caches, no instance state.
         private static readonly MaterializerFactory _sharedMaterializerFactory = new();
         // Cache constructor existence checks to avoid repeated reflection.
         private static readonly ConcurrentDictionary<Type, bool> _constrainedQueryableCache = new();
@@ -123,10 +123,10 @@ namespace nORM.Query
         public void Dispose()
         {
             foreach (var entry in _pooledCountCommands.Values)
-                try { entry.Cmd.Dispose(); } catch (ObjectDisposedException) { /* already disposed � safe to ignore */ }
+                try { entry.Cmd.Dispose(); } catch (ObjectDisposedException) { /* already disposed - safe to ignore */ }
             _pooledCountCommands.Clear();
             foreach (var entry in _pooledPlanCommands.Values)
-                try { entry.Command.Dispose(); } catch (ObjectDisposedException) { /* already disposed � safe to ignore */ }
+                try { entry.Command.Dispose(); } catch (ObjectDisposedException) { /* already disposed - safe to ignore */ }
             _pooledPlanCommands.Clear();
 
             // C1: stop background timers when the last provider is disposed so the process
@@ -213,7 +213,7 @@ namespace nORM.Query
 
             // Remove in separate pass to avoid concurrent modification.
             // Use value-matching TryRemove so we don't accidentally remove a
-            // concurrently re-inserted semaphore for the same key. Do NOT dispose �
+            // concurrently re-inserted semaphore for the same key. Do NOT dispose -
             // threads holding a reference obtained via GetOrAdd before this removal can
             // still call Wait/WaitAsync safely on the semaphore. GC will collect it once
             // all references drop. SemaphoreSlim only allocates its underlying event lazily
@@ -255,7 +255,7 @@ namespace nORM.Query
         /// </summary>
         public TResult ExecuteSync<TResult>(Expression expression)
         {
-            // Queryable.Aggregate with a sum-fold accumulator � rewrite to
+            // Queryable.Aggregate with a sum-fold accumulator - rewrite to
             // SUM at translation time so we don't materialise the full result
             // set client-side. Supported shapes: 1-arg `(acc, x) => acc + x`
             // and 2-arg `seed, (acc, x) => acc + sub(x)`. Other Aggregate
@@ -286,7 +286,7 @@ namespace nORM.Query
                 return false;
 
             // Three Aggregate overloads: 2 args (source, func), 3 args (source, seed, func),
-            // 4 args (source, seed, func, resultSelector � unsupported).
+            // 4 args (source, seed, func, resultSelector - unsupported).
             LambdaExpression? fold;
             object? seed;
             Type seedType;
@@ -344,7 +344,7 @@ namespace nORM.Query
             if (ReferencesParameter(sub, accParam)) return false;
 
             // Build the equivalent Queryable.Sum call. nORM's DirectAggregate
-            // translator only emits SUM SQL when given a selector lambda � the
+            // translator only emits SUM SQL when given a selector lambda - the
             // no-selector overload Sum(IQueryable<T>) materialises the list
             // and aggregates client-side. Always synthesize the selector form
             // so the aggregation happens on the server.
@@ -464,7 +464,7 @@ namespace nORM.Query
             result = default!;
             // Try to detect "isMax" (true = MAX, false = MIN, null = no match).
             bool? isMax = null;
-            // Math.Max(acc, x) / Math.Min(acc, x) � order-insensitive args.
+            // Math.Max(acc, x) / Math.Min(acc, x) - order-insensitive args.
             if (fold.Body is MethodCallExpression mathCall
                 && mathCall.Method.DeclaringType == typeof(Math)
                 && mathCall.Arguments.Count == 2
@@ -474,7 +474,7 @@ namespace nORM.Query
                 if (mathCall.Method.Name == nameof(Math.Max)) isMax = true;
                 else if (mathCall.Method.Name == nameof(Math.Min)) isMax = false;
             }
-            // Conditional: x [>/<] acc ? x : acc � or acc [>/<] x ? acc : x.
+            // Conditional: x [>/<] acc ? x : acc - or acc [>/<] x ? acc : x.
             else if (fold.Body is ConditionalExpression cond
                      && cond.Test is BinaryExpression cmp
                      && (cmp.NodeType == ExpressionType.GreaterThan
@@ -673,7 +673,7 @@ namespace nORM.Query
             if (groupByMethod == null) throw new InvalidOperationException("DBG-SC6: groupByMethod is null");
             var groupByCall = Expression.Call(groupByMethod.MakeGenericMethod(sourceGenArg, typeof(int)), groupedSource, Expression.Quote(groupKeyLambda));
 
-            // Inside the result selector: g.Select(<projLambda>) � Enumerable.Select
+            // Inside the result selector: g.Select(<projLambda>) - Enumerable.Select
             // (NOT Queryable.Select; the second param is Func<,>, not Expression<Func<,>>).
             var iGroupingType = typeof(System.Linq.IGrouping<,>).MakeGenericType(typeof(int), sourceGenArg);
             var enumerableSelect = typeof(System.Linq.Enumerable).GetMethods()
@@ -698,11 +698,11 @@ namespace nORM.Query
             if (stringJoinMethod == null) throw new InvalidOperationException("DBG-SC8: stringJoinMethod null");
             var joinCall = Expression.Call(stringJoinMethod, Expression.Constant(sep), innerSelectCall);
 
-            // Wrap in Select(g => new { V = string.Join(...) }) � the existing
+            // Wrap in Select(g => new { V = string.Join(...) }) - the existing
             // IGrouping-projection path emits BOTH groupKey AND value columns
             // for a scalar MethodCall body (Aggregates.cs:184). The single-
             // field NewExpression takes the NewExpression branch which only
-            // emits the explicit args � exactly one column (the joined value)
+            // emits the explicit args - exactly one column (the joined value)
             // so the scalar materialiser reads it correctly.
             var anonType = typeof(StringConcatAggResult);
             var anonCtor = anonType.GetConstructor(new[] { typeof(string) })!;
@@ -750,7 +750,7 @@ namespace nORM.Query
             sep = "";
             // Direct string constant: ", "
             if (TryEvaluateConstant(sepExpr, out var v) && v is string s1) { sep = s1; return true; }
-            // Conditional: (acc == "" ? "" : sep) � extract the non-empty branch.
+            // Conditional: (acc == "" ? "" : sep) - extract the non-empty branch.
             if (sepExpr is ConditionalExpression cond)
             {
                 if (TryEvaluateConstant(cond.IfTrue, out var t) && t is string tStr
@@ -824,7 +824,7 @@ namespace nORM.Query
                 return ExecuteCountAsync<TResult>(countSql, countParameters, ct);
             }
 
-            // Fast path � bypass translator for recognized simple patterns
+            // Fast path - bypass translator for recognized simple patterns
             if (TryExecuteFastPath<TResult>(expression, ct, out var fastResult))
                 return fastResult;
             // Simple query path (slightly higher overhead than fast path but handles more patterns)
@@ -992,7 +992,7 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             // For cached queries, use the closure-based path (rare).
-            // For non-cached queries (common), return task directly � no async state machine needed.
+            // For non-cached queries (common), return task directly - no async state machine needed.
             if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
             {
                 return ExecuteInternalCachedAsync<TResult>(plan, paramValues, sw, ct);
@@ -1009,7 +1009,7 @@ namespace nORM.Query
             return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
         }
         /// <summary>
-        /// Non-async entry point � does synchronous command setup when connection is ready,
+        /// Non-async entry point - does synchronous command setup when connection is ready,
         /// then dispatches to the appropriate async materializer. Avoids one async state machine
         /// allocation on the hot path.
         /// </summary>
@@ -1023,7 +1023,7 @@ namespace nORM.Query
             if (CanUsePooledPlanCommand<TResult>(plan, paramValues))
                 return ExecutePooledQueryPlanSync<TResult>(plan, paramValues, sw, ct);
 
-            // Synchronous command setup � no async state machine needed
+            // Synchronous command setup - no async state machine needed
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
@@ -1034,7 +1034,7 @@ namespace nORM.Query
             // inspecting the token; the sync dispatchers below never check it either.
             ct.ThrowIfCancellationRequested();
 
-            // Dispatch directly to materializer � avoids wrapping in another async method
+            // Dispatch directly to materializer - avoids wrapping in another async method
             if (plan.IsScalar)
             {
                 // Sync scalar for providers without true async I/O (SQLite)
@@ -1044,7 +1044,7 @@ namespace nORM.Query
             }
 
             // For providers that don't support true async I/O (SQLite), use fully synchronous
-            // materialization to eliminate per-row ReadAsync state machine overhead (~50ns � N rows).
+            // materialization to eliminate per-row ReadAsync state machine overhead (~50ns x N rows).
             if (_ctx.RawProvider.PrefersSyncExecution || _ctx.RawProvider.PrefersSyncQueryPlanExecution)
                 return ExecuteListPlanSyncWrapped<TResult>(plan, cmd, sw);
 
@@ -1054,7 +1054,7 @@ namespace nORM.Query
             return ExecuteListPlanAsync<TResult>(plan, cmd, sw, ct);
         }
 
-        /// <summary>PERF: Slow path � connection needs initialization.</summary>
+        /// <summary>PERF: Slow path - connection needs initialization.</summary>
         private async Task<TResult> ExecuteQueryFromPlanSlowAsync<TResult>(Task<DbConnection> ensureTask, QueryPlan plan, IReadOnlyList<object?>? paramValues, Stopwatch? sw, CancellationToken ct)
         {
             await ensureTask.ConfigureAwait(false);
@@ -1207,7 +1207,7 @@ namespace nORM.Query
                 if (plan.MethodName is "Min" or "Max" or "Average" &&
                     typeof(TResult).IsValueType && Nullable.GetUnderlyingType(typeof(TResult)) == null)
                     throw new InvalidOperationException("Sequence contains no elements");
-                // LINQ-to-Objects Sum returns 0 for empty / all-null source � even for
+                // LINQ-to-Objects Sum returns 0 for empty / all-null source - even for
                 // nullable element types (`Enumerable.Sum(IEnumerable<decimal?>)` returns 0,
                 // not null). SQL `SUM(col)` returns NULL on the same input, so map NULL to
                 // zero-of-target so the materialized result matches LINQ semantics.
@@ -1250,7 +1250,7 @@ namespace nORM.Query
             return (TResult)Activator.CreateInstance(underlying)!;
         }
 
-        /// <summary>PERF: List&lt;object&gt; materialization path � avoids covariant copy.</summary>
+        /// <summary>PERF: List&lt;object&gt; materialization path - avoids covariant copy.</summary>
         private async Task<List<object>> ExecuteObjectListPlanAsync(QueryPlan plan, DbCommand cmd, Stopwatch? sw, CancellationToken ct)
         {
             var objectList = await _executor.MaterializeAsObjectListAsync(plan, cmd, ct).ConfigureAwait(false);
@@ -1262,7 +1262,7 @@ namespace nORM.Query
         /// <summary>
         /// Fully synchronous materialization wrapped in Task.FromResult.
         /// Eliminates async state machine overhead for providers without true async I/O (SQLite).
-        /// Saves ~50-100ns per Read() call ? ~1-4�s for typical result sets.
+        /// Saves ~50-100ns per Read() call ? ~1-4us for typical result sets.
         /// </summary>
         private Task<TResult> ExecuteListPlanSyncWrapped<TResult>(QueryPlan plan, DbCommand cmd, Stopwatch? sw)
         {
@@ -1844,7 +1844,7 @@ namespace nORM.Query
 
             if (!_ctx.RawProvider.SupportsRowTupleComparison)
             {
-                // SQL Server: row-tuple IN is unsupported � use JOIN-based DELETE/UPDATE.
+                // SQL Server: row-tuple IN is unsupported - use JOIN-based DELETE/UPDATE.
                 // DELETE __nm_tgt FROM Table AS __nm_tgt INNER JOIN (...) AS __nm_cud ON T.pk1 = cud.pk1 ...
                 const string tgtAlias = "__nm_tgt";
                 var joinOn = string.Join(" AND ", pkCols.Select(pk => tgtAlias + "." + pk + " = __nm_cud." + pk));
@@ -1943,7 +1943,7 @@ namespace nORM.Query
             if (plan.Includes.Count > 0)
                 throw new NormUnsupportedFeatureException(
                     "AsAsyncEnumerable does not support Include. Eager-load paths issue a dependent " +
-                    "fetch after the principal materializer completes � incompatible with row-by-row " +
+                    "fetch after the principal materializer completes - incompatible with row-by-row " +
                     "streaming. Use `await query.ToListAsync()` to materialize the fully-loaded set " +
                     "in one round-trip, or remove the Include and reissue the child query manually " +
                     "per principal if streaming is required.");

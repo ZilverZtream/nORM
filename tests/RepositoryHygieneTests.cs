@@ -68,6 +68,19 @@ public sealed class RepositoryHygieneTests
     }
 
     [Fact]
+    public void Encoding_scan_rejects_replacement_and_mojibake_markers()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        var script = File.ReadAllText(Path.Combine(RepoRoot, "eng", "scripts", "check-encoding.ps1"));
+
+        Assert.Contains("Encoding Gate", ownership, StringComparison.Ordinal);
+        Assert.Contains("0xFFFD", script, StringComparison.Ordinal);
+        Assert.Contains("0x00E2", script, StringComparison.Ordinal);
+        Assert.Contains("0x00C3", script, StringComparison.Ordinal);
+        Assert.Contains("Test-TextHasMojibakeMarker", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Production_scaffolding_files_stay_split_by_responsibility()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
