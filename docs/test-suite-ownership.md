@@ -173,11 +173,11 @@ in the matching partial test file or create a new command-area file.
 
 ## Query Translator Source Size
 
-The central `QueryTranslator.cs` file stays below 1500 lines so translator state
-and dispatch do not absorb plan generation, post-materialization, or other large
-helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1500 lines.
-Split each partial by operator family before it grows into a catch-all translator
-file. `RepositoryHygieneTests` enforces both boundaries.
+The central `QueryTranslator.cs` file stays below 1000 lines so translator state
+and dispatch do not absorb lifecycle, subquery context, parameter, split-query,
+window-builder, or projection-helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1200 lines. Split each partial by
+operator family before it grows into a catch-all translator file.
+`RepositoryHygieneTests` enforces both boundaries.
 
 ## Query Provider Source Size
 

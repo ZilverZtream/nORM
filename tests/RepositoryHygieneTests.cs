@@ -18,8 +18,8 @@ public sealed class RepositoryHygieneTests
     private const int MaxProviderMobilitySchemaInspectorFileLines = 200;
     private const int MaxProviderMobilityTranslationFileLines = 250;
     private const int MaxCliIntegrationFileLines = 1500;
-    private const int MaxCoreQueryTranslatorFileLines = 1500;
-    private const int MaxQueryTranslatorPartialFileLines = 1500;
+    private const int MaxCoreQueryTranslatorFileLines = 1000;
+    private const int MaxQueryTranslatorPartialFileLines = 1200;
     private const int MaxNormQueryProviderPartialFileLines = 1500;
     private const int MaxSelectClauseVisitorPartialFileLines = 1500;
     private const int MaxExpressionToSqlVisitorPartialFileLines = 1500;
@@ -293,7 +293,7 @@ public sealed class RepositoryHygieneTests
     public void Core_query_translator_file_stays_split_from_plan_and_client_tail_helpers()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("The central `QueryTranslator.cs` file stays below 1500 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("The central `QueryTranslator.cs` file stays below 1000 lines", ownership, StringComparison.Ordinal);
 
         var queryTranslatorPath = Path.Combine(RepoRoot, "src", "nORM", "Query", "QueryTranslator.cs");
         var lineCount = File.ReadLines(queryTranslatorPath).Count();
@@ -307,7 +307,7 @@ public sealed class RepositoryHygieneTests
     public void Query_translator_partials_stay_split_by_operator_family()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("Every `QueryTranslator*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("Every `QueryTranslator*.cs` partial stays below 1200 lines", ownership, StringComparison.Ordinal);
 
         var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "QueryTranslator*.cs")
             .Select(path => new
