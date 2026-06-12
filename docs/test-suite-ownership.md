@@ -124,6 +124,13 @@ recommendations, and report writers remain separate responsibilities.
 `RepositoryHygieneTests` enforces this boundary for
 `src/dotnet-norm/ProviderMobilityCertification*.cs`.
 
+## Provider Mobility Source Scanner Size
+
+Provider mobility source scanner files stay below 200 lines so source traversal,
+rule inventories, source-file scanning, project-file XML scanning, and finding
+classification remain separate responsibilities. `RepositoryHygieneTests`
+enforces this boundary for `src/dotnet-norm/ProviderMobilitySourceScanner*.cs`.
+
 ## Scaffolding Contract Test Sources
 
 Scaffolding contract source-reader helpers stay in

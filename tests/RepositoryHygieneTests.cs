@@ -14,6 +14,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCliScaffoldingFileLines = 200;
     private const int MaxCliDesignTimeFileLines = 200;
     private const int MaxProviderMobilityCertificationFileLines = 200;
+    private const int MaxProviderMobilitySourceScannerFileLines = 200;
     private const int MaxCliIntegrationFileLines = 1500;
     private const int MaxCoreQueryTranslatorFileLines = 1500;
     private const int MaxQueryTranslatorPartialFileLines = 1500;
@@ -196,6 +197,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split provider mobility certification code before it becomes a god object: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Provider_mobility_source_scanner_files_stay_split_by_scan_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Provider mobility source scanner files stay below 200 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "dotnet-norm"), "ProviderMobilitySourceScanner*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxProviderMobilitySourceScannerFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split provider mobility source scanning by traversal, rules, project files, source files, and finding classification before it becomes a god object: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]
