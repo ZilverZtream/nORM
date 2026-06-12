@@ -16,6 +16,78 @@ namespace nORM.Tests;
 
 public sealed partial class LiveProviderScaffoldCliParityTests
 {
+    private static void SetupUnnamedForeignKeyRelationship(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind,
+        string parentTable,
+        string childTable)
+    {
+        CleanupReferentialActionRelationship(connection, provider, childTable, parentTable);
+
+        var parent = provider.Escape(parentTable);
+        var child = provider.Escape(childTable);
+        var id = provider.Escape("Id");
+        var parentId = provider.Escape("ParentId");
+        var name = provider.Escape("Name");
+        var idType = kind == ProviderKind.Sqlite ? "INTEGER" : "int";
+        var text = kind switch
+        {
+            ProviderKind.SqlServer => "nvarchar(80)",
+            ProviderKind.MySql => "varchar(80)",
+            _ => "text"
+        };
+
+        Execute(connection,
+            $"CREATE TABLE {parent} ({id} {idType} NOT NULL PRIMARY KEY, {name} {text} NOT NULL)",
+            $"CREATE TABLE {child} ({id} {idType} NOT NULL PRIMARY KEY, {parentId} {idType} NOT NULL, {name} {text} NOT NULL, " +
+            $"FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}))");
+    }
+
+    private static void SetupCompositePrimaryKeyForeignKey(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind,
+        string parentTable,
+        string childTable,
+        string parentPkName,
+        string fkName)
+    {
+        CleanupCompositePrimaryKeyForeignKey(connection, provider, parentTable, childTable);
+
+        var parent = provider.Escape(parentTable);
+        var child = provider.Escape(childTable);
+        var parentPk = provider.Escape(parentPkName);
+        var id = provider.Escape("Id");
+        var tenantId = provider.Escape("TenantId");
+        var orderNo = provider.Escape("OrderNo");
+        var name = provider.Escape("Name");
+        var notes = provider.Escape("Notes");
+        var idType = kind == ProviderKind.Sqlite ? "INTEGER" : "int";
+        var text = kind switch
+        {
+            ProviderKind.SqlServer => "nvarchar(80)",
+            ProviderKind.MySql => "varchar(80)",
+            _ => "text"
+        };
+
+        Execute(connection,
+            $"CREATE TABLE {parent} ({tenantId} {idType} NOT NULL, {orderNo} {idType} NOT NULL, {name} {text} NOT NULL, CONSTRAINT {parentPk} PRIMARY KEY ({tenantId}, {orderNo}))",
+            $"CREATE TABLE {child} ({id} {idType} NOT NULL PRIMARY KEY, {tenantId} {idType} NOT NULL, {orderNo} {idType} NOT NULL, {notes} {text} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(fkName)} FOREIGN KEY ({tenantId}, {orderNo}) REFERENCES {parent} ({tenantId}, {orderNo}))");
+    }
+
+    private static void CleanupCompositePrimaryKeyForeignKey(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string parentTable,
+        string childTable)
+    {
+        Execute(connection,
+            $"DROP TABLE IF EXISTS {provider.Escape(childTable)}",
+            $"DROP TABLE IF EXISTS {provider.Escape(parentTable)}");
+    }
+
     private static void SetupCompositeForeignKeyToUniqueIndex(
         DbConnection connection,
         DatabaseProvider provider,
