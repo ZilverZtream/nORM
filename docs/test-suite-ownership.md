@@ -102,6 +102,13 @@ remains split by provider, model phase, or generated-code responsibility.
 When a scaffolding change needs more room, split the responsibility into a new
 focused helper instead of growing an existing file.
 
+## CLI Scaffold Source Size
+
+CLI scaffold command files stay below 200 lines so option binding, request
+resolution, execution, output handling, and project/configuration helpers remain
+separate responsibilities. `RepositoryHygieneTests` enforces this boundary for
+`src/dotnet-norm/Program.Scaffolding*.cs`.
+
 ## Scaffolding Contract Test Sources
 
 Scaffolding contract source-reader helpers stay in
