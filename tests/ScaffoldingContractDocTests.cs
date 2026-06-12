@@ -337,6 +337,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipAdapter.Conversions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipAdapter.Keys.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityFileAdapter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityFileAdapter.Conversions.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityFileAdapter.ReadOnly.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsAdapter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsAdapter.JoinTables.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsAdapter.Reports.cs"),
