@@ -135,6 +135,6 @@ in the matching partial test file or create a new command-area file.
 
 The central `QueryTranslator.cs` file stays below 1500 lines so translator state
 and dispatch do not absorb plan generation, post-materialization, or other large
-helper responsibilities. `RepositoryHygieneTests` enforces this boundary for the
-core file; oversized translator partials such as method translators should be
-split by operator family as they are touched.
+helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1500 lines.
+Split each partial by operator family before it grows into a catch-all translator
+file. `RepositoryHygieneTests` enforces both boundaries.

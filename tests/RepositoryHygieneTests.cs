@@ -14,6 +14,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCliScaffoldingFileLines = 200;
     private const int MaxCliIntegrationFileLines = 1500;
     private const int MaxCoreQueryTranslatorFileLines = 1500;
+    private const int MaxQueryTranslatorPartialFileLines = 1500;
 
     [Fact]
     public void Test_project_does_not_suppress_async_warning_as_release_exception()
@@ -175,6 +176,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             lineCount <= MaxCoreQueryTranslatorFileLines,
             $"Keep QueryTranslator.cs focused on translator state and dispatch; split plan generation, post-materialization, or sub-context helpers before it grows back into a god file ({lineCount} lines).");
+    }
+
+    [Fact]
+    public void Query_translator_partials_stay_split_by_operator_family()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `QueryTranslator*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "QueryTranslator*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxQueryTranslatorPartialFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split QueryTranslator partials by operator family before they become god files: " + string.Join(", ", oversizedFiles));
     }
 
     private static string[] GetTrackedFiles()
