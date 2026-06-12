@@ -192,6 +192,14 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Markdown.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Json.cs"));
 
+    private static string ReadEntityWriterSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.Columns.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.Formatting.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.Indexes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.Navigations.cs"));
+
     private static string ReadRoutineStubWriterSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.cs"),
@@ -273,6 +281,7 @@ public partial class ScaffoldingContractDocTests
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
             ReadDatabaseScaffolderSource(),
+            ReadEntityWriterSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.Probes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.ProviderTypes.cs"),
@@ -584,7 +593,7 @@ public partial class ScaffoldingContractDocTests
     public void Source_pins_explicit_system_usings_for_generated_scaffold_artifacts()
     {
         var source = ReadStaticEntityScaffoldSource();
-        var entityWriterSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityWriter.cs");
+        var entityWriterSource = ReadEntityWriterSource();
         var contextWriterSource = ReadContextWriterSource();
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var entityStart = source.IndexOf("public static async Task<string> BuildAsync", StringComparison.Ordinal);

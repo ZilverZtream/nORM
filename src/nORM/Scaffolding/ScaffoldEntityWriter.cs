@@ -1,14 +1,10 @@
 #nullable enable
-using System;
-using System.Globalization;
-using System.Linq;
 using System.Text;
-using nORM.Configuration;
 using static nORM.Scaffolding.ScaffoldCodeText;
 
 namespace nORM.Scaffolding
 {
-    internal static class ScaffoldEntityWriter
+    internal static partial class ScaffoldEntityWriter
     {
         public static string Write(ScaffoldEntityInfo entity)
         {
@@ -46,130 +42,6 @@ namespace nORM.Scaffolding
 
             sb.AppendLine("}");
             return sb.ToString();
-        }
-
-        private static void AppendColumn(StringBuilder sb, ScaffoldEntityColumnInfo column, bool useNullableReferenceTypes)
-        {
-            var typeName = ScaffoldTypeNameHelper.GetTypeName(column.ClrType, column.EffectiveAllowNull, useNullableReferenceTypes);
-            AppendColumnXmlDocumentation(sb, column.ColumnName, column.Comment);
-            if (column.IsKey)
-                sb.AppendLine("    [Key]");
-            if (column.IsRowVersion)
-                sb.AppendLine("    [Timestamp]");
-            if (column.IsAutoIncrement)
-                sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-            else if (column.IsComputed)
-                sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
-            if (column.MaxLength.HasValue)
-                sb.AppendLine($"    [MaxLength({column.MaxLength.Value})]");
-            if (!column.ClrType.IsValueType && !column.EffectiveAllowNull)
-                sb.AppendLine("    [Required]");
-
-            AppendIndexes(sb, column.Indexes);
-            if (column.ClrType == typeof(decimal) && column.DecimalPrecision.HasValue)
-            {
-                sb.AppendLine($"    [Column(\"{EscapeStringLiteral(column.ColumnName)}\", TypeName = \"{FormatDecimalTypeName(column.DecimalPrecision.Value)}\")]");
-            }
-            else
-            {
-                sb.AppendLine($"    [Column(\"{EscapeStringLiteral(column.ColumnName)}\")]");
-            }
-
-            var initializer = column.ClrType == typeof(byte[]) && !column.EffectiveAllowNull
-                ? " = Array.Empty<byte>();"
-                : useNullableReferenceTypes && !column.ClrType.IsValueType && !column.EffectiveAllowNull ? " = default!;" : string.Empty;
-            sb.AppendLine($"    public {typeName} {column.PropertyName} {{ get; set; }}{initializer}");
-            sb.AppendLine();
-        }
-
-        private static void AppendIndexes(StringBuilder sb, System.Collections.Generic.IReadOnlyList<ScaffoldEntityIndexInfo> indexes)
-        {
-            foreach (var index in indexes
-                .OrderBy(i => i.IndexName, StringComparer.Ordinal)
-                .ThenBy(i => i.Ordinal))
-            {
-                if (index.IndexName.Length == 0)
-                    continue;
-
-                var safeIndexName = EscapeStringLiteral(index.IndexName);
-                var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
-                var orderSuffix = index.ColumnCount > 1 && !index.IsIncluded ? $", Order = {index.Ordinal.ToString(CultureInfo.InvariantCulture)}" : string.Empty;
-                var descendingSuffix = index.IsDescending ? ", IsDescending = true" : string.Empty;
-                var includedSuffix = index.IsIncluded ? ", IsIncluded = true" : string.Empty;
-                var nullSortOrderSuffix = index.NullSortOrder == IndexNullSortOrder.Default ? string.Empty : $", NullSortOrder = IndexNullSortOrder.{index.NullSortOrder}";
-                var nullsNotDistinctSuffix = index.NullsNotDistinct ? ", NullsNotDistinct = true" : string.Empty;
-                var filterSuffix = string.IsNullOrWhiteSpace(index.FilterSql) ? string.Empty : $", FilterSql = \"{EscapeStringLiteral(index.FilterSql)}\"";
-                sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix}{includedSuffix}{nullSortOrderSuffix}{nullsNotDistinctSuffix}{filterSuffix})]");
-            }
-        }
-
-        private static void AppendReferences(StringBuilder sb, System.Collections.Generic.IReadOnlyList<ScaffoldEntityReferenceInfo> references, bool useNullableReferenceTypes)
-        {
-            foreach (var reference in references
-                .OrderBy(r => r.ReferenceNavigationName, StringComparer.Ordinal)
-                .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
-            {
-                if (!reference.IsComposite)
-                    sb.AppendLine($"    [ForeignKey(nameof({ScaffoldNameHelper.EscapeCSharpIdentifier(reference.ForeignKeyPropertyName)}))]");
-                var nullableReferenceSuffix = useNullableReferenceTypes && !reference.IsRequired ? "?" : string.Empty;
-                var initializer = useNullableReferenceTypes && reference.IsRequired ? " = default!;" : string.Empty;
-                sb.AppendLine($"    public {ScaffoldNameHelper.EscapeCSharpIdentifier(reference.PrincipalEntityName)}{nullableReferenceSuffix} {ScaffoldNameHelper.EscapeCSharpIdentifier(reference.ReferenceNavigationName)} {{ get; set; }}{initializer}");
-                sb.AppendLine();
-            }
-        }
-
-        private static void AppendCollections(StringBuilder sb, System.Collections.Generic.IReadOnlyList<ScaffoldEntityCollectionInfo> collections, bool useNullableReferenceTypes)
-        {
-            foreach (var collection in collections
-                .OrderBy(r => r.CollectionNavigationName, StringComparer.Ordinal)
-                .ThenBy(r => r.ForeignKeyPropertyName, StringComparer.Ordinal))
-            {
-                if (collection.IsUniqueDependentKey)
-                {
-                    var nullableReferenceSuffix = useNullableReferenceTypes ? "?" : string.Empty;
-                    sb.AppendLine($"    public {ScaffoldNameHelper.EscapeCSharpIdentifier(collection.DependentEntityName)}{nullableReferenceSuffix} {ScaffoldNameHelper.EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }}");
-                }
-                else
-                {
-                    sb.AppendLine($"    public List<{ScaffoldNameHelper.EscapeCSharpIdentifier(collection.DependentEntityName)}> {ScaffoldNameHelper.EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
-                }
-
-                sb.AppendLine();
-            }
-        }
-
-        private static void AppendManyToManyCollections(StringBuilder sb, System.Collections.Generic.IReadOnlyList<ScaffoldEntityManyToManyNavigationInfo> manyToManyCollections)
-        {
-            foreach (var collection in manyToManyCollections
-                .OrderBy(n => n.CollectionNavigationName, StringComparer.Ordinal)
-                .ThenBy(n => n.TargetEntityName, StringComparer.Ordinal))
-            {
-                sb.AppendLine($"    public List<{ScaffoldNameHelper.EscapeCSharpIdentifier(collection.TargetEntityName)}> {ScaffoldNameHelper.EscapeCSharpIdentifier(collection.CollectionNavigationName)} {{ get; set; }} = new();");
-                sb.AppendLine();
-            }
-        }
-
-        private static void AppendNullableDirective(StringBuilder sb, bool useNullableReferenceTypes)
-            => sb.AppendLine(useNullableReferenceTypes ? "#nullable enable" : "#nullable disable");
-
-        private static string FormatDecimalTypeName(ScaffoldEntityDecimalPrecisionInfo decimalPrecision)
-        {
-            var precision = decimalPrecision.Precision.ToString(CultureInfo.InvariantCulture);
-            return decimalPrecision.Scale.HasValue
-                ? $"decimal({precision},{decimalPrecision.Scale.Value.ToString(CultureInfo.InvariantCulture)})"
-                : $"decimal({precision})";
-        }
-
-        private static void AppendColumnXmlDocumentation(StringBuilder sb, string columnName, string? comment)
-        {
-            if (string.IsNullOrWhiteSpace(comment))
-            {
-                AppendXmlSummary(sb, "    ", "Maps to column " + columnName);
-                return;
-            }
-
-            AppendXmlSummary(sb, "    ", comment!);
-            sb.AppendLine($"    /// <remarks>Maps to column {EscapeXmlDocumentation(columnName)}</remarks>");
         }
     }
 }
