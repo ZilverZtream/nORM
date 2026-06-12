@@ -42,31 +42,34 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
-    public void Scaffold_rejects_duplicate_connection_and_provider_inputs()
+    public void Scaffold_explicit_connection_and_provider_options_override_positionals()
     {
         var root = FindRepositoryRoot();
-        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_duplicate_inputs_out_" + Guid.NewGuid().ToString("N"));
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_explicit_precedence_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_explicit_precedence_out_" + Guid.NewGuid().ToString("N"));
 
         try
         {
-            var duplicateConnection = RunCli(
-                $"scaffold {Quote("Data Source=ignored.db")} sqlite --connection {Quote("Data Source=:memory:")} --provider sqlite --output {Quote(output)} --namespace CliScaffolded --context CliCtx",
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = "CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold {Quote("Data Source=ignored.db")} notaprovider --connection {Quote($"Data Source={dbFile}")} --provider Microsoft.EntityFrameworkCore.Sqlite --output {Quote(output)} --namespace CliScaffolded --context CliCtx",
                 root);
 
-            Assert.NotEqual(0, duplicateConnection.ExitCode);
-            Assert.Contains("Use either --connection or the EF-style positional <CONNECTION>", duplicateConnection.Stderr, StringComparison.Ordinal);
-
-            var duplicateProvider = RunCli(
-                $"scaffold {Quote("Data Source=:memory:")} sqlite --provider Microsoft.EntityFrameworkCore.Sqlite --output {Quote(output)} --namespace CliScaffolded --context CliCtx",
-                root);
-
-            Assert.NotEqual(0, duplicateProvider.ExitCode);
-            Assert.Contains("Use either --provider or the EF-style positional <PROVIDER>", duplicateProvider.Stderr, StringComparison.Ordinal);
-            Assert.False(File.Exists(Path.Combine(output, "Customer.cs")));
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+            Assert.True(File.Exists(Path.Combine(output, "Customer.cs")));
         }
         finally
         {
             TryDeleteDirectory(output);
+            try { File.Delete(dbFile); } catch { }
             try { File.Delete(Path.Combine(root, "ignored.db")); } catch { }
         }
     }

@@ -45,25 +45,6 @@ partial class Program
     static bool IsScaffoldOptionExplicit<T>(ParseResult result, Option<T> option)
         => result.GetResult(option) is { Implicit: false };
 
-    static void ValidateScaffoldConnectionAndProviderInputs(
-        string? connectionOption,
-        string? providerOption,
-        string? connectionPosition,
-        string? providerPosition)
-    {
-        if (connectionOption is not null && connectionPosition is not null)
-        {
-            throw new NormConfigurationException(
-                "Use either --connection or the EF-style positional <CONNECTION> argument for scaffold, not both.");
-        }
-
-        if (providerOption is not null && providerPosition is not null)
-        {
-            throw new NormConfigurationException(
-                "Use either --provider or the EF-style positional <PROVIDER> argument for scaffold, not both.");
-        }
-    }
-
     static void ValidateScaffoldUnmatchedTokens(ParseResult result)
     {
         if (result.UnmatchedTokens.Count == 0)

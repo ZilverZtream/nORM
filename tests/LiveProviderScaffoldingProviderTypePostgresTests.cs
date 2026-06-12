@@ -41,7 +41,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                         OverwriteFiles = false
                     });
 
-                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, PostgresTypedColumnTable + ".cs"));
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, PostgresTypedColumnTable));
 
                 Assert.Contains("using System;", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public Guid TraceId { get; set; }", entityCode, StringComparison.Ordinal);

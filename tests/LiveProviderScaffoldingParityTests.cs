@@ -225,6 +225,12 @@ public sealed partial class LiveProviderScaffoldingParityTests
         _ => tableName
     };
 
+    private static string DefaultScaffoldEntityName(string tableName)
+        => ScaffoldNameHelper.Singularize(ScaffoldNameHelper.ToScaffoldClrName(tableName, useDatabaseNames: false));
+
+    private static string DefaultScaffoldEntityPath(string directory, string tableName)
+        => Path.Combine(directory, DefaultScaffoldEntityName(tableName) + ".cs");
+
     private static async Task ExecuteAsync(DbConnection connection, string sql)
     {
         await using var cmd = connection.CreateCommand();

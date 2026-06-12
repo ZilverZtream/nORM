@@ -41,7 +41,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                         OverwriteFiles = false
                     });
 
-                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlTypedColumnTable + ".cs"));
+                var entityName = DefaultScaffoldEntityName(MySqlTypedColumnTable);
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, MySqlTypedColumnTable));
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlTypedColumnContext.cs"));
 
                 Assert.Contains("public string Payload { get; set; } = default!;", entityCode, StringComparison.Ordinal);
@@ -49,8 +50,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Contains("public string Flags { get; set; } = default!;", entityCode, StringComparison.Ordinal);
                 Assert.Contains("FiscalYear { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.DoesNotContain("object FiscalYear", entityCode, StringComparison.Ordinal);
-                Assert.Contains($".HasCheckConstraint(\"CK_{MySqlTypedColumnTable}_Status_Enum\", \"Status IN ('draft', 'paid', 'cancelled')\")", contextCode, StringComparison.Ordinal);
-                Assert.Contains($".HasCheckConstraint(\"CK_{MySqlTypedColumnTable}_Flags_Set\", \"Flags IN ('', 'read', 'write', 'read,write', 'admin', 'read,admin', 'write,admin', 'read,write,admin')\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".HasCheckConstraint(\"CK_{entityName}_Status_Enum\", \"Status IN ('draft', 'paid', 'cancelled')\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($".HasCheckConstraint(\"CK_{entityName}_Flags_Set\", \"Flags IN ('', 'read', 'write', 'read,write', 'admin', 'read,admin', 'write,admin', 'read,write,admin')\")", contextCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -118,7 +119,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                         OverwriteFiles = false
                     });
 
-                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlUnsignedColumnTable + ".cs"));
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, MySqlUnsignedColumnTable));
                 using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
 

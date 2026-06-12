@@ -114,29 +114,30 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     "LiveScaffoldStringBinaryFacetContext",
                     new ScaffoldOptions { Tables = new[] { StringBinaryFacetTable }, OverwriteFiles = false });
 
-                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, StringBinaryFacetTable + ".cs"));
+                var entityName = DefaultScaffoldEntityName(StringBinaryFacetTable);
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, StringBinaryFacetTable));
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldStringBinaryFacetContext.cs"));
 
                 Assert.Contains("[MaxLength(40)]", entityCode, StringComparison.Ordinal);
                 Assert.Contains("[MaxLength(12)]", entityCode, StringComparison.Ordinal);
-                Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.Code).HasMaxLength(40)", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.FixedCode).HasMaxLength(12)", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.Code).HasMaxLength(40)", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.FixedCode).HasMaxLength(12)", contextCode, StringComparison.Ordinal);
 
                 if (kind == ProviderKind.SqlServer)
                 {
-                    Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.Code).HasMaxLength(40).IsUnicode(false);", contextCode, StringComparison.Ordinal);
-                    Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.FixedCode).HasMaxLength(12).IsUnicode(false).IsFixedLength();", contextCode, StringComparison.Ordinal);
-                    Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.Code).HasMaxLength(40).IsUnicode(false);", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.FixedCode).HasMaxLength(12).IsUnicode(false).IsFixedLength();", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", contextCode, StringComparison.Ordinal);
                 }
                 else if (kind is ProviderKind.MySql or ProviderKind.Sqlite)
                 {
-                    Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.FixedCode).HasMaxLength(12).IsFixedLength();", contextCode, StringComparison.Ordinal);
-                    Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.FixedCode).HasMaxLength(12).IsFixedLength();", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", contextCode, StringComparison.Ordinal);
                     Assert.DoesNotContain($".Property(e => e.Code).HasMaxLength(40).IsUnicode", contextCode, StringComparison.Ordinal);
                 }
                 else
                 {
-                    Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.FixedCode).HasMaxLength(12).IsFixedLength();", contextCode, StringComparison.Ordinal);
+                    Assert.Contains($"mb.Entity<{entityName}>().Property(e => e.FixedCode).HasMaxLength(12).IsFixedLength();", contextCode, StringComparison.Ordinal);
                     Assert.DoesNotContain($".Property(e => e.Code).HasMaxLength(40).IsUnicode", contextCode, StringComparison.Ordinal);
                     Assert.DoesNotContain($".Property(e => e.Token).HasMaxLength", contextCode, StringComparison.Ordinal);
                 }
@@ -223,7 +224,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     "LiveScaffoldTemporalStoreTypeContext",
                     new ScaffoldOptions { Tables = new[] { DefaultSchemaTableFilter(kind, TemporalStoreTypeTable) }, OverwriteFiles = false });
 
-                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, TemporalStoreTypeTable + ".cs"));
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, TemporalStoreTypeTable));
 
                 Assert.Contains("public DateOnly BusinessDate { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public DateTime CreatedAt { get; set; }", entityCode, StringComparison.Ordinal);
@@ -319,7 +320,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     "LiveScaffoldProviderSpecificColumnContext",
                     new ScaffoldOptions { Tables = new[] { ProviderSpecificColumnDiagnosticsTable }, OverwriteFiles = false });
 
-                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderSpecificColumnDiagnosticsTable + ".cs"));
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, ProviderSpecificColumnDiagnosticsTable));
                 using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
 
