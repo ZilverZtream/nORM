@@ -60,6 +60,73 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("This is a PostgreSQL-specific set-returning-function scaffold shape.", "Postgres")
         };
 
+    private static readonly IReadOnlyDictionary<string, PartialCoverageExpectation> ProviderSpecificFactCoverage =
+        new Dictionary<string, PartialCoverageExpectation>(StringComparer.Ordinal)
+        {
+            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_mysql_prefix_index_without_emitting_normal_index"] =
+                Expect("MySQL prefix indexes are a MySQL-only index metadata shape.", "MySql"),
+            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_mysql_expression_index_as_provider_owned"] =
+                Expect("MySQL expression index catalog metadata is exposed through MySQL-specific DDL.", "MySql"),
+            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_postgres_expression_index_with_include_metadata"] =
+                Expect("PostgreSQL expression INCLUDE metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_postgres_null_sort_order_index_metadata"] =
+                Expect("PostgreSQL NULLS FIRST/LAST index metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_postgres_expression_btree_key_options_as_provider_owned"] =
+                Expect("PostgreSQL expression B-tree operator-class/key options are PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_postgres_nulls_not_distinct_unique_index_metadata"] =
+                Expect("PostgreSQL NULLS NOT DISTINCT unique index metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_sqlserver_native_temporal_tables_and_marks_them_read_only"] =
+                Expect("SQL Server system-versioned temporal tables are SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_rejects_sqlserver_procedure_synonym_as_entity_filter"] =
+                Expect("SQL Server procedure synonyms are SQL Server-specific provider objects.", "SqlServer"),
+            ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_mysql_event_diagnostics_on_live_provider"] =
+                Expect("MySQL scheduled events are a MySQL-only routine/object catalog shape.", "MySql"),
+            ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact"] =
+                Expect("SQLite virtual tables and shadow-table diagnostics are SQLite-specific.", "Sqlite"),
+            ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =
+                Expect("PostgreSQL serial columns and owned sequences are PostgreSQL-specific catalog behavior.", "Postgres"),
+            ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
+                Expect("SQL Server rowversion/timestamp concurrency metadata is SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_emits_postgres_uuid_and_array_columns_on_live_provider"] =
+                Expect("PostgreSQL UUID and native array column DDL is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_postgres_uuid_and_array_columns_on_live_provider"] =
+                Expect("PostgreSQL UUID and native array runtime metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_emits_mysql_json_and_year_columns_on_live_provider"] =
+                Expect("MySQL JSON/YEAR/ENUM/SET column metadata is MySQL-specific.", "MySql"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_reports_postgres_domain_columns_with_underlying_type_on_live_provider"] =
+                Expect("PostgreSQL domains and enum-base domains are PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_postgres_domain_columns_on_live_provider"] =
+                Expect("PostgreSQL domain runtime metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_reports_sqlserver_alias_type_columns_with_base_type_on_live_provider"] =
+                Expect("SQL Server alias/user-defined types are SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_sqlserver_alias_type_columns_on_live_provider"] =
+                Expect("SQL Server alias/user-defined runtime metadata is SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_reports_mysql_unsigned_columns_as_provider_specific_on_live_provider"] =
+                Expect("MySQL unsigned integer and unsigned decimal DDL is MySQL-specific.", "MySql"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_mysql_unsigned_columns_on_live_provider"] =
+                Expect("MySQL unsigned runtime metadata is MySQL-specific.", "MySql"),
+            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_marks_unsafe_mysql_set_columns_read_only_on_live_provider"] =
+                Expect("Unsafe MySQL SET write-blocking metadata is MySQL-specific.", "MySql"),
+            ["LiveProviderScaffoldingQueryArtifactTests.cs::ScaffoldAsync_emits_postgres_materialized_view_as_read_only_query_artifact"] =
+                Expect("PostgreSQL materialized views are PostgreSQL-specific query artifacts.", "Postgres"),
+            ["LiveProviderScaffoldingQueryArtifactTests.cs::ScaffoldAsync_emits_sqlserver_local_table_synonym_as_read_only_query_artifact"] =
+                Expect("SQL Server local table/view synonyms are SQL Server-specific query artifacts.", "SqlServer"),
+            ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider"] =
+                Expect("SQL Server table-valued parameters are SQL Server-specific routine metadata.", "SqlServer"),
+            ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_scalar_and_table_valued_function_wrappers_on_live_provider"] =
+                Expect("SQL Server scalar and table-valued function catalog shapes are SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_sqlserver_no_result_procedure_as_non_query_wrapper"] =
+                Expect("SQL Server no-result stored procedures with output metadata are SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_array_and_uuid_routine_parameters_on_live_provider"] =
+                Expect("PostgreSQL array and UUID routine parameters are PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_overloaded_function_wrappers_without_collisions"] =
+                Expect("PostgreSQL overloaded functions are PostgreSQL-specific routine metadata.", "Postgres"),
+            ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_quoted_parameter_function_as_positional_arguments"] =
+                Expect("PostgreSQL quoted routine parameter names require PostgreSQL-specific invocation handling.", "Postgres"),
+            ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_mysql_unsigned_routine_parameters_on_live_provider"] =
+                Expect("MySQL unsigned routine parameter metadata is MySQL-specific.", "MySql")
+        };
+
     [Fact]
     public void Live_provider_scaffold_tests_are_all_four_or_explicitly_justified()
     {
@@ -89,6 +156,35 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
             "Remove stale scaffold live-provider partial-coverage justifications: " + string.Join("; ", missingExpectedEntries));
     }
 
+    [Fact]
+    public void Provider_specific_live_provider_scaffold_facts_are_explicitly_justified()
+    {
+        var providerSpecificFacts = FindProviderSpecificFactCoverage().ToArray();
+        var unexpected = providerSpecificFacts
+            .Where(item => !ProviderSpecificFactCoverage.ContainsKey(item.Key))
+            .Select(item => $"{item.Key} references {string.Join(", ", item.Providers)} at {item.File}:{item.Line}")
+            .ToArray();
+
+        Assert.True(
+            unexpected.Length == 0,
+            "Provider-specific scaffold live-provider [Fact] tests must be listed with a capability reason instead of bypassing the all-four provider inventory: " + string.Join("; ", unexpected));
+
+        foreach (var item in providerSpecificFacts)
+        {
+            var expectation = ProviderSpecificFactCoverage[item.Key];
+            Assert.True(
+                SameProviders(item.Providers, expectation.Providers),
+                $"{item.Key} provider set changed. Expected {string.Join(", ", expectation.Providers)} because {expectation.Reason}; actual {string.Join(", ", item.Providers)}.");
+        }
+
+        var missingExpectedEntries = ProviderSpecificFactCoverage.Keys
+            .Except(providerSpecificFacts.Select(item => item.Key), StringComparer.Ordinal)
+            .ToArray();
+        Assert.True(
+            missingExpectedEntries.Length == 0,
+            "Remove stale scaffold live-provider provider-specific fact justifications: " + string.Join("; ", missingExpectedEntries));
+    }
+
     private static IEnumerable<PartialCoverage> FindPartialLiveProviderCoverage()
     {
         var providerRegex = new Regex(@"InlineData\(ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)\)", RegexOptions.Compiled);
@@ -116,6 +212,34 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 }
 
                 providers.Clear();
+            }
+        }
+    }
+
+    private static IEnumerable<PartialCoverage> FindProviderSpecificFactCoverage()
+    {
+        var factMethodRegex = new Regex(
+            @"(?s)\[Fact(?:\([^\]]*\))?\]\s*public\s+(?:async\s+)?(?:Task|void)\s+([A-Za-z0-9_]+)\s*\([^)]*\)(?<body>.*?)(?=\n\s*\[(?:Fact|Theory)(?:\(|\])|\z)",
+            RegexOptions.Compiled);
+        var providerRegex = new Regex(@"ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)", RegexOptions.Compiled);
+
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "LiveProviderScaffold*.cs"))
+        {
+            var text = File.ReadAllText(file);
+            foreach (Match match in factMethodRegex.Matches(text))
+            {
+                var providers = providerRegex.Matches(match.Groups["body"].Value)
+                    .Select(provider => provider.Groups[1].Value)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(ProviderOrder)
+                    .ToArray();
+                if (providers.Length == 0)
+                    continue;
+
+                var fileName = Path.GetFileName(file);
+                var methodName = match.Groups[1].Value;
+                var line = text[..match.Index].Count(c => c == '\n') + 1;
+                yield return new PartialCoverage(fileName, line, methodName, providers);
             }
         }
     }

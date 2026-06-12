@@ -121,7 +121,9 @@ Scaffold live-provider tests should cover SQLite, SQL Server, PostgreSQL, and
 MySQL whenever the database feature exists on all four providers. Partial
 provider coverage must be listed in `ScaffoldLiveProviderParityInventoryTests`
 with the exact provider set and a capability reason, so missing providers are
-explicit decisions rather than accidental gaps.
+explicit decisions rather than accidental gaps. Provider-specific live-provider
+`[Fact]` tests are inventoried there as well, so provider-only scaffold coverage
+cannot bypass the all-four matrix by avoiding provider `InlineData`.
 
 ## CLI Integration Test Size
 

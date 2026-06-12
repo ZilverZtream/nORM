@@ -78,8 +78,8 @@ public partial class ScaffoldingContractDocTests
     public void Doc_and_source_pin_scaffold_length_round_trip()
     {
         var doc = ReadDoc();
-        var snapshot = ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs");
-        var entityTypeBuilder = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
+        var snapshot = ReadSchemaSnapshotSource();
+        var entityTypeBuilder = ReadEntityTypeBuilderSource();
         var entityTypeConfiguration = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
         var scaffolder = ReadDatabaseScaffolderSource();
         var contextWriterSource = ReadContextWriterSource();
@@ -712,11 +712,11 @@ public partial class ScaffoldingContractDocTests
         var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
-        var builderSource = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
+        var builderSource = ReadEntityTypeBuilderSource();
         var configurationSource = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
         var scalarDefaultConfigurationSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldScalarFeatureConfigurationBuilder.Defaults.cs");
         var sqlServerMigrationSource = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
-        var snapshotSource = ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs");
+        var snapshotSource = ReadSchemaSnapshotSource();
         var liveCliSource = ReadLiveProviderScaffoldCliParitySource();
 
         Assert.Contains("generated output are ordered deterministically", doc, StringComparison.Ordinal);

@@ -25,6 +25,21 @@ public partial class ScaffoldingContractDocTests
         return File.ReadAllText(path);
     }
 
+    private static string ReadEntityTypeBuilderSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.MappingConfiguration.cs"),
+            ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.PropertyBuilders.cs"),
+            ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.ReferenceBuilders.cs"),
+            ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.CollectionBuilders.cs"));
+
+    private static string ReadSchemaSnapshotSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs"),
+            ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Builder.cs"),
+            ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Diff.cs"),
+            ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Differ.cs"));
+
     private static string ReadJoinTableDiagnosticSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableDiagnosticBuilder.cs"),
