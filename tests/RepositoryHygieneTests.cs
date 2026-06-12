@@ -15,6 +15,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCliIntegrationFileLines = 1500;
     private const int MaxCoreQueryTranslatorFileLines = 1500;
     private const int MaxQueryTranslatorPartialFileLines = 1500;
+    private const int MaxNormQueryProviderPartialFileLines = 1500;
     private const int MaxSqliteProviderPartialFileLines = 1500;
 
     [Fact]
@@ -221,6 +222,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split SQLite provider code by translation, schema/temporal, and bulk responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Norm_query_provider_partials_stay_split_by_execution_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `NormQueryProvider*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "NormQueryProvider*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxNormQueryProviderPartialFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split NormQueryProvider code by aggregate rewrite, execution, simple-query, CUD, and streaming/plan responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     private static string[] GetTrackedFiles()

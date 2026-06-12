@@ -89,8 +89,8 @@ src/nORM/Query/JoinBuilder.cs:285:IL2026
 src/nORM/Query/JoinBuilder.cs:285:IL3050
 src/nORM/Query/MaterializerFactory.Types.cs:242:IL2093
 src/nORM/Query/MaterializerFactory.Types.cs:70:IL2093
-src/nORM/Query/NormQueryProvider.cs:2296:IL2026
-src/nORM/Query/NormQueryProvider.cs:2296:IL3050
+src/nORM/Query/NormQueryProvider.StreamingPlans.cs:393:IL2026
+src/nORM/Query/NormQueryProvider.StreamingPlans.cs:393:IL3050
 src/nORM/Query/QueryTranslator.cs:616:IL2026
 src/nORM/Query/QueryTranslator.cs:616:IL3050
 src/nORM/Query/QueryTranslator.FilterProjectionTranslators.cs:129:IL2026

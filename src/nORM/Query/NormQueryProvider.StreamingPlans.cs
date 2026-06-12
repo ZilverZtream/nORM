@@ -1,0 +1,402 @@
+using System;
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO.Hashing;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using nORM.Core;
+using nORM.Execution;
+using nORM.Internal;
+using nORM.Mapping;
+using nORM.Navigation;
+#nullable enable
+namespace nORM.Query
+{
+    internal sealed partial class NormQueryProvider
+    {        public async IAsyncEnumerable<T> AsAsyncEnumerable<T>(Expression expression, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            // Execute in true streaming mode so only one row is materialized at a time.
+            var plan = GetPlan(expression, out _, out var paramValues);
+            // Only allocate Stopwatch when logger is active
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.CreateCommand();
+            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+            cmd.CommandText = plan.Sql;
+            BindPlanParameters(cmd, plan, paramValues);
+            if (plan.Includes.Count > 0)
+                throw new NormUnsupportedFeatureException(
+                    "AsAsyncEnumerable does not support Include. Eager-load paths issue a dependent " +
+                    "fetch after the principal materializer completes - incompatible with row-by-row " +
+                    "streaming. Use `await query.ToListAsync()` to materialize the fully-loaded set " +
+                    "in one round-trip, or remove the Include and reissue the child query manually " +
+                    "per principal if streaming is required.");
+            if (plan.GroupJoinInfo != null)
+            {
+                await foreach (var item in _executor.StreamGroupJoinAsync<T>(plan, cmd, ct).ConfigureAwait(false))
+                    yield return item;
+                yield break;
+            }
+            var trackable = !plan.NoTracking &&
+                             plan.ElementType.IsClass &&
+                             !plan.ElementType.Name.StartsWith("<>") &&
+                             plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
+                             _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
+            if (trackable)
+                _ctx.GetMapping(plan.ElementType);
+            var count = 0;
+            await using var reader = await cmd
+                .ExecuteReaderWithInterceptionAsync(
+                    _ctx,
+                    CommandBehavior.SingleResult,
+                    ct)
+                .ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var entity = (T)await plan.Materializer(reader, ct).ConfigureAwait(false);
+                if (trackable)
+                {
+                    var actualMap = _ctx.GetMapping(entity!.GetType());
+                    var entry = _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
+                    entity = (T)entry.Entity!;
+                    NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
+                }
+                count++;
+                yield return entity;
+            }
+            sw?.Stop();
+            _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, count);
+        }
+        /// <summary>
+        /// Returns the cached plan and binds parameters separately to avoid cloning the
+        /// parameters dictionary on every cache hit.
+        /// </summary>
+        internal QueryPlan GetPlan(Expression expression, out Expression filtered, out IReadOnlyList<object?>? parameterValues)
+        {
+            filtered = ApplyGlobalFilters(expression);
+            var elementType = GetElementType(UnwrapQueryExpression(filtered));
+            var tenantHash = _ctx.Options.TenantProvider != null
+                ? _ctx.GetRequiredTenantId("query plan cache key").GetHashCode()
+                : 0;
+            // Use cached mapping hash instead of recomputing on every query
+            int mappingHash = _ctx.GetMappingHash();
+
+            // Batch all 5 extends into a single hash operation (saves 4 XxHash128 calls)
+            var fingerprint = ExpressionFingerprint
+                .ComputeForPlanCache(filtered)
+                .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
+                        _ctx.RawProvider.GetType().GetHashCode(), mappingHash)
+                .Extend((int)_ctx.Options.ClientEvaluationPolicy);
+
+            if (_planCache.TryGet(fingerprint, out var cached))
+            {
+                parameterValues = ExtractParameterValues(filtered, cached);
+                return cached;
+            }
+
+            // ExceptBy / IntersectBy / UnionBy and local-sequence SequenceEqual capture
+            // an in-memory IEnumerable from the user's closure. The plan cache
+            // keys by expression fingerprint, which doesn't differentiate captured
+            // collection identity / contents; reusing the cached plan would replay
+            // the prior call's collection. Bypass the cache for these methods so each
+            // invocation translates fresh against the live closure values. Run this
+            // detector only after a cache miss so normal hot cached queries do not
+            // pay a full tree walk on every execution.
+            bool bypassPlanCache = ExpressionContainsLocalSequenceOp(filtered);
+
+            var localFiltered = filtered;
+            QueryPlan plan;
+            if (bypassPlanCache)
+            {
+                using var freshTranslator = new QueryTranslator(_ctx);
+                var p = freshTranslator.Translate(localFiltered);
+                plan = p with
+                {
+                    Fingerprint = fingerprint,
+                    Parameters = new Dictionary<string, object>(p.Parameters),
+                    CompiledParameters = new List<string>(p.CompiledParameters)
+                };
+                parameterValues = ExtractParameterValues(filtered, plan);
+                return plan;
+            }
+            plan = _planCache.GetOrAdd(fingerprint, _ =>
+            {
+                using var translator = new QueryTranslator(_ctx);
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                var p = translator.Translate(localFiltered);
+                var after = GC.GetAllocatedBytesForCurrentThread();
+                var size = after - before;
+                Interlocked.Add(ref _totalPlanSize, size);
+                Interlocked.Increment(ref _planSizeSamples);
+                var clonedParams = new Dictionary<string, object>(p.Parameters);
+                var clonedCompiledParams = new List<string>(p.CompiledParameters);
+                return p with
+                {
+                    Fingerprint = fingerprint,
+                    Parameters = clonedParams,
+                    CompiledParameters = clonedCompiledParams
+                };
+            });
+
+            parameterValues = ExtractParameterValues(filtered, plan);
+            return plan;
+        }
+
+        /// <summary>
+        /// Walks the expression tree looking for methods whose captured local sequence
+        /// contents are embedded into generated SQL. Plans containing these calls bypass
+        /// the fingerprint-keyed plan cache to avoid replaying a prior call's collection.
+        /// </summary>
+        private static bool ExpressionContainsLocalSequenceOp(Expression expression)
+        {
+            return LocalSequenceOpDetector.Has(expression);
+        }
+
+        private sealed class LocalSequenceOpDetector : ExpressionVisitor
+        {
+            private bool _found;
+            public static bool Has(Expression e)
+            {
+                var d = new LocalSequenceOpDetector();
+                d.Visit(e);
+                return d._found;
+            }
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (!_found
+                    && (node.Method.DeclaringType == typeof(System.Linq.Queryable)
+                        || node.Method.DeclaringType == typeof(System.Linq.Enumerable))
+                    && (node.Method.Name == "ExceptBy"
+                        || node.Method.Name == "IntersectBy"
+                        || node.Method.Name == "UnionBy"
+                        || node.Method.Name == "SequenceEqual"))
+                {
+                    _found = true;
+                    return node;
+                }
+                return base.VisitMethodCall(node);
+            }
+        }
+
+        /// <summary>
+        /// Returns ONLY the extracted values, no Dictionary allocation.
+        /// Reuses a thread-local extractor to avoid allocating a new visitor + List per query.
+        /// </summary>
+        [ThreadStatic] private static ParameterValueExtractor? t_extractor;
+        private IReadOnlyList<object?>? ExtractParameterValues(Expression expression, QueryPlan plan)
+        {
+            if (plan.CompiledParameters.Count == 0)
+                return null;
+
+            var extractor = t_extractor ??= new ParameterValueExtractor();
+            extractor.Reset();
+            extractor.Visit(expression);
+
+            // Copy values to a new list since the extractor will be reused
+            return extractor.GetValuesCopy();
+        }
+
+        private IReadOnlyDictionary<string, object> EnsureParameterDictionary(QueryPlan plan, IReadOnlyList<object?>? parameterValues)
+        {
+            if (plan.CompiledParameters.Count == 0)
+                return plan.Parameters;
+
+            var parameters = new Dictionary<string, object>(plan.Parameters);
+            if (parameterValues != null)
+            {
+                // The audit pattern (407e03d / eeff6e7 / cf39b61 / 04a0003 /
+                // 7d6d7ac / c6c4710) repeatedly surfaced a silent-wrongness bug
+                // where ETSV inline-folds consumed a closure MemberExpression's
+                // value without reserving a compiled-param slot. ParameterValue
+                // Extractor walks every closure unconditionally, so the value
+                // array can drift longer than the compiled-param list -- and
+                // Math.Min silently truncated, producing the wrong row set.
+                // Assert equal counts in Debug so any future inline-fold that
+                // forgets to reserve a placeholder surfaces immediately during
+                // tests instead of as a hard-to-trace silent wrong-rows return.
+                // Release stays with the Math.Min fallback so production users
+                // get best-effort behavior rather than an assertion crash.
+                System.Diagnostics.Debug.Assert(
+                    parameterValues.Count == plan.CompiledParameters.Count,
+                    $"ParameterValueExtractor produced {parameterValues.Count} values but plan has " +
+                    $"{plan.CompiledParameters.Count} compiled-param slots. An ETSV inline-fold consumed a " +
+                    $"closure MemberExpression without calling ReserveCompiledParamSlotIfClosure -- see " +
+                    $"the audit thread (407e03d, eeff6e7, cf39b61, 04a0003, 7d6d7ac, c6c4710) for the fix " +
+                    $"shape.");
+                var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    parameters[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
+                }
+            }
+            else
+            {
+                for (int i = 0; i < plan.CompiledParameters.Count; i++)
+                {
+                    parameters[plan.CompiledParameters[i]] = DBNull.Value;
+                }
+            }
+
+            return parameters;
+        }
+        private static Expression UnwrapQueryExpression(Expression expression)
+        {
+            return expression is MethodCallExpression mc &&
+                   !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
+                   mc.Arguments.Count > 0
+                ? mc.Arguments[0]
+                : expression;
+        }
+        private Expression ApplyGlobalFilters(Expression expression)
+        {
+            // Skip the entire recursive walk when no global filters or tenant provider exist.
+            // The recursion allocates new expression nodes (ToArray + Update) on every node even
+            // when there are no filters to apply.
+            if (_ctx.Options.GlobalFilters.Count == 0 && _ctx.Options.TenantProvider == null)
+                return expression;
+
+            if (expression is MethodCallExpression mc &&
+                !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
+                mc.Arguments.Count > 0)
+            {
+                var filteredSource = ApplyGlobalFilters(mc.Arguments[0]);
+                var args = mc.Arguments.ToArray();
+                args[0] = filteredSource;
+                return mc.Update(mc.Object, args);
+            }
+
+            if (expression is MethodCallExpression queryCall &&
+                queryCall.Method.DeclaringType == typeof(Queryable) &&
+                queryCall.Arguments.Count > 0 &&
+                typeof(IQueryable).IsAssignableFrom(queryCall.Arguments[0].Type))
+            {
+                var resultElementType = GetElementType(expression);
+                var sourceElementType = GetElementType(queryCall.Arguments[0]);
+
+                if (resultElementType != sourceElementType || !_ctx.IsMapped(resultElementType))
+                {
+                    var filteredSource = ApplyGlobalFilters(queryCall.Arguments[0]);
+                    var args = queryCall.Arguments.ToArray();
+                    args[0] = filteredSource;
+                    return queryCall.Update(queryCall.Object, args);
+                }
+            }
+
+            var entityType = GetElementType(expression);
+            if (_ctx.Options.GlobalFilters.Count > 0)
+            {
+                foreach (var kvp in _ctx.Options.GlobalFilters)
+                {
+                    if (!kvp.Key.IsAssignableFrom(entityType)) continue;
+                    foreach (var filter in kvp.Value)
+                    {
+                        LambdaExpression lambda;
+                        if (filter.Parameters.Count == 2)
+                        {
+                            var replacer = new ParameterReplacer(filter.Parameters[0], Expression.Constant(_ctx));
+                            var body = replacer.Visit(filter.Body)!;
+                            lambda = Expression.Lambda(body, filter.Parameters[1]);
+                        }
+                        else
+                        {
+                            lambda = filter;
+                        }
+                        expression = Expression.Call(
+                            typeof(Queryable),
+                            nameof(Queryable.Where),
+                            new[] { entityType },
+                            expression,
+                            Expression.Quote(lambda));
+                    }
+                }
+            }
+            if (_ctx.Options.TenantProvider != null)
+            {
+                var map = _ctx.GetMapping(entityType);
+                var tenantCol = _ctx.RequireTenantColumn(map, "query");
+                var param = Expression.Parameter(entityType, "t");
+                var prop = Expression.Property(param, tenantCol.Prop.Name);
+                var tenantId = _ctx.GetRequiredTenantId(map, "query");
+                var constant = Expression.Constant(tenantId, tenantCol.Prop.PropertyType);
+                var body = Expression.Equal(prop, constant);
+                var lambda = Expression.Lambda(body, param);
+                expression = Expression.Call(
+                    typeof(Queryable),
+                    nameof(Queryable.Where),
+                    new[] { entityType },
+                    expression,
+                    Expression.Quote(lambda));
+            }
+            return expression;
+        }
+        /// <summary>
+        /// Cached version of GetElementType to avoid repeated reflection.
+        /// GetInterfaces() is expensive and this is called frequently in hot paths.
+        /// </summary>
+        private static Type GetElementType(Expression queryExpression)
+        {
+            var type = queryExpression.Type;
+
+            // Fast path for generic types with arguments
+            if (type.IsGenericType)
+            {
+                var args = type.GetGenericArguments();
+                if (args.Length > 0) return args[0];
+            }
+
+            // Cached reflection path
+            return _elementTypeCache.GetOrAdd(type, static t =>
+            {
+                var iface = t.GetInterfaces()
+                    .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+                if (iface != null) return iface.GetGenericArguments()[0];
+                throw new ArgumentException($"Cannot determine element type from expression of type {t}");
+            });
+        }
+        private sealed class ParameterValueExtractor : ExpressionVisitor
+        {
+            private readonly List<object?> _values = new();
+
+            public void Reset() => _values.Clear();
+
+            /// <summary>
+            /// Returns a copy of extracted values (caller owns the array).
+            /// Uses array for less overhead than List when count is small.
+            /// </summary>
+            public object?[] GetValuesCopy() => _values.ToArray();
+
+            protected override Expression VisitConstant(ConstantExpression node)
+            {
+                // Skip all constants - they are either IQueryable roots or values already baked
+                // into the plan's Parameters dictionary by AppendConstant during translation.
+                return node;
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                // Closure-captured variables (member access whose root resolves to a constant)
+                // are now emitted as compiled parameters by ExpressionToSqlVisitor.VisitMember.
+                // Extract the live value here so it can be bound at execution time.
+                if (QueryTranslator.TryGetConstantValue(node, out var value))
+                {
+                    _values.Add(value ?? DBNull.Value);
+                    return node; // early return: do NOT visit children (avoids double-counting)
+                }
+                return base.VisitMember(node);
+            }
+        }
+    }
+}

@@ -139,6 +139,13 @@ helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1500 li
 Split each partial by operator family before it grows into a catch-all translator
 file. `RepositoryHygieneTests` enforces both boundaries.
 
+## Query Provider Source Size
+
+Every `NormQueryProvider*.cs` partial stays below 1500 lines so aggregate
+rewrites, async execution, simple-query fast paths, CUD, and streaming/plan
+helpers remain separate execution responsibilities. `RepositoryHygieneTests`
+enforces this boundary.
+
 ## SQLite Provider Source Size
 
 Every `SqliteProvider*.cs` partial stays below 1500 lines so SQLite SQL
