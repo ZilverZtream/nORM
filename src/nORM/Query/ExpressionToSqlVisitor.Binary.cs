@@ -1,0 +1,635 @@
+using System;
+using System.Collections.Generic;
+using System.Collections;
+using System.Data;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Globalization;
+using System.Collections.Frozen;
+using nORM.Core;
+using nORM.Internal;
+using nORM.Mapping;
+using nORM.Providers;
+#nullable enable
+namespace nORM.Query
+{
+    internal sealed partial class ExpressionToSqlVisitor
+    {
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            // C# lifts char comparisons to int — `r.Name[0] == 'A'` becomes
+            // `Equal(Convert(get_Chars(...), int), Constant(65, int))`. If we let the
+            // generic comparison path emit it, the int parameter (65) would never match
+            // the char-shaped result of SUBSTR(...). Detect the lift on one side and
+            // re-fold both operands back to char so the SQL compares string vs string.
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
+            {
+                var rewritten = TryRewriteLiftedCharComparison(node);
+                if (rewritten != null) node = rewritten;
+                // `list.IndexOf(x) [op] 0/-1` is the older spelling of `list.Contains(x)`.
+                // Rewrite to a Contains call (optionally negated) so the existing
+                // d97c5f0 IN-list handler picks it up. Without this, IndexOf on a
+                // generic-collection receiver would fail the IsTranslatableMethod gate
+                // and throw "Method 'IndexOf' cannot be translated to SQL".
+                var asContains = TryRewriteIndexOfToContains(node);
+                if (asContains != null)
+                {
+                    return Visit(asContains);
+                }
+            }
+            if (TryEmitDateTimeOffsetLiteralComparison(node))
+                return node;
+
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                bool leftNull  = IsNullExpression(node.Left);
+                bool rightNull = IsNullExpression(node.Right);
+                if (leftNull || rightNull)
+                {
+                    _sql.Append("(");
+                    Visit(leftNull ? node.Right : node.Left);
+                    _sql.Append(node.NodeType == ExpressionType.Equal ? " IS NULL" : " IS NOT NULL");
+                    _sql.Append(")");
+                    return node;
+                }
+
+                // Inline boolean literals (true/false) as SQL literals instead of parameterizing.
+                // Parameterized booleans (WHERE col = @p0 with @p0=1) deprive query planners of
+                // column selectivity statistics. Providers that prefer bare boolean predicates get
+                // WHERE col / WHERE NOT col for non-nullable bools instead.
+                if (TryInlineBoolLiteral(node))
+                    return node;
+
+                // Nullable column-vs-column comparison needs three-valued logic.
+                // A plain = or <> is incorrect when either side can be NULL at runtime.
+                // For Nullable<T> value types: always expand (runtime null possible).
+                // For reference types (string, class): only expand when BOTH sides could be null
+                // at runtime (i.e., neither side is a known non-null constant or parameter).
+                // Comparing a string column to a literal "ABC" does not need expansion since "ABC" is never null.
+                // DateTimeOffset col vs DateTime literal: SQLite stores DTOs as
+                // text with an offset suffix and the literal binds as offset-less
+                // text, so naive equality misses rows storing the same UTC instant
+                // in a different offset. Lower to UTC epoch-microsecond comparison via
+                // a provider hook. .NET's DateTime→DateTimeOffset implicit conv
+                // treats Utc-kind as offset 0 and Unspecified/Local as the local
+                // offset. LocalDateTime member access uses a full offset-range
+                // CASE expression; DateTime literals remain a single value.
+                if (TryEmitDateTimeOffsetLiteralComparison(node))
+                    return node;
+
+                if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
+                {
+                    int ls = _sql.Length;
+                    Visit(node.Left);
+                    string lf = _sql.ToString(ls, _sql.Length - ls);
+                    _sql.TruncateTo(ls);
+
+                    int rs = _sql.Length;
+                    Visit(node.Right);
+                    string rf = _sql.ToString(rs, _sql.Length - rs);
+                    _sql.TruncateTo(rs);
+
+                    if (node.NodeType == ExpressionType.Equal)
+                    {
+                        _sql.Append(_provider.NullSafeEqual(lf, rf));
+                    }
+                    else
+                    {
+                        // For NotEqual, use asymmetric simplified form when the right side is a
+                        // known non-null value (e.g. a literal or closure-captured non-null constant).
+                        // In that case, "rf IS NULL" can never happen, so the full 3-way expansion
+                        // reduces to: (lf IS NULL OR lf <> rf)
+                        bool rightCouldBeNull = CouldBeNull(node.Right);
+                        if (!rightCouldBeNull)
+                            _sql.Append($"({lf} IS NULL OR {lf} <> {rf})");
+                        else
+                            _sql.Append(_provider.NullSafeNotEqual(lf, rf));
+                    }
+                    return node;
+                }
+            }
+
+            if (node.NodeType is ExpressionType.AndAlso or ExpressionType.OrElse)
+            {
+                _sql.Append("(");
+                if (!TryEmitMappedBooleanPredicate(node.Left, expectedValue: true))
+                    Visit(node.Left);
+                _sql.Append(node.NodeType == ExpressionType.AndAlso ? " AND " : " OR ");
+                if (!TryEmitMappedBooleanPredicate(node.Right, expectedValue: true))
+                    Visit(node.Right);
+                _sql.Append(")");
+                return node;
+            }
+
+            // `a ?? b` lowers to COALESCE(a, b). The expression tree uses Coalesce as a
+            // BinaryExpression node; sit it before the generic switch below so it doesn't
+            // hit the "operator not supported" throw. Composes with arithmetic / comparison
+            // so `(col ?? 0) > 5` becomes `(COALESCE(col, 0)) > 5`.
+            if (node.NodeType == ExpressionType.Coalesce)
+            {
+                _sql.Append("COALESCE(");
+                Visit(node.Left);
+                _sql.Append(", ");
+                Visit(node.Right);
+                _sql.Append(")");
+                return node;
+            }
+
+            // Bitwise XOR needs provider-specific syntax — SQLite has no `^` operator and
+            // PostgreSQL uses `#`. Route through DatabaseProvider.GetBitwiseXorSql which
+            // hands back the right token (or a synthesised `(a|b) - (a&b)` on SQLite).
+            if (node.NodeType == ExpressionType.ExclusiveOr)
+            {
+                var leftSql = GetSql(node.Left);
+                var rightSql = GetSql(node.Right);
+                _sql.Append(_provider.GetBitwiseXorSql(leftSql, rightSql));
+                return node;
+            }
+
+            // C# `+` on string operands is concatenation, not arithmetic. The
+            // generic `+ ` emit below produces SQL numeric addition which on
+            // SQLite coerces TEXT to 0 (silent "0" results for every row).
+            // Route through the provider's concat SQL (`||` on SQLite,
+            // `CONCAT(...)` on SQL Server/MySQL) when either operand is string.
+            if (node.NodeType == ExpressionType.Add
+                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)))
+            {
+                var concatLeftSql = GetSql(node.Left);
+                var concatRightSql = GetSql(node.Right);
+                _sql.Append(_provider.GetConcatSql(concatLeftSql, concatRightSql));
+                return node;
+            }
+
+            // DateTime + TimeSpan COLUMN shift in Where -- mirror of
+            // SCV's 7f91efc branch. Without this SQL '+' on TEXT coerces
+            // both operands to numeric (returning garbage like 2027 from
+            // "2026-05-24 09:00:00.0000000" + "01:00:00") and the predicate
+            // evaluates against nonsense. Parse the sub-day 'HH:mm:ss'
+            // TimeSpan-column text via SUBSTR + CAST and construct the
+            // strftime modifier dynamically. Sub-day TimeSpan only per
+            // memory item b17440e.
+            // DateTime AND DateTimeOffset use the same date-arithmetic emit path
+            // (both store comparable text on SQLite and have native temporal types
+            // on other providers). Treat them uniformly.
+            static bool IsDateTimeOrOffset(Type t)
+                => t == typeof(DateTime) || t == typeof(DateTimeOffset);
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && IsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && !TryGetConstantValue(node.Right, out _))
+            {
+                var lhsSql = GetSql(node.Left);
+                var rhsSql = GetSql(node.Right);
+                // Provider hook handles TimeSpan storage format per provider:
+                // SQLite parses 'HH:mm:ss' text; SqlServer / Postgres / MySQL
+                // use native TIME/INTERVAL operators (no text parsing). Avoids
+                // emitting SQLite-specific substr() on non-SQLite providers.
+                var subtract = node.NodeType == ExpressionType.Subtract;
+                var dateArithSql = _provider.AddTimeSpanColumnToDateTimeSql(lhsSql, rhsSql, subtract);
+                if (dateArithSql != null)
+                {
+                    _sql.Append(dateArithSql);
+                    return node;
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
+                    "DateTime/Offset +/- TimeSpan column arithmetic in WHERE requires this provider hook.");
+            }
+            // DateTime/DateTimeOffset + constant TimeSpan -- folds the rhs span via
+            // TryGetConstantValue (closure MemberExpression carrying a TimeSpan value)
+            // and routes through AddSecondsToDateTimeSql for the provider-native shift.
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && IsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && node.Right is MemberExpression rhsMember
+                && TryGetConstantValue(rhsMember, out var rhsTs)
+                && rhsTs is TimeSpan span)
+            {
+                // ParameterValueExtractor walks EVERY closure-captured
+                // MemberExpression in the predicate and appends a value to its
+                // value-list in document order. Compiled-param names (@cp0,
+                // @cp1, ...) are assigned in the order ETSV emits them. If we
+                // fold the rhs TimeSpan inline without adding a placeholder
+                // compiled-param, the extractor still produces a value for it
+                // -- shifting every subsequent @cpN's value by one slot. The
+                // anchor RHS of an outer relop would then receive the shift
+                // value, returning silently wrong rows. Reserve a placeholder
+                // slot so the extractor's index aligns with ETSV's @cpN names.
+                var placeholderParam = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                _params[placeholderParam] = DBNull.Value;
+                _compiledParams.Add(placeholderParam);
+                var leftSql = GetSql(node.Left);
+                var seconds = span.TotalSeconds;
+                if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
+                var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+                var dateArithSql = _provider.AddSecondsToDateTimeSql(leftSql, secondsLiteral);
+                if (dateArithSql != null)
+                {
+                    _sql.Append(dateArithSql);
+                    return node;
+                }
+                throw new NormUnsupportedFeatureException(
+                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
+                    "DateTime + constant TimeSpan arithmetic requires this provider hook.");
+            }
+
+            // Decimal comparisons / arithmetic on TEXT-stored decimal columns
+            // must coerce both operands to REAL or SQLite performs lex compare
+            // ('10.5' < '2' because '1' < '2'). Wrap both sides with CAST AS
+            // REAL when either operand is decimal-typed and the op is a
+            // comparison or numeric arithmetic. CAST(int AS REAL) is identity
+            // with .0 so non-decimal pairings still round-trip.
+            //
+            // PRECISION TRADEOFF: REAL is IEEE-754 binary double. Numeric
+            // ordering/comparison via CAST AS REAL is correct for practical
+            // magnitudes (the only alternative -- TEXT lex compare -- is
+            // silently wrong on every mixed-magnitude case). Arithmetic
+            // results carry floating-point rounding (e.g. 0.01m is not
+            // exactly representable in binary). Exact decimal semantics on
+            // SQLite would require a different storage/aggregate strategy;
+            // the SqlServer/Postgres/MySQL providers use native DECIMAL.
+            bool isDecimalComparable = node.NodeType is
+                    ExpressionType.Equal or ExpressionType.NotEqual
+                    or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                    or ExpressionType.Add or ExpressionType.Subtract
+                    or ExpressionType.Multiply or ExpressionType.Divide
+                    or ExpressionType.Modulo;
+            bool leftIsDecimal = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(decimal);
+            bool rightIsDecimal = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
+            if (isDecimalComparable && (leftIsDecimal || rightIsDecimal))
+            {
+                // Route through the provider hook: SqliteProvider wraps with
+                // CAST AS REAL (TEXT storage needs numeric coercion); other
+                // providers' native DECIMAL is precise so the hook is identity
+                // and the SQL shape stays `(left op right)`.
+                var leftSqlD = _provider.NormalizeDecimalForCompare(GetSql(node.Left));
+                var rightSqlD = _provider.NormalizeDecimalForCompare(GetSql(node.Right));
+                _sql.Append('(').Append(leftSqlD);
+                _sql.Append(node.NodeType switch
+                {
+                    ExpressionType.Equal => " = ",
+                    ExpressionType.NotEqual => " <> ",
+                    ExpressionType.GreaterThan => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan => " < ",
+                    ExpressionType.LessThanOrEqual => " <= ",
+                    ExpressionType.Add => " + ",
+                    ExpressionType.Subtract => " - ",
+                    ExpressionType.Multiply => " * ",
+                    ExpressionType.Divide => " / ",
+                    ExpressionType.Modulo => " % ",
+                    _ => throw new InvalidOperationException()
+                });
+                _sql.Append(rightSqlD).Append(')');
+                return node;
+            }
+
+            // DateTime / DateTimeOffset comparison: SQLite stores as TEXT and lex-compares
+            // ISO strings, which mis-orders rows with mixed timezone offsets ('+02:00'
+            // suffix vs 'Z'). Other providers' native DATETIME types compare correctly so
+            // NormalizeDateTimeForCompare is identity for them.
+            //
+            // CRITICAL: wrap ONLY operands that resolve to column references. Parameter
+            // operands are bound from .NET DateTime values whose canonical serialization
+            // ('yyyy-MM-dd HH:mm:ss.fffffff' for Microsoft.Data.Sqlite) already lex-
+            // compares correctly against datetime()'s output. Wrapping a parameter side
+            // breaks because SQLite's datetime() returns EMPTY for max-precision inputs
+            // like DateTime.MaxValue ('9999-12-31 23:59:59.9999999') -- the .9999999
+            // fractional overflows when added to the max year, producing NULL/empty and
+            // collapsing the comparison to UNKNOWN/false.
+            // Only ORDER-sensitive operators get the datetime() wrap. Equality (= / <>)
+            // already works against the canonical storage format (callers must serialize
+            // DateTimeOffset with offset suffix; wrapping the column would strip the
+            // suffix and break exact-match).
+            bool isDateCmp = node.NodeType is
+                    ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
+            Type leftDtType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+            Type rightDtType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+            bool leftIsDt = leftDtType == typeof(DateTime) || leftDtType == typeof(DateTimeOffset);
+            bool rightIsDt = rightDtType == typeof(DateTime) || rightDtType == typeof(DateTimeOffset);
+            bool leftIsCol = IsColumnReference(node.Left);
+            bool rightIsCol = IsColumnReference(node.Right);
+            if (isDateCmp && leftIsDt && rightIsDt && (leftIsCol || rightIsCol))
+            {
+                var leftSql = GetSql(node.Left);
+                var rightSql = GetSql(node.Right);
+                _sql.Append("(")
+                    .Append(leftIsCol ? _provider.NormalizeDateTimeForCompare(leftSql) : leftSql);
+                _sql.Append(node.NodeType switch
+                {
+                    ExpressionType.Equal => " = ",
+                    ExpressionType.NotEqual => " <> ",
+                    ExpressionType.GreaterThan => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan => " < ",
+                    ExpressionType.LessThanOrEqual => " <= ",
+                    _ => throw new InvalidOperationException()
+                });
+                _sql.Append(rightIsCol ? _provider.NormalizeDateTimeForCompare(rightSql) : rightSql).Append(")");
+                return node;
+            }
+
+            // TimeSpan comparison (column vs column, column vs parameter, etc.).
+            // SQLite stores TimeSpan as canonical 'c' TEXT; lex-ordering silently
+            // mis-sorts multi-day durations ("10.00:00:00" < "9.23:59:59" lex but
+            // 10 days > 9 days 23 hours). Both sides must be converted to fractional
+            // seconds via NormalizeTimeSpanForCompare so the comparison is numeric.
+            // Parameters also carry canonical TEXT (Microsoft.Data.Sqlite binds TimeSpan
+            // as text), so the same conversion applies to them.
+            // SQL Server / Postgres / MySQL: NormalizeTimeSpanForCompare is identity —
+            // their native TIME / INTERVAL types compare correctly without conversion.
+            bool isOrderOrEqualCmp = node.NodeType is
+                ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                or ExpressionType.Equal or ExpressionType.NotEqual;
+            Type leftTsType = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+            Type rightTsType = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+            bool leftIsTs = leftTsType == typeof(TimeSpan);
+            bool rightIsTs = rightTsType == typeof(TimeSpan);
+            if (isOrderOrEqualCmp && (leftIsTs || rightIsTs))
+            {
+                var leftSqlTs = GetSql(node.Left);
+                var rightSqlTs = GetSql(node.Right);
+                var leftNorm  = leftIsTs  ? _provider.NormalizeTimeSpanForCompare(leftSqlTs)  : leftSqlTs;
+                var rightNorm = rightIsTs ? _provider.NormalizeTimeSpanForCompare(rightSqlTs) : rightSqlTs;
+                _sql.Append('(').Append(leftNorm);
+                _sql.Append(node.NodeType switch
+                {
+                    ExpressionType.Equal              => " = ",
+                    ExpressionType.NotEqual           => " <> ",
+                    ExpressionType.GreaterThan        => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan           => " < ",
+                    ExpressionType.LessThanOrEqual    => " <= ",
+                    _ => throw new InvalidOperationException()
+                });
+                _sql.Append(rightNorm).Append(')');
+                return node;
+            }
+
+            _sql.Append("(");
+            Visit(node.Left);
+            _sql.Append(node.NodeType switch
+            {
+                ExpressionType.Equal => " = ",
+                ExpressionType.NotEqual => " <> ",
+                ExpressionType.GreaterThan => " > ",
+                ExpressionType.GreaterThanOrEqual => " >= ",
+                ExpressionType.LessThan => " < ",
+                ExpressionType.LessThanOrEqual => " <= ",
+                ExpressionType.AndAlso => " AND ",
+                ExpressionType.OrElse => " OR ",
+                // Arithmetic operators flow through to SQL directly; the column type drives the
+                // server's semantics (integer vs decimal vs double).
+                ExpressionType.Add => " + ",
+                ExpressionType.Subtract => " - ",
+                ExpressionType.Multiply => " * ",
+                ExpressionType.Divide => " / ",
+                ExpressionType.Modulo => " % ",
+                // Bitwise operators on integer columns: the And/Or/ExclusiveOr node types
+                // overload as both boolean (no short-circuit) and bitwise depending on operand
+                // type. Lower to SQL bit operators so flag-mask predicates like
+                // `(Flags & 4) == 4` translate server-side. All four supported providers
+                // (SQLite, SQL Server, Postgres, MySQL) accept & | ^ for integer columns.
+                ExpressionType.And => " & ",
+                ExpressionType.Or => " | ",
+                // SQLite, SQL Server, MySQL, and PostgreSQL all support << and >>
+                // bitwise-shift operators with .NET-equivalent semantics, so emit
+                // directly rather than forcing the multiply-rewrite workaround.
+                ExpressionType.LeftShift => " << ",
+                ExpressionType.RightShift => " >> ",
+                // ExclusiveOr is handled above via DatabaseProvider.GetBitwiseXorSql
+                _ => throw new NormUnsupportedFeatureException(
+                    $"Binary operator '{node.NodeType}' has no portable SQL equivalent. " +
+                    "For Power, use `Math.Pow(x, n)` which lowers to the provider's " +
+                    "POWER / POW function.")
+            });
+            Visit(node.Right);
+            _sql.Append(")");
+            return node;
+        }
+
+        /// <summary>
+        /// Checks if an expression is a compile-time boolean constant (true/false).
+        /// Handles ConstantExpression and Convert(ConstantExpression) wrappers.
+        /// </summary>
+        private static bool TryGetBoolConstant(Expression expr, out bool value)
+        {
+            if (expr is ConstantExpression { Value: bool b })
+            {
+                value = b;
+                return true;
+            }
+            if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } ue)
+                return TryGetBoolConstant(ue.Operand, out value);
+            value = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Optimizes boolean literal comparisons by emitting SQL literals instead of parameters.
+        /// Returns true if the optimization was applied (caller should return node immediately).
+        /// </summary>
+        private bool TryInlineBoolLiteral(BinaryExpression node)
+        {
+            if (TryGetBoolConstant(node.Left, out bool boolVal))
+            {
+                EmitBoolComparison(node.Right, boolVal, node.NodeType);
+                return true;
+            }
+            if (TryGetBoolConstant(node.Right, out boolVal))
+            {
+                EmitBoolComparison(node.Left, boolVal, node.NodeType);
+                return true;
+            }
+            return false;
+        }
+
+        private void EmitBoolComparison(Expression memberSide, bool boolVal, ExpressionType op)
+        {
+            if (_provider.PrefersBareBooleanPredicates && memberSide.Type == typeof(bool))
+            {
+                var emitPositivePredicate =
+                    op == ExpressionType.Equal && boolVal ||
+                    op == ExpressionType.NotEqual && !boolVal;
+
+                _sql.Append("(");
+                if (!emitPositivePredicate)
+                    _sql.Append("NOT ");
+                Visit(memberSide);
+                _sql.Append(")");
+                return;
+            }
+
+            var literal = boolVal ? _provider.BooleanTrueLiteral : _provider.BooleanFalseLiteral;
+            _sql.Append("(");
+            Visit(memberSide);
+            _sql.Append(op == ExpressionType.Equal ? " = " : " <> ");
+            _sql.Append(literal);
+            _sql.Append(")");
+        }
+
+        private static bool IsNullExpression(Expression e)
+        {
+            if (e is ConstantExpression ce)
+                return ce.Value is null;
+            if (e is UnaryExpression ue && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
+                return IsNullExpression(ue.Operand);
+            if (e is MemberExpression me && me.Expression is ConstantExpression closure)
+            {
+                try
+                {
+                    var val = closure.Value == null ? null :
+                        me.Member is FieldInfo fi ? fi.GetValue(closure.Value) :
+                        me.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
+                    return val is null;
+                }
+                catch (Exception ex) when (ex is TargetInvocationException or MemberAccessException or InvalidOperationException or ArgumentException)
+                {
+                    // Reflection failures (getter throws, access denied, etc.) — conservatively
+                    // report as non-null so the caller does not emit an incorrect IS NULL predicate.
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="t"/> is <c>Nullable&lt;T&gt;</c>.
+        /// Used to detect when column-vs-column comparisons need three-valued logic.
+        /// </summary>
+        private static bool IsNullableValueType(Type t) =>
+            t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>);
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="t"/> is either a reference type (string, class, etc.)
+        /// or a <c>Nullable&lt;T&gt;</c> value type. Both can be NULL at runtime and require
+        /// three-valued SQL logic (IS NULL guards) for equality/inequality comparisons.
+        /// </summary>
+        private static bool IsNullableOrReferenceType(Type t) =>
+            !t.IsValueType ||  // reference types (string, class, etc.)
+            (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
+
+        /// <summary>
+        /// Determines whether an equality/inequality comparison between two expressions needs
+        /// three-valued SQL logic (IS NULL expansion). The expansion is required when:
+        /// - Either side is <c>Nullable&lt;T&gt;</c>, or
+        /// - For <c>Equal</c>: both sides are reference types that could be null (no change needed;
+        ///   <c>NULL = 'Alice'</c> is UNKNOWN in SQL and <c>null == "Alice"</c> is false in C#, so plain = is correct).
+        /// - For <c>NotEqual</c>: the LEFT side could be null (column reference) even when the right
+        ///   side is a known non-null constant. SQL 3-valued logic makes <c>NULL &lt;&gt; 'Alice'</c>
+        ///   UNKNOWN (excluded), but C# semantics say <c>null != "Alice"</c> is true (included).
+        ///   Fix: emit <c>(col IS NULL OR col &lt;&gt; @p)</c> whenever left could be null.
+        /// </summary>
+        private bool NeedsNullSafeExpansion(Expression left, Expression right, ExpressionType nodeType = ExpressionType.Equal)
+        {
+            // Nullable<T> value types always need expansion (runtime null is possible on either side)
+            if (IsNullableValueType(left.Type) || IsNullableValueType(right.Type))
+                return true;
+
+            // Reference types: asymmetric rule for Equal vs NotEqual.
+            // At least one side is a reference type (the condition below is true when
+            // either left or right is not a value type, via De Morgan on the negation).
+            // A "known non-null" side is one that is:
+            //   - A non-null compile-time constant (ConstantExpression with non-null value)
+            //   - A closure capture whose value we can verify is non-null at expression-build time
+            if (!left.Type.IsValueType || !right.Type.IsValueType)
+            {
+                bool leftCouldBeNull  = CouldBeNull(left);
+                bool rightCouldBeNull = CouldBeNull(right);
+
+                if (nodeType == ExpressionType.NotEqual)
+                    // For NotEqual: expand when EITHER side could be null.
+                    // Specifically, a nullable column vs a non-null constant still needs
+                    // (col IS NULL OR col <> @p) to preserve C# null != "literal" → true semantics.
+                    return leftCouldBeNull || rightCouldBeNull;
+                else
+                    // For Equal: expand only when BOTH sides could be null.
+                    // null == "Alice" is false in both SQL (UNKNOWN→false) and C#, so no expansion needed.
+                    return leftCouldBeNull && rightCouldBeNull;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns <c>true</c> when <paramref name="expr"/> might evaluate to SQL NULL at runtime.
+        /// Constants and member accesses on closures whose current value is non-null are "safe"
+        /// (they will never produce SQL NULL on the right-hand side of a comparison).
+        /// Column references (member accesses on query parameters) are always potentially nullable.
+        /// </summary>
+        /// <remarks>
+        /// This method does not distinguish C# nullable reference types (NRTs) from non-nullable
+        /// reference types. The NRT annotation (e.g., <c>string?</c> vs <c>string</c>) is erased
+        /// at runtime and is not present in expression trees. At the CLR level all reference types
+        /// can be null, so this method conservatively returns <c>true</c> for any reference-typed
+        /// column or method-call expression.
+        /// </remarks>
+        private bool CouldBeNull(Expression expr)
+        {
+            // Non-null compile-time constant: cannot be null
+            if (expr is ConstantExpression ce)
+                return ce.Value is null;
+
+            // Unwrap casts/conversions
+            if (expr is UnaryExpression ue && (ue.NodeType == ExpressionType.Convert || ue.NodeType == ExpressionType.ConvertChecked))
+                return CouldBeNull(ue.Operand);
+
+            if (expr is MemberExpression columnMember &&
+                TableMapping.TryGetMemberAccessRoot(columnMember, out var columnParameter) &&
+                _parameterMappings.TryGetValue(columnParameter, out var mappedParameter) &&
+                mappedParameter.Mapping.TryGetColumnForMemberAccess(columnMember, out var column))
+            {
+                return column.IsNullable;
+            }
+
+            // Closure-captured member whose value is non-null at expression-build time
+            if (expr is MemberExpression me && me.Expression is ConstantExpression closure)
+            {
+                try
+                {
+                    var val = closure.Value == null ? null :
+                        me.Member is FieldInfo fi ? fi.GetValue(closure.Value) :
+                        me.Member is PropertyInfo pi ? pi.GetValue(closure.Value) : null;
+                    return val is null;  // non-null captured value → not nullable
+                }
+                catch (Exception ex) when (ex is TargetInvocationException or MemberAccessException or InvalidOperationException or ArgumentException)
+                {
+                    // Reflection failures (getter throws, access denied, etc.) — assume nullable
+                    // to preserve correctness.
+                    return true;
+                }
+            }
+
+            // Everything else (column references, method calls, etc.) could be null
+            return true;
+        }
+
+        private bool TryEmitMappedBooleanPredicate(Expression expression, bool expectedValue)
+        {
+            while (expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                expression = convert.Operand;
+
+            if (expression is UnaryExpression { NodeType: ExpressionType.Not } not)
+                return TryEmitMappedBooleanPredicate(not.Operand, !expectedValue);
+
+            if (expression.Type != typeof(bool) ||
+                expression is not MemberExpression member ||
+                !TableMapping.TryGetMemberAccessRoot(member, out var parameter) ||
+                !_parameterMappings.TryGetValue(parameter, out var info) ||
+                !info.Mapping.TryGetColumnForMemberAccess(member, out _))
+            {
+                return false;
+            }
+
+            var columnSql = GetSql(member);
+            _sql.Append(_provider.FormatBooleanPredicate(columnSql, expectedValue));
+            return true;
+        }
+    }
+}

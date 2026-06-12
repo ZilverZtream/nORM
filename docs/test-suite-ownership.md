@@ -153,6 +153,13 @@ method calls, navigation aggregate subqueries, formatting, operators, and helper
 utilities remain separate responsibilities. `RepositoryHygieneTests` enforces
 this boundary.
 
+## Expression SQL Visitor Source Size
+
+Every `ExpressionToSqlVisitor*.cs` partial stays below 1500 lines so binary/null
+semantics, member/constant folding, control-flow dispatch, method-call
+translation, navigation subqueries, formatting, and support helpers remain
+separate responsibilities. `RepositoryHygieneTests` enforces this boundary.
+
 ## SQLite Provider Source Size
 
 Every `SqliteProvider*.cs` partial stays below 1500 lines so SQLite SQL
