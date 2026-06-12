@@ -776,12 +776,14 @@ public sealed partial class LiveProviderScaffoldCliParityTests
 
         if (kind == ProviderKind.SqlServer)
             Execute(connection, $"IF SCHEMA_ID(N'{schemaName}') IS NULL EXEC(N'CREATE SCHEMA {provider.Escape(schemaName)}')");
-        else
+        else if (kind != ProviderKind.Sqlite)
             Execute(connection, $"CREATE SCHEMA IF NOT EXISTS {provider.Escape(schemaName)}");
 
         var author = Qualified(provider, schemaName, authorTable);
         var book = Qualified(provider, schemaName, bookTable);
         var authorBook = Qualified(provider, schemaName, authorBookTable);
+        var authorReference = kind == ProviderKind.Sqlite ? provider.Escape(authorTable) : author;
+        var bookReference = kind == ProviderKind.Sqlite ? provider.Escape(bookTable) : book;
         var id = provider.Escape("Id");
         var name = provider.Escape("Name");
         var title = provider.Escape("Title");
@@ -793,8 +795,8 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             $"CREATE TABLE {author} ({id} int NOT NULL PRIMARY KEY, {name} {text} NOT NULL)",
             $"CREATE TABLE {book} ({id} int NOT NULL PRIMARY KEY, {title} {text} NOT NULL)",
             $"CREATE TABLE {authorBook} ({authorId} int NOT NULL, {bookId} int NOT NULL, PRIMARY KEY ({authorId}, {bookId}), " +
-            $"CONSTRAINT {provider.Escape(authorFkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}), " +
-            $"CONSTRAINT {provider.Escape(bookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}))");
+            $"CONSTRAINT {provider.Escape(authorFkName)} FOREIGN KEY ({authorId}) REFERENCES {authorReference} ({id}), " +
+            $"CONSTRAINT {provider.Escape(bookFkName)} FOREIGN KEY ({bookId}) REFERENCES {bookReference} ({id}))");
     }
 
     private static void CleanupSchemaQualifiedManyToMany(
@@ -806,14 +808,18 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         string bookTable,
         string authorBookTable)
     {
+        var author = kind == ProviderKind.Sqlite ? provider.Escape(authorTable) : Qualified(provider, schemaName, authorTable);
+        var book = kind == ProviderKind.Sqlite ? provider.Escape(bookTable) : Qualified(provider, schemaName, bookTable);
+        var authorBook = kind == ProviderKind.Sqlite ? provider.Escape(authorBookTable) : Qualified(provider, schemaName, authorBookTable);
+
         Execute(connection,
-            DropTable(kind, schemaName + "." + authorBookTable, Qualified(provider, schemaName, authorBookTable)),
-            DropTable(kind, schemaName + "." + bookTable, Qualified(provider, schemaName, bookTable)),
-            DropTable(kind, schemaName + "." + authorTable, Qualified(provider, schemaName, authorTable)));
+            DropTable(kind, schemaName + "." + authorBookTable, authorBook),
+            DropTable(kind, schemaName + "." + bookTable, book),
+            DropTable(kind, schemaName + "." + authorTable, author));
 
         if (kind == ProviderKind.SqlServer)
             Execute(connection, $"IF SCHEMA_ID(N'{schemaName}') IS NOT NULL DROP SCHEMA {provider.Escape(schemaName)}");
-        else
+        else if (kind != ProviderKind.Sqlite)
             Execute(connection, $"DROP SCHEMA IF EXISTS {provider.Escape(schemaName)}");
     }
 

@@ -555,13 +555,14 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     }
 
     [Theory]
+    [InlineData(ProviderKind.Sqlite)]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     public void Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();
         var suffix = IdentifierSuffix();
-        var schemaName = "CliSchema" + suffix;
+        var schemaName = kind == ProviderKind.Sqlite ? "main" : "CliSchema" + suffix;
         var authorTable = "CliSchemaAuthor" + suffix;
         var bookTable = "CliSchemaBook" + suffix;
         var authorBookTable = "CliSchemaAuthorBook" + suffix;
@@ -602,10 +603,20 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             var bookCode = File.ReadAllText(Path.Combine(output, bookTable + ".cs"));
             var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveSchemaManyToManyCtx.cs"));
 
-            Assert.Contains($"[Table(\"{authorTable}\", Schema = \"{schemaName}\")]", authorCode, StringComparison.Ordinal);
+            if (kind == ProviderKind.Sqlite)
+            {
+                Assert.Contains($"[Table(\"{authorTable}\")]", authorCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("Schema = \"main\"", authorCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{authorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
+            }
+            else
+            {
+                Assert.Contains($"[Table(\"{authorTable}\", Schema = \"{schemaName}\")]", authorCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{authorBookTable}\", \"AuthorId\", \"BookId\", schema: \"{schemaName}\");", contextCode, StringComparison.Ordinal);
+            }
+
             Assert.Contains($"public List<{bookTable}> {bookTable}s {{ get; set; }} = new();", authorCode, StringComparison.Ordinal);
             Assert.Contains($"public List<{authorTable}> {authorTable}s {{ get; set; }} = new();", bookCode, StringComparison.Ordinal);
-            Assert.Contains($".UsingTable(\"{authorBookTable}\", \"AuthorId\", \"BookId\", schema: \"{schemaName}\");", contextCode, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
