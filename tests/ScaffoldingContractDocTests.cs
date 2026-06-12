@@ -481,7 +481,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ReferencesScaffoldablePrincipalKey", source, StringComparison.Ordinal);
         Assert.Contains("ReferencesUniqueIndex", source, StringComparison.Ordinal);
         Assert.Contains("ReferencesUniqueIndex(foreignKeyGroup, primaryKeyColumnsByTable, indexes)", source, StringComparison.Ordinal);
-        Assert.Contains("HasExactUniqueIndex(indexes, tableKey, foreignKeyColumnSet)", joinDiagnosticBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("HasExactUniqueColumnSet(indexes, tableKey, foreignKeyColumnSet)", joinDiagnosticBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("HasExactOrderedUniqueIndex(indexes, principalKey, principalColumns)", joinDiagnosticBuilderSource, StringComparison.Ordinal);
         Assert.Contains("GetIdentityColumnNamesAsync", source, StringComparison.Ordinal);
         Assert.Contains("auto_increment", columnDiscoverySource, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("nextval(%", columnDiscoverySource, StringComparison.Ordinal);

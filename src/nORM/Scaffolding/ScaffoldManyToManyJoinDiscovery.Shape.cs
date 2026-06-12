@@ -57,7 +57,7 @@ namespace nORM.Scaffolding
                 && string.Equals(joinPrimaryKeyColumns[0], payloadColumns[0], StringComparison.OrdinalIgnoreCase)
                 && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
                 && identityColumns.Contains(payloadColumns[0])
-                && ScaffoldForeignKeyShape.HasExactUniqueIndex(indexes, joinTableKey, fkColumnNames);
+                && ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, joinTableKey, fkColumnNames);
 
             if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)
                 return false;

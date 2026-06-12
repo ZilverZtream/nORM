@@ -67,11 +67,11 @@ namespace nORM.Scaffolding
         private static bool HasOnlyScaffoldableReferentialActions(IEnumerable<ScaffoldForeignKey> foreignKeys)
             => ScaffoldRelationshipAdapter.HasOnlyScaffoldableReferentialActions(foreignKeys);
 
-        private static bool HasExactUniqueIndex(
+        private static bool HasExactUniqueColumnSet(
             IReadOnlyList<ScaffoldIndex> indexes,
             string tableKey,
             IReadOnlySet<string> columnNames)
-            => ScaffoldRelationshipAdapter.HasExactUniqueIndex(indexes, tableKey, columnNames);
+            => ScaffoldRelationshipAdapter.HasExactUniqueColumnSet(indexes, tableKey, columnNames);
 
         private static bool AllForeignKeyGroupsAreUniqueDependentKeys(
             string dependentTableKey,

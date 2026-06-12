@@ -89,7 +89,7 @@ namespace nORM.Scaffolding
             var dependentColumns = rows.Select(static row => row.DependentColumn).ToArray();
             var isRequired = HasNonNullableColumns(nonNullableColumnsByTable, dependentKey, dependentColumns);
             var isUniqueDependentKey = ScaffoldForeignKeyShape.HasPrimaryKeyColumns(primaryKeyColumnsByTable, dependentKey, dependentColumns)
-                || ScaffoldForeignKeyShape.HasExactUniqueIndex(indexes, dependentKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
+                || ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, dependentKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
             var (referenceName, collectionName) = ScaffoldRelationshipNavigationNameBuilder.BuildNavigationNames(
                 dependentKey,
                 principalKey,

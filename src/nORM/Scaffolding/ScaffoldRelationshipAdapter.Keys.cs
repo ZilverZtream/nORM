@@ -22,11 +22,11 @@ namespace nORM.Scaffolding
             IEnumerable<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys)
             => ScaffoldForeignKeyShape.HasOnlyScaffoldableReferentialActions(ConvertForeignKeyInfos(foreignKeys.ToArray()));
 
-        public static bool HasExactUniqueIndex(
+        public static bool HasExactUniqueColumnSet(
             IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
             string tableKey,
             IReadOnlySet<string> columnNames)
-            => ScaffoldForeignKeyShape.HasExactUniqueIndex(ConvertIndexInfos(indexes), tableKey, columnNames);
+            => ScaffoldForeignKeyShape.HasExactUniqueColumnSet(ConvertIndexInfos(indexes), tableKey, columnNames);
 
         public static bool AllForeignKeyGroupsAreUniqueDependentKeys(
             string dependentTableKey,

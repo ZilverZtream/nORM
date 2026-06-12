@@ -189,7 +189,7 @@ namespace nORM.Scaffolding
                    {
                        var dependentColumns = group.Select(static row => row.DependentColumn).ToArray();
                        return ScaffoldForeignKeyShape.HasPrimaryKeyColumns(primaryKeyColumnsByTable, dependentTableKey, dependentColumns)
-                              || ScaffoldForeignKeyShape.HasExactUniqueIndex(indexes, dependentTableKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
+                              || ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, dependentTableKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
                    });
         }
     }

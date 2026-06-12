@@ -89,6 +89,51 @@ public class SanSchemaChild
 public partial class DatabaseScaffolderPrivateMethodTests
 {
     [Fact]
+    public void UniqueIndexShape_DistinguishesColumnSetFromOrderedAlternateKey()
+    {
+        var indexes = new[]
+        {
+            new ScaffoldIndexInfo(
+                "Order",
+                "ExternalNo",
+                "UX_Order_ExternalNo_TenantId",
+                IsUnique: true,
+                ColumnCount: 2,
+                Ordinal: 0,
+                IsDescending: false,
+                IsIncluded: false,
+                NullSortOrder: IndexNullSortOrder.Default,
+                NullsNotDistinct: false,
+                FilterSql: null),
+            new ScaffoldIndexInfo(
+                "Order",
+                "TenantId",
+                "UX_Order_ExternalNo_TenantId",
+                IsUnique: true,
+                ColumnCount: 2,
+                Ordinal: 1,
+                IsDescending: false,
+                IsIncluded: false,
+                NullSortOrder: IndexNullSortOrder.Default,
+                NullsNotDistinct: false,
+                FilterSql: null)
+        };
+
+        Assert.True(ScaffoldForeignKeyShape.HasExactUniqueColumnSet(
+            indexes,
+            "Order",
+            new HashSet<string>(new[] { "TenantId", "ExternalNo" }, StringComparer.OrdinalIgnoreCase)));
+        Assert.False(ScaffoldForeignKeyShape.HasExactOrderedUniqueIndex(
+            indexes,
+            "Order",
+            new[] { "TenantId", "ExternalNo" }));
+        Assert.True(ScaffoldForeignKeyShape.HasExactOrderedUniqueIndex(
+            indexes,
+            "Order",
+            new[] { "ExternalNo", "TenantId" }));
+    }
+
+    [Fact]
     public void ToPascalCase_UnderscoreSeparated_ReturnsPascalCase()
     {
         var result = InvokeToPascalCase("user_name");

@@ -100,7 +100,7 @@ namespace nORM.Scaffolding
                 return;
 
             reasons.Add(ScaffoldJoinTableShape.HasGeneratedSurrogatePrimaryKey(primaryKeyColumns, foreignKeyColumns, databaseGeneratedColumns, identityColumns)
-                        && !ScaffoldForeignKeyShape.HasExactUniqueIndex(indexes, tableKey, foreignKeyColumns)
+                        && !ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, tableKey, foreignKeyColumns)
                 ? "missing-exact-unique-index"
                 : "primary-key-not-exact-bridge-columns");
         }

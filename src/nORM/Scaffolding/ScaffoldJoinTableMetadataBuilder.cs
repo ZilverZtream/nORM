@@ -41,7 +41,7 @@ namespace nORM.Scaffolding
                 ["nullableForeignKeyColumns"] = GetNullableForeignKeyColumns(nonNullableColumnsByTable, tableKey, foreignKeyColumns),
                 ["hasExactBridgePrimaryKey"] = ScaffoldJoinTableShape.HasExactBridgePrimaryKey(primaryKeyColumns, foreignKeyColumnSet),
                 ["hasGeneratedSurrogatePrimaryKey"] = ScaffoldJoinTableShape.HasGeneratedSurrogatePrimaryKey(primaryKeyColumns, foreignKeyColumnSet, databaseGeneratedColumnSet, identityColumnSet),
-                ["hasExactForeignKeyUniqueIndex"] = ScaffoldForeignKeyShape.HasExactUniqueIndex(indexes, tableKey, foreignKeyColumnSet),
+                ["hasExactForeignKeyUniqueIndex"] = ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, tableKey, foreignKeyColumnSet),
                 ["foreignKeys"] = BuildForeignKeyConstraintMetadata(foreignKeys)
             };
         }

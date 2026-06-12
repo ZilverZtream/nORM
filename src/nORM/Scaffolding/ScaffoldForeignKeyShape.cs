@@ -28,7 +28,7 @@ namespace nORM.Scaffolding
                 IsScaffoldableReferentialAction(fk.OnDelete)
                 && IsScaffoldableReferentialAction(fk.OnUpdate));
 
-        public static bool HasExactUniqueIndex(
+        public static bool HasExactUniqueColumnSet(
             IReadOnlyList<ScaffoldIndexInfo> indexes,
             string tableKey,
             IReadOnlySet<string> columnNames)
@@ -47,6 +47,26 @@ namespace nORM.Scaffolding
                            && keyColumns.All(columnNames.Contains);
                 });
 
+        public static bool HasExactOrderedUniqueIndex(
+            IReadOnlyList<ScaffoldIndexInfo> indexes,
+            string tableKey,
+            IReadOnlyList<string> columnNames)
+            => indexes
+                .Where(index => IsUnfilteredUniqueKeyIndex(index)
+                                && string.Equals(index.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(static index => index.IndexName, StringComparer.OrdinalIgnoreCase)
+                .Any(group =>
+                {
+                    var keyColumns = group
+                        .Where(static index => !index.IsIncluded)
+                        .OrderBy(static index => index.Ordinal)
+                        .Select(static index => index.ColumnName)
+                        .ToArray();
+                    return keyColumns.Length == columnNames.Count
+                           && group.All(col => col.ColumnCount == columnNames.Count)
+                           && keyColumns.SequenceEqual(columnNames, StringComparer.OrdinalIgnoreCase);
+                });
+
         public static bool AllForeignKeyGroupsAreUniqueDependentKeys(
             string dependentTableKey,
             IEnumerable<IReadOnlyList<ScaffoldForeignKeyInfo>> foreignKeyGroups,
@@ -63,7 +83,7 @@ namespace nORM.Scaffolding
                    {
                        var dependentColumns = group.Select(static row => row.DependentColumn).ToArray();
                        return HasPrimaryKeyColumns(primaryKeyColumnsByTable, dependentTableKey, dependentColumns)
-                              || HasExactUniqueIndex(indexes, dependentTableKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
+                              || HasExactUniqueColumnSet(indexes, dependentTableKey, dependentColumns.ToHashSet(StringComparer.OrdinalIgnoreCase));
                    });
         }
 
@@ -104,20 +124,7 @@ namespace nORM.Scaffolding
             }
 
             var principalColumns = rows.Select(static row => row.PrincipalColumn).ToArray();
-            return indexes
-                .Where(index => IsUnfilteredUniqueKeyIndex(index) && string.Equals(index.TableKey, principalKey, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(static index => index.IndexName, StringComparer.OrdinalIgnoreCase)
-                .Any(group =>
-                {
-                    var keyColumns = group
-                        .Where(static index => !index.IsIncluded)
-                        .OrderBy(static index => index.Ordinal)
-                        .Select(static index => index.ColumnName)
-                        .ToArray();
-                    return keyColumns.Length == rows.Count
-                           && group.All(col => col.ColumnCount == rows.Count)
-                           && keyColumns.SequenceEqual(principalColumns, StringComparer.OrdinalIgnoreCase);
-                });
+            return HasExactOrderedUniqueIndex(indexes, principalKey, principalColumns);
         }
 
         public static string NormalizeReferentialAction(string? action)
