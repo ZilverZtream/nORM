@@ -187,3 +187,10 @@ enforces this boundary.
 Every `SchemaSnapshot*.cs` file stays below 1500 lines so snapshot DTOs, model
 scanning, destructive-change diagnostics, and diffing remain separate migration
 responsibilities. `RepositoryHygieneTests` enforces this boundary.
+
+## Entity Type Builder Source Size
+
+Every `EntityTypeBuilder*.cs` file stays below 1500 lines so configuration
+storage, core entity-level API, property builders, reference builders, and
+collection/many-to-many builders remain separate model-configuration
+responsibilities. `RepositoryHygieneTests` enforces this boundary.
