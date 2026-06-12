@@ -994,7 +994,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Relationship navigations and fluent relationship", doc, StringComparison.Ordinal);
         Assert.Contains("provider-reported foreign key constraint names", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server foreign-key names marked", doc, StringComparison.Ordinal);
-        Assert.Contains("generated-versus-declared name flag", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL default", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL default", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server CHECK constraint", doc, StringComparison.Ordinal);
         Assert.Contains("CK_<Entity>_<hash>", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite autoindex", doc, StringComparison.Ordinal);
@@ -1004,6 +1005,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("SQL Server system-generated names", doc, StringComparison.Ordinal);
         Assert.Contains("ConstraintName", source, StringComparison.Ordinal);
         Assert.Contains("fk.is_system_named AS IsSyntheticConstraintName", foreignKeyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("dep.relname || '_'", foreignKeyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("CHAR_LENGTH(kcu.table_name) + 6", foreignKeyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("REGEXP '^[0-9]+$'", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("foreignKey.IsSyntheticConstraintName ? null", relationshipDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("MarkSystemNamedCheckConstraintFeaturesAsync", sqlServerUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("BuildGeneratedCheckConstraintName", checkFeatureConfigurationBuilderSource, StringComparison.Ordinal);

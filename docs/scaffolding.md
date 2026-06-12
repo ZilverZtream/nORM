@@ -212,9 +212,10 @@ must be reviewed and edited like handwritten model code.
   into generated source. SQL Server foreign-key names marked
   `is_system_named` by the catalog are likewise treated as generated database
   noise and are not emitted as fluent constraint-name arguments; explicit SQL
-  Server FK names are still preserved. PostgreSQL and MySQL catalog-reported FK
-  names remain preserved because those catalogs do not expose the same reliable
-  generated-versus-declared name flag. `ON DELETE CASCADE` is preserved as nORM tracked-graph
+  Server FK names are still preserved. PostgreSQL default
+  `<table>_<columns>_fkey` names and MySQL default `<table>_ibfk_<n>` names are
+  also treated as generated database noise; explicit provider-reported names
+  outside those default patterns are preserved. `ON DELETE CASCADE` is preserved as nORM tracked-graph
   cascade behavior; valid database referential actions (`NO ACTION`,
   `CASCADE`, `SET NULL`, `RESTRICT`, `SET DEFAULT`) are emitted into generated
   fluent configuration, including `ON UPDATE` actions. Relationships are emitted when the FK targets the

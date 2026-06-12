@@ -36,6 +36,19 @@ namespace nORM.Scaffolding
                 principal.relname AS PrincipalTable,
                 principal_att.attname AS PrincipalColumn,
                 con.conname AS ConstraintName,
+                CASE
+                    WHEN con.conname = LEFT(
+                        dep.relname || '_' ||
+                        (
+                            SELECT string_agg(dep_name.attname, '_' ORDER BY dep_key.ord)
+                            FROM unnest(con.conkey) WITH ORDINALITY AS dep_key(attnum, ord)
+                            INNER JOIN pg_attribute dep_name
+                                ON dep_name.attrelid = dep.oid
+                               AND dep_name.attnum = dep_key.attnum
+                        ) || '_fkey',
+                        63)
+                    THEN true ELSE false
+                END AS IsSyntheticConstraintName,
                 array_length(con.conkey, 1) AS ColumnCount,
                 CASE con.confdeltype
                     WHEN 'c' THEN 'CASCADE'
@@ -73,6 +86,11 @@ namespace nORM.Scaffolding
                 kcu.referenced_table_name AS PrincipalTable,
                 kcu.referenced_column_name AS PrincipalColumn,
                 kcu.constraint_name AS ConstraintName,
+                CASE
+                    WHEN LOWER(LEFT(kcu.constraint_name, CHAR_LENGTH(kcu.table_name) + 6)) = LOWER(CONCAT(kcu.table_name, '_ibfk_'))
+                     AND SUBSTRING(kcu.constraint_name, CHAR_LENGTH(kcu.table_name) + 7) REGEXP '^[0-9]+$'
+                    THEN 1 ELSE 0
+                END AS IsSyntheticConstraintName,
                 COUNT(*) OVER (PARTITION BY kcu.constraint_schema, kcu.table_name, kcu.constraint_name) AS ColumnCount,
                 rc.delete_rule AS OnDelete,
                 rc.update_rule AS OnUpdate

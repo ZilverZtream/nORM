@@ -216,15 +216,12 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveSyntheticFkCtx.cs"));
 
             Assert.Contains($"public {parentTable} {parentTable} {{ get; set; }} = default!;", childCode, StringComparison.Ordinal);
-            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id", contextCode, StringComparison.Ordinal);
-            if (kind is ProviderKind.Sqlite or ProviderKind.SqlServer)
-            {
-                Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
-            }
-            if (kind == ProviderKind.Sqlite)
-            {
-                Assert.DoesNotContain("sqlite_fk_", contextCode, StringComparison.Ordinal);
-            }
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".HasForeignKey(d => d.ParentId, p => p.Id, \"", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("sqlite_fk_", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("FK__", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("_fkey", contextCode, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("_ibfk_", contextCode, StringComparison.OrdinalIgnoreCase);
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
