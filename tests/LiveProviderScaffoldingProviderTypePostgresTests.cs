@@ -228,6 +228,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Equal("decimal(18,4)", scoreColumn.TypeName);
                 Assert.Equal(typeof(int[]), type.GetProperty("Scores")!.PropertyType);
                 Assert.Equal(typeof(string), type.GetProperty("Status")!.PropertyType);
+                Assert.Null(type.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
             }
             finally
             {

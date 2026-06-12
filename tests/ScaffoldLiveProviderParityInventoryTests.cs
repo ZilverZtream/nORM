@@ -93,6 +93,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL UUID and native array runtime metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingProviderTypeMySqlTests.cs::ScaffoldAsync_emits_mysql_json_and_year_columns_on_live_provider"] =
                 Expect("MySQL JSON/YEAR/ENUM/SET column metadata is MySQL-specific.", "MySql"),
+            ["LiveProviderScaffoldingProviderTypeMySqlTests.cs::Dynamic_scaffolding_handles_mysql_json_year_enum_set_columns_on_live_provider"] =
+                Expect("MySQL JSON/YEAR/ENUM/SET runtime metadata is MySQL-specific.", "MySql"),
             ["LiveProviderScaffoldingProviderTypePostgresTests.cs::ScaffoldAsync_reports_postgres_domain_columns_with_underlying_type_on_live_provider"] =
                 Expect("PostgreSQL domains and enum-base domains are PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingProviderTypePostgresTests.cs::Dynamic_scaffolding_handles_postgres_domain_columns_on_live_provider"] =

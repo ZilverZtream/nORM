@@ -65,6 +65,35 @@ public sealed partial class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task Dynamic_scaffolding_handles_mysql_json_year_enum_set_columns_on_live_provider()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupMySqlTypedColumnTableAsync(connection, provider);
+            try
+            {
+                var type = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, MySqlTypedColumnTable);
+
+                Assert.Equal(typeof(int), type.GetProperty("Id")!.PropertyType);
+                Assert.Equal(typeof(string), type.GetProperty("Payload")!.PropertyType);
+                Assert.NotEqual(typeof(object), type.GetProperty("FiscalYear")!.PropertyType);
+                Assert.Equal(typeof(string), type.GetProperty("Status")!.PropertyType);
+                Assert.Equal(typeof(string), type.GetProperty("Flags")!.PropertyType);
+                Assert.Null(type.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+            }
+            finally
+            {
+                await TeardownMySqlTypedColumnTableAsync(connection, provider);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_reports_mysql_unsigned_columns_as_provider_specific_on_live_provider()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
@@ -160,6 +189,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 var amountColumn = Assert.Single(amount.GetCustomAttributes(typeof(ColumnAttribute), inherit: false).Cast<ColumnAttribute>());
                 Assert.Equal("UnsignedAmount", amountColumn.Name);
                 Assert.Equal("decimal(18,4)", amountColumn.TypeName);
+                Assert.Null(type.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
             }
             finally
             {
