@@ -22,8 +22,8 @@ src/nORM/Mapping/Column.cs:148:IL3050
 src/nORM/Mapping/Column.cs:149:IL3050
 src/nORM/Providers/BulkOperationProvider.cs:32:IL2026
 src/nORM/Providers/BulkOperationProvider.cs:32:IL3050
-src/nORM/Providers/DatabaseProvider.cs:1473:IL2026
-src/nORM/Providers/DatabaseProvider.cs:1473:IL3050
+src/nORM/Providers/DatabaseProvider.Bulk.cs:48:IL2026
+src/nORM/Providers/DatabaseProvider.Bulk.cs:48:IL3050
 src/nORM/Providers/MySqlProvider.cs:1193:IL2026
 src/nORM/Providers/MySqlProvider.cs:1193:IL3050
 src/nORM/Providers/MySqlProvider.cs:1219:IL2026

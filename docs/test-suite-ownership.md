@@ -165,3 +165,11 @@ separate responsibilities. `RepositoryHygieneTests` enforces this boundary.
 Every `SqliteProvider*.cs` partial stays below 1500 lines so SQLite SQL
 translation, schema/temporal behavior, and bulk DML remain separate provider
 responsibilities. `RepositoryHygieneTests` enforces this boundary.
+
+## Database Provider Source Size
+
+Every `DatabaseProvider*.cs` partial stays below 1500 lines so base provider
+capability and dialect defaults, temporal/tenant hooks, scalar SQL expressions,
+runtime/connection validation, fallback bulk operations, and DML SQL builders
+remain separate responsibilities. `RepositoryHygieneTests` enforces this
+boundary.
