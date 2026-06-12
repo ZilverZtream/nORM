@@ -239,10 +239,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("builds the generated project", doc, StringComparison.Ordinal);
         Assert.Contains("EF-style `.config/dotnet-ef.json`", doc, StringComparison.Ordinal);
         Assert.Contains("config-supplied `project`, `startupProject`, and `context`", doc, StringComparison.Ordinal);
-        Assert.Contains("The shared CLI config parser is separately pinned", doc, StringComparison.Ordinal);
-        Assert.Contains("output directory, namespace, context directory, context namespace", doc, StringComparison.Ordinal);
-        Assert.Contains("table/schema filters, naming", doc, StringComparison.Ordinal);
-        Assert.Contains("naming, and overwrite defaults", doc, StringComparison.Ordinal);
+        Assert.Contains("Expanded config-supplied output directory, namespace", doc, StringComparison.Ordinal);
+        Assert.Contains("context directory, context namespace, table filters", doc, StringComparison.Ordinal);
+        Assert.Contains("overwrite", doc, StringComparison.Ordinal);
+        Assert.Contains("defaults are likewise verified through real CLI scaffolds", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_dotnet_ef_config_expanded_defaults_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("`Name=...` named connections from startup-project `appsettings.json`", doc, StringComparison.Ordinal);
         Assert.Contains("Explicit CLI", doc, StringComparison.Ordinal);
         Assert.Contains("`--project`, `--startup-project`, and", doc, StringComparison.Ordinal);

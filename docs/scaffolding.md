@@ -796,9 +796,10 @@ must be reviewed and edited like handwritten model code.
   config-supplied `project`, `startupProject`, and `context`, positional
   `Name=...` named connections from startup-project `appsettings.json`, and
   accepted EF provider package aliases all feed generated code that builds as
-  the target project. The shared CLI config parser is separately pinned for
-  output directory, namespace, context directory, context namespace,
-  table/schema filters, naming, and overwrite defaults. Explicit CLI
+  the target project. Expanded config-supplied output directory, namespace,
+  context directory, context namespace, table filters, naming, and overwrite
+  defaults are likewise verified through real CLI scaffolds across all four
+  providers, with generated output built under the target project. Explicit CLI
   `--project`, `--startup-project`, and `--context` values are verified to
   override conflicting
   `.config/dotnet-ef.json` defaults across all four providers while still
