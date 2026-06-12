@@ -43,8 +43,8 @@ src/nORM/Providers/PostgresProvider.Bulk.cs:57:IL2026
 src/nORM/Providers/PostgresProvider.Bulk.cs:58:IL2026
 src/nORM/Providers/PostgresProvider.Bulk.cs:61:IL2026
 src/nORM/Providers/PostgresProvider.cs:105:IL2077
-src/nORM/Providers/PostgresProvider.cs:951:IL3050
-src/nORM/Providers/PostgresProvider.cs:954:IL3050
+src/nORM/Providers/PostgresProvider.Json.cs:220:IL3050
+src/nORM/Providers/PostgresProvider.Json.cs:223:IL3050
 src/nORM/Providers/SqlServerProvider.Bulk.cs:162:IL2026
 src/nORM/Providers/SqlServerProvider.Bulk.cs:162:IL3050
 src/nORM/Providers/SqlServerProvider.Bulk.cs:362:IL2072
