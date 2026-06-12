@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace nORM.Tests;
@@ -481,6 +482,44 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Ordinary SQL Server/PostgreSQL included-column indexes are emitted with `IndexAttribute.IsIncluded`", doc, StringComparison.Ordinal);
         Assert.Contains("Ordinary PostgreSQL column indexes with non-default `NULLS FIRST/LAST` ordering are emitted with `IndexAttribute.NullSortOrder`", doc, StringComparison.Ordinal);
         Assert.Contains("ordinary PostgreSQL unique column indexes with `NULLS NOT DISTINCT` are emitted with `IndexAttribute.NullsNotDistinct`", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Provider_emitted_unsupported_feature_kinds_have_stable_diagnostics()
+    {
+        var source = string.Concat(
+            ReadSqliteUnsupportedFeatureSource(),
+            ReadSqlServerUnsupportedFeatureSource(),
+            ReadPostgresUnsupportedFeatureSource(),
+            ReadMySqlUnsupportedFeatureSource(),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiagnosticBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedDiagnosticAdapter.cs"));
+        var codeSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Codes.cs");
+        var actionSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.cs");
+
+        var emittedKinds = Regex.Matches(
+                source,
+                "new\\s+ScaffoldUnsupportedFeatureInfo\\([^;]*?\"(?<kind>[A-Za-z][A-Za-z0-9]*)\"",
+                RegexOptions.Singleline)
+            .Select(match => match.Groups["kind"].Value)
+            .Concat(Regex.Matches(
+                    source,
+                    "'(?<kind>[A-Za-z][A-Za-z0-9]*)'\\s+(?:AS\\s+)?Kind\\b",
+                    RegexOptions.IgnoreCase)
+                .Select(match => match.Groups["kind"].Value))
+            .Where(kind => !string.Equals(kind, "Kind", StringComparison.OrdinalIgnoreCase))
+            .Where(kind => kind is not ("View" or "Routine" or "Sequence" or "Synonym" or "MaterializedView" or "Event" or "VirtualTable" or "VirtualTableShadow"))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(kind => kind, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Contains("PrecisionScale", emittedKinds);
+        foreach (var kind in emittedKinds)
+        {
+            Assert.Contains($"\"{kind}\" => \"SCF", codeSource, StringComparison.Ordinal);
+            Assert.DoesNotContain($"\"{kind}\" => \"SCF199\"", codeSource, StringComparison.Ordinal);
+            Assert.Contains($"\"{kind}\" =>", actionSource, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
