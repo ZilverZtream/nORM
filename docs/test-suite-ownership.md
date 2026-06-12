@@ -162,6 +162,9 @@ with the exact provider set and a capability reason, so missing providers are
 explicit decisions rather than accidental gaps. Provider-specific live-provider
 `[Fact]` tests are inventoried there as well, so provider-only scaffold coverage
 cannot bypass the all-four matrix by avoiding provider `InlineData`.
+Live-provider scaffold test files stay below 700 lines so CLI parity, runtime
+scaffolder parity, helpers, setup, and teardown remain split by scenario group.
+`RepositoryHygieneTests` enforces this boundary for `tests/LiveProviderScaffold*.cs`.
 
 ## CLI Integration Test Size
 

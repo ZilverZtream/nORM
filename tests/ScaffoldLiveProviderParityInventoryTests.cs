@@ -40,9 +40,9 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL provider-specific access-method diagnostics are covered by the dedicated MySQL access-method test.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_provider_specific_index_access_methods_as_provider_owned"] =
                 Expect("SQLite has no provider-specific index access-method catalog equivalent.", "SqlServer", "Postgres", "MySql"),
-            ["LiveProviderScaffoldingManyToManyTests.cs::ScaffoldAsync_preserves_restrict_fk_referential_actions_on_live_provider"] =
+            ["LiveProviderScaffoldingReferentialActionTests.cs::ScaffoldAsync_preserves_restrict_fk_referential_actions_on_live_provider"] =
                 Expect("SQL Server does not accept RESTRICT as a foreign-key referential action.", "Sqlite", "Postgres", "MySql"),
-            ["LiveProviderScaffoldingManyToManyTests.cs::ScaffoldAsync_preserves_set_default_fk_referential_actions_on_live_provider"] =
+            ["LiveProviderScaffoldingReferentialActionTests.cs::ScaffoldAsync_preserves_set_default_fk_referential_actions_on_live_provider"] =
                 Expect("MySQL does not support executable SET DEFAULT foreign-key actions in the live schema setup.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldingManyToManyTests.cs::ScaffoldAsync_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
                 Expect("MySQL does not expose filtered unique indexes; this diagnostic is for providers with partial-index metadata.", "Sqlite", "SqlServer", "Postgres"),

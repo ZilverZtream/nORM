@@ -286,6 +286,7 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("tests", "LiveProviderScaffoldingParityTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingReferentialActionTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingRelationshipTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypePostgresTests.cs"),

@@ -17,6 +17,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxProviderMobilitySourceScannerFileLines = 200;
     private const int MaxProviderMobilitySchemaInspectorFileLines = 200;
     private const int MaxProviderMobilityTranslationFileLines = 250;
+    private const int MaxLiveProviderScaffoldFileLines = 700;
     private const int MaxCliIntegrationFileLines = 1000;
     private const int MaxCoreQueryTranslatorFileLines = 1000;
     private const int MaxQueryTranslatorPartialFileLines = 1200;
@@ -97,6 +98,28 @@ public sealed class RepositoryHygieneTests
         Assert.Contains("ScaffoldLiveProviderParityInventoryTests", ownership, StringComparison.Ordinal);
         Assert.Contains("Live_provider_scaffold_tests_are_all_four_or_explicitly_justified", inventory, StringComparison.Ordinal);
         Assert.Contains("IntentionalPartialCoverage", inventory, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Live_provider_scaffold_tests_stay_split_by_scenario_group()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Live-provider scaffold test files stay below 700 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "LiveProviderScaffold*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxLiveProviderScaffoldFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split live provider scaffold tests by CLI/runtime scenario, helper family, setup, or teardown before they become god files: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]
