@@ -580,6 +580,131 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_dotnet_ef_config_supplies_safety_defaults_with_cli_precedence()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_safety_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+        var projectDir = Path.Combine(tempRoot, "src", "App");
+        var projectPath = Path.Combine(projectDir, "SafetyDefaultsApp.csproj");
+        var dbFile = Path.Combine(tempRoot, "safety-defaults.db");
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+            Directory.CreateDirectory(projectDir);
+            File.WriteAllText(
+                projectPath,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <RootNamespace>SafetyDefaultsApp</RootNamespace>
+                  </PropertyGroup>
+                </Project>
+                """,
+                Encoding.UTF8);
+
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = "CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);";
+                cmd.ExecuteNonQuery();
+            }
+
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                """
+                {
+                  "project": "src/App",
+                  "outputDir": "DryRunModels",
+                  "tables": [ "Customer" ],
+                  "dryRun": true,
+                  "failOnWarnings": true,
+                  "emitRoutineStubs": true,
+                  "emitSequenceStubs": true,
+                  "emitViewEntities": true,
+                  "emitQueryArtifacts": true
+                }
+                """,
+                Encoding.UTF8);
+
+            var dryRun = RunCli(
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite --json",
+                workDir);
+
+            Assert.True(dryRun.ExitCode == 0,
+                $"CLI dry run failed with exit code {dryRun.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{dryRun.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{dryRun.Stderr}");
+            using (var document = JsonDocument.Parse(dryRun.Stdout))
+            {
+                var json = document.RootElement;
+                Assert.Equal("succeeded", json.GetProperty("status").GetString());
+                Assert.True(json.GetProperty("dryRun").GetBoolean());
+                Assert.Equal(Path.GetFullPath(Path.Combine(projectDir, "DryRunModels")), json.GetProperty("outputDirectory").GetString());
+            }
+            Assert.False(Directory.Exists(Path.Combine(projectDir, "DryRunModels")));
+
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                """
+                {
+                  "project": "src/App",
+                  "outputDir": "ForceModels",
+                  "context": "ForceCtx",
+                  "tables": [ "Customer" ],
+                  "noOverwrite": true
+                }
+                """,
+                Encoding.UTF8);
+            var forceOutput = Path.Combine(projectDir, "ForceModels");
+            Directory.CreateDirectory(forceOutput);
+            File.WriteAllText(Path.Combine(forceOutput, "Customer.cs"), "stale entity", Encoding.UTF8);
+            File.WriteAllText(Path.Combine(forceOutput, "ForceCtx.cs"), "stale context", Encoding.UTF8);
+
+            var force = RunCli(
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite --force",
+                workDir);
+
+            Assert.True(force.ExitCode == 0,
+                $"CLI force override failed with exit code {force.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{force.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{force.Stderr}");
+            Assert.DoesNotContain("stale entity", File.ReadAllText(Path.Combine(forceOutput, "Customer.cs")), StringComparison.Ordinal);
+            Assert.DoesNotContain("stale context", File.ReadAllText(Path.Combine(forceOutput, "ForceCtx.cs")), StringComparison.Ordinal);
+
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                """
+                {
+                  "project": "src/App",
+                  "outputDir": "NoOverwriteModels",
+                  "context": "NoOverwriteCtx",
+                  "tables": [ "Customer" ],
+                  "force": true
+                }
+                """,
+                Encoding.UTF8);
+            var noOverwriteOutput = Path.Combine(projectDir, "NoOverwriteModels");
+            Directory.CreateDirectory(noOverwriteOutput);
+            File.WriteAllText(Path.Combine(noOverwriteOutput, "Customer.cs"), "stale entity", Encoding.UTF8);
+            File.WriteAllText(Path.Combine(noOverwriteOutput, "NoOverwriteCtx.cs"), "stale context", Encoding.UTF8);
+
+            var noOverwrite = RunCli(
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite --no-overwrite",
+                workDir);
+
+            Assert.NotEqual(0, noOverwrite.ExitCode);
+            Assert.Contains("already exists", noOverwrite.Stdout + noOverwrite.Stderr, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("stale entity", File.ReadAllText(Path.Combine(noOverwriteOutput, "Customer.cs")), StringComparison.Ordinal);
+            Assert.Contains("stale context", File.ReadAllText(Path.Combine(noOverwriteOutput, "NoOverwriteCtx.cs")), StringComparison.Ordinal);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void Scaffold_dotnet_ef_config_startup_project_resolves_named_connection()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_startup_" + Guid.NewGuid().ToString("N"));

@@ -39,7 +39,14 @@ partial class Program
                 ReadEfToolConfigBool(document.RootElement, "prefixOutput"),
                 ReadEfToolConfigBool(document.RootElement, "noPluralize"),
                 ReadEfToolConfigBool(document.RootElement, "useDatabaseNames"),
-                ReadEfToolConfigBool(document.RootElement, "force"));
+                ReadEfToolConfigBool(document.RootElement, "force"),
+                ReadEfToolConfigBool(document.RootElement, "noOverwrite"),
+                ReadEfToolConfigBool(document.RootElement, "dryRun"),
+                ReadEfToolConfigBool(document.RootElement, "failOnWarnings"),
+                ReadEfToolConfigBool(document.RootElement, "emitRoutineStubs"),
+                ReadEfToolConfigBool(document.RootElement, "emitSequenceStubs"),
+                ReadEfToolConfigBool(document.RootElement, "emitViewEntities"),
+                ReadEfToolConfigBool(document.RootElement, "emitQueryArtifacts"));
         }
         catch (NormConfigurationException)
         {
@@ -177,5 +184,12 @@ partial class Program
         bool? PrefixOutput,
         bool? NoPluralize,
         bool? UseDatabaseNames,
-        bool? Force);
+        bool? Force,
+        bool? NoOverwrite,
+        bool? DryRun,
+        bool? FailOnWarnings,
+        bool? EmitRoutineStubs,
+        bool? EmitSequenceStubs,
+        bool? EmitViewEntities,
+        bool? EmitQueryArtifacts);
 }

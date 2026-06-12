@@ -56,8 +56,14 @@ partial class Program
         if (contextNamespace is not null)
             contextNamespace = ValidateScaffoldNamespaceName(contextNamespace, explicitContextNamespace is null ? "context namespace" : "--context-namespace");
 
-        var forceOverwrite = GetScaffoldBoolOptionOrConfig(result, bindings.ForceOption, efToolConfig?.Force);
-        var noOverwrite = result.GetValue(bindings.NoOverwriteOption);
+        var forceExplicit = IsScaffoldOptionExplicit(result, bindings.ForceOption);
+        var noOverwriteExplicit = IsScaffoldOptionExplicit(result, bindings.NoOverwriteOption);
+        var forceOverwrite = forceExplicit
+            ? result.GetValue(bindings.ForceOption)
+            : !noOverwriteExplicit && efToolConfig?.Force == true;
+        var noOverwrite = noOverwriteExplicit
+            ? result.GetValue(bindings.NoOverwriteOption)
+            : !forceExplicit && efToolConfig?.NoOverwrite == true;
         if (forceOverwrite && noOverwrite)
             throw new NormConfigurationException("Use either --force or --no-overwrite for scaffold output conflicts, not both.");
 
@@ -86,12 +92,12 @@ partial class Program
             ContextOutputDirectory = contextOutputDirectory,
             ContextNamespace = contextNamespace,
             OverwriteFiles = forceOverwrite,
-            DryRun = result.GetValue(bindings.DryRunOption),
-            FailOnWarnings = result.GetValue(bindings.FailOnWarningsOption),
-            EmitRoutineStubs = result.GetValue(bindings.EmitRoutineStubsOption),
-            EmitSequenceStubs = result.GetValue(bindings.EmitSequenceStubsOption),
-            EmitViewEntities = result.GetValue(bindings.EmitViewEntitiesOption),
-            EmitQueryArtifacts = result.GetValue(bindings.EmitQueryArtifactsOption)
+            DryRun = GetScaffoldBoolOptionOrConfig(result, bindings.DryRunOption, efToolConfig?.DryRun),
+            FailOnWarnings = GetScaffoldBoolOptionOrConfig(result, bindings.FailOnWarningsOption, efToolConfig?.FailOnWarnings),
+            EmitRoutineStubs = GetScaffoldBoolOptionOrConfig(result, bindings.EmitRoutineStubsOption, efToolConfig?.EmitRoutineStubs),
+            EmitSequenceStubs = GetScaffoldBoolOptionOrConfig(result, bindings.EmitSequenceStubsOption, efToolConfig?.EmitSequenceStubs),
+            EmitViewEntities = GetScaffoldBoolOptionOrConfig(result, bindings.EmitViewEntitiesOption, efToolConfig?.EmitViewEntities),
+            EmitQueryArtifacts = GetScaffoldBoolOptionOrConfig(result, bindings.EmitQueryArtifactsOption, efToolConfig?.EmitQueryArtifacts)
         };
 
         return new ScaffoldCommandRequest(providerName, validated.ConnectionString, output, ns, ctx, options);
