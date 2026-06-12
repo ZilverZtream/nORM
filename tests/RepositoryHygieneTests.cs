@@ -17,7 +17,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxProviderMobilitySourceScannerFileLines = 200;
     private const int MaxProviderMobilitySchemaInspectorFileLines = 200;
     private const int MaxProviderMobilityTranslationFileLines = 250;
-    private const int MaxCliIntegrationFileLines = 1300;
+    private const int MaxCliIntegrationFileLines = 1000;
     private const int MaxCoreQueryTranslatorFileLines = 1000;
     private const int MaxQueryTranslatorPartialFileLines = 1200;
     private const int MaxNormQueryProviderPartialFileLines = 1500;
@@ -271,7 +271,7 @@ public sealed class RepositoryHygieneTests
     public void Cli_integration_tests_stay_split_by_command_area()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("CLI integration tests stay below 1300 lines per file", ownership, StringComparison.Ordinal);
+        Assert.Contains("CLI integration tests stay below 1000 lines per file", ownership, StringComparison.Ordinal);
 
         var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "CliIntegration*.cs")
             .Select(path => new

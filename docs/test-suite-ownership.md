@@ -165,7 +165,7 @@ cannot bypass the all-four matrix by avoiding provider `InlineData`.
 
 ## CLI Integration Test Size
 
-CLI integration tests stay below 1300 lines per file so command coverage remains
+CLI integration tests stay below 1000 lines per file so command coverage remains
 split by command area instead of growing one catch-all test object.
 `RepositoryHygieneTests` enforces this boundary for `tests/CliIntegration*.cs`.
 When adding CLI scaffold, migration, database, or portability coverage, place it
