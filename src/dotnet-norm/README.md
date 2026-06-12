@@ -48,7 +48,9 @@ The scaffolder emits project-aware nullable entity classes, `[Table]`/`[Column]`
 generated fluent string/binary length, Unicode, and fixed-length facets,
 deterministic C# identifier cleanup, de-duplicated generated names,
 partial entity/context classes with an `OnModelCreatingPartial(ModelBuilder)`
-hook for reviewed custom configuration, `IQueryable<T>` context properties backed by nORM's query provider,
+hook plus caller-supplied `DbContextOptions.OnModelCreating` for reviewed
+custom configuration after scaffolded model configuration, `IQueryable<T>`
+context properties backed by nORM's query provider,
 generated context constructors for both `DbConnection` and connection strings
 that still require an explicit `DatabaseProvider` and never hard-code the
 scaffold connection string,

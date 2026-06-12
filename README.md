@@ -378,9 +378,10 @@ Clean later scaffold runs remove stale warning reports when overwrite is
 explicitly allowed, or fail clearly when overwrite protection would leave stale
 reports in place.
 Repeated scaffolds can keep reviewed custom code in partial entity/context
-classes, with generated contexts calling `OnModelCreatingPartial(ModelBuilder)`
-after caller-supplied model configuration. Table filters (`--tables`/`--table`)
-and schema filters (`--schemas`/`--schema`) can be combined; EF-style
+classes, with generated contexts applying scaffolded model configuration before
+caller-supplied `DbContextOptions.OnModelCreating` and
+`OnModelCreatingPartial(ModelBuilder)` customization hooks. Table filters
+(`--tables`/`--table`) and schema filters (`--schemas`/`--schema`) can be combined; EF-style
 multi-value `--table First Second` and `--schema Accounting Sales` tokens are
 accepted, and table filters can use `schema.table` or `schema.view`.
 Blank CLI table/schema filters are rejected so an empty option cannot broaden

@@ -158,10 +158,10 @@ must be reviewed and edited like handwritten model code.
   are emitted as non-null properties initialized with `default!` in
   nullable-enabled output. Optional reference navigations remain nullable.
 - Generated entity classes and generated contexts are `partial`. Generated
-  contexts preserve caller-supplied `DbContextOptions.OnModelCreating`
-  configuration and then call a private static
-  `OnModelCreatingPartial(ModelBuilder)` partial method, so repeated scaffolds
-  can keep reviewed custom model configuration in a separate partial context
+  contexts apply scaffolded model configuration first, then invoke
+  caller-supplied `DbContextOptions.OnModelCreating` and finally call a private
+  static `OnModelCreatingPartial(ModelBuilder)` partial method, so repeated
+  scaffolds can keep reviewed custom model configuration in a separate partial context
   file instead of editing generated source.
 - `DbContext` generation with `IQueryable<T>` properties backed by nORM's
   query provider. Generated contexts expose both `DbConnection` and connection

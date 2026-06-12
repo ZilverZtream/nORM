@@ -98,7 +98,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void ScaffoldContext_EmitsPartialCustomizationHook()
     {
-        var code = InvokeScaffoldContext("MyApp", "AppDbContext", new[] { "User" });
+        var code = InvokeScaffoldContextWithPrimaryKeyConstraintName();
 
         Assert.Contains("public partial class AppDbContext : DbContext", code);
         Assert.Contains(": base(cn, provider, ConfigureOptions(options))", code);
@@ -106,6 +106,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("configure?.Invoke(mb);", code);
         Assert.Contains("OnModelCreatingPartial(mb);", code);
         Assert.Contains("static partial void OnModelCreatingPartial(ModelBuilder modelBuilder);", code);
+
+        var generatedConfigurationIndex = code.IndexOf("mb.Entity<User>()", StringComparison.Ordinal);
+        var callerConfigurationIndex = code.IndexOf("configure?.Invoke(mb);", StringComparison.Ordinal);
+        var partialHookIndex = code.IndexOf("OnModelCreatingPartial(mb);", StringComparison.Ordinal);
+        Assert.True(generatedConfigurationIndex >= 0, "Expected generated entity configuration before customization hooks.");
+        Assert.True(generatedConfigurationIndex < callerConfigurationIndex, "Caller-supplied configuration must run after generated scaffold configuration so it can override it.");
+        Assert.True(callerConfigurationIndex < partialHookIndex, "The partial hook must be the final generated customization point.");
     }
 
     [Fact]

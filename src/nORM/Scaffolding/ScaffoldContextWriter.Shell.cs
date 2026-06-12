@@ -81,11 +81,11 @@ namespace nORM.Scaffolding
             sb.AppendLine("        var configure = configuredOptions.OnModelCreating;");
             sb.AppendLine("        configuredOptions.OnModelCreating = mb =>");
             sb.AppendLine("        {");
-            sb.AppendLine("            configure?.Invoke(mb);");
         }
 
         private static void AppendScaffoldContextFooter(StringBuilder sb)
         {
+            sb.AppendLine("            configure?.Invoke(mb);");
             sb.AppendLine("            OnModelCreatingPartial(mb);");
             sb.AppendLine("        };");
             sb.AppendLine("        return configuredOptions;");
