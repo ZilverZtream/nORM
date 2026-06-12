@@ -73,7 +73,7 @@ namespace nORM.Scaffolding
                 composition.IdentityOptionConfigurations,
                 composition.PrecisionConfigurations,
                 composition.ColumnFacetConfigurations,
-                options.PluralizeQueryProperties,
+                options.UsePluralizer,
                 options.UseNullableReferenceTypes,
                 namespaceName,
                 options.UseDatabaseNames);

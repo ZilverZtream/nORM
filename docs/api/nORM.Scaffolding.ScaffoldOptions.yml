@@ -15,11 +15,11 @@ items:
   - nORM.Scaffolding.ScaffoldOptions.EmitViewEntities
   - nORM.Scaffolding.ScaffoldOptions.FailOnWarnings
   - nORM.Scaffolding.ScaffoldOptions.OverwriteFiles
-  - nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties
   - nORM.Scaffolding.ScaffoldOptions.Schemas
   - nORM.Scaffolding.ScaffoldOptions.Tables
   - nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames
   - nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes
+  - nORM.Scaffolding.ScaffoldOptions.UsePluralizer
   langs:
   - csharp
   - vb
@@ -143,44 +143,46 @@ items:
       type: System.Collections.Generic.IReadOnlyCollection{System.String}
     content.vb: Public Property Schemas As IReadOnlyCollection(Of String)
   overload: nORM.Scaffolding.ScaffoldOptions.Schemas*
-- uid: nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties
-  commentId: P:nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties
-  id: PluralizeQueryProperties
+- uid: nORM.Scaffolding.ScaffoldOptions.UsePluralizer
+  commentId: P:nORM.Scaffolding.ScaffoldOptions.UsePluralizer
+  id: UsePluralizer
   parent: nORM.Scaffolding.ScaffoldOptions
   langs:
   - csharp
   - vb
-  name: PluralizeQueryProperties
-  nameWithType: ScaffoldOptions.PluralizeQueryProperties
-  fullName: nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties
+  name: UsePluralizer
+  nameWithType: ScaffoldOptions.UsePluralizer
+  fullName: nORM.Scaffolding.ScaffoldOptions.UsePluralizer
   type: Property
   source:
     remote:
       path: src/nORM/Scaffolding/ScaffoldOptions.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
-    id: PluralizeQueryProperties
+    id: UsePluralizer
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 38
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
   summary: >-
-    Gets a value indicating whether generated <code>IQueryable&lt;T&gt;</code>
+    Gets a value indicating whether scaffolding should use nORM's
 
-    context properties should use plural collection-style names. Entity
+    pluralizer for generated CLR names. When enabled, plural database
 
-    class names remain based on the database object names regardless of
+    object names are singularized for entity classes and generated
 
-    this setting.
+    <code>IQueryable&lt;T&gt;</code> context properties use plural collection-style
+
+    names.
   example: []
   syntax:
-    content: public bool PluralizeQueryProperties { get; init; }
+    content: public bool UsePluralizer { get; init; }
     parameters: []
     return:
       type: System.Boolean
-    content.vb: Public Property PluralizeQueryProperties As Boolean
-  overload: nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties*
+    content.vb: Public Property UsePluralizer As Boolean
+  overload: nORM.Scaffolding.ScaffoldOptions.UsePluralizer*
 - uid: nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames
   commentId: P:nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames
   id: UseDatabaseNames
@@ -1699,12 +1701,12 @@ references:
   name: Schemas
   nameWithType: ScaffoldOptions.Schemas
   fullName: nORM.Scaffolding.ScaffoldOptions.Schemas
-- uid: nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties*
-  commentId: Overload:nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties
-  href: nORM.Scaffolding.ScaffoldOptions.html#nORM_Scaffolding_ScaffoldOptions_PluralizeQueryProperties
-  name: PluralizeQueryProperties
-  nameWithType: ScaffoldOptions.PluralizeQueryProperties
-  fullName: nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties
+- uid: nORM.Scaffolding.ScaffoldOptions.UsePluralizer*
+  commentId: Overload:nORM.Scaffolding.ScaffoldOptions.UsePluralizer
+  href: nORM.Scaffolding.ScaffoldOptions.html#nORM_Scaffolding_ScaffoldOptions_UsePluralizer
+  name: UsePluralizer
+  nameWithType: ScaffoldOptions.UsePluralizer
+  fullName: nORM.Scaffolding.ScaffoldOptions.UsePluralizer
 - uid: System.Boolean
   commentId: T:System.Boolean
   parent: System

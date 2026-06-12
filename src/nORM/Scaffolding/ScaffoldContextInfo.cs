@@ -21,7 +21,7 @@ namespace nORM.Scaffolding
         IReadOnlyList<ScaffoldContextIdentityOptionInfo> IdentityOptionConfigurations,
         IReadOnlyList<ScaffoldContextPrecisionInfo> PrecisionConfigurations,
         IReadOnlyList<ScaffoldContextColumnFacetInfo> ColumnFacetConfigurations,
-        bool PluralizeQueryProperties,
+        bool UsePluralizer,
         bool UseNullableReferenceTypes,
         string? EntityNamespaceName,
         bool UseDatabaseNames);

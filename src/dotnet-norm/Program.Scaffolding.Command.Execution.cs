@@ -77,7 +77,7 @@ partial class Program
         {
             Schemas = options.Schemas,
             Tables = options.Tables,
-            PluralizeQueryProperties = options.PluralizeQueryProperties,
+            UsePluralizer = options.UsePluralizer,
             UseDatabaseNames = options.UseDatabaseNames,
             UseNullableReferenceTypes = options.UseNullableReferenceTypes,
             ContextDirectory = options.ContextDirectory,

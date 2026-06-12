@@ -23,7 +23,8 @@ namespace nORM.Scaffolding
             var tableInfos = BuildTableInfos(tables);
             var entityByTable = ScaffoldEntityNameBuilder.BuildEntityNameMap(
                 tableInfos,
-                options.UseDatabaseNames);
+                options.UseDatabaseNames,
+                options.UsePluralizer);
 
             var metadata = await ScaffoldModelMetadataDiscovery.DiscoverAsync(
                 connection,

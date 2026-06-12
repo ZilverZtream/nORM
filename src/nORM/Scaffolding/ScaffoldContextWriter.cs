@@ -27,7 +27,7 @@ namespace nORM.Scaffolding
                 sb,
                 context.ContextName,
                 context.EntityNames,
-                context.PluralizeQueryProperties,
+                context.UsePluralizer,
                 context.UseNullableReferenceTypes);
             if (emitRoutineStubs)
                 ScaffoldRoutineStubWriter.AppendRoutineStubs(sb, context.RoutineStubs, queryPropertyNames, context.UseNullableReferenceTypes, context.UseDatabaseNames);

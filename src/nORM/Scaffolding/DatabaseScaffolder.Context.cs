@@ -7,10 +7,10 @@ namespace nORM.Scaffolding
     public static partial class DatabaseScaffolder
     {
         private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
-            => ScaffoldContext(namespaceName, contextName, entities, pluralizeQueryProperties: true);
+            => ScaffoldContext(namespaceName, contextName, entities, usePluralizer: true);
 
-        private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities, bool pluralizeQueryProperties)
-            => ScaffoldContextWithRelationships(namespaceName, contextName, entities, Array.Empty<ScaffoldRelationship>(), Array.Empty<ScaffoldManyToManyJoin>(), pluralizeQueryProperties: pluralizeQueryProperties);
+        private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities, bool usePluralizer)
+            => ScaffoldContextWithRelationships(namespaceName, contextName, entities, Array.Empty<ScaffoldRelationship>(), Array.Empty<ScaffoldManyToManyJoin>(), usePluralizer: usePluralizer);
 
         private static string ScaffoldContextWithRelationships(
             string namespaceName,
@@ -29,7 +29,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
             IReadOnlyList<ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
             IReadOnlyList<ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
-            bool pluralizeQueryProperties = true,
+            bool usePluralizer = true,
             bool useNullableReferenceTypes = true,
             string? entityNamespaceName = null,
             bool useDatabaseNames = false)
@@ -50,7 +50,7 @@ namespace nORM.Scaffolding
                 identityOptionConfigurations,
                 precisionConfigurations,
                 columnFacetConfigurations,
-                pluralizeQueryProperties,
+                usePluralizer,
                 useNullableReferenceTypes,
                 entityNamespaceName,
                 useDatabaseNames);

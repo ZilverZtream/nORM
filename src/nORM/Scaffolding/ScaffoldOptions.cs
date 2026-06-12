@@ -31,12 +31,13 @@ namespace nORM.Scaffolding
         public IReadOnlyCollection<string> Schemas { get; init; } = Array.Empty<string>();
 
         /// <summary>
-        /// Gets a value indicating whether generated <c>IQueryable&lt;T&gt;</c>
-        /// context properties should use plural collection-style names. Entity
-        /// class names remain based on the database object names regardless of
-        /// this setting.
+        /// Gets a value indicating whether scaffolding should use nORM's
+        /// pluralizer for generated CLR names. When enabled, plural database
+        /// object names are singularized for entity classes and generated
+        /// <c>IQueryable&lt;T&gt;</c> context properties use plural collection-style
+        /// names.
         /// </summary>
-        public bool PluralizeQueryProperties { get; init; } = true;
+        public bool UsePluralizer { get; init; } = true;
 
         /// <summary>
         /// Gets a value indicating whether generated CLR entity, property,

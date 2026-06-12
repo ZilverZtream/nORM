@@ -34,7 +34,7 @@ partial class Program
         var tableOpt = new Option<string[]>("--table", "-t") { Description = "Optional repeatable table filter for names that should not be comma-split. May be specified multiple times." };
         schemaOpt.AllowMultipleArgumentsPerToken = true;
         tableOpt.AllowMultipleArgumentsPerToken = true;
-        var noPluralizeOpt = new Option<bool>("--no-pluralize") { Description = "Do not pluralize generated IQueryable<T> context property names. Entity class names are unchanged." };
+        var noPluralizeOpt = new Option<bool>("--no-pluralize") { Description = "Do not singularize entity class names or pluralize generated IQueryable<T> context property names." };
         var useDatabaseNamesOpt = new Option<bool>("--use-database-names") { Description = "Preserve legal table, view, sequence, routine, column, and routine result-column names as generated CLR names instead of applying PascalCase naming." };
         var noOnConfiguringOpt = new Option<bool>("--no-onconfiguring") { Description = "Accepted for EF Core scaffold compatibility; nORM generated contexts never emit OnConfiguring." };
         var dataAnnotationsOpt = new Option<bool>("--data-annotations", "-d") { Description = "Accepted for EF Core scaffold compatibility; nORM scaffolding already emits data annotations where supported." };

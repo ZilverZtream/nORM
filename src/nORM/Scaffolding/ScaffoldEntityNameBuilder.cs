@@ -9,7 +9,8 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyDictionary<string, string> BuildEntityNameMap(
             IReadOnlyList<ScaffoldTableInfo> tables,
-            bool useDatabaseNames)
+            bool useDatabaseNames,
+            bool usePluralizer = true)
         {
             var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -26,7 +27,10 @@ namespace nORM.Scaffolding
                         ? "Default_" + table.Name
                         : table.Schema + "_" + table.Name
                     : table.Name;
-                var baseName = ScaffoldNameHelper.ToScaffoldClrName(sourceName, useDatabaseNames);
+                var clrName = ScaffoldNameHelper.ToScaffoldClrName(sourceName, useDatabaseNames);
+                var baseName = usePluralizer && !useDatabaseNames
+                    ? ScaffoldNameHelper.Singularize(clrName)
+                    : clrName;
                 names[TableKey(table.Schema, table.Name)] = ScaffoldNameHelper.MakeUnique(baseName, existingNames);
             }
 

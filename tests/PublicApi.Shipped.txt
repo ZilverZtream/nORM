@@ -1505,11 +1505,11 @@ P:nORM.Scaffolding.ScaffoldOptions.EmitSequenceStubs:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitViewEntities:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.FailOnWarnings:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.OverwriteFiles:System.Boolean
-P:nORM.Scaffolding.ScaffoldOptions.PluralizeQueryProperties:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.Schemas:System.Collections.Generic.IReadOnlyCollection{System.String}
 P:nORM.Scaffolding.ScaffoldOptions.Tables:System.Collections.Generic.IReadOnlyCollection{System.String}
 P:nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes:System.Boolean
+P:nORM.Scaffolding.ScaffoldOptions.UsePluralizer:System.Boolean
 P:nORM.SourceGeneration.CompileTimeQueryAttribute.Sql:System.String
 P:nORM.SourceGeneration.CompiledMaterializerStore.Count:System.Int32
 P:nORM.SourceGeneration.CompiledMaterializerStore.Evictions:System.Int64

@@ -303,7 +303,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`--no-onconfiguring` emits no `OnConfiguring`", doc, StringComparison.Ordinal);
         Assert.Contains("hard-coded scaffold connection string", doc, StringComparison.Ordinal);
         Assert.Contains("`--data-annotations` is accepted", doc, StringComparison.Ordinal);
-        Assert.Contains("`--no-pluralize` keeps", doc, StringComparison.Ordinal);
+        Assert.Contains("`--no-pluralize` disables", doc, StringComparison.Ordinal);
         Assert.Contains("common", doc, StringComparison.Ordinal);
         Assert.Contains("output switches `--json`, `--verbose`, `--no-color`, and `--prefix-output`", doc, StringComparison.Ordinal);
         Assert.Contains("successful machine-readable summary", doc, StringComparison.Ordinal);

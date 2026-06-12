@@ -925,7 +925,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldAsync(DbConnection, DatabaseProvider, string, string, ScaffoldOptions)", scaffolderDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync(DbConnection, DatabaseProvider, string, string, string, ScaffoldOptions?)", scaffolderDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.Schemas", optionsDoc, StringComparison.Ordinal);
-        Assert.Contains("ScaffoldOptions.PluralizeQueryProperties", optionsDoc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldOptions.UsePluralizer", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseDatabaseNames", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseNullableReferenceTypes", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.ContextDirectory", optionsDoc, StringComparison.Ordinal);

@@ -387,10 +387,11 @@ accepted, and table filters can use `schema.table` or `schema.view`.
 Blank CLI table/schema filters are rejected so an empty option cannot broaden
 the run to every table.
 Schema filters select all discovered user tables and supported query
-artifacts in matching schemas. Generated `IQueryable<T>` context properties use collection-style
-names by default; `--no-pluralize` or `ScaffoldOptions.PluralizeQueryProperties`
-can leave query property names singular without changing entity class names or
-database object names. `--use-database-names` or
+artifacts in matching schemas. By default, nORM's scaffold pluralizer singularizes
+plural database object names for entity classes and emits collection-style
+`IQueryable<T>` context property names; `--no-pluralize` or
+`ScaffoldOptions.UsePluralizer = false` preserves generated names without
+singularizing or pluralizing them. `--use-database-names` or
 `ScaffoldOptions.UseDatabaseNames` preserves legal database table, view,
 sequence, routine, column, and routine result-column names as generated CLR
 names while still escaping invalid C# identifiers; synthetic navigation members

@@ -93,7 +93,7 @@ partial class Program
         {
             Schemas = schemaFilters,
             Tables = tableFilters,
-            PluralizeQueryProperties = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize),
+            UsePluralizer = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize),
             UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames),
             UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true,
             ContextOutputDirectory = contextOutputDirectory,

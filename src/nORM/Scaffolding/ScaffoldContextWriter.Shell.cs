@@ -50,7 +50,7 @@ namespace nORM.Scaffolding
             StringBuilder sb,
             string contextName,
             IEnumerable<string> entities,
-            bool pluralizeQueryProperties,
+            bool usePluralizer,
             bool useNullableReferenceTypes)
         {
             var safeContext = ScaffoldNameHelper.EscapeCSharpIdentifier(contextName);
@@ -63,7 +63,7 @@ namespace nORM.Scaffolding
             foreach (var entity in entities.OrderBy(e => e))
             {
                 var safeEntity = ScaffoldNameHelper.EscapeCSharpIdentifier(entity);
-                var queryPropertyBase = pluralizeQueryProperties ? ScaffoldNameHelper.Pluralize(safeEntity) : safeEntity;
+                var queryPropertyBase = usePluralizer ? ScaffoldNameHelper.Pluralize(safeEntity) : safeEntity;
                 var queryProperty = ScaffoldNameHelper.MakeUnique(queryPropertyBase, queryPropertyNames);
                 sb.AppendLine($"    public IQueryable<{safeEntity}> {queryProperty} => this.Query<{safeEntity}>();");
             }

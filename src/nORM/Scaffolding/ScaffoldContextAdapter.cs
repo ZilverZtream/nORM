@@ -22,7 +22,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<DatabaseScaffolder.ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
             IReadOnlyList<DatabaseScaffolder.ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
             IReadOnlyList<DatabaseScaffolder.ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
-            bool pluralizeQueryProperties = true,
+            bool usePluralizer = true,
             bool useNullableReferenceTypes = true,
             string? entityNamespaceName = null,
             bool useDatabaseNames = false)
@@ -43,7 +43,7 @@ namespace nORM.Scaffolding
                 identityOptionConfigurations,
                 precisionConfigurations,
                 columnFacetConfigurations,
-                pluralizeQueryProperties,
+                usePluralizer,
                 useNullableReferenceTypes,
                 entityNamespaceName,
                 useDatabaseNames));

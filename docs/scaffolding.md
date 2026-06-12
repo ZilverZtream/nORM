@@ -381,12 +381,13 @@ must be reviewed and edited like handwritten model code.
   unqualified default database and still emits unqualified `[Table]` metadata.
   MySQL scaffolding still uses the current database as an unqualified model
   because nORM does not emit the MySQL catalog/database name as a schema.
-- Optional query-property naming control through
-  `ScaffoldOptions.PluralizeQueryProperties` and CLI `--no-pluralize`. By
-  default generated `IQueryable<T>` context properties use collection-style
-  names with deterministic cleanup for descriptor-like entity names. Disabling
-  pluralization leaves query property names singular; entity class names and
-  database object names are unchanged.
+- Optional generated-name pluralizer control through
+  `ScaffoldOptions.UsePluralizer` and CLI `--no-pluralize`. By default plural
+  database object names are singularized for entity classes, and generated
+  `IQueryable<T>` context properties use collection-style names with
+  deterministic cleanup for descriptor-like entity names. Disabling
+  pluralization preserves generated names without singularizing or pluralizing
+  them.
 - Optional database-name preservation through `ScaffoldOptions.UseDatabaseNames`
   and CLI `--use-database-names`. When enabled, legal database table, view,
   sequence, routine, column, and routine result-column names are preserved as
@@ -863,8 +864,9 @@ must be reviewed and edited like handwritten model code.
   nORM's generated model semantics are also verified through the real CLI
   across all four providers: `--no-onconfiguring` emits no `OnConfiguring` or
   hard-coded scaffold connection string, `--data-annotations` is accepted while
-  preserving nORM's default annotation output, and `--no-pluralize` keeps
-  singular query properties. The same clean live scaffold verifies common
+  preserving nORM's default annotation output, and `--no-pluralize` disables
+  entity-name singularization and collection query-property pluralization. The
+  same clean live scaffold verifies common
   output switches `--json`, `--verbose`, `--no-color`, and `--prefix-output`
   across all four providers by parsing a successful machine-readable summary
   with zero warnings. It also

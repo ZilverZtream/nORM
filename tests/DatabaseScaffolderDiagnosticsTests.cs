@@ -461,14 +461,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 "VirtualQueryCtx",
                 new ScaffoldOptions { Tables = new[] { "SearchDocs" }, EmitQueryArtifacts = true });
 
-            var entityCode = File.ReadAllText(Path.Combine(dir, "SearchDocs.cs"));
+            var entityCode = File.ReadAllText(Path.Combine(dir, "SearchDoc.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "VirtualQueryCtx.cs"));
             using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
 
             Assert.Contains("[Table(\"SearchDocs\")]", entityCode);
             Assert.Contains("[ReadOnlyEntity]", entityCode);
             Assert.Contains("Body { get; set; }", entityCode);
-            Assert.Contains("IQueryable<SearchDocs> SearchDocs", contextCode);
+            Assert.Contains("IQueryable<SearchDoc> SearchDocs", contextCode);
             Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsData", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(Directory.GetFiles(dir, "*.cs"), path => Path.GetFileNameWithoutExtension(path).StartsWith("SearchDocsIdx", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(), item =>

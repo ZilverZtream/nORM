@@ -199,7 +199,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "DottedCtx");
 
-            var entityCode = File.ReadAllText(Path.Combine(dir, "AuditEvents.cs"));
+            var entityCode = File.ReadAllText(Path.Combine(dir, "AuditEvent.cs"));
             Assert.Contains("[Table(\"audit.events\")]", entityCode);
             Assert.Contains("[Index(\"ix.audit.value\")]", entityCode);
             Assert.Contains("[Column(\"value.part\")]", entityCode);
@@ -273,7 +273,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
         {
             await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "ObjectMemberCtx");
 
-            var entityCode = File.ReadAllText(Path.Combine(dir, "ObjectMembers.cs"));
+            var entityCode = File.ReadAllText(Path.Combine(dir, "ObjectMember.cs"));
+            Assert.Contains("public partial class ObjectMember", entityCode);
             Assert.Contains("public string ToString2 { get; set; } = default!;", entityCode);
             Assert.Contains("public string Equals2 { get; set; } = default!;", entityCode);
             Assert.Contains("public string GetHashCode2 { get; set; } = default!;", entityCode);

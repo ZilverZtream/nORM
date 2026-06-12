@@ -54,7 +54,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`schema.table`", doc, StringComparison.Ordinal);
         Assert.Contains("`schema.view`", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.Schemas", doc, StringComparison.Ordinal);
-        Assert.Contains("ScaffoldOptions.PluralizeQueryProperties", doc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldOptions.UsePluralizer", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseDatabaseNames", doc, StringComparison.Ordinal);
         Assert.Contains("routine result-column names", doc, StringComparison.Ordinal);
         Assert.Contains("Synthetic navigation", doc, StringComparison.Ordinal);
@@ -130,7 +130,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ShouldEmitQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("IsDefaultQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("unioned with explicit table filters", doc, StringComparison.Ordinal);
-        Assert.Contains("entity class names and", doc, StringComparison.Ordinal);
+        Assert.Contains("database object names are singularized for entity classes", doc, StringComparison.Ordinal);
         Assert.Contains("output-relative API placement", doc, StringComparison.Ordinal);
         Assert.Contains("EF-style project-relative placement", doc, StringComparison.Ordinal);
         Assert.Contains("CLI `--context-dir` rejects absolute", doc, StringComparison.Ordinal);
@@ -245,7 +245,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("efToolConfig?.EmitViewEntities", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.EmitQueryArtifacts", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.MsbuildProjectExtensionsPath", cliSource, StringComparison.Ordinal);
-        Assert.Contains("PluralizeQueryProperties = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize)", cliSource, StringComparison.Ordinal);
+        Assert.Contains("UsePluralizer = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames)", cliSource, StringComparison.Ordinal);
         Assert.Contains("DryRun = GetScaffoldBoolOptionOrConfig(result, bindings.DryRunOption, efToolConfig?.DryRun)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true", cliSource, StringComparison.Ordinal);

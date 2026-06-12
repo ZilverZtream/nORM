@@ -92,10 +92,11 @@ filters. Schema filters apply where nORM preserves schema identity
 SQLite `main` matches the unqualified default database and still emits
 unqualified `[Table]` metadata. MySQL remains scoped to the current database
 without emitting that database name as a model schema.
-Generated `IQueryable<T>` context properties use collection-style names by
-default, with deterministic cleanup for descriptor-like entity names. Use
-`--no-pluralize` when you want singular query property names; entity class
-names and database object names are unchanged.
+By default, nORM's scaffold pluralizer singularizes plural database object
+names for entity classes and emits collection-style generated `IQueryable<T>`
+context property names, with deterministic cleanup for descriptor-like entity
+names. Use `--no-pluralize` when generated names should be preserved without
+singularizing or pluralizing them.
 Use `--use-database-names` when legal table, view, sequence, routine, column,
 and routine result-column names should be preserved as generated CLR names
 instead of normalized to PascalCase. Invalid C# identifiers and C# keywords are
