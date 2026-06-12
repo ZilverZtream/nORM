@@ -87,25 +87,25 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL serial columns and owned sequences are PostgreSQL-specific catalog behavior.", "Postgres"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
                 Expect("SQL Server rowversion/timestamp concurrency metadata is SQL Server-specific.", "SqlServer"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_emits_postgres_uuid_and_array_columns_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypePostgresTests.cs::ScaffoldAsync_emits_postgres_uuid_and_array_columns_on_live_provider"] =
                 Expect("PostgreSQL UUID and native array column DDL is PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_postgres_uuid_and_array_columns_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypePostgresTests.cs::Dynamic_scaffolding_handles_postgres_uuid_and_array_columns_on_live_provider"] =
                 Expect("PostgreSQL UUID and native array runtime metadata is PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_emits_mysql_json_and_year_columns_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypeMySqlTests.cs::ScaffoldAsync_emits_mysql_json_and_year_columns_on_live_provider"] =
                 Expect("MySQL JSON/YEAR/ENUM/SET column metadata is MySQL-specific.", "MySql"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_reports_postgres_domain_columns_with_underlying_type_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypePostgresTests.cs::ScaffoldAsync_reports_postgres_domain_columns_with_underlying_type_on_live_provider"] =
                 Expect("PostgreSQL domains and enum-base domains are PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_postgres_domain_columns_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypePostgresTests.cs::Dynamic_scaffolding_handles_postgres_domain_columns_on_live_provider"] =
                 Expect("PostgreSQL domain runtime metadata is PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_reports_sqlserver_alias_type_columns_with_base_type_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypeSqlServerTests.cs::ScaffoldAsync_reports_sqlserver_alias_type_columns_with_base_type_on_live_provider"] =
                 Expect("SQL Server alias/user-defined types are SQL Server-specific.", "SqlServer"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_sqlserver_alias_type_columns_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypeSqlServerTests.cs::Dynamic_scaffolding_handles_sqlserver_alias_type_columns_on_live_provider"] =
                 Expect("SQL Server alias/user-defined runtime metadata is SQL Server-specific.", "SqlServer"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::ScaffoldAsync_reports_mysql_unsigned_columns_as_provider_specific_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypeMySqlTests.cs::ScaffoldAsync_reports_mysql_unsigned_columns_as_provider_specific_on_live_provider"] =
                 Expect("MySQL unsigned integer and unsigned decimal DDL is MySQL-specific.", "MySql"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_handles_mysql_unsigned_columns_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypeMySqlTests.cs::Dynamic_scaffolding_handles_mysql_unsigned_columns_on_live_provider"] =
                 Expect("MySQL unsigned runtime metadata is MySQL-specific.", "MySql"),
-            ["LiveProviderScaffoldingProviderTypeTests.cs::Dynamic_scaffolding_marks_unsafe_mysql_set_columns_read_only_on_live_provider"] =
+            ["LiveProviderScaffoldingProviderTypeMySqlTests.cs::Dynamic_scaffolding_marks_unsafe_mysql_set_columns_read_only_on_live_provider"] =
                 Expect("Unsafe MySQL SET write-blocking metadata is MySQL-specific.", "MySql"),
             ["LiveProviderScaffoldingQueryArtifactTests.cs::ScaffoldAsync_emits_postgres_materialized_view_as_read_only_query_artifact"] =
                 Expect("PostgreSQL materialized views are PostgreSQL-specific query artifacts.", "Postgres"),
