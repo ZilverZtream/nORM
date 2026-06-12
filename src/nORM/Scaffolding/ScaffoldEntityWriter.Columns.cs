@@ -17,7 +17,7 @@ namespace nORM.Scaffolding
                 sb.AppendLine("    [Timestamp]");
             if (column.IsAutoIncrement)
                 sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-            else if (column.IsComputed)
+            else if (column.IsComputed || column.IsRowVersion)
                 sb.AppendLine("    [DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
             if (column.MaxLength.HasValue)
                 sb.AppendLine($"    [MaxLength({column.MaxLength.Value})]");

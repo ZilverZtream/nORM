@@ -316,10 +316,23 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public byte[] RowVersion { get; set; } = Array.Empty<byte>();", entityCode, StringComparison.Ordinal);
                 Assert.DoesNotContain(".Property(e => e.RowVersion).HasComputedColumnSql", contextCode, StringComparison.Ordinal);
-                Assert.Contains(providerOwned, item =>
+                var rowVersionDiagnostic = Assert.Single(providerOwned, item =>
                     item.GetProperty("kind").GetString() == "RowVersion" &&
                     item.GetProperty("code").GetString() == "SCF108" &&
                     item.GetProperty("table").GetString()!.EndsWith(SqlServerRowVersionTable, StringComparison.Ordinal));
+                var rowVersionMetadata = rowVersionDiagnostic.GetProperty("metadata");
+                Assert.Contains(
+                    rowVersionMetadata.GetProperty("providerType").GetString(),
+                    new[] { "rowversion", "timestamp" },
+                    StringComparer.OrdinalIgnoreCase);
+                Assert.True(rowVersionMetadata.GetProperty("providerOwnedDdl").GetBoolean());
+                Assert.True(rowVersionMetadata.GetProperty("generatedModelConfigurationSupported").GetBoolean());
+                Assert.True(rowVersionMetadata.GetProperty("concurrencyToken").GetBoolean());
+                Assert.True(rowVersionMetadata.GetProperty("databaseGenerated").GetBoolean());
+                Assert.False(rowVersionMetadata.GetProperty("readOnlyEntity").GetBoolean());
+                Assert.True(rowVersionMetadata.GetProperty("generatedWritesSupported").GetBoolean());
+                Assert.Equal("provider-managed-rowversion", rowVersionMetadata.GetProperty("reason").GetString());
+                Assert.Contains("[Timestamp]", rowVersionDiagnostic.GetProperty("suggestedAction").GetString(), StringComparison.Ordinal);
                 AssertScaffoldOutputBuilds(dir);
             }
             finally

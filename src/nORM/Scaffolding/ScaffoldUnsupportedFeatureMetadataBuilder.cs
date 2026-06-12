@@ -65,8 +65,16 @@ namespace nORM.Scaffolding
                     metadata["stored"] = stored;
                     break;
                 case "RowVersion":
+                    if (!metadata.ContainsKey("table"))
+                        metadata["table"] = feature.TableKey;
+                    metadata["providerType"] = feature.Detail;
+                    metadata["providerOwnedDdl"] = true;
+                    metadata["generatedModelConfigurationSupported"] = true;
                     metadata["concurrencyToken"] = true;
                     metadata["databaseGenerated"] = true;
+                    metadata["readOnlyEntity"] = false;
+                    metadata["generatedWritesSupported"] = true;
+                    metadata["reason"] = "provider-managed-rowversion";
                     break;
                 case "IdentityStrategy":
                     metadata["identityStrategy"] = feature.Detail;

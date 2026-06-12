@@ -611,14 +611,16 @@ must be reviewed and edited like handwritten model code.
   configuration are also ordered by generated names rather than raw provider FK
   discovery order.
 - Deterministic Markdown and JSON diagnostics for discovered database features
-  that are not converted into runnable model code. Composite foreign keys that
+  that are provider-owned or not fully converted into runnable model code.
+  Composite foreign keys that
   do not target the generated principal primary key or an exact ordered unfiltered unique index
   are listed there instead of being silently ignored or converted into fake
   single-column navigations;
   unsafe/provider-specific defaults that fail the safe default allowlist,
   provider-specific column types that cannot be represented as safe scalar
   storage,
-  SQL Server rowversion/timestamp columns,
+  SQL Server rowversion/timestamp columns whose concurrency metadata is emitted
+  but whose exact provider DDL remains provider-owned,
   unparsed provider-specific identity strategy metadata, unrecognized FK referential actions,
   relationships that do not target the generated principal primary key or an
   exact ordered unfiltered unique index,
@@ -1176,8 +1178,9 @@ Each row also includes stable diagnostic metadata:
   dependent/principal table and column details, referential
   `onDelete`/`onUpdate` actions plus the suppression `reason`,
   decimal `precision`/`scale`, computed-column
-  `computedSql`/`stored`, provider `collation`, rowversion concurrency flags,
-  parsed identity `seed`/`increment`, and index-shape flags plus parsed
+  `computedSql`/`stored`, provider `collation`, rowversion concurrency,
+  database-generation, generated-model, generated-write, and provider-owned DDL
+  flags, parsed identity `seed`/`increment`, and index-shape flags plus parsed
   `indexSql`/`keySql`/`expressionSql`/`filterSql`/`isUnique` and MySQL
   prefix-column lengths when the provider exposes them. Provider-specific
   column rows include `providerType`, `readOnlyEntity`,
@@ -1241,7 +1244,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `citext`/`json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` plus bounded simple `set(...)` are scaffolded as supported storage; MySQL unsigned integer and decimal/numeric columns, SQL Server alias types over scaffoldable scalar/binary bases, and PostgreSQL domains over safe scalar/array/enum base types preserve generated writes and bounded facets where provider metadata exposes them while remaining diagnostics because the DDL is provider-specific. Unsafe provider-specific declarations such as SQL Server/SQLite/MySQL spatial types like `GEOMETRY`/`POINT`, PostgreSQL network/search types such as `inet`, and larger or ambiguous MySQL `set(...)` declarations remain diagnostics and make the generated entity `[ReadOnlyEntity]` so generated writes fail closed. |
 | `SCF106` | `relationship` | Unsupported/provider-specific FK referential action discovered. Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted in generated fluent configuration. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unfiltered unique index. |
-| `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. |
+| `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. Static and dynamic scaffolding emit `[Timestamp]` plus computed database-generation metadata so generated writes and concurrency checks can use the column; exact provider rowversion/timestamp DDL remains provider-owned. |
 | `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
 | `SCF110` | `database-object` | Trigger discovered; the generated table type is read-only until trigger side effects are hand-modeled. |
 | `SCF111` | `index` | Filtered/partial index discovered. |

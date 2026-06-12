@@ -372,8 +372,16 @@ public partial class ScaffoldingContractDocTests
         Assert.Equal("Price * Quantity", computed["computedSql"]);
         Assert.Equal(true, computed["stored"]);
 
-        Assert.Equal(true, Metadata("RowVersion", "Version", "rowversion")["concurrencyToken"]);
-        Assert.Equal(true, Metadata("RowVersion", "Version", "rowversion")["databaseGenerated"]);
+        var rowVersion = Metadata("RowVersion", "Version", "rowversion");
+        Assert.Equal("dbo.Orders", rowVersion["table"]);
+        Assert.Equal("rowversion", rowVersion["providerType"]);
+        Assert.Equal(true, rowVersion["providerOwnedDdl"]);
+        Assert.Equal(true, rowVersion["generatedModelConfigurationSupported"]);
+        Assert.Equal(true, rowVersion["concurrencyToken"]);
+        Assert.Equal(true, rowVersion["databaseGenerated"]);
+        Assert.Equal(false, rowVersion["readOnlyEntity"]);
+        Assert.Equal(true, rowVersion["generatedWritesSupported"]);
+        Assert.Equal("provider-managed-rowversion", rowVersion["reason"]);
 
         var identity = Metadata("IdentityStrategy", "Id", "IDENTITY(100,10)");
         Assert.Equal("IDENTITY(100,10)", identity["identityStrategy"]);
