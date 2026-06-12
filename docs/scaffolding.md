@@ -461,12 +461,17 @@ must be reviewed and edited like handwritten model code.
   `DOTNET_ENVIRONMENT` select the matching `appsettings.{Environment}.json`
   file. Unmatched scaffold tokens before `--` still fail fast so option typos are not swallowed.
 - EF-style `.config/dotnet-ef.json` defaults are read for `project`,
-  `startupProject`, `context`, `framework`, `configuration`, `runtime`,
-  `verbose`, `noColor`, and `prefixOutput`. Relative project paths are resolved
-  relative to the parent directory of `.config`, and explicit CLI options take
-  precedence over configuration file values. Build/runtime defaults remain
-  compatibility-only because nORM does not build or execute startup code during
-  scaffolding.
+  `startupProject`, `outputDir`/`output`, `namespace`, `context`,
+  `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
+  `framework`, `configuration`, `runtime`, `verbose`, `noColor`,
+  `prefixOutput`, `noPluralize`, `useDatabaseNames`, and `force`. Relative
+  project paths are resolved relative to the parent directory of `.config`,
+  comma-separated or array table/schema defaults are accepted, and explicit CLI
+  options take precedence over configuration file values. When any CLI
+  table/schema filter is supplied, `.config/dotnet-ef.json` table/schema
+  defaults are ignored so they cannot expand the explicit selection.
+  Build/runtime defaults remain compatibility-only because nORM does not build
+  or execute startup code during scaffolding.
 - EF common output switches are accepted: `--json` emits a machine-readable
   scaffold result summary for successful runs and scaffold failures, while `--verbose`/`-v`, `--no-color`, and
   `--prefix-output` are compatibility switches because nORM scaffold output is
@@ -791,8 +796,11 @@ must be reviewed and edited like handwritten model code.
   config-supplied `project`, `startupProject`, and `context`, positional
   `Name=...` named connections from startup-project `appsettings.json`, and
   accepted EF provider package aliases all feed generated code that builds as
-  the target project. Explicit CLI `--project`, `--startup-project`, and
-  `--context` values are verified to override conflicting
+  the target project. The shared CLI config parser is separately pinned for
+  output directory, namespace, context directory, context namespace,
+  table/schema filters, naming, and overwrite defaults. Explicit CLI
+  `--project`, `--startup-project`, and `--context` values are verified to
+  override conflicting
   `.config/dotnet-ef.json` defaults across all four providers while still
   building the generated target project. Explicit `--startup-project`/`-s` named-connection
   lookup is also verified across all four providers: startup-project

@@ -428,6 +428,158 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_dotnet_ef_config_supplies_output_filter_and_naming_defaults()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_output_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+        var projectDir = Path.Combine(tempRoot, "src", "App");
+        var projectPath = Path.Combine(projectDir, "ConfiguredOutputApp.csproj");
+        var dbFile = Path.Combine(tempRoot, "configured-output.db");
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+            Directory.CreateDirectory(projectDir);
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                """
+                {
+                  "project": "src/App",
+                  "outputDir": "Generated/Entities",
+                  "namespace": "Configured.Entities",
+                  "context": "ConfiguredCtx",
+                  "contextDir": "Generated/Contexts",
+                  "contextNamespace": "Configured.Contexts",
+                  "tables": [ "Customer" ],
+                  "noPluralize": true,
+                  "useDatabaseNames": true,
+                  "force": true
+                }
+                """,
+                Encoding.UTF8);
+            File.WriteAllText(
+                projectPath,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <RootNamespace>Ignored.Project.Namespace</RootNamespace>
+                  </PropertyGroup>
+                </Project>
+                """,
+                Encoding.UTF8);
+
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                    CREATE TABLE Ignored (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var entityOutput = Path.Combine(projectDir, "Generated", "Entities");
+            var contextOutput = Path.Combine(projectDir, "Generated", "Contexts");
+            Directory.CreateDirectory(entityOutput);
+            Directory.CreateDirectory(contextOutput);
+            File.WriteAllText(Path.Combine(entityOutput, "Customer.cs"), "stale entity", Encoding.UTF8);
+            File.WriteAllText(Path.Combine(contextOutput, "ConfiguredCtx.cs"), "stale context", Encoding.UTF8);
+
+            var result = RunCli(
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite",
+                workDir);
+
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+
+            var entityCode = File.ReadAllText(Path.Combine(entityOutput, "Customer.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(contextOutput, "ConfiguredCtx.cs"));
+            Assert.DoesNotContain("stale entity", entityCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("stale context", contextCode, StringComparison.Ordinal);
+            Assert.Contains("namespace Configured.Entities;", entityCode, StringComparison.Ordinal);
+            Assert.Contains("namespace Configured.Contexts;", contextCode, StringComparison.Ordinal);
+            Assert.Contains("using Configured.Entities;", contextCode, StringComparison.Ordinal);
+            Assert.Contains("[Table(\"Customer\")]", entityCode, StringComparison.Ordinal);
+            Assert.Contains("IQueryable<Customer> Customer", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(entityOutput, "Ignored.cs")));
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void Scaffold_dotnet_ef_config_filter_defaults_do_not_expand_explicit_cli_filters()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_filter_override_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+        var projectDir = Path.Combine(tempRoot, "src", "App");
+        var projectPath = Path.Combine(projectDir, "FilterOverrideApp.csproj");
+        var dbFile = Path.Combine(tempRoot, "filter-override.db");
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+            Directory.CreateDirectory(projectDir);
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                """
+                {
+                  "project": "src/App",
+                  "outputDir": "Models",
+                  "tables": [ "Ignored" ],
+                  "force": true
+                }
+                """,
+                Encoding.UTF8);
+            File.WriteAllText(
+                projectPath,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <RootNamespace>FilterOverrideApp</RootNamespace>
+                  </PropertyGroup>
+                </Project>
+                """,
+                Encoding.UTF8);
+
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                    CREATE TABLE Ignored (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite --table Customer",
+                workDir);
+
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+
+            var entityOutput = Path.Combine(projectDir, "Models");
+            Assert.True(File.Exists(Path.Combine(entityOutput, "Customer.cs")));
+            Assert.False(File.Exists(Path.Combine(entityOutput, "Ignored.cs")));
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void Scaffold_dotnet_ef_config_startup_project_resolves_named_connection()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_startup_" + Guid.NewGuid().ToString("N"));

@@ -25,6 +25,26 @@ partial class Program
         return value;
     }
 
+    static string GetRequiredNonBlankScaffoldOption(ParseResult result, Option<string> option, string optionName, string? fallbackValue)
+    {
+        var optionResult = result.GetResult(option);
+        if (optionResult is { Implicit: false } || fallbackValue is null)
+            return GetRequiredNonBlankScaffoldOption(result, option, optionName);
+
+        if (string.IsNullOrWhiteSpace(fallbackValue))
+            throw new NormConfigurationException($"Scaffold {optionName} must not be blank.");
+
+        return fallbackValue;
+    }
+
+    static bool GetScaffoldBoolOptionOrConfig(ParseResult result, Option<bool> option, bool? fallbackValue)
+        => result.GetResult(option) is { Implicit: false }
+            ? result.GetValue(option)
+            : fallbackValue ?? false;
+
+    static bool IsScaffoldOptionExplicit<T>(ParseResult result, Option<T> option)
+        => result.GetResult(option) is { Implicit: false };
+
     static void ValidateScaffoldUnmatchedTokens(ParseResult result)
     {
         if (result.UnmatchedTokens.Count == 0)

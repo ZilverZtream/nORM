@@ -165,9 +165,14 @@ pass-through environment is supplied, `ASPNETCORE_ENVIRONMENT` and then
 `DOTNET_ENVIRONMENT` select the matching `appsettings.{Environment}.json` file.
 Unmatched scaffold tokens before `--` still fail fast.
 EF-style `.config/dotnet-ef.json` defaults are read for `project`,
-`startupProject`, `context`, `framework`, `configuration`, `runtime`, `verbose`,
-`noColor`, and `prefixOutput`; relative project paths are resolved relative to
-the parent of `.config`, and explicit CLI options override config values.
+`startupProject`, `outputDir`/`output`, `namespace`, `context`, `contextDir`,
+`contextNamespace`, `schema`/`schemas`, `table`/`tables`, `framework`,
+`configuration`, `runtime`, `verbose`, `noColor`, `prefixOutput`,
+`noPluralize`, `useDatabaseNames`, and `force`; relative project paths are
+resolved relative to the parent of `.config`, comma-separated or array
+table/schema defaults are accepted, and explicit CLI options override config
+values. When any CLI table/schema filter is supplied, config table/schema
+defaults are ignored so they cannot expand the explicit selection.
 `--json` emits a machine-readable scaffold result summary for successful runs
 and scaffold failures. `--verbose`/`-v`,
 `--no-color`, and `--prefix-output` are accepted for EF Core command-line

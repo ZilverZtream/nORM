@@ -40,33 +40,48 @@ partial class Program
         var scaffoldEnvironment = GetScaffoldPassThroughEnvironment();
         var connectionString = ResolveScaffoldConnectionString(connectionReference, projectInfo, startupProjectInfo, scaffoldEnvironment);
         var validated = ConnectionStringValidator.Validate(connectionString, providerName);
-        var output = ResolveScaffoldOutputPath(GetRequiredNonBlankScaffoldOption(result, bindings.OutputOption, "--output"), projectInfo);
+        var output = ResolveScaffoldOutputPath(GetRequiredNonBlankScaffoldOption(result, bindings.OutputOption, "--output", efToolConfig?.OutputDir), projectInfo);
 
-        var explicitNamespace = GetOptionalNonBlankScaffoldOption(result, bindings.NamespaceOption, "--namespace");
+        var explicitNamespace = FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, bindings.NamespaceOption, "--namespace"), efToolConfig?.Namespace);
         var ns = ValidateScaffoldNamespaceName(ResolveScaffoldNamespace(explicitNamespace, projectInfo, output), "--namespace");
-        var contextDirectory = GetOptionalNonBlankScaffoldOption(result, bindings.ContextDirectoryOption, "--context-dir");
+        var contextDirectory = FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, bindings.ContextDirectoryOption, "--context-dir"), efToolConfig?.ContextDir);
         var contextOutputDirectory = ResolveScaffoldContextOutputDirectory(contextDirectory, projectInfo);
         var explicitContextName = FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, bindings.ContextOption, "--context"), efToolConfig?.Context);
         var contextName = explicitContextName
             ?? InferScaffoldContextName(validated.ConnectionString, connectionReference, providerName);
-        var explicitContextNamespace = GetOptionalNonBlankScaffoldOption(result, bindings.ContextNamespaceOption, "--context-namespace");
+        var explicitContextNamespace = FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, bindings.ContextNamespaceOption, "--context-namespace"), efToolConfig?.ContextNamespace);
         var (ctx, contextNamespace) = ResolveScaffoldContextNameAndNamespace(contextName, explicitContextNamespace, ns, contextDirectory, explicitNamespace, projectInfo);
         if (explicitContextName is not null)
             ctx = ValidateScaffoldContextClassName(ctx);
         if (contextNamespace is not null)
             contextNamespace = ValidateScaffoldNamespaceName(contextNamespace, explicitContextNamespace is null ? "context namespace" : "--context-namespace");
 
-        var forceOverwrite = result.GetValue(bindings.ForceOption);
+        var forceOverwrite = GetScaffoldBoolOptionOrConfig(result, bindings.ForceOption, efToolConfig?.Force);
         var noOverwrite = result.GetValue(bindings.NoOverwriteOption);
         if (forceOverwrite && noOverwrite)
             throw new NormConfigurationException("Use either --force or --no-overwrite for scaffold output conflicts, not both.");
 
+        var hasExplicitCliFilters =
+            IsScaffoldOptionExplicit(result, bindings.SchemasOption) ||
+            IsScaffoldOptionExplicit(result, bindings.SchemaOption) ||
+            IsScaffoldOptionExplicit(result, bindings.TablesOption) ||
+            IsScaffoldOptionExplicit(result, bindings.TableOption);
+        var schemaFilters = ParseSchemaFilters(result.GetValue(bindings.SchemasOption), result.GetValue(bindings.SchemaOption));
+        var tableFilters = ParseTableFilters(result.GetValue(bindings.TablesOption), result.GetValue(bindings.TableOption));
+        if (!hasExplicitCliFilters)
+        {
+            if (efToolConfig?.Schemas.Count > 0)
+                schemaFilters = efToolConfig.Schemas;
+            if (efToolConfig?.Tables.Count > 0)
+                tableFilters = efToolConfig.Tables;
+        }
+
         var options = new ScaffoldOptions
         {
-            Schemas = ParseSchemaFilters(result.GetValue(bindings.SchemasOption), result.GetValue(bindings.SchemaOption)),
-            Tables = ParseTableFilters(result.GetValue(bindings.TablesOption), result.GetValue(bindings.TableOption)),
-            PluralizeQueryProperties = !result.GetValue(bindings.NoPluralizeOption),
-            UseDatabaseNames = result.GetValue(bindings.UseDatabaseNamesOption),
+            Schemas = schemaFilters,
+            Tables = tableFilters,
+            PluralizeQueryProperties = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize),
+            UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames),
             UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true,
             ContextOutputDirectory = contextOutputDirectory,
             ContextNamespace = contextNamespace,
