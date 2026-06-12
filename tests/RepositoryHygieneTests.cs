@@ -56,6 +56,18 @@ public sealed class RepositoryHygieneTests
     }
 
     [Fact]
+    public void Scaffolding_contract_doc_tests_keep_source_readers_split()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        var assertions = File.ReadAllText(Path.Combine(RepoRoot, "tests", "ScaffoldingContractDocTests.cs"));
+        var sources = File.ReadAllText(Path.Combine(RepoRoot, "tests", "ScaffoldingContractDocTestSources.cs"));
+
+        Assert.Contains("Scaffolding contract source-reader helpers stay in", ownership, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static string ReadRepoFile", assertions, StringComparison.Ordinal);
+        Assert.Contains("private static string ReadRepoFile", sources, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Production_scaffolding_files_stay_split_by_responsibility()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));

@@ -95,6 +95,12 @@ remains split by provider, model phase, or generated-code responsibility.
 When a scaffolding change needs more room, split the responsibility into a new
 focused helper instead of growing an existing file.
 
+## Scaffolding Contract Test Sources
+
+Scaffolding contract source-reader helpers stay in
+`ScaffoldingContractDocTestSources.cs` so `ScaffoldingContractDocTests.cs`
+stays focused on the consumer-facing contract assertions.
+
 ## CLI Integration Test Size
 
 CLI integration tests stay below 1500 lines per file so command coverage remains
