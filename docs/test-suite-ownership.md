@@ -131,6 +131,14 @@ rule inventories, source-file scanning, project-file XML scanning, and finding
 classification remain separate responsibilities. `RepositoryHygieneTests`
 enforces this boundary for `src/dotnet-norm/ProviderMobilitySourceScanner*.cs`.
 
+## Provider Mobility Schema Inspector Size
+
+Provider mobility schema inspector files stay below 200 lines so table
+traversal, column checks, default-value classification, foreign-key validation,
+provider-generation smoke checks, and CLR type resolution remain separate
+responsibilities. `RepositoryHygieneTests` enforces this boundary for
+`src/dotnet-norm/ProviderMobilitySchemaInspector*.cs`.
+
 ## Scaffolding Contract Test Sources
 
 Scaffolding contract source-reader helpers stay in

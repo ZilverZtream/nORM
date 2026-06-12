@@ -15,6 +15,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCliDesignTimeFileLines = 200;
     private const int MaxProviderMobilityCertificationFileLines = 200;
     private const int MaxProviderMobilitySourceScannerFileLines = 200;
+    private const int MaxProviderMobilitySchemaInspectorFileLines = 200;
     private const int MaxCliIntegrationFileLines = 1500;
     private const int MaxCoreQueryTranslatorFileLines = 1500;
     private const int MaxQueryTranslatorPartialFileLines = 1500;
@@ -219,6 +220,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split provider mobility source scanning by traversal, rules, project files, source files, and finding classification before it becomes a god object: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Provider_mobility_schema_inspector_files_stay_split_by_schema_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Provider mobility schema inspector files stay below 200 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "dotnet-norm"), "ProviderMobilitySchemaInspector*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxProviderMobilitySchemaInspectorFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split provider mobility schema inspection by table traversal, columns, defaults, foreign keys, provider generation, and type resolution before it becomes a god object: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]
