@@ -200,6 +200,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.Shell.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ModelConfiguration.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ManyToMany.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.Relationships.cs"));
 
     private static string ReadLiveProviderScaffoldCliParitySource()
