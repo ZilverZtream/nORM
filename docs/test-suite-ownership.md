@@ -146,6 +146,13 @@ rewrites, async execution, simple-query fast paths, CUD, and streaming/plan
 helpers remain separate execution responsibilities. `RepositoryHygieneTests`
 enforces this boundary.
 
+## Select Clause Visitor Source Size
+
+Every `SelectClauseVisitor*.cs` partial stays below 1500 lines so projection
+method calls, navigation aggregate subqueries, formatting, operators, and helper
+utilities remain separate responsibilities. `RepositoryHygieneTests` enforces
+this boundary.
+
 ## SQLite Provider Source Size
 
 Every `SqliteProvider*.cs` partial stays below 1500 lines so SQLite SQL

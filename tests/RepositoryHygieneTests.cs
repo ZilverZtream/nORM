@@ -16,6 +16,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCoreQueryTranslatorFileLines = 1500;
     private const int MaxQueryTranslatorPartialFileLines = 1500;
     private const int MaxNormQueryProviderPartialFileLines = 1500;
+    private const int MaxSelectClauseVisitorPartialFileLines = 1500;
     private const int MaxSqliteProviderPartialFileLines = 1500;
 
     [Fact]
@@ -244,6 +245,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split NormQueryProvider code by aggregate rewrite, execution, simple-query, CUD, and streaming/plan responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Select_clause_visitor_partials_stay_split_by_projection_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `SelectClauseVisitor*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "SelectClauseVisitor*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxSelectClauseVisitorPartialFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split SelectClauseVisitor code by method-call, navigation, formatting, operator, and helper responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     private static string[] GetTrackedFiles()

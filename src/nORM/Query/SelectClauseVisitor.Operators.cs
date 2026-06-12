@@ -1,0 +1,435 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Text;
+using Microsoft.Extensions.ObjectPool;
+using nORM.Core;
+using nORM.Mapping;
+using nORM.Providers;
+
+#nullable enable
+
+namespace nORM.Query
+{
+    internal sealed partial class SelectClauseVisitor
+    {
+        protected override Expression VisitConditional(ConditionalExpression node)
+        {
+            var sb = EnsureBuilder();
+            sb.Append("(CASE WHEN ");
+            Visit(node.Test);
+            sb.Append(" THEN ");
+            Visit(node.IfTrue);
+            sb.Append(" ELSE ");
+            Visit(node.IfFalse);
+            sb.Append(" END)");
+            return node;
+        }
+
+        protected override Expression VisitConstant(ConstantExpression node)
+        {
+            var sb = EnsureBuilder();
+            if (node.Value is null)
+            {
+                sb.Append("NULL");
+                return node;
+            }
+            switch (node.Value)
+            {
+                case string s:
+                    sb.Append('\'').Append(s.Replace("'", "''")).Append('\'');
+                    break;
+                case bool b:
+                    sb.Append(b ? _provider.BooleanTrueLiteral : "0");
+                    break;
+                case System.Enum e:
+                    sb.Append(Convert.ToInt64(e, System.Globalization.CultureInfo.InvariantCulture));
+                    break;
+                default:
+                    sb.Append(System.Convert.ToString(node.Value, System.Globalization.CultureInfo.InvariantCulture));
+                    break;
+            }
+            return node;
+        }
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            var sb = EnsureBuilder();
+            // `a ?? b` in a projection lowers to COALESCE(a, b) — emit as a function call so
+            // it composes inside `new { Name = r.Name ?? "anon" }` projections.
+            if (node.NodeType == ExpressionType.Coalesce)
+            {
+                sb.Append("COALESCE(");
+                Visit(node.Left);
+                sb.Append(", ");
+                Visit(node.Right);
+                sb.Append(')');
+                return node;
+            }
+            // C# `+` on string operands is concatenation, not arithmetic. Emit
+            // the provider's concat SQL (`||` on SQLite, `CONCAT(...)` on
+            // SQL Server/MySQL) so projections like `Select(p => p.First + " " + p.Last)`
+            // don't fall through to SQL numeric `+` (which on SQLite coerces TEXT
+            // to 0, returning "0" per row). Capture each side via a StringBuilder
+            // length-snapshot then hand the slices to GetConcatSql.
+            if (node.NodeType == ExpressionType.Add
+                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                sb.Append(_provider.GetConcatSql(leftSql, rightSql));
+                return node;
+            }
+            // DateTime + TimeSpan COLUMN (rhs is not a foldable constant --
+            // e.g. p.Stamp + p.Duration). Without this branch SQL '+' on TEXT
+            // coerces to numeric and produces garbage that fails GetDateTime
+            // via FromJulianDate. Emit strftime with a constructed modifier
+            // 'sign || N || " seconds"' where N parses the TimeSpan column's
+            // sub-day 'HH:mm:ss' text per b17440e. Sub-day only -- multi-day
+            // TimeSpan columns are out of scope (same scope cap as memory
+            // item TimeSpan handler).
+            // DateTime AND DateTimeOffset use the same arithmetic emit path.
+            static bool ScvIsDateTimeOrOffset(Type t)
+                => t == typeof(DateTime) || t == typeof(DateTimeOffset);
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && ScvIsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && !QueryTranslator.TryGetConstantValue(node.Right, out _))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                var subtract = node.NodeType == ExpressionType.Subtract;
+                var leftIsDto = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTimeOffset);
+                var dateArithSql = leftIsDto
+                    ? _provider.AddTimeSpanColumnToDateTimeOffsetSql(leftSql, rightSql, subtract)
+                    : _provider.AddTimeSpanColumnToDateTimeSql(leftSql, rightSql, subtract);
+                if (dateArithSql != null)
+                {
+                    sb.Append(dateArithSql);
+                    return node;
+                }
+                throw new InvalidOperationException(
+                    $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
+                    "DateTime/Offset +/- TimeSpan column arithmetic in projection requires this provider hook.");
+            }
+            // DateTime/DateTimeOffset + constant TimeSpan -> same type. Folds via
+            // TryGetConstantValue; AddSecondsToDateTimeSql handles provider-native
+            // date arithmetic.
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && ScvIsDateTimeOrOffset(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan)
+                && QueryTranslator.TryGetConstantValue(node.Right, out var rhsTs)
+                && rhsTs is TimeSpan span)
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var seconds = span.TotalSeconds;
+                if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
+                var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+                var dateArithSql = _provider.AddSecondsToDateTimeSql(leftSql, secondsLiteral);
+                if (dateArithSql != null)
+                {
+                    sb.Append(dateArithSql);
+                    return node;
+                }
+                throw new InvalidOperationException(
+                    $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
+                    "DateTime + constant TimeSpan arithmetic in projection requires this provider hook.");
+            }
+            // DateTime - DateTime / DateTimeOffset - DateTimeOffset in projection
+            // -> TimeSpan. SQL '-' on TEXT columns returns 0 (silent-wrongness);
+            // route through the provider hook (julianday on SQLite parses ISO
+            // offset suffixes, so DTO subtraction yields the UTC-instant
+            // difference even when LHS/RHS were stored in different offsets).
+            static bool IsDateOrDtoType(Type t) => t == typeof(DateTime) || t == typeof(DateTimeOffset);
+            if (node.NodeType == ExpressionType.Subtract
+                && IsDateOrDtoType(Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type)
+                && IsDateOrDtoType(Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                // For DateTimeOffset operands, use UTC-epoch-microsecond
+                // subtraction (sister of the equality lowering) to avoid the
+                // julianday-delta double-precision noise that turns FromSeconds(15)
+                // into 14.9999991s while still preserving practical sub-second
+                // duration semantics across providers.
+                Type lt = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+                Type rt = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+                if (lt == typeof(DateTimeOffset) && rt == typeof(DateTimeOffset))
+                {
+                    sb.Append(_provider.GetDateTimeOffsetDifferenceSecondsSql(leftSql, rightSql));
+                }
+                else
+                {
+                    // Provider hook returns REAL seconds (julianday delta on SQLite,
+                    // DATEDIFF_BIG on SqlServer, EXTRACT(EPOCH) on Postgres,
+                    // TIMESTAMPDIFF on MySQL). Materializer reads as double; user
+                    // expects TimeSpan -- handled by MaterializerFactory's
+                    // GetFieldValue path which converts numeric to TimeSpan via
+                    // TimeSpan.FromSeconds.
+                    sb.Append('(').Append(_provider.GetDateTimeDifferenceSecondsSql(leftSql, rightSql)).Append(')');
+                }
+                return node;
+            }
+            // TimeSpan + TimeSpan and TimeSpan - TimeSpan between two column
+            // expressions (or sub-expressions of TimeSpan type) -> fractional
+            // seconds via the provider's GetTimeSpanColumnSecondsSql hook,
+            // then sum/diff. Materialiser converts the resulting numeric to
+            // TimeSpan via TimeSpan.FromSeconds.
+            if ((node.NodeType == ExpressionType.Add || node.NodeType == ExpressionType.Subtract)
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(TimeSpan)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeSpan))
+            {
+                var tsLeftStart = sb.Length;
+                Visit(node.Left);
+                var tsLeftSql = sb.ToString(tsLeftStart, sb.Length - tsLeftStart);
+                sb.Length = tsLeftStart;
+                var tsRightStart = sb.Length;
+                Visit(node.Right);
+                var tsRightSql = sb.ToString(tsRightStart, sb.Length - tsRightStart);
+                sb.Length = tsRightStart;
+                var op = node.NodeType == ExpressionType.Add ? '+' : '-';
+                sb.Append('(').Append(_provider.GetTimeSpanColumnSecondsSql(tsLeftSql))
+                  .Append(' ').Append(op).Append(' ')
+                  .Append(_provider.GetTimeSpanColumnSecondsSql(tsRightSql)).Append(')');
+                return node;
+            }
+            // TimeOnly - TimeOnly -> TimeSpan, wrapped to [0, 24h) per
+            // .NET's TimeOnly.op_Subtraction. Each provider's hook emits the
+            // wrapped form so the materializer's TimeSpan.FromSeconds path
+            // produces the same wall-clock-elapsed semantics.
+            if (node.NodeType == ExpressionType.Subtract
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(TimeOnly)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeOnly))
+            {
+                var leftStart = sb.Length;
+                Visit(node.Left);
+                var leftSql = sb.ToString(leftStart, sb.Length - leftStart);
+                sb.Length = leftStart;
+                var rightStart = sb.Length;
+                Visit(node.Right);
+                var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
+                sb.Length = rightStart;
+                sb.Append('(').Append(_provider.GetTimeOnlyDifferenceSecondsSql(leftSql, rightSql)).Append(')');
+                return node;
+            }
+            // Bitwise XOR on integer/enum operands -- SQLite has no `^`
+            // primitive; rewrite to (a | b) & ~(a & b), the standard bit-
+            // twiddling identity that holds for 64-bit signed two's-complement
+            // integers. Captures each operand's SQL once and inlines into the
+            // 4-position emit. Restricted to non-bool operand types since
+            // `^` on bool is logical XOR (rare; would need a separate CASE
+            // rewrite).
+            if (node.NodeType == ExpressionType.ExclusiveOr
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) != typeof(bool))
+            {
+                var xorLeftStart = sb.Length;
+                Visit(node.Left);
+                var xorLeftSql = sb.ToString(xorLeftStart, sb.Length - xorLeftStart);
+                sb.Length = xorLeftStart;
+                var xorRightStart = sb.Length;
+                Visit(node.Right);
+                var xorRightSql = sb.ToString(xorRightStart, sb.Length - xorRightStart);
+                sb.Length = xorRightStart;
+                sb.Append("((").Append(xorLeftSql).Append(" | ").Append(xorRightSql)
+                  .Append(") & ~(").Append(xorLeftSql).Append(" & ").Append(xorRightSql).Append("))");
+                return node;
+            }
+            // Decimal comparisons / arithmetic on TEXT-stored decimal columns
+            // must coerce both operands to REAL or SQLite performs lex compare
+            // ('10.5' < '2' because '1' < '2'). Mirror of ETSV's bilateral
+            // CAST AS REAL wrap (8d795f4). See ETSV.VisitBinary for the
+            // precision-tradeoff comment.
+            bool isDecCmpArith = node.NodeType is
+                    ExpressionType.Equal or ExpressionType.NotEqual
+                    or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                    or ExpressionType.Add or ExpressionType.Subtract
+                    or ExpressionType.Multiply or ExpressionType.Divide
+                    or ExpressionType.Modulo;
+            bool leftIsDec = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(decimal);
+            bool rightIsDec = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
+            if (isDecCmpArith && (leftIsDec || rightIsDec))
+            {
+                // Provider hook: SqliteProvider wraps with CAST AS REAL,
+                // others identity (native DECIMAL).
+                var decLeftStart = sb.Length;
+                Visit(node.Left);
+                var decLeftSql = sb.ToString(decLeftStart, sb.Length - decLeftStart);
+                sb.Length = decLeftStart;
+                var decRightStart = sb.Length;
+                Visit(node.Right);
+                var decRightSql = sb.ToString(decRightStart, sb.Length - decRightStart);
+                sb.Length = decRightStart;
+                sb.Append('(').Append(_provider.NormalizeDecimalForCompare(decLeftSql))
+                  .Append(' ').Append(node.NodeType switch
+                {
+                    ExpressionType.Equal => "=",
+                    ExpressionType.NotEqual => "<>",
+                    ExpressionType.LessThan => "<",
+                    ExpressionType.LessThanOrEqual => "<=",
+                    ExpressionType.GreaterThan => ">",
+                    ExpressionType.GreaterThanOrEqual => ">=",
+                    ExpressionType.Add => "+",
+                    ExpressionType.Subtract => "-",
+                    ExpressionType.Multiply => "*",
+                    ExpressionType.Divide => "/",
+                    ExpressionType.Modulo => "%",
+                    _ => throw new InvalidOperationException()
+                }).Append(' ').Append(_provider.NormalizeDecimalForCompare(decRightSql)).Append(')');
+                return node;
+            }
+
+            sb.Append('(');
+            Visit(node.Left);
+            sb.Append(' ').Append(node.NodeType switch
+            {
+                ExpressionType.Equal => "=",
+                ExpressionType.NotEqual => "<>",
+                ExpressionType.LessThan => "<",
+                ExpressionType.LessThanOrEqual => "<=",
+                ExpressionType.GreaterThan => ">",
+                ExpressionType.GreaterThanOrEqual => ">=",
+                // `&&` is always AndAlso (logical) and `||` is OrElse. `&` and
+                // `|` are ExpressionType.And/Or and their meaning depends on
+                // the operand type -- on bool they're logical (no short-circuit),
+                // on integers/enums they're bitwise. Map accordingly so flag
+                // arithmetic (p.Flags & Perm.Read) emits SQLite's bitwise &
+                // rather than logical AND (which silently coerces operands to
+                // truthy 0/1 and gives the wrong answer).
+                ExpressionType.AndAlso => "AND",
+                ExpressionType.OrElse => "OR",
+                ExpressionType.And => (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(bool) ? "AND" : "&",
+                ExpressionType.Or => (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(bool) ? "OR" : "|",
+                // SQLite has no native XOR operator on integers; the lower
+                // (a | b) - (a & b) rewrite is non-trivial in a single-line
+                // emit, so XOR continues to fall through to the default throw
+                // until a caller actually needs it.
+                ExpressionType.Add => "+",
+                ExpressionType.Subtract => "-",
+                ExpressionType.Multiply => "*",
+                ExpressionType.Divide => "/",
+                ExpressionType.Modulo => "%",
+                // SQLite, SQL Server, MySQL, and PostgreSQL all support << and >>
+                // as bitwise shift operators with the same precedence semantics
+                // as .NET, so emit the operator directly rather than forcing the
+                // multiply-rewrite workaround the old throw suggested.
+                ExpressionType.LeftShift => "<<",
+                ExpressionType.RightShift => ">>",
+                _ => throw new InvalidOperationException(
+                    $"Binary operator '{node.NodeType}' has no portable SQL equivalent in a SELECT " +
+                    "projection. For Power, use `Math.Pow(x, n)` which lowers to the provider's " +
+                    "POWER / POW function."),
+            }).Append(' ');
+            Visit(node.Right);
+            sb.Append(')');
+            return node;
+        }
+
+        protected override Expression VisitUnary(UnaryExpression node)
+        {
+            // Numeric / enum / primitive Convert: the SQL value is the operand itself.
+            if (node.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+            {
+                Visit(node.Operand);
+                return node;
+            }
+            // Unary minus / boolean NOT inside a projection. Without explicit handling, the
+            // default ExpressionVisitor base just visits the operand and the unary op is
+            // dropped — `r.Score < 0 ? -r.Score : r.Score` silently returned r.Score for
+            // BOTH branches. Emit the operator as SQL so the value flips correctly.
+            if (node.NodeType is ExpressionType.Negate or ExpressionType.NegateChecked)
+            {
+                var sb = EnsureBuilder();
+                // TimeSpan column negation: route through the seconds-as-REAL hook so
+                // the materialiser reconstructs via TimeSpan.FromSeconds(-sec) instead
+                // of coercing the column text to a numeric prefix and negating.
+                var opTypeNeg = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                if (opTypeNeg == typeof(TimeSpan))
+                {
+                    var tsStart = sb.Length;
+                    Visit(node.Operand);
+                    var tsColSql = sb.ToString(tsStart, sb.Length - tsStart);
+                    sb.Length = tsStart;
+                    sb.Append("(-1.0 * ").Append(_provider.GetTimeSpanColumnSecondsSql(tsColSql)).Append(')');
+                    return node;
+                }
+                sb.Append("-(");
+                Visit(node.Operand);
+                sb.Append(')');
+                return node;
+            }
+            if (node.NodeType is ExpressionType.Not)
+            {
+                var sb = EnsureBuilder();
+                // C# `!x` on bool and `~x` on integer/enum both compile to
+                // ExpressionType.Not -- dispatch on the operand type. SQLite
+                // uses NOT for logical and `~` for bitwise.
+                var notOperandType = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                if (notOperandType == typeof(bool))
+                {
+                    sb.Append("NOT (");
+                    Visit(node.Operand);
+                    sb.Append(')');
+                }
+                else
+                {
+                    sb.Append("~(");
+                    Visit(node.Operand);
+                    sb.Append(')');
+                }
+                return node;
+            }
+            return base.VisitUnary(node);
+        }
+
+        protected override Expression VisitMemberInit(MemberInitExpression node)
+        {
+            var sb = EnsureBuilder();
+            bool firstColumn = true;
+            for (int i = 0; i < node.Bindings.Count; i++)
+            {
+                if (node.Bindings[i] is MemberAssignment assignment)
+                {
+                    // Check if this is a navigation property (collection)
+                    if (IsNavigationCollection(assignment.Expression, out var navProperty))
+                    {
+                        // Track it for later split query processing
+                        _detectedCollections.Add(navProperty);
+                        // Skip adding to SQL SELECT - it will be fetched separately
+                        continue;
+                    }
+
+                    if (!firstColumn) sb.Append(", ");
+                    Visit(assignment.Expression);
+                    sb.Append(" AS ").Append(_provider.Escape(assignment.Member.Name));
+                    firstColumn = false;
+                }
+            }
+            return node;
+        }
+    }
+}
