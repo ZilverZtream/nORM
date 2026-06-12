@@ -180,6 +180,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_accepts_csv_and_multi_value_schema_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_unions_schema_and_table_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_accepts_no_onconfiguring_data_annotations_and_no_pluralize_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_singularizes_plural_table_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_routine_stubs_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_advanced_routine_stubs_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_routine_output_and_non_query_wrappers_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -205,6 +206,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_preserves_index_metadata_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_provider_index_metadata_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("--use-database-names --no-pluralize", doc, StringComparison.Ordinal);
+        Assert.Contains("Default plural table-name singularization", doc, StringComparison.Ordinal);
         Assert.Contains("Invalid table/column identifiers", doc, StringComparison.Ordinal);
         Assert.Contains("duplicate normalized entity", doc, StringComparison.Ordinal);
         Assert.Contains("object-member column names", doc, StringComparison.Ordinal);

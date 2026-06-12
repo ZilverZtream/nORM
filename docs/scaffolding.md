@@ -751,7 +751,9 @@ must be reviewed and edited like handwritten model code.
   bridge, a mixed one-to-many plus many-to-many model shape that also preserves
   composite index metadata through the real CLI, a direct composite primary-key FK model shape with generated composite `HasKey` and fluent FK selectors, and with
   `--use-database-names --no-pluralize` over preserved legal database
-  identifiers. Invalid table/column identifiers, duplicate normalized entity
+  identifiers. Default plural table-name singularization and plural query
+  property generation are verified through the real CLI across all four
+  providers. Invalid table/column identifiers, duplicate normalized entity
   names, duplicate normalized property names, and object-member column names
   are also verified through the real CLI across all four providers, then the
   generated output is built as a consumer project. Project-targeted scaffold
