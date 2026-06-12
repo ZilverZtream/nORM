@@ -173,3 +173,11 @@ capability and dialect defaults, temporal/tenant hooks, scalar SQL expressions,
 runtime/connection validation, fallback bulk operations, and DML SQL builders
 remain separate responsibilities. `RepositoryHygieneTests` enforces this
 boundary.
+
+## DbContext Source Size
+
+Every `DbContext*.cs` partial stays below 1500 lines so construction,
+connection/command infrastructure, mapping/query roots, transactions,
+tenant/temporal APIs, disposal, raw SQL, prepared statements, change tracking,
+and write operations remain separate responsibilities. `RepositoryHygieneTests`
+enforces this boundary.
