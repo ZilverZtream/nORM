@@ -15,6 +15,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCliIntegrationFileLines = 1500;
     private const int MaxCoreQueryTranslatorFileLines = 1500;
     private const int MaxQueryTranslatorPartialFileLines = 1500;
+    private const int MaxSqliteProviderPartialFileLines = 1500;
 
     [Fact]
     public void Test_project_does_not_suppress_async_warning_as_release_exception()
@@ -198,6 +199,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split QueryTranslator partials by operator family before they become god files: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Sqlite_provider_partials_stay_split_by_provider_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `SqliteProvider*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Providers"), "SqliteProvider*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxSqliteProviderPartialFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split SQLite provider code by translation, schema/temporal, and bulk responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     private static string[] GetTrackedFiles()

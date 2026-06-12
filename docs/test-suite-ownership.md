@@ -138,3 +138,9 @@ and dispatch do not absorb plan generation, post-materialization, or other large
 helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1500 lines.
 Split each partial by operator family before it grows into a catch-all translator
 file. `RepositoryHygieneTests` enforces both boundaries.
+
+## SQLite Provider Source Size
+
+Every `SqliteProvider*.cs` partial stays below 1500 lines so SQLite SQL
+translation, schema/temporal behavior, and bulk DML remain separate provider
+responsibilities. `RepositoryHygieneTests` enforces this boundary.
