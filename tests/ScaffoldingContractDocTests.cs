@@ -99,7 +99,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Nullability.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"));
 
     private static string ReadPostgresUnsupportedFeatureSource()
         => string.Concat(
@@ -165,6 +166,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Nullability.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnPropertyDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCommentDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.Probes.cs"),
@@ -317,6 +319,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.ProviderTypes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.Indexes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceInfo.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelMetadataDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelMetadataDiscovery.Filters.cs"),
@@ -400,6 +404,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.Sqlite.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.Keys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataReader.StoreTypes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityProviderTypeMetadataReader.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityProviderTypeMetadataReader.Postgres.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityProviderTypeMetadataReader.MySql.cs"),
@@ -407,6 +412,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaMetadataQuery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityConnectionKind.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"));
 
     [Fact]
@@ -427,6 +433,26 @@ public partial class ScaffoldingContractDocTests
     {
         var doc = ReadDoc();
         Assert.Contains(provider, doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Doc_and_source_pin_provider_catalog_store_type_mapping()
+    {
+        var doc = ReadDoc();
+        var staticSource = ReadStaticEntityScaffoldSource();
+        var dynamicSource = ReadDynamicEntitySource();
+
+        Assert.Contains("Provider catalog `date`/`time` store types map to CLR temporal types where the mapping is unambiguous", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server and PostgreSQL `date`/`time`, MySQL `date`, PostgreSQL `interval`,", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server `datetimeoffset`, and SQLite declared", doc, StringComparison.Ordinal);
+        Assert.Contains("`DATE`/`TIME`/`DATETIME`/`TIMESTAMP`/`DATETIMEOFFSET`", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL `TIME` is left to", doc, StringComparison.Ordinal);
+        Assert.Contains("provider metadata rather than guessed", doc, StringComparison.Ordinal);
+        Assert.Contains("GetColumnStoreTypesAsync", staticSource, StringComparison.Ordinal);
+        Assert.Contains("ColumnStoreTypesByTable", staticSource, StringComparison.Ordinal);
+        Assert.Contains("TryMapStoreType(provider, columnStoreType", staticSource, StringComparison.Ordinal);
+        Assert.Contains("GetColumnStoreTypes", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("TryMapStoreType(connection, columnStoreType", dynamicSource, StringComparison.Ordinal);
     }
 
     [Fact]

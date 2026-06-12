@@ -28,6 +28,7 @@ namespace nORM.Scaffolding
         bool UseNullableReferenceTypes,
         IReadOnlySet<string>? NonNullableColumns,
         IReadOnlyDictionary<string, string>? SqliteDeclaredTypes,
+        IReadOnlyDictionary<string, string>? ColumnStoreTypes,
         IReadOnlyDictionary<string, string>? ProviderSpecificColumnTypes);
 
     internal readonly record struct ScaffoldEntityIndexSourceInfo(

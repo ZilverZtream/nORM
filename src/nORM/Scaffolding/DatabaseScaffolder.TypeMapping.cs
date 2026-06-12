@@ -36,6 +36,17 @@ namespace nORM.Scaffolding
                 declaredType,
                 providerSpecificColumnType);
 
+        private static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType, string? providerSpecificColumnType, string? columnStoreType)
+            => ScaffoldEntitySourceBuilder.NormalizeScaffoldClrType(
+                provider,
+                clrType,
+                allowNull,
+                isKey,
+                isAuto,
+                declaredType,
+                providerSpecificColumnType,
+                columnStoreType);
+
         private static bool TryMapSqlServerAliasBaseClrType(string? detail, out Type type)
             => ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrType(detail, out type);
 

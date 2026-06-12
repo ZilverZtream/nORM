@@ -31,6 +31,10 @@ namespace nORM.Scaffolding
             var sqliteDeclaredTypesByTable = ScaffoldProviderKind.IsSqlite(provider)
                 ? await ScaffoldModelDiscovery.GetSqliteDeclaredColumnTypesAsync(connection, provider, tables).ConfigureAwait(false)
                 : new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            var columnStoreTypesByTable = await ScaffoldColumnDiscovery.GetColumnStoreTypesAsync(
+                connection,
+                provider,
+                tableInfos).ConfigureAwait(false);
             var stringBinaryFacetsByTable = await ScaffoldColumnDiscovery.GetStringBinaryFacetsAsync(connection, provider, tableInfos).ConfigureAwait(false);
             var commentsByTable = await ScaffoldCommentDiscovery.GetScaffoldCommentsAsync(connection, provider, tableInfos).ConfigureAwait(false);
             var identityColumnsByTable = await ScaffoldColumnDiscovery.GetIdentityColumnNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
@@ -62,6 +66,7 @@ namespace nORM.Scaffolding
                 primaryKeyConstraintNamesByTable,
                 nonNullableColumnsByTable,
                 sqliteDeclaredTypesByTable,
+                columnStoreTypesByTable,
                 stringBinaryFacetsByTable,
                 commentsByTable,
                 identityColumnsByTable,

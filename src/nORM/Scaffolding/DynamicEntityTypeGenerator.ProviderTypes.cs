@@ -23,6 +23,9 @@ namespace nORM.Scaffolding
         private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
             => DynamicEntityTableSchemaReader.NormalizeScaffoldClrType(connection, clrType, allowNull, isKey, isAuto, declaredType);
 
+        private static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType, string? columnStoreType)
+            => DynamicEntityTableSchemaReader.NormalizeScaffoldClrType(connection, clrType, allowNull, isKey, isAuto, declaredType, columnStoreType);
+
         private static bool TryMapSqlServerAliasBaseClrType(string? typeText, out Type type)
             => ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrTypeName(typeText, out type);
 

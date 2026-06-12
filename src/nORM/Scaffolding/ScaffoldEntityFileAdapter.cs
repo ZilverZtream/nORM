@@ -20,6 +20,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> sqliteDeclaredTypesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnStoreTypesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable,
             IReadOnlyDictionary<string, ScaffoldComments> commentsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
@@ -41,6 +42,7 @@ namespace nORM.Scaffolding
                 primaryKeyColumnsByTable,
                 nonNullableColumnsByTable,
                 sqliteDeclaredTypesByTable,
+                columnStoreTypesByTable,
                 stringBinaryFacetsByTable,
                 commentsByTable,
                 identityColumnsByTable,
@@ -74,6 +76,7 @@ namespace nORM.Scaffolding
             bool useNullableReferenceTypes = true,
             IReadOnlySet<string>? nonNullableColumns = null,
             IReadOnlyDictionary<string, string>? sqliteDeclaredTypes = null,
+            IReadOnlyDictionary<string, string>? columnStoreTypes = null,
             IReadOnlyDictionary<string, string>? providerSpecificColumnTypes = null)
             => ScaffoldEntitySourceBuilder.BuildAsync(new ScaffoldEntitySourceInfo(
                 connection,
@@ -97,6 +100,7 @@ namespace nORM.Scaffolding
                 useNullableReferenceTypes,
                 nonNullableColumns,
                 sqliteDeclaredTypes,
+                columnStoreTypes,
                 providerSpecificColumnTypes));
     }
 }

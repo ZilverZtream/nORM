@@ -47,8 +47,18 @@ namespace nORM.Scaffolding
                 entity.SqliteDeclaredTypes?.TryGetValue(colName, out declaredType);
                 string? providerSpecificType = null;
                 entity.ProviderSpecificColumnTypes?.TryGetValue(colName, out providerSpecificType);
+                string? columnStoreType = null;
+                entity.ColumnStoreTypes?.TryGetValue(colName, out columnStoreType);
                 var rawClrType = row["DataType"] is Type type ? type : typeof(object);
-                var clrType = NormalizeScaffoldClrType(entity.Provider, rawClrType, effectiveAllowNull, isKey, isAuto, declaredType, providerSpecificType);
+                var clrType = NormalizeScaffoldClrType(
+                    entity.Provider,
+                    rawClrType,
+                    effectiveAllowNull,
+                    isKey,
+                    isAuto,
+                    declaredType,
+                    providerSpecificType,
+                    columnStoreType);
 
                 var columnFacet = entity.ColumnFacets is not null && entity.ColumnFacets.TryGetValue(colName, out var resolvedFacet)
                     ? resolvedFacet

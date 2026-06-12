@@ -31,6 +31,7 @@ namespace nORM.Scaffolding
             var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
             var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
             var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
+            var columnStoreTypes = GetColumnStoreTypes(connection, schemaName, tableName);
             var sqlServerAliasBaseTypes = GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
             var mySqlUnsignedColumnTypes = GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
             var decimalPrecisions = GetDecimalPrecisions(connection, schemaName, tableName);
@@ -64,8 +65,9 @@ namespace nORM.Scaffolding
                 var isRowVersion = rowVersionColumns.Contains(colName);
                 var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
                 sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
+                columnStoreTypes.TryGetValue(colName, out var columnStoreType);
                 sqlServerAliasBaseTypes.TryGetValue(colName, out var sqlServerAliasBaseType);
-                var normalizedClrType = NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType);
+                var normalizedClrType = NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType, columnStoreType);
                 normalizedClrType = ResolveProviderSpecificClrType(
                     connection,
                     normalizedClrType,

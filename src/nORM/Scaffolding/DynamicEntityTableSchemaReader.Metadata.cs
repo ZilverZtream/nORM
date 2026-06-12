@@ -12,6 +12,9 @@ namespace nORM.Scaffolding
         public static IReadOnlyDictionary<string, string> GetSqliteDeclaredColumnTypes(DbConnection connection, string? schemaName, string tableName)
             => DynamicEntitySchemaMetadataReader.GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
 
+        public static IReadOnlyDictionary<string, string> GetColumnStoreTypes(DbConnection connection, string? schemaName, string tableName)
+            => DynamicEntitySchemaMetadataReader.GetColumnStoreTypes(connection, schemaName, tableName);
+
         public static IReadOnlySet<string> GetIdentityColumns(DbConnection connection, string? schemaName, string tableName)
             => DynamicEntitySchemaMetadataReader.GetIdentityColumns(connection, schemaName, tableName);
 

@@ -22,6 +22,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> sqliteDeclaredTypesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnStoreTypesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable,
             IReadOnlyDictionary<string, ScaffoldComments> commentsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
@@ -43,6 +44,7 @@ namespace nORM.Scaffolding
                 primaryKeyColumnsByTable,
                 nonNullableColumnsByTable,
                 sqliteDeclaredTypesByTable,
+                columnStoreTypesByTable,
                 stringBinaryFacetsByTable,
                 commentsByTable,
                 identityColumnsByTable,
@@ -97,6 +99,7 @@ namespace nORM.Scaffolding
             context.NonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns);
             context.FeatureConfigurations.DecimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
             context.StringBinaryFacetsByTable.TryGetValue(tableKey, out var columnFacets);
+            context.ColumnStoreTypesByTable.TryGetValue(tableKey, out var columnStoreTypes);
             context.CommentsByTable.TryGetValue(tableKey, out var comments);
             context.SqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
             context.FeatureConfigurations.ProviderSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
@@ -132,6 +135,7 @@ namespace nORM.Scaffolding
                 context.Options.UseNullableReferenceTypes,
                 nonNullableColumns,
                 sqliteDeclaredTypes,
+                columnStoreTypes,
                 providerSpecificColumnTypes).ConfigureAwait(false);
 
             return new EntityFileResult(
@@ -153,6 +157,7 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyList<string>> PrimaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> NonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> SqliteDeclaredTypesByTable,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ColumnStoreTypesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> StringBinaryFacetsByTable,
             IReadOnlyDictionary<string, ScaffoldComments> CommentsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> IdentityColumnsByTable,

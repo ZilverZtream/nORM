@@ -37,6 +37,7 @@ namespace nORM.Scaffolding
                 discovery.PrimaryKeyColumnsByTable,
                 discovery.NonNullableColumnsByTable,
                 discovery.SqliteDeclaredTypesByTable,
+                discovery.ColumnStoreTypesByTable,
                 discovery.StringBinaryFacetsByTable,
                 discovery.CommentsByTable,
                 discovery.IdentityColumnsByTable,

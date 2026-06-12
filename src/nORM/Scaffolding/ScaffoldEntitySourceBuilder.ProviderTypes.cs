@@ -25,7 +25,21 @@ namespace nORM.Scaffolding
                || size == 1073741823;
 
         public static Type NormalizeScaffoldClrType(DatabaseProvider provider, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null, string? providerSpecificColumnType = null)
+            => NormalizeScaffoldClrType(provider, clrType, allowNull, isKey, isAuto, declaredType, providerSpecificColumnType, null);
+
+        public static Type NormalizeScaffoldClrType(
+            DatabaseProvider provider,
+            Type clrType,
+            bool allowNull,
+            bool isKey,
+            bool isAuto,
+            string? declaredType,
+            string? providerSpecificColumnType,
+            string? columnStoreType)
         {
+            if (ScaffoldStoreTypeClrMapper.TryMapStoreType(provider, columnStoreType, out var storeClrType))
+                return storeClrType;
+
             if (ScaffoldProviderKind.IsSqlite(provider) && IsSqliteUuidDeclaredType(declaredType))
                 return typeof(Guid);
 

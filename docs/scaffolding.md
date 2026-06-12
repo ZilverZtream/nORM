@@ -47,6 +47,13 @@ must be reviewed and edited like handwritten model code.
   `XML` columns scaffold as string storage instead of being warning-only
   provider-specific type rows. JSON/XML query semantics remain ordinary string
   semantics unless the application adds explicit provider-bound queries.
+  Provider catalog `date`/`time` store types map to CLR temporal types where the mapping is unambiguous:
+  SQL Server and PostgreSQL `date`/`time`, MySQL `date`, PostgreSQL `interval`,
+  SQL Server `datetimeoffset`, and SQLite declared
+  `DATE`/`TIME`/`DATETIME`/`TIMESTAMP`/`DATETIMEOFFSET` are applied before
+  falling back to provider schema-row CLR metadata. MySQL `TIME` is left to
+  provider metadata rather than guessed because it can represent time-of-day or
+  elapsed duration depending on schema intent.
   SQL Server `xml`, PostgreSQL `citext`/`json`/`jsonb`/`xml`/`uuid`/simple enum columns,
   and MySQL `json`/`year`/simple `enum(...)`/bounded simple `set(...)` columns likewise scaffold as safe
   scalar CLR storage instead of warning-only provider-specific type rows;

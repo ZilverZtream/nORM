@@ -176,6 +176,50 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithSqliteTemporalDeclaredTypes_MapsStoreTypesInStaticAndDynamicScaffolding()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE TemporalStoreTyped (
+                Id INTEGER PRIMARY KEY,
+                BusinessDate DATE NOT NULL,
+                StartsAt TIME NULL,
+                CreatedAt DATETIME NOT NULL,
+                OffsetAt DATETIMEOFFSET NULL,
+                ExternalUuid UUID NOT NULL
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "TemporalStoreTypedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "TemporalStoreTyped.cs"));
+            Assert.Contains("public DateOnly BusinessDate { get; set; }", entityCode);
+            Assert.Contains("public TimeOnly? StartsAt { get; set; }", entityCode);
+            Assert.Contains("public DateTime CreatedAt { get; set; }", entityCode);
+            Assert.Contains("public DateTimeOffset? OffsetAt { get; set; }", entityCode);
+            Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
+
+            var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "TemporalStoreTyped");
+            Assert.Equal(typeof(DateOnly), dynamicType.GetProperty("BusinessDate")!.PropertyType);
+            Assert.Equal(typeof(TimeOnly?), dynamicType.GetProperty("StartsAt")!.PropertyType);
+            Assert.Equal(typeof(DateTime), dynamicType.GetProperty("CreatedAt")!.PropertyType);
+            Assert.Equal(typeof(DateTimeOffset?), dynamicType.GetProperty("OffsetAt")!.PropertyType);
+            Assert.Equal(typeof(Guid), dynamicType.GetProperty("ExternalUuid")!.PropertyType);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithUnmodeledDefault_MarksTypeReadOnly()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

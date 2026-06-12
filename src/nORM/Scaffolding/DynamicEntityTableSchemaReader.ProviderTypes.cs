@@ -19,7 +19,20 @@ namespace nORM.Scaffolding
         }
 
         public static Type NormalizeScaffoldClrType(DbConnection connection, Type clrType, bool allowNull, bool isKey, bool isAuto, string? declaredType = null)
+            => NormalizeScaffoldClrType(connection, clrType, allowNull, isKey, isAuto, declaredType, null);
+
+        public static Type NormalizeScaffoldClrType(
+            DbConnection connection,
+            Type clrType,
+            bool allowNull,
+            bool isKey,
+            bool isAuto,
+            string? declaredType,
+            string? columnStoreType)
         {
+            if (ScaffoldStoreTypeClrMapper.TryMapStoreType(connection, columnStoreType, out var storeClrType))
+                return storeClrType;
+
             if (DynamicEntityConnectionKind.IsSqlite(connection)
                 && IsSqliteUuidDeclaredType(declaredType))
             {

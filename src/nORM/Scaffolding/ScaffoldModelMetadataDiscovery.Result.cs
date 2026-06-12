@@ -10,6 +10,7 @@ namespace nORM.Scaffolding
         IReadOnlyDictionary<string, string> PrimaryKeyConstraintNamesByTable,
         IReadOnlyDictionary<string, IReadOnlySet<string>> NonNullableColumnsByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> SqliteDeclaredTypesByTable,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ColumnStoreTypesByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> StringBinaryFacetsByTable,
         IReadOnlyDictionary<string, ScaffoldComments> CommentsByTable,
         IReadOnlyDictionary<string, IReadOnlySet<string>> IdentityColumnsByTable,

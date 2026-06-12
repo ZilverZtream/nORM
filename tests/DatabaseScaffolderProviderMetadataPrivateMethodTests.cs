@@ -205,6 +205,71 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("sqlserver", "date", typeof(DateTime), typeof(DateOnly))]
+    [InlineData("sqlserver", "time", typeof(TimeSpan), typeof(TimeOnly))]
+    [InlineData("sqlserver", "datetimeoffset(7)", typeof(DateTime), typeof(DateTimeOffset))]
+    [InlineData("sqlserver", "uniqueidentifier", typeof(object), typeof(Guid))]
+    [InlineData("postgres", "date", typeof(DateTime), typeof(DateOnly))]
+    [InlineData("postgres", "time without time zone", typeof(TimeSpan), typeof(TimeOnly))]
+    [InlineData("postgres", "timestamp with time zone", typeof(DateTime), typeof(DateTimeOffset))]
+    [InlineData("postgres", "interval", typeof(TimeSpan), typeof(TimeSpan))]
+    [InlineData("postgres", "uuid", typeof(object), typeof(Guid))]
+    [InlineData("mysql", "date", typeof(DateTime), typeof(DateOnly))]
+    [InlineData("mysql", "datetime(6)", typeof(DateTime), typeof(DateTime))]
+    [InlineData("mysql", "timestamp", typeof(DateTime), typeof(DateTime))]
+    [InlineData("sqlite", "DATE", typeof(string), typeof(DateOnly))]
+    [InlineData("sqlite", "TIME", typeof(string), typeof(TimeOnly))]
+    [InlineData("sqlite", "DATETIME", typeof(string), typeof(DateTime))]
+    [InlineData("sqlite", "DATETIMEOFFSET", typeof(string), typeof(DateTimeOffset))]
+    [InlineData("sqlite", "UUID", typeof(string), typeof(Guid))]
+    public void NormalizeScaffoldClrType_MapsUnambiguousCatalogStoreTypes_StaticAndDynamic(
+        string providerName,
+        string storeType,
+        Type rawClrType,
+        Type expected)
+    {
+        var method = GetMethod(
+            "NormalizeScaffoldClrType",
+            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("NormalizeScaffoldClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "NormalizeScaffoldClrType");
+
+        using var dynamicConnection = CreateDynamicStoreTypeProbeConnection(providerName);
+        var staticResult = (Type)method.Invoke(
+            null,
+            new object?[] { CreateStoreTypeProbeProvider(providerName), rawClrType, false, false, false, null, null, storeType })!;
+        var dynamicResult = (Type)dynamicMethod.Invoke(
+            null,
+            new object?[] { dynamicConnection, rawClrType, false, false, false, null, storeType })!;
+
+        Assert.Equal(expected, staticResult);
+        Assert.Equal(expected, dynamicResult);
+    }
+
+    [Fact]
+    public void NormalizeScaffoldClrType_DoesNotGuessAmbiguousMySqlTimeStoreType()
+    {
+        var method = GetMethod(
+            "NormalizeScaffoldClrType",
+            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string) });
+        var dynamicMethod = typeof(DynamicEntityTypeGenerator)
+            .GetMethod("NormalizeScaffoldClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) }, null)
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "NormalizeScaffoldClrType");
+
+        using var dynamicConnection = CreateDynamicStoreTypeProbeConnection("mysql");
+        var staticResult = (Type)method.Invoke(
+            null,
+            new object?[] { CreateStoreTypeProbeProvider("mysql"), typeof(TimeSpan), false, false, false, null, null, "time" })!;
+        var dynamicResult = (Type)dynamicMethod.Invoke(
+            null,
+            new object?[] { dynamicConnection, typeof(TimeSpan), false, false, false, null, "time" })!;
+
+        Assert.Equal(typeof(TimeSpan), staticResult);
+        Assert.Equal(typeof(TimeSpan), dynamicResult);
+    }
+
+    [Theory]
     [InlineData("user-defined type (dbo.EmailAddress -> nvarchar(320))", "nvarchar(320)", 320)]
     [InlineData("user-defined type (dbo.Code -> varchar(40))", "varchar(40)", 40)]
     [InlineData("user-defined type (dbo.TokenBytes -> varbinary(64))", "varbinary(64)", 64)]
@@ -544,5 +609,25 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.True((bool)method.Invoke(null, args)!);
         Assert.Equal(expected, args[1]);
     }
+
+    private static DatabaseProvider CreateStoreTypeProbeProvider(string providerName)
+        => providerName switch
+        {
+            "sqlserver" => new SqlServerProvider(),
+            "postgres" => new PostgresProvider(new SqliteParameterFactory()),
+            "mysql" => new MySqlProvider(new SqliteParameterFactory()),
+            "sqlite" => new SqliteProvider(),
+            _ => throw new ArgumentOutOfRangeException(nameof(providerName), providerName, null)
+        };
+
+    private static DbConnection CreateDynamicStoreTypeProbeConnection(string providerName)
+        => providerName switch
+        {
+            "sqlserver" => new DynamicSqlConnectionSchemaProbeConnection(),
+            "postgres" => new DynamicNpgsqlSchemaProbeConnection(),
+            "mysql" => new DynamicMySqlMetadataProbeConnection(),
+            "sqlite" => new SqliteConnection("Data Source=:memory:"),
+            _ => throw new ArgumentOutOfRangeException(nameof(providerName), providerName, null)
+        };
 
 }
