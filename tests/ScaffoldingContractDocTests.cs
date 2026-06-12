@@ -217,6 +217,12 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Guards.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Metadata.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Types.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFunctionRoutineStubWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFunctionRoutineStubWriter.Buffered.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFunctionRoutineStubWriter.Scalar.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFunctionRoutineStubWriter.Streaming.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoredProcedureRoutineStubWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoredProcedureOutputRoutineStubWriter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Postgres.cs"),
@@ -747,6 +753,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);
         Assert.Contains("suggestedAction", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("RequireScaffoldedRoutineParameters", routineWriterSource, StringComparison.Ordinal);
+        Assert.Contains("QueryUnchangedStreamAsync", routineWriterSource, StringComparison.Ordinal);
+        Assert.Contains("ExecuteStoredProcedureWithOutputAsync", routineWriterSource, StringComparison.Ordinal);
+        Assert.Contains("OutputParameter[]", routineWriterSource, StringComparison.Ordinal);
     }
 
     [Fact]
