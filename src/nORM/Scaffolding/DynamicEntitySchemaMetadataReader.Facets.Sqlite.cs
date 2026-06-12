@@ -53,12 +53,5 @@ namespace nORM.Scaffolding
             return result;
         }
 
-        private static string SqlitePragma(DbConnection connection, string? schema, string pragmaName, string argument)
-        {
-            var prefix = string.IsNullOrWhiteSpace(schema)
-                ? string.Empty
-                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schema!) + ".";
-            return $"PRAGMA {prefix}{pragmaName}({DynamicEntityConnectionKind.EscapeIdentifier(connection, argument)})";
-        }
     }
 }

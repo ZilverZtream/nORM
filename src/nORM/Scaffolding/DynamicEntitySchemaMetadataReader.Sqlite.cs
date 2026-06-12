@@ -15,10 +15,7 @@ namespace nORM.Scaffolding
 
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             using var cmd = connection.CreateCommand();
-            var schemaPrefix = string.IsNullOrWhiteSpace(schemaName)
-                ? string.Empty
-                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
-            cmd.CommandText = $"PRAGMA {schemaPrefix}table_xinfo({DynamicEntityConnectionKind.EscapeIdentifier(connection, tableName)})";
+            cmd.CommandText = SqlitePragma(connection, schemaName, "table_xinfo", tableName);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
@@ -32,6 +29,14 @@ namespace nORM.Scaffolding
             }
 
             return result;
+        }
+
+        private static string SqlitePragma(DbConnection connection, string? schema, string pragmaName, string argument)
+        {
+            var prefix = string.IsNullOrWhiteSpace(schema)
+                ? string.Empty
+                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schema!) + ".";
+            return $"PRAGMA {prefix}{pragmaName}({DynamicEntityConnectionKind.EscapeIdentifier(connection, argument)})";
         }
     }
 }
