@@ -523,6 +523,36 @@ public partial class ScaffoldingContractDocTests
     }
 
     [Fact]
+    public void Provider_emitted_skipped_object_kinds_have_stable_diagnostics()
+    {
+        var source = ReadSkippedObjectDiscoverySource();
+        var codeSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Codes.cs");
+        var actionSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.cs");
+        var emittedKinds = source
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+            .SelectMany(line => new[]
+            {
+                Regex.Match(line, "'(?<kind>[A-Za-z][A-Za-z0-9]*)'\\s+AS\\s+Kind", RegexOptions.IgnoreCase),
+                Regex.Match(line, "SELECT\\b.*?,\\s*.*?,\\s*'(?<kind>[A-Za-z][A-Za-z0-9]*)'\\s*,", RegexOptions.IgnoreCase)
+            })
+            .Where(match => match.Success)
+            .Select(match => match.Groups["kind"].Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(kind => kind, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Contains("View", emittedKinds);
+        Assert.Contains("Routine", emittedKinds);
+        Assert.Contains("VirtualTable", emittedKinds);
+        foreach (var kind in emittedKinds)
+        {
+            Assert.Contains($"\"{kind}\" => \"SCF", codeSource, StringComparison.Ordinal);
+            Assert.DoesNotContain($"\"{kind}\" => \"SCF299\"", codeSource, StringComparison.Ordinal);
+            Assert.Contains($"\"{kind}\" =>", actionSource, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Source_pins_scaffold_provider_dispatch_helper()
     {
         var helper = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldProviderKind.cs");
