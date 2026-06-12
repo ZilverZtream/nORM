@@ -13,6 +13,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxProductionScaffoldingFileLines = 250;
     private const int MaxCliScaffoldingFileLines = 200;
     private const int MaxCliIntegrationFileLines = 1500;
+    private const int MaxCoreQueryTranslatorFileLines = 1500;
 
     [Fact]
     public void Test_project_does_not_suppress_async_warning_as_release_exception()
@@ -160,6 +161,20 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split CLI integration tests by command area before they become god files: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Core_query_translator_file_stays_split_from_plan_and_client_tail_helpers()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("The central `QueryTranslator.cs` file stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var queryTranslatorPath = Path.Combine(RepoRoot, "src", "nORM", "Query", "QueryTranslator.cs");
+        var lineCount = File.ReadLines(queryTranslatorPath).Count();
+
+        Assert.True(
+            lineCount <= MaxCoreQueryTranslatorFileLines,
+            $"Keep QueryTranslator.cs focused on translator state and dispatch; split plan generation, post-materialization, or sub-context helpers before it grows back into a god file ({lineCount} lines).");
     }
 
     private static string[] GetTrackedFiles()

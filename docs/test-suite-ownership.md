@@ -130,3 +130,11 @@ split by command area instead of growing one catch-all test object.
 `RepositoryHygieneTests` enforces this boundary for `tests/CliIntegration*.cs`.
 When adding CLI scaffold, migration, database, or portability coverage, place it
 in the matching partial test file or create a new command-area file.
+
+## Query Translator Source Size
+
+The central `QueryTranslator.cs` file stays below 1500 lines so translator state
+and dispatch do not absorb plan generation, post-materialization, or other large
+helper responsibilities. `RepositoryHygieneTests` enforces this boundary for the
+core file; oversized translator partials such as method translators should be
+split by operator family as they are touched.
