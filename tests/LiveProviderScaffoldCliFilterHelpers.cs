@@ -8,55 +8,6 @@ namespace nORM.Tests;
 
 public sealed partial class LiveProviderScaffoldCliParityTests
 {
-    private static void SetupIdentifierCollisionScaffold(
-        DbConnection connection,
-        DatabaseProvider provider,
-        ProviderKind kind,
-        string invalidIdentifierTable,
-        string collisionDashTable,
-        string collisionUnderscoreTable)
-    {
-        CleanupIdentifierCollisionScaffold(connection, provider, kind, invalidIdentifierTable, collisionDashTable, collisionUnderscoreTable);
-
-        var invalid = provider.Escape(invalidIdentifierTable);
-        var dash = provider.Escape(collisionDashTable);
-        var underscore = provider.Escape(collisionUnderscoreTable);
-        var id = provider.Escape("Id");
-        var invalidLeadingDigit = provider.Escape("1st-name");
-        var hasSpace = provider.Escape("has space");
-        var firstNameDash = provider.Escape("first-name");
-        var firstNameUnderscore = provider.Escape("first_name");
-        var toString = provider.Escape("ToString");
-        var equals = provider.Escape("Equals");
-        var value = provider.Escape("Value");
-        var idType = kind == ProviderKind.Sqlite ? "INTEGER" : "int";
-        var text = kind switch
-        {
-            ProviderKind.SqlServer => "nvarchar(80)",
-            ProviderKind.MySql => "varchar(80)",
-            _ => "text"
-        };
-
-        Execute(connection,
-            $"CREATE TABLE {invalid} ({id} {idType} NOT NULL PRIMARY KEY, {invalidLeadingDigit} {text} NOT NULL, {hasSpace} {idType} NULL, {firstNameDash} {text} NOT NULL, {firstNameUnderscore} {text} NOT NULL, {toString} {text} NOT NULL, {equals} {text} NOT NULL)",
-            $"CREATE TABLE {dash} ({id} {idType} NOT NULL PRIMARY KEY, {value} {text} NOT NULL)",
-            $"CREATE TABLE {underscore} ({id} {idType} NOT NULL PRIMARY KEY, {value} {text} NOT NULL)");
-    }
-
-    private static void CleanupIdentifierCollisionScaffold(
-        DbConnection connection,
-        DatabaseProvider provider,
-        ProviderKind kind,
-        string invalidIdentifierTable,
-        string collisionDashTable,
-        string collisionUnderscoreTable)
-    {
-        Execute(connection,
-            DropTable(kind, collisionUnderscoreTable, provider.Escape(collisionUnderscoreTable)),
-            DropTable(kind, collisionDashTable, provider.Escape(collisionDashTable)),
-            DropTable(kind, invalidIdentifierTable, provider.Escape(invalidIdentifierTable)));
-    }
-
     private static void SetupProjectAwareScaffold(
         DbConnection connection,
         DatabaseProvider provider,

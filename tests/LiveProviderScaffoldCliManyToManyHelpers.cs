@@ -2,7 +2,6 @@
 
 using System;
 using System.Data.Common;
-using System.Linq;
 using nORM.Providers;
 
 namespace nORM.Tests;
@@ -356,47 +355,6 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             $"DROP TABLE IF EXISTS {provider.Escape(authorBookTable)}",
             $"DROP TABLE IF EXISTS {provider.Escape(bookTable)}",
             $"DROP TABLE IF EXISTS {provider.Escape(authorTable)}");
-    }
-
-    private static void SetupUseDatabaseNames(
-        DbConnection connection,
-        DatabaseProvider provider,
-        ProviderKind kind,
-        string customerTable,
-        string orderLineTable)
-    {
-        CleanupUseDatabaseNames(connection, provider, customerTable, orderLineTable);
-
-        var customer = provider.Escape(customerTable);
-        var orderLine = provider.Escape(orderLineTable);
-        var customerId = provider.Escape("customer_id");
-        var orderLineId = provider.Escape("order_line_id");
-        var displayName = provider.Escape("display_name");
-        var sku = provider.Escape("SKU");
-        var classColumn = provider.Escape("class");
-        var hasSpace = provider.Escape("has space");
-        var text = kind switch
-        {
-            ProviderKind.SqlServer => "nvarchar(80)",
-            ProviderKind.MySql => "varchar(80)",
-            _ => "text"
-        };
-
-        Execute(connection,
-            $"CREATE TABLE {customer} ({customerId} int NOT NULL PRIMARY KEY, {displayName} {text} NOT NULL)",
-            $"CREATE TABLE {orderLine} ({orderLineId} int NOT NULL PRIMARY KEY, {customerId} int NOT NULL, {sku} {text} NOT NULL, {classColumn} {text} NULL, {hasSpace} {text} NULL, " +
-            $"FOREIGN KEY ({customerId}) REFERENCES {customer} ({customerId}))");
-    }
-
-    private static void CleanupUseDatabaseNames(
-        DbConnection connection,
-        DatabaseProvider provider,
-        string customerTable,
-        string orderLineTable)
-    {
-        Execute(connection,
-            $"DROP TABLE IF EXISTS {provider.Escape(orderLineTable)}",
-            $"DROP TABLE IF EXISTS {provider.Escape(customerTable)}");
     }
 
     private static void SetupAlternateKeyManyToMany(
