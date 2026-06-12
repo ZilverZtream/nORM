@@ -744,4 +744,35 @@ public sealed partial class LiveProviderScaffoldingParityTests
             $"CREATE TABLE {table} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {code} {codeType} NOT NULL, {fixedCode} {fixedCodeType} NOT NULL, {token} {tokenType} NOT NULL)");
     }
 
+    private static async Task SetupTemporalStoreTypeTableAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownTemporalStoreTypeTableAsync(connection, provider, kind);
+
+        var table = kind switch
+        {
+            ProviderKind.SqlServer => SqlServerQualified(provider, TemporalStoreTypeTable),
+            ProviderKind.Postgres => Qualified(provider, "public", TemporalStoreTypeTable),
+            _ => provider.Escape(TemporalStoreTypeTable)
+        };
+        var id = provider.Escape("Id");
+        var businessDate = provider.Escape("BusinessDate");
+        var startsAt = provider.Escape("StartsAt");
+        var createdAt = provider.Escape("CreatedAt");
+        var offsetAt = provider.Escape("OffsetAt");
+        var sql = kind switch
+        {
+            ProviderKind.SqlServer =>
+                $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {businessDate} date NOT NULL, {startsAt} time NULL, {createdAt} datetime2 NOT NULL, {offsetAt} datetimeoffset NULL)",
+            ProviderKind.Postgres =>
+                $"CREATE TABLE {table} ({id} integer NOT NULL PRIMARY KEY, {businessDate} date NOT NULL, {startsAt} time without time zone NULL, {createdAt} timestamp without time zone NOT NULL, {offsetAt} timestamp with time zone NULL)",
+            ProviderKind.MySql =>
+                $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {businessDate} DATE NOT NULL, {startsAt} TIME NULL, {createdAt} DATETIME NOT NULL)",
+            ProviderKind.Sqlite =>
+                $"CREATE TABLE {table} ({id} INTEGER PRIMARY KEY, {businessDate} DATE NOT NULL, {startsAt} TIME NULL, {createdAt} DATETIME NOT NULL, {offsetAt} DATETIMEOFFSET NULL)",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
+        };
+
+        await ExecuteAsync(connection, sql);
+    }
+
 }

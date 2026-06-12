@@ -186,6 +186,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string DynamicCompositeKeyTable = "ScaffoldLiveDynamicCompositeKey";
     private const string DecimalPrecisionTable = "ScaffoldLiveDecimalPrecision";
     private const string StringBinaryFacetTable = "ScaffoldLiveStringBinaryFacets";
+    private const string TemporalStoreTypeTable = "ScaffoldLiveTemporalStoreTypes";
     private const string SqlServerRowVersionTable = "ScaffoldLiveRowVersion";
     private const string SqlServerAliasTypeTable = "ScaffoldLiveAliasCustomer";
     private const string SqlServerAliasTypeName = "ScaffoldLiveEmailAddress";
@@ -216,6 +217,13 @@ public sealed partial class LiveProviderScaffoldingParityTests
 
     private static string Qualified(DatabaseProvider provider, string schemaName, string tableName)
         => provider.Escape(schemaName) + "." + provider.Escape(tableName);
+
+    private static string DefaultSchemaTableFilter(ProviderKind kind, string tableName) => kind switch
+    {
+        ProviderKind.SqlServer => "dbo." + tableName,
+        ProviderKind.Postgres => "public." + tableName,
+        _ => tableName
+    };
 
     private static async Task ExecuteAsync(DbConnection connection, string sql)
     {

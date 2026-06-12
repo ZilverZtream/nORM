@@ -54,6 +54,9 @@ must be reviewed and edited like handwritten model code.
   falling back to provider schema-row CLR metadata. MySQL `TIME` is left to
   provider metadata rather than guessed because it can represent time-of-day or
   elapsed duration depending on schema intent.
+  Real-provider static and runtime dynamic scaffold tests cover this temporal
+  store-type mapping across SQLite, SQL Server, PostgreSQL, and MySQL, including
+  the intentionally unguessed MySQL `TIME` shape.
   SQL Server `xml`, PostgreSQL `citext`/`json`/`jsonb`/`xml`/`uuid`/simple enum columns,
   and MySQL `json`/`year`/simple `enum(...)`/bounded simple `set(...)` columns likewise scaffold as safe
   scalar CLR storage instead of warning-only provider-specific type rows;

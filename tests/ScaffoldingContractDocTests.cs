@@ -441,6 +441,7 @@ public partial class ScaffoldingContractDocTests
         var doc = ReadDoc();
         var staticSource = ReadStaticEntityScaffoldSource();
         var dynamicSource = ReadDynamicEntitySource();
+        var liveProviderSource = ReadLiveProviderScaffoldingParitySource();
 
         Assert.Contains("Provider catalog `date`/`time` store types map to CLR temporal types where the mapping is unambiguous", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server and PostgreSQL `date`/`time`, MySQL `date`, PostgreSQL `interval`,", doc, StringComparison.Ordinal);
@@ -448,11 +449,14 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`DATE`/`TIME`/`DATETIME`/`TIMESTAMP`/`DATETIMEOFFSET`", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL `TIME` is left to", doc, StringComparison.Ordinal);
         Assert.Contains("provider metadata rather than guessed", doc, StringComparison.Ordinal);
+        Assert.Contains("Real-provider static and runtime dynamic scaffold tests cover this temporal", doc, StringComparison.Ordinal);
         Assert.Contains("GetColumnStoreTypesAsync", staticSource, StringComparison.Ordinal);
         Assert.Contains("ColumnStoreTypesByTable", staticSource, StringComparison.Ordinal);
         Assert.Contains("TryMapStoreType(provider, columnStoreType", staticSource, StringComparison.Ordinal);
         Assert.Contains("GetColumnStoreTypes", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("TryMapStoreType(connection, columnStoreType", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_maps_temporal_catalog_store_types_on_live_provider", liveProviderSource, StringComparison.Ordinal);
+        Assert.Contains("Dynamic_scaffolding_maps_temporal_catalog_store_types_on_live_provider", liveProviderSource, StringComparison.Ordinal);
     }
 
     [Fact]

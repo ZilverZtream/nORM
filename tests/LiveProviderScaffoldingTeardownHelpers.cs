@@ -412,6 +412,25 @@ public sealed partial class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task TeardownTemporalStoreTypeTableAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            var rawName = DefaultSchemaTableFilter(kind, TemporalStoreTypeTable);
+            var escapedName = kind switch
+            {
+                ProviderKind.SqlServer => SqlServerQualified(provider, TemporalStoreTypeTable),
+                ProviderKind.Postgres => Qualified(provider, "public", TemporalStoreTypeTable),
+                _ => provider.Escape(TemporalStoreTypeTable)
+            };
+            await ExecuteAsync(connection, DropTable(kind, rawName, escapedName));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
     private static async Task TeardownRoutineAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try

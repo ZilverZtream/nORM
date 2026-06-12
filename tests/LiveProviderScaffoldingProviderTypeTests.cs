@@ -194,6 +194,99 @@ public sealed partial class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_maps_temporal_catalog_store_types_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupTemporalStoreTypeTableAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_temporal_store_types_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldTemporalStoreTypeContext",
+                    new ScaffoldOptions { Tables = new[] { DefaultSchemaTableFilter(kind, TemporalStoreTypeTable) }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, TemporalStoreTypeTable + ".cs"));
+
+                Assert.Contains("public DateOnly BusinessDate { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public DateTime CreatedAt { get; set; }", entityCode, StringComparison.Ordinal);
+                if (kind == ProviderKind.MySql)
+                {
+                    Assert.Contains("public TimeSpan? StartsAt { get; set; }", entityCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain("public TimeOnly? StartsAt { get; set; }", entityCode, StringComparison.Ordinal);
+                    Assert.DoesNotContain("OffsetAt", entityCode, StringComparison.Ordinal);
+                }
+                else
+                {
+                    Assert.Contains("public TimeOnly? StartsAt { get; set; }", entityCode, StringComparison.Ordinal);
+                    Assert.Contains("public DateTimeOffset? OffsetAt { get; set; }", entityCode, StringComparison.Ordinal);
+                }
+
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownTemporalStoreTypeTableAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task Dynamic_scaffolding_maps_temporal_catalog_store_types_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupTemporalStoreTypeTableAsync(connection, provider, kind);
+            try
+            {
+                var type = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, DefaultSchemaTableFilter(kind, TemporalStoreTypeTable));
+
+                Assert.Equal(typeof(DateOnly), type.GetProperty("BusinessDate")!.PropertyType);
+                Assert.Equal(typeof(DateTime), type.GetProperty("CreatedAt")!.PropertyType);
+                if (kind == ProviderKind.MySql)
+                {
+                    Assert.Equal(typeof(TimeSpan?), type.GetProperty("StartsAt")!.PropertyType);
+                    Assert.Null(type.GetProperty("OffsetAt"));
+                }
+                else
+                {
+                    Assert.Equal(typeof(TimeOnly?), type.GetProperty("StartsAt")!.PropertyType);
+                    Assert.Equal(typeof(DateTimeOffset?), type.GetProperty("OffsetAt")!.PropertyType);
+                }
+            }
+            finally
+            {
+                await TeardownTemporalStoreTypeTableAsync(connection, provider, kind);
+            }
+        }
+    }
+
     [Fact]
     public async Task ScaffoldAsync_emits_postgres_uuid_and_array_columns_on_live_provider()
     {
