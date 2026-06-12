@@ -737,7 +737,9 @@ public sealed partial class LiveProviderScaffoldingParityTests
             ProviderKind.Postgres => ("VARCHAR(40)", "CHAR(12)", "BYTEA"),
             ProviderKind.MySql when alternate => ("CHAR(40)", "VARCHAR(12)", "VARBINARY(16)"),
             ProviderKind.MySql => ("VARCHAR(40)", "CHAR(12)", "BINARY(16)"),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "String/binary facet live test only targets SQL Server, PostgreSQL, and MySQL.")
+            ProviderKind.Sqlite when alternate => ("CHAR(40)", "VARCHAR(12)", "VARBINARY(16)"),
+            ProviderKind.Sqlite => ("VARCHAR(40)", "CHAR(12)", "BINARY(16)"),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
         };
 
         await ExecuteAsync(connection,

@@ -44,6 +44,8 @@ namespace nORM.Scaffolding
                 }
                 if (ScaffoldSqliteDdlParser.IsProviderSpecificDeclaredType(declaredType))
                     features.Add(new ScaffoldUnsupportedFeatureInfo(tableKey, "ProviderSpecificColumnType", name, declaredType!));
+                if (ScaffoldSqliteDdlParser.TryParseDeclaredDecimalPrecision(declaredType, out _))
+                    features.Add(new ScaffoldUnsupportedFeatureInfo(tableKey, "PrecisionScale", name, declaredType!));
             }
         }
 

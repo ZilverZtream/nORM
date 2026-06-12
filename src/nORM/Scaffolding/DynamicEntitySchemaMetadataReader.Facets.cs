@@ -73,6 +73,9 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
+                return GetSqliteDeclaredStringBinaryFacets(connection, schemaName, tableName);
+
             return new Dictionary<string, ScaffoldColumnFacet>(0, StringComparer.OrdinalIgnoreCase);
         }
 
@@ -126,7 +129,64 @@ namespace nORM.Scaffolding
                     """, schemaName, tableName);
             }
 
+            if (DynamicEntityConnectionKind.IsSqlite(connection))
+                return GetSqliteDeclaredDecimalPrecisions(connection, schemaName, tableName);
+
             return new Dictionary<string, ScaffoldDecimalPrecisionInfo>(0, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static IReadOnlyDictionary<string, ScaffoldColumnFacet> GetSqliteDeclaredStringBinaryFacets(
+            DbConnection connection,
+            string? schemaName,
+            string tableName)
+        {
+            var result = new Dictionary<string, ScaffoldColumnFacet>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = SqlitePragma(connection, schemaName, "table_xinfo", tableName);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["name"]);
+                var declaredType = Convert.ToString(reader["type"]);
+                if (!string.IsNullOrWhiteSpace(columnName)
+                    && ScaffoldSqliteDdlParser.TryParseDeclaredStringBinaryFacet(declaredType, out var facet))
+                {
+                    result[columnName!] = facet;
+                }
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo> GetSqliteDeclaredDecimalPrecisions(
+            DbConnection connection,
+            string? schemaName,
+            string tableName)
+        {
+            var result = new Dictionary<string, ScaffoldDecimalPrecisionInfo>(StringComparer.OrdinalIgnoreCase);
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = SqlitePragma(connection, schemaName, "table_xinfo", tableName);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var columnName = Convert.ToString(reader["name"]);
+                var declaredType = Convert.ToString(reader["type"]);
+                if (!string.IsNullOrWhiteSpace(columnName)
+                    && ScaffoldSqliteDdlParser.TryParseDeclaredDecimalPrecision(declaredType, out var precision))
+                {
+                    result[columnName!] = precision;
+                }
+            }
+
+            return result;
+        }
+
+        private static string SqlitePragma(DbConnection connection, string? schema, string pragmaName, string argument)
+        {
+            var prefix = string.IsNullOrWhiteSpace(schema)
+                ? string.Empty
+                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schema!) + ".";
+            return $"PRAGMA {prefix}{pragmaName}({DynamicEntityConnectionKind.EscapeIdentifier(connection, argument)})";
         }
     }
 }

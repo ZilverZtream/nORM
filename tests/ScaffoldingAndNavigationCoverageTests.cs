@@ -553,6 +553,53 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Theory]
+    [InlineData("VARCHAR(40)", true, 40, false)]
+    [InlineData("CHAR(12)", true, 12, true)]
+    [InlineData("NATIVE   CHARACTER(20)", true, 20, true)]
+    [InlineData("VARBINARY(16)", true, 16, false)]
+    [InlineData("BINARY(8)", true, 8, true)]
+    [InlineData("BLOB", false, null, false)]
+    [InlineData("VARCHAR(max)", false, null, false)]
+    [InlineData("VARCHAR(0)", false, null, false)]
+    public void SqliteDeclaredStringBinaryFacetParser_ParsesBoundedDeclaredTypes(
+        string declaredType,
+        bool expected,
+        int? expectedMaxLength,
+        bool expectedFixedLength)
+    {
+        var result = ScaffoldSqliteDdlParser.TryParseDeclaredStringBinaryFacet(declaredType, out var facet);
+
+        Assert.Equal(expected, result);
+        if (!expected)
+            return;
+
+        Assert.Equal(expectedMaxLength, facet.MaxLength);
+        Assert.Null(facet.IsUnicode);
+        Assert.Equal(expectedFixedLength, facet.IsFixedLength);
+    }
+
+    [Theory]
+    [InlineData("DECIMAL(28,6)", true, 28, 6)]
+    [InlineData("NUMERIC(10)", true, 10, null)]
+    [InlineData("NOTNUMERIC(10,2)", false, null, null)]
+    [InlineData("DECIMAL(4,5)", false, null, null)]
+    public void SqliteDeclaredDecimalPrecisionParser_UsesNumericDeclaredTypes(
+        string declaredType,
+        bool expected,
+        int? expectedPrecision,
+        int? expectedScale)
+    {
+        var result = ScaffoldSqliteDdlParser.TryParseDeclaredDecimalPrecision(declaredType, out var precision);
+
+        Assert.Equal(expected, result);
+        if (!expected)
+            return;
+
+        Assert.Equal(expectedPrecision, precision.Precision);
+        Assert.Equal(expectedScale, precision.Scale);
+    }
+
+    [Theory]
     [InlineData("decimal(18,2)", 18, 2)]
     [InlineData("decimal(18)", 18, null)]
     [InlineData("numeric(18,0)", 18, 0)]

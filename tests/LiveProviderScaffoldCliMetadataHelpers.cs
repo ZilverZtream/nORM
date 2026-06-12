@@ -187,7 +187,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             ProviderKind.SqlServer => ("VARCHAR(40)", "CHAR(12)", "BINARY(16)"),
             ProviderKind.Postgres => ("VARCHAR(40)", "CHAR(12)", "BYTEA"),
             ProviderKind.MySql => ("VARCHAR(40)", "CHAR(12)", "BINARY(16)"),
-            ProviderKind.Sqlite => ("VARCHAR(40)", "CHAR(12)", "BLOB"),
+            ProviderKind.Sqlite => ("VARCHAR(40)", "CHAR(12)", "BINARY(16)"),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.")
         };
         var idType = kind == ProviderKind.Sqlite ? "INTEGER" : "int";

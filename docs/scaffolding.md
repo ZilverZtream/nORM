@@ -284,8 +284,9 @@ must be reviewed and edited like handwritten model code.
   evidence when the prefix is shorter than the declared column length because
   prefix uniqueness is not full-column uniqueness. Prefix indexes whose prefix
   covers the full declared column length are emitted as normal indexes.
-- Decimal precision/scale preservation, including precision-only metadata, for SQL Server, PostgreSQL, and MySQL
-  `decimal`/`numeric` columns. Static scaffolding emits
+- Decimal precision/scale preservation, including precision-only metadata, for SQL Server, PostgreSQL, MySQL, and SQLite
+  `decimal`/`numeric` columns. SQLite parses declared `DECIMAL(p,s)` and
+  `NUMERIC(p,s)` type text from `PRAGMA table_xinfo`. Static scaffolding emits
   `Property(...).HasPrecision(p, s)` or `Property(...).HasPrecision(p)` in
   generated context configuration and keeps
   `[Column(TypeName = "decimal(p,s)")]` or `[Column(TypeName = "decimal(p)")]`
@@ -296,7 +297,8 @@ must be reviewed and edited like handwritten model code.
   falling back to `DECIMAL(18,2)`. Fluent `Property(...).HasPrecision(p, s)` and
   precision-only `Property(...).HasPrecision(p)` feed the same migration
   snapshot metadata.
-  SQLite remains on its provider-neutral `NUMERIC` mapping.
+  SQLite still keeps provider-neutral migration storage, but declared
+  precision-bearing numeric columns scaffold as `decimal` properties.
 - Pure many-to-many join table generation for the safe v1 subset: exactly two
   non-null foreign-key constraints, no payload columns, a join-table primary
   key made exactly from those FK columns, and both references targeting the
@@ -912,7 +914,9 @@ must be reviewed and edited like handwritten model code.
   Decimal precision plus
   bounded string/binary length, Unicode, and fixed-length facets are also
   verified through real CLI scaffolds on the providers whose catalogs expose
-  those facets, with SQLite kept in the same command-path build gate. Ordinary
+  those facets. SQLite participates by parsing declared `VARCHAR(n)`,
+  `CHAR(n)`, `BINARY(n)`, `VARBINARY(n)`, `DECIMAL(p,s)`, and
+  `NUMERIC(p,s)` type text from `PRAGMA table_xinfo`. Ordinary
   single-column indexes and ordered unique composite indexes are likewise
   verified through generated `[Index]` attributes and consumer builds on all
   four live providers. Provider-bound filtered/partial predicates, descending

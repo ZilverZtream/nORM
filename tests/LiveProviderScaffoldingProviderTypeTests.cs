@@ -20,6 +20,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_preserves_decimal_precision_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -59,6 +60,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task Dynamic_scaffolding_preserves_decimal_precision_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -91,6 +93,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_preserves_string_binary_facets_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
@@ -125,7 +128,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.FixedCode).HasMaxLength(12).IsUnicode(false).IsFixedLength();", contextCode, StringComparison.Ordinal);
                     Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", contextCode, StringComparison.Ordinal);
                 }
-                else if (kind == ProviderKind.MySql)
+                else if (kind is ProviderKind.MySql or ProviderKind.Sqlite)
                 {
                     Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.FixedCode).HasMaxLength(12).IsFixedLength();", contextCode, StringComparison.Ordinal);
                     Assert.Contains($"mb.Entity<{StringBinaryFacetTable}>().Property(e => e.Token).HasMaxLength(16).IsFixedLength();", contextCode, StringComparison.Ordinal);
@@ -153,6 +156,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task Dynamic_scaffolding_schema_signature_includes_string_binary_facets_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
