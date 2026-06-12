@@ -212,6 +212,11 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.GeneratedMembers.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Documentation.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Functions.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Guards.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Metadata.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Types.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Postgres.cs"),
