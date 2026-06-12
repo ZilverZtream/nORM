@@ -136,5 +136,16 @@ namespace nORM.Scaffolding
               AND index_name <> 'PRIMARY'
               AND UPPER(COALESCE(NULLIF(index_type, ''), 'BTREE')) <> 'BTREE'
             """;
+
+        private const string MySqlDefaultNamedCheckConstraintSql = """
+            SELECT NULL AS TableSchema,
+                   tc.table_name AS TableName,
+                   tc.constraint_name AS ConstraintName
+            FROM information_schema.table_constraints tc
+            WHERE tc.table_schema = DATABASE()
+              AND tc.constraint_type = 'CHECK'
+              AND LOWER(LEFT(tc.constraint_name, CHAR_LENGTH(tc.table_name) + 5)) = LOWER(CONCAT(tc.table_name, '_chk_'))
+              AND SUBSTRING(tc.constraint_name, CHAR_LENGTH(tc.table_name) + 6) REGEXP '^[0-9]+$'
+            """;
     }
 }

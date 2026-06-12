@@ -1011,9 +1011,10 @@ must be reviewed and edited like handwritten model code.
   and safe PostgreSQL typed-cast defaults, are emitted as migration metadata with
   `HasDefaultValueSql`; table CHECK constraints are emitted as provider-bound
   migration metadata with `HasCheckConstraint`. SQL Server CHECK constraint
-  names marked `is_system_named` by the catalog are replaced with stable
-  generated `CK_<Entity>_<hash>` names so scaffold output preserves the
-  predicate without carrying unstable `CK__...` catalog artifacts.
+  names marked `is_system_named` by the catalog, PostgreSQL default
+  `<table>_<columns>_check` names, and MySQL default `<table>_chk_<n>` names
+  are replaced with stable generated `CK_<Entity>_<hash>` names so scaffold
+  output preserves the predicate without carrying generated catalog artifacts.
   Computed/generated column expressions are emitted as provider-bound migration metadata with
   `HasComputedColumnSql`; column collations are emitted as provider-bound
   migration metadata with `HasCollation`; complex/provider-specific defaults
@@ -1221,7 +1222,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
 | `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary literals and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
-| `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`; SQL Server system-generated names are replaced with stable generated names. |
+| `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`; SQL Server, PostgreSQL, and MySQL provider-default names are replaced with stable generated names. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `citext`/`json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` plus bounded simple `set(...)` are scaffolded as supported storage; MySQL unsigned integer and decimal/numeric columns, SQL Server alias types over scaffoldable scalar/binary bases, and PostgreSQL domains over safe scalar/array/enum base types preserve generated writes and bounded facets where provider metadata exposes them while remaining diagnostics because the DDL is provider-specific. Unsafe provider-specific declarations such as SQL Server/SQLite/MySQL spatial types like `GEOMETRY`/`POINT`, PostgreSQL network/search types such as `inet`, and larger or ambiguous MySQL `set(...)` declarations remain diagnostics and make the generated entity `[ReadOnlyEntity]` so generated writes fail closed. |
 | `SCF106` | `relationship` | Unsupported/provider-specific FK referential action discovered. Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted in generated fluent configuration. |

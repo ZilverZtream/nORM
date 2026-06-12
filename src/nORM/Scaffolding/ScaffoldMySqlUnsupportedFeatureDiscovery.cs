@@ -17,6 +17,7 @@ namespace nORM.Scaffolding
         {
             var features = new List<ScaffoldUnsupportedFeatureInfo>();
             await AddCatalogFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
+            await MarkDefaultNamedCheckConstraintFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             features.AddRange(await GetExpressionIndexFeaturesAsync(connection, provider, tables).ConfigureAwait(false));
             return features;
         }
@@ -26,5 +27,16 @@ namespace nORM.Scaffolding
             List<ScaffoldUnsupportedFeatureInfo> features,
             HashSet<string> tableKeys)
             => AddFeaturesAsync(connection, features, tableKeys, MySqlUnsupportedFeatureSql);
+
+        private static Task MarkDefaultNamedCheckConstraintFeaturesAsync(
+            DbConnection connection,
+            List<ScaffoldUnsupportedFeatureInfo> features,
+            HashSet<string> tableKeys)
+            => ScaffoldSyntheticFeatureNameMarker.MarkFeaturesAsync(
+                connection,
+                features,
+                tableKeys,
+                MySqlDefaultNamedCheckConstraintSql,
+                "CheckConstraint");
     }
 }

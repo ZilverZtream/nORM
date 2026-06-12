@@ -16,6 +16,7 @@ namespace nORM.Scaffolding
             await AddComputedColumnFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             await AddTriggerFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             await AddCheckConstraintFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
+            await MarkDefaultNamedCheckConstraintFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             await AddCollationFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             await ScaffoldPostgresProviderSpecificColumnFeatureDiscovery.AddFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);
             await AddPrecisionScaleFeaturesAsync(connection, features, tableKeys).ConfigureAwait(false);

@@ -982,10 +982,13 @@ public partial class ScaffoldingContractDocTests
         var contextWriterSource = ReadContextWriterSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var checkFeatureConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCheckFeatureConfigurationBuilder.cs");
+        var syntheticFeatureNameMarkerSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSyntheticFeatureNameMarker.cs");
         var foreignKeyDiscoverySource = ReadForeignKeyDiscoverySource();
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var keyDiscoverySource = ReadKeyDiscoverySource();
         var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
+        var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
+        var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var builderSource = ReadRepoFile("src", "nORM", "Configuration", "EntityTypeBuilder.cs");
         var configurationSource = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
         var snapshotSource = ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs");
@@ -997,6 +1000,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL default", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL default", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server CHECK constraint", doc, StringComparison.Ordinal);
+        Assert.Contains("<table>_<columns>_check", doc, StringComparison.Ordinal);
+        Assert.Contains("<table>_chk_<n>", doc, StringComparison.Ordinal);
         Assert.Contains("CK_<Entity>_<hash>", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite autoindex", doc, StringComparison.Ordinal);
         Assert.Contains("UX_<Table>_<Columns>", doc, StringComparison.Ordinal);
@@ -1010,6 +1015,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("REGEXP '^[0-9]+$'", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("foreignKey.IsSyntheticConstraintName ? null", relationshipDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("MarkSystemNamedCheckConstraintFeaturesAsync", sqlServerUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("MarkDefaultNamedCheckConstraintFeaturesAsync", postgresUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("MarkDefaultNamedCheckConstraintFeaturesAsync", mySqlUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldSyntheticFeatureNameMarker", syntheticFeatureNameMarkerSource, StringComparison.Ordinal);
+        Assert.Contains("isSyntheticName", syntheticFeatureNameMarkerSource, StringComparison.Ordinal);
         Assert.Contains("BuildGeneratedCheckConstraintName", checkFeatureConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("NormalizeSyntheticIndexNames", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("RequiresExplicitManyToManyReferentialActions", contextWriterSource, StringComparison.Ordinal);

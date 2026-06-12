@@ -30,5 +30,39 @@ namespace nORM.Scaffolding
                 WHERE con.contype = 'c'
                   AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
                 """);
+
+        private static Task MarkDefaultNamedCheckConstraintFeaturesAsync(
+            DbConnection connection,
+            List<ScaffoldUnsupportedFeatureInfo> features,
+            HashSet<string> tableKeys)
+            => ScaffoldSyntheticFeatureNameMarker.MarkFeaturesAsync(
+                connection,
+                features,
+                tableKeys,
+                """
+                SELECT ns.nspname AS TableSchema,
+                       tbl.relname AS TableName,
+                       con.conname AS ConstraintName
+                FROM pg_constraint con
+                INNER JOIN pg_class tbl ON tbl.oid = con.conrelid
+                INNER JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                WHERE con.contype = 'c'
+                  AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                  AND con.conname = LEFT(
+                      tbl.relname || '_' ||
+                      CASE
+                          WHEN array_length(con.conkey, 1) > 0
+                          THEN (
+                              SELECT string_agg(att.attname, '_' ORDER BY key.ord) || '_'
+                              FROM unnest(con.conkey) WITH ORDINALITY AS key(attnum, ord)
+                              INNER JOIN pg_attribute att
+                                  ON att.attrelid = tbl.oid
+                                 AND att.attnum = key.attnum
+                          )
+                          ELSE ''
+                      END || 'check',
+                      63)
+                """,
+                "CheckConstraint");
     }
 }

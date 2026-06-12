@@ -135,15 +135,18 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             var warningJsonPath = Path.Combine(output, "nORM.ScaffoldWarnings.json");
 
             Assert.Contains($".Entity<{tableName}>().HasCheckConstraint(", contextCode, StringComparison.Ordinal);
-            if (kind == ProviderKind.SqlServer)
-            {
-                Assert.Contains($".Entity<{tableName}>().HasCheckConstraint(\"CK_{tableName}_", contextCode, StringComparison.Ordinal);
-                Assert.DoesNotContain("CK__", contextCode, StringComparison.Ordinal);
-            }
             if (kind == ProviderKind.Sqlite)
             {
                 Assert.Contains($".Entity<{tableName}>().HasCheckConstraint(\"CK_{tableName}_1", contextCode, StringComparison.Ordinal);
             }
+            else
+            {
+                Assert.Contains($".Entity<{tableName}>().HasCheckConstraint(\"CK_{tableName}_", contextCode, StringComparison.Ordinal);
+            }
+
+            Assert.DoesNotContain("CK__", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(tableName + "_check", contextCode, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(tableName + "_chk_", contextCode, StringComparison.OrdinalIgnoreCase);
 
             AssertFeatureMetadataHasNoProviderOwnedDiagnostics(warningJsonPath, tableName);
 
