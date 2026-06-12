@@ -49,6 +49,8 @@ namespace nORM.Scaffolding
                 {
                     includedColumnNames = ScaffoldSqlMetadataParser.ExtractCreateIndexIncludedColumnNames(includedFeature.Detail);
                     if (includedColumnNames.Length == 0)
+                        includedColumnNames = ScaffoldSqlMetadataParser.ExtractCreateIndexIncludedColumnNames(feature.Detail);
+                    if (includedColumnNames.Length == 0)
                         continue;
                 }
 

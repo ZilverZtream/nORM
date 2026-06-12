@@ -19,6 +19,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxSelectClauseVisitorPartialFileLines = 1500;
     private const int MaxExpressionToSqlVisitorPartialFileLines = 1500;
     private const int MaxSqliteProviderPartialFileLines = 1500;
+    private const int MaxConcreteProviderPartialFileLines = 1500;
     private const int MaxDatabaseProviderPartialFileLines = 1500;
     private const int MaxDbContextPartialFileLines = 1500;
     private const int MaxSchemaSnapshotFileLines = 1500;
@@ -229,6 +230,29 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split SQLite provider code by translation, schema/temporal, and bulk responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Concrete_provider_partials_stay_split_by_provider_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `SqlServerProvider*.cs`, `PostgresProvider*.cs`, and `MySqlProvider*.cs` file stays below 1500 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = new[] { "SqlServerProvider*.cs", "PostgresProvider*.cs", "MySqlProvider*.cs" }
+            .SelectMany(pattern => Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Providers"), pattern))
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxConcreteProviderPartialFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split concrete provider code by core dialect, scalar SQL, regex, translation, temporal/tenant/runtime, and bulk responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]

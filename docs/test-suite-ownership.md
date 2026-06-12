@@ -168,6 +168,12 @@ Every `SqliteProvider*.cs` partial stays below 1500 lines so SQLite SQL
 translation, schema/temporal behavior, and bulk DML remain separate provider
 responsibilities. `RepositoryHygieneTests` enforces this boundary.
 
+## Concrete Provider Source Size
+
+Every `SqlServerProvider*.cs`, `PostgresProvider*.cs`, and `MySqlProvider*.cs` file stays below 1500 lines so concrete provider dialect defaults, scalar SQL,
+regex and method translation, temporal/tenant/runtime behavior, and bulk DML remain separate provider responsibilities. `RepositoryHygieneTests` enforces
+this boundary.
+
 ## Database Provider Source Size
 
 Every `DatabaseProvider*.cs` partial stays below 1500 lines so base provider
