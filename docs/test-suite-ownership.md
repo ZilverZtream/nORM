@@ -83,6 +83,9 @@ Do not add new catch-all `CoverageBoost` files. When touching these tests,
 prefer moving coherent groups into domain-named files such as
 `QueryTranslationRegressionTests`, `MaterializerRegressionTests`,
 `NavigationRegressionTests`, or `ProviderRegressionTests`.
+Do not recreate `CoverageBoostScaffoldingRuntimeGroupsTests.cs`; its mixed
+scaffolding/runtime/navigation/migration groups have been split into
+class-named files with the original test class names.
 
 ## Scaffolding Source Size
 

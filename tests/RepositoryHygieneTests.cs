@@ -48,6 +48,14 @@ public sealed class RepositoryHygieneTests
     }
 
     [Fact]
+    public void Mixed_scaffolding_runtime_coverage_group_stays_decomposed()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Do not recreate `CoverageBoostScaffoldingRuntimeGroupsTests.cs`", ownership, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(RepoRoot, "tests", "CoverageBoostScaffoldingRuntimeGroupsTests.cs")));
+    }
+
+    [Fact]
     public void Production_scaffolding_files_stay_split_by_responsibility()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
