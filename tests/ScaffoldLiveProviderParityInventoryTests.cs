@@ -185,6 +185,29 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
             "Remove stale scaffold live-provider provider-specific fact justifications: " + string.Join("; ", missingExpectedEntries));
     }
 
+    [Fact]
+    public void Live_provider_scaffold_coverage_keeps_each_provider_substantial()
+    {
+        var summaries = BuildProviderCoverageSummaries().ToArray();
+        Assert.Equal(AllProviders, summaries.Select(summary => summary.Provider).OrderBy(ProviderOrder));
+
+        var maxReferences = summaries.Max(summary => summary.ReferenceCount);
+        var maxFiles = summaries.Max(summary => summary.FileCount);
+        var minReferenceCount = (int)Math.Floor(maxReferences * 0.60);
+        var minFileCount = (int)Math.Floor(maxFiles * 0.80);
+        var weakProviders = summaries
+            .Where(summary => summary.ReferenceCount < minReferenceCount || summary.FileCount < minFileCount)
+            .Select(summary =>
+                $"{summary.Provider}: {summary.ReferenceCount} ProviderKind references across {summary.FileCount} files; " +
+                $"minimums are {minReferenceCount} references and {minFileCount} files. Current spread: {FormatCoverageSummaries(summaries)}")
+            .ToArray();
+
+        Assert.True(
+            weakProviders.Length == 0,
+            "Live scaffold coverage must stay materially all-four-provider even after legitimate provider-specific tests are added: " +
+            string.Join("; ", weakProviders));
+    }
+
     private static IEnumerable<PartialCoverage> FindPartialLiveProviderCoverage()
     {
         var providerRegex = new Regex(@"InlineData\(ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)\)", RegexOptions.Compiled);
@@ -244,6 +267,39 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
         }
     }
 
+    private static IEnumerable<ProviderCoverageSummary> BuildProviderCoverageSummaries()
+    {
+        var providerRegex = new Regex(@"ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)", RegexOptions.Compiled);
+        var summaries = AllProviders.ToDictionary(
+            provider => provider,
+            provider => new ProviderCoverageBuilder(provider),
+            StringComparer.Ordinal);
+
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "LiveProviderScaffold*.cs"))
+        {
+            var fileName = Path.GetFileName(file);
+            var providerCounts = providerRegex.Matches(File.ReadAllText(file))
+                .Select(match => match.Groups[1].Value)
+                .GroupBy(provider => provider, StringComparer.Ordinal);
+
+            foreach (var providerCount in providerCounts)
+            {
+                summaries[providerCount.Key].AddFile(fileName, providerCount.Count());
+            }
+        }
+
+        return summaries.Values
+            .Select(builder => builder.ToSummary())
+            .OrderBy(summary => ProviderOrder(summary.Provider));
+    }
+
+    private static string FormatCoverageSummaries(IEnumerable<ProviderCoverageSummary> summaries)
+        => string.Join(
+            ", ",
+            summaries
+                .OrderBy(summary => ProviderOrder(summary.Provider))
+                .Select(summary => $"{summary.Provider}={summary.ReferenceCount}/{summary.FileCount}"));
+
     private static PartialCoverageExpectation Expect(string reason, params string[] providers)
     {
         Assert.False(string.IsNullOrWhiteSpace(reason));
@@ -264,6 +320,26 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
     {
         public string Key => File + "::" + Method;
     }
+
+    private sealed class ProviderCoverageBuilder(string provider)
+    {
+        private readonly HashSet<string> _files = new(StringComparer.Ordinal);
+
+        public string Provider { get; } = provider;
+
+        public int ReferenceCount { get; private set; }
+
+        public void AddFile(string file, int references)
+        {
+            ReferenceCount += references;
+            _files.Add(file);
+        }
+
+        public ProviderCoverageSummary ToSummary()
+            => new(Provider, ReferenceCount, _files.Count);
+    }
+
+    private sealed record ProviderCoverageSummary(string Provider, int ReferenceCount, int FileCount);
 
     private sealed record PartialCoverageExpectation(IReadOnlyList<string> Providers, string Reason);
 }
