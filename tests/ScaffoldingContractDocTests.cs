@@ -86,6 +86,14 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Expressions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Types.cs"));
 
+    private static string ReadSemicolonParserSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.Keys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.Markers.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.Routines.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.Selection.cs"));
+
     private static string ReadColumnDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.cs"),
@@ -484,7 +492,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.Results.cs"));
         var columnDiscoverySource = ReadColumnDiscoverySource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
-        var parserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSemicolonParser.cs");
+        var parserSource = ReadSemicolonParserSource();
         var sqlMetadataParserSource = ReadSqlMetadataParserSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
