@@ -108,6 +108,14 @@ Scaffolding contract source-reader helpers stay in
 `ScaffoldingContractDocTestSources.cs` so `ScaffoldingContractDocTests.cs`
 stays focused on the consumer-facing contract assertions.
 
+## Scaffolding Live-Provider Matrix
+
+Scaffold live-provider tests should cover SQLite, SQL Server, PostgreSQL, and
+MySQL whenever the database feature exists on all four providers. Partial
+provider coverage must be listed in `ScaffoldLiveProviderParityInventoryTests`
+with the exact provider set and a capability reason, so missing providers are
+explicit decisions rather than accidental gaps.
+
 ## CLI Integration Test Size
 
 CLI integration tests stay below 1500 lines per file so command coverage remains

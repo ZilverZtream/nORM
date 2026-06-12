@@ -68,6 +68,20 @@ public sealed class RepositoryHygieneTests
     }
 
     [Fact]
+    public void Scaffold_live_provider_partial_coverage_stays_explicit()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        var inventory = File.ReadAllText(Path.Combine(RepoRoot, "tests", "ScaffoldLiveProviderParityInventoryTests.cs"));
+
+        Assert.Contains("Scaffolding Live-Provider Matrix", ownership, StringComparison.Ordinal);
+        Assert.Contains("Scaffold live-provider tests should cover SQLite, SQL Server, PostgreSQL, and", ownership, StringComparison.Ordinal);
+        Assert.Contains("provider coverage must be listed", ownership, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldLiveProviderParityInventoryTests", ownership, StringComparison.Ordinal);
+        Assert.Contains("Live_provider_scaffold_tests_are_all_four_or_explicitly_justified", inventory, StringComparison.Ordinal);
+        Assert.Contains("IntentionalPartialCoverage", inventory, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Encoding_scan_rejects_replacement_and_mojibake_markers()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
