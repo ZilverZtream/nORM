@@ -91,3 +91,11 @@ remains split by provider, model phase, or generated-code responsibility.
 `RepositoryHygieneTests` enforces this boundary for `src/nORM/Scaffolding`.
 When a scaffolding change needs more room, split the responsibility into a new
 focused helper instead of growing an existing file.
+
+## CLI Integration Test Size
+
+CLI integration tests stay below 1500 lines per file so command coverage remains
+split by command area instead of growing one catch-all test object.
+`RepositoryHygieneTests` enforces this boundary for `tests/CliIntegration*.cs`.
+When adding CLI scaffold, migration, database, or portability coverage, place it
+in the matching partial test file or create a new command-area file.
