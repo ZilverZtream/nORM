@@ -124,10 +124,10 @@ public class DatabaseScaffolderIntegrationTests
         {
             await DatabaseScaffolder.ScaffoldAsync(fakeConn, new SqliteProvider(), outputDir, "TestNs");
 
-            var entityFile = Path.Combine(outputDir, "Customers.cs");
+            var entityFile = Path.Combine(outputDir, DefaultScaffoldEntityName("Customers") + ".cs");
             Assert.True(File.Exists(entityFile));
             var code = await File.ReadAllTextAsync(entityFile);
-            Assert.Contains("public partial class Customers", code);
+            Assert.Contains("public partial class Customer", code);
             Assert.Contains("namespace TestNs", code);
             Assert.Contains("[Table(\"Customers\")]", code);
 
@@ -171,11 +171,11 @@ public class DatabaseScaffolderIntegrationTests
             await DatabaseScaffolder.ScaffoldAsync(fakeConn, new SqliteProvider(), outputDir, "MultiNs", "MultiCtx");
 
             var ctxCode = await File.ReadAllTextAsync(Path.Combine(outputDir, "MultiCtx.cs"));
-            Assert.Contains("IQueryable<Products>", ctxCode);
-            Assert.Contains("IQueryable<Orders>", ctxCode);
+            Assert.Contains("IQueryable<Product> Products", ctxCode);
+            Assert.Contains("IQueryable<Order> Orders", ctxCode);
 
-            Assert.True(File.Exists(Path.Combine(outputDir, "Products.cs")));
-            Assert.True(File.Exists(Path.Combine(outputDir, "Orders.cs")));
+            Assert.True(File.Exists(Path.Combine(outputDir, DefaultScaffoldEntityName("Products") + ".cs")));
+            Assert.True(File.Exists(Path.Combine(outputDir, DefaultScaffoldEntityName("Orders") + ".cs")));
         }
         finally
         {
@@ -207,7 +207,7 @@ public class DatabaseScaffolderIntegrationTests
             try
             {
                 await DatabaseScaffolder.ScaffoldAsync(fakeConn, new SqliteProvider(), outputDir, "Ns");
-                Assert.True(File.Exists(Path.Combine(outputDir, "Things.cs")));
+                Assert.True(File.Exists(Path.Combine(outputDir, DefaultScaffoldEntityName("Things") + ".cs")));
             }
             finally
             {
@@ -219,6 +219,9 @@ public class DatabaseScaffolderIntegrationTests
             try { File.Delete(dbFile); } catch { }
         }
     }
+
+    private static string DefaultScaffoldEntityName(string tableName)
+        => ScaffoldNameHelper.Singularize(ScaffoldNameHelper.ToScaffoldClrName(tableName, useDatabaseNames: false));
 
     [Fact]
     public void GetTypeName_NullableReferenceType_AddsQuestionMark()

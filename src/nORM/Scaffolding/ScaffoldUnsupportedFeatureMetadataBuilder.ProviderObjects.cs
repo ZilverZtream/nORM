@@ -6,6 +6,26 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldUnsupportedFeatureMetadataBuilder
     {
+        private static bool TryAddProviderObjectFeatureMetadata(
+            IDictionary<string, object?> metadata,
+            ScaffoldUnsupportedFeatureInfo feature)
+        {
+            switch (feature.Kind)
+            {
+                case "Trigger":
+                    AddTriggerFeatureMetadata(metadata, feature);
+                    return true;
+                case "TemporalTable":
+                    AddTemporalTableFeatureMetadata(metadata, feature);
+                    metadata["readOnlyEntity"] = true;
+                    metadata["generatedWritesSupported"] = false;
+                    metadata["reason"] = "provider-native-temporal";
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static void AddTriggerFeatureMetadata(IDictionary<string, object?> metadata, ScaffoldUnsupportedFeatureInfo feature)
         {
             var values = ScaffoldSemicolonParser.Parse(feature.Detail, out var header);
