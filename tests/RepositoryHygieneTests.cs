@@ -26,7 +26,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxSqliteProviderPartialFileLines = 1500;
     private const int MaxConcreteProviderPartialFileLines = 1500;
     private const int MaxDatabaseProviderPartialFileLines = 1500;
-    private const int MaxDbContextPartialFileLines = 1500;
+    private const int MaxDbContextPartialFileLines = 1000;
     private const int MaxSchemaSnapshotFileLines = 1500;
     private const int MaxEntityTypeBuilderFileLines = 1500;
     private const int MaxMaterializerFactoryFileLines = 1500;
@@ -396,7 +396,7 @@ public sealed class RepositoryHygieneTests
     public void DbContext_partials_stay_split_by_context_responsibility()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("Every `DbContext*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("Every `DbContext*.cs` partial stays below 1000 lines", ownership, StringComparison.Ordinal);
 
         var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Core"), "DbContext*.cs")
             .Select(path => new

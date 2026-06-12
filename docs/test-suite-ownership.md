@@ -222,11 +222,12 @@ boundary.
 
 ## DbContext Source Size
 
-Every `DbContext*.cs` partial stays below 1500 lines so construction,
+Every `DbContext*.cs` partial stays below 1000 lines so construction,
 connection/command infrastructure, mapping/query roots, transactions,
 tenant/temporal APIs, disposal, raw SQL, prepared statements, change tracking,
-and write operations remain separate responsibilities. `RepositoryHygieneTests`
-enforces this boundary.
+save orchestration, owned collections, many-to-many sync, batched writes, write
+guards, and timeout helpers remain separate responsibilities.
+`RepositoryHygieneTests` enforces this boundary.
 
 ## Schema Snapshot Source Size
 
