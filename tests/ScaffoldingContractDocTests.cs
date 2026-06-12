@@ -490,6 +490,11 @@ public partial class ScaffoldingContractDocTests
         var skippedDiscoverySource = ReadSkippedObjectDiscoverySource();
         var skippedMetadataSource = string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.Events.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.QueryObjects.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.Sequences.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.Synonyms.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectMetadataBuilder.Values.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.Parameters.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.Results.cs"));
