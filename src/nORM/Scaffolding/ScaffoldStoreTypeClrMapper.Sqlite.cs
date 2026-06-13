@@ -9,6 +9,9 @@ namespace nORM.Scaffolding
         {
             clrType = typeof(object);
             var declared = storeType.Trim().ToUpperInvariant();
+            if (ScaffoldSqliteDdlParser.IsUnsafeProviderSpecificDeclaredType(declared))
+                return false;
+
             if (ScaffoldSqliteDdlParser.ContainsDeclaredTypeToken(declared, "DECIMAL")
                 || ScaffoldSqliteDdlParser.ContainsDeclaredTypeToken(declared, "NUMERIC"))
                 clrType = typeof(decimal);

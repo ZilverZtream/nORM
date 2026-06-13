@@ -132,6 +132,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 ExternalUuid UUID NOT NULL,
                 XmlPayload XML NULL,
                 Shape GEOMETRY NULL,
+                ShapeId GEOMETRY_UUID NULL,
                 PortableText TEXT NOT NULL
             );
             """;
@@ -150,6 +151,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("ExternalUuid |", warnings);
             Assert.DoesNotContain("XmlPayload |", warnings);
             Assert.Contains("Shape", warnings);
+            Assert.Contains("ShapeId", warnings);
             Assert.DoesNotContain("PortableText |", warnings);
             Assert.Contains("using System;", entityCode);
             Assert.Contains("using nORM.Configuration;", entityCode);
@@ -157,10 +159,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public string Payload { get; set; } = default!;", entityCode);
             Assert.Contains("public Guid ExternalUuid { get; set; }", entityCode);
             Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
+            Assert.Contains("public string? ShapeId { get; set; }", entityCode);
+            Assert.DoesNotContain("public Guid? ShapeId { get; set; }", entityCode);
             var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "ProviderTyped");
             Assert.Equal(typeof(string), dynamicType.GetProperty("Payload")!.PropertyType);
             Assert.Equal(typeof(Guid), dynamicType.GetProperty("ExternalUuid")!.PropertyType);
             Assert.Equal(typeof(string), dynamicType.GetProperty("XmlPayload")!.PropertyType);
+            Assert.Equal(typeof(string), dynamicType.GetProperty("ShapeId")!.PropertyType);
             Assert.NotNull(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
 
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
@@ -172,6 +177,12 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
                 !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean() &&
                 item.GetProperty("metadata").GetProperty("reason").GetString() == "provider-specific-column-type");
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                item.GetProperty("name").GetString() == "ShapeId" &&
+                item.GetProperty("metadata").GetProperty("providerType").GetString() == "GEOMETRY_UUID" &&
+                item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
+                !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean());
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
