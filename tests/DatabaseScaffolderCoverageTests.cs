@@ -76,11 +76,7 @@ public class DatabaseScaffolderCoverageTests
 
 
     private static string GetTypeName(Type type, bool allowNull)
-    {
-        var m = _scaffolderType.GetMethod("GetTypeName",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string)m.Invoke(null, new object[] { type, allowNull, true })!;
-    }
+        => ScaffoldTypeNameHelper.GetTypeName(type, allowNull);
 
     [Theory]
     [InlineData(typeof(int),       false, "int")]

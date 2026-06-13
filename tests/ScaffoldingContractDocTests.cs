@@ -157,6 +157,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataBuilder.Results.cs"));
         var columnDiscoverySource = ReadColumnDiscoverySource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
+        var routineStubWriterSource = ReadRoutineStubWriterSource();
         var parserSource = ReadSemicolonParserSource();
         var sqlMetadataParserSource = ReadSqlMetadataParserSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
@@ -207,7 +208,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("MissingPrimaryKey", source, StringComparison.Ordinal);
         Assert.Contains("Collation", source, StringComparison.Ordinal);
         Assert.Contains("ProviderSpecificColumnType", source, StringComparison.Ordinal);
-        Assert.Contains("PrecisionScale", source, StringComparison.Ordinal);
+        Assert.Contains("PrecisionScale", routineStubWriterSource, StringComparison.Ordinal);
         Assert.Contains("EndsWithDelimitedTypeName", sqlMetadataParserSource, StringComparison.Ordinal);
         Assert.Contains("RowVersion", source, StringComparison.Ordinal);
         Assert.Contains("IdentityStrategy", source, StringComparison.Ordinal);

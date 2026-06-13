@@ -162,8 +162,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("INT(10) UNSIGNED ZEROFILL", typeof(uint))]
     public void TryMapMySqlUnsignedType_StaticAndDynamic_IgnoreDisplayWidth(string detail, Type expected)
     {
-        var staticResult = InvokeTryMapMySqlUnsignedType(typeof(DatabaseScaffolder), detail);
-        var dynamicResult = InvokeTryMapMySqlUnsignedType(typeof(DynamicEntityTypeGenerator), detail);
+        var staticResult = InvokeStaticTryMapMySqlUnsignedType(detail);
+        var dynamicResult = InvokeDynamicTryMapMySqlUnsignedType(detail);
 
         Assert.True(staticResult.Mapped);
         Assert.True(dynamicResult.Mapped);
@@ -181,16 +181,18 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("user-defined type (dbo.StartAt -> time)", "time", typeof(TimeOnly))]
     public void NormalizeScaffoldClrType_MapsSafeSqlServerAliasBaseTypeWhenSchemaTypeIsVague(string detail, string baseType, Type expected)
     {
-        var method = GetMethod(
-            "NormalizeScaffoldClrType",
-            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("TryMapSqlServerAliasBaseClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(Type).MakeByRefType() }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryMapSqlServerAliasBaseClrType");
 
-        var result = (Type)method.Invoke(
-            null,
-            new object?[] { new SqlServerProvider(), typeof(object), false, false, false, null, detail })!;
+        var result = ScaffoldEntitySourceBuilder.NormalizeScaffoldClrType(
+            new SqlServerProvider(),
+            typeof(object),
+            allowNull: false,
+            isKey: false,
+            isAuto: false,
+            declaredType: null,
+            providerSpecificColumnType: detail);
         object?[] dynamicArgs = { baseType, null };
 
         Assert.Equal(expected, result);
@@ -201,16 +203,18 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void NormalizeScaffoldClrType_DoesNotMapUnsafeSqlServerAliasBaseType()
     {
-        var method = GetMethod(
-            "NormalizeScaffoldClrType",
-            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("TryMapSqlServerAliasBaseClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(Type).MakeByRefType() }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryMapSqlServerAliasBaseClrType");
 
-        var result = (Type)method.Invoke(
-            null,
-            new object?[] { new SqlServerProvider(), typeof(object), false, false, false, null, "user-defined type (dbo.Shape -> geography)" })!;
+        var result = ScaffoldEntitySourceBuilder.NormalizeScaffoldClrType(
+            new SqlServerProvider(),
+            typeof(object),
+            allowNull: false,
+            isKey: false,
+            isAuto: false,
+            declaredType: null,
+            providerSpecificColumnType: "user-defined type (dbo.Shape -> geography)");
         object?[] dynamicArgs = { "geography", null };
 
         Assert.Equal(typeof(object), result);
@@ -243,17 +247,20 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Type rawClrType,
         Type expected)
     {
-        var method = GetMethod(
-            "NormalizeScaffoldClrType",
-            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("NormalizeScaffoldClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "NormalizeScaffoldClrType");
 
         using var dynamicConnection = CreateDynamicStoreTypeProbeConnection(providerName);
-        var staticResult = (Type)method.Invoke(
-            null,
-            new object?[] { CreateStoreTypeProbeProvider(providerName), rawClrType, false, false, false, null, null, storeType })!;
+        var staticResult = ScaffoldEntitySourceBuilder.NormalizeScaffoldClrType(
+            CreateStoreTypeProbeProvider(providerName),
+            rawClrType,
+            allowNull: false,
+            isKey: false,
+            isAuto: false,
+            declaredType: null,
+            providerSpecificColumnType: null,
+            columnStoreType: storeType);
         var dynamicResult = (Type)dynamicMethod.Invoke(
             null,
             new object?[] { dynamicConnection, rawClrType, false, false, false, null, storeType })!;
@@ -265,17 +272,20 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void NormalizeScaffoldClrType_DoesNotGuessAmbiguousMySqlTimeStoreType()
     {
-        var method = GetMethod(
-            "NormalizeScaffoldClrType",
-            new[] { typeof(DatabaseProvider), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string), typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("NormalizeScaffoldClrType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(DbConnection), typeof(Type), typeof(bool), typeof(bool), typeof(bool), typeof(string), typeof(string) }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "NormalizeScaffoldClrType");
 
         using var dynamicConnection = CreateDynamicStoreTypeProbeConnection("mysql");
-        var staticResult = (Type)method.Invoke(
-            null,
-            new object?[] { CreateStoreTypeProbeProvider("mysql"), typeof(TimeSpan), false, false, false, null, null, "time" })!;
+        var staticResult = ScaffoldEntitySourceBuilder.NormalizeScaffoldClrType(
+            CreateStoreTypeProbeProvider("mysql"),
+            typeof(TimeSpan),
+            allowNull: false,
+            isKey: false,
+            isAuto: false,
+            declaredType: null,
+            providerSpecificColumnType: null,
+            columnStoreType: "time");
         var dynamicResult = (Type)dynamicMethod.Invoke(
             null,
             new object?[] { dynamicConnection, typeof(TimeSpan), false, false, false, null, "time" })!;
@@ -293,12 +303,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("user-defined type (dbo.Amount -> decimal(18,4))", "decimal(18,4)", null)]
     public void SqlServerAliasBaseMaxLength_StaticAndDynamic_ParseBoundedTextAndBinaryFacets(string detail, string baseType, int? expected)
     {
-        var staticMethod = GetMethod("GetSqlServerAliasBaseMaxLength", new[] { typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("GetSqlServerAliasBaseMaxLengthFromTypeText", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "GetSqlServerAliasBaseMaxLengthFromTypeText");
 
-        Assert.Equal(expected, (int?)staticMethod.Invoke(null, new object[] { detail }));
+        Assert.Equal(expected, ScaffoldProviderSpecificTypeClassifier.GetSqlServerAliasBaseMaxLength(detail));
         Assert.Equal(expected, (int?)dynamicMethod.Invoke(null, new object[] { baseType }));
     }
 
@@ -403,12 +412,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("MYUUID", false)]
     public void IsSqliteUuidDeclaredType_StaticAndDynamic_RequiresSafeUuidToken(string declaredType, bool expected)
     {
-        var staticMethod = GetMethod("IsSqliteUuidDeclaredType", new[] { typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("IsSqliteUuidDeclaredType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "IsSqliteUuidDeclaredType");
 
-        Assert.Equal(expected, (bool)staticMethod.Invoke(null, new object[] { declaredType })!);
+        Assert.Equal(expected, ScaffoldEntitySourceBuilder.IsSqliteUuidDeclaredType(declaredType));
         Assert.Equal(expected, (bool)dynamicMethod.Invoke(null, new object[] { declaredType })!);
     }
 
@@ -640,12 +648,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("timetz[]", "time with time zone[]")]
     public void NormalizePostgresDomainProbeCastType_StaticAndDynamic_NormalizesSafeFacetsAndTextCastsMalformedTypes(string typeText, string expected)
     {
-        var staticMethod = GetMethod("NormalizePostgresDomainProbeCastType", new[] { typeof(string) });
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
             .GetMethod("NormalizePostgresDomainProbeCastType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string) }, null)
             ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "NormalizePostgresDomainProbeCastType");
 
-        Assert.Equal(expected, (string)staticMethod.Invoke(null, new object[] { typeText })!);
+        Assert.Equal(expected, ScaffoldProviderSpecificTypeClassifier.NormalizePostgresDomainProbeCastType(typeText));
         Assert.Equal(expected, (string)dynamicMethod.Invoke(null, new object[] { typeText })!);
     }
 
@@ -655,11 +662,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("USER-DEFINED (custom_payload)", "text")]
     public void TryGetPostgresSchemaProbeCastType_Static_PreservesSafeUdtsAndTextCastsUnsafe(string detail, string expected)
     {
-        var method = GetMethod("TryGetPostgresSchemaProbeCastType", new[] { typeof(string), typeof(string).MakeByRefType() });
-        object?[] args = { detail, null };
-
-        Assert.True((bool)method.Invoke(null, args)!);
-        Assert.Equal(expected, args[1]);
+        Assert.True(ScaffoldProviderSpecificTypeClassifier.TryGetPostgresSchemaProbeCastType(detail, out var castType));
+        Assert.Equal(expected, castType);
     }
 
     private static DatabaseProvider CreateStoreTypeProbeProvider(string providerName)

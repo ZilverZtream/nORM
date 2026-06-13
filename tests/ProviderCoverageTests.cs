@@ -1107,7 +1107,7 @@ public class DatabaseScaffolderHelperTests
     private static object? Invoke(string methodName, object?[] args)
     {
         if (methodName == "GetTypeName" && args.Length == 2)
-            args = args.Concat(new object?[] { true }).ToArray();
+            return ScaffoldTypeNameHelper.GetTypeName((Type)args[0]!, (bool)args[1]!, useNullableReferenceTypes: true);
 
         var method = typeof(DatabaseScaffolder)
             .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)

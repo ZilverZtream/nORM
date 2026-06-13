@@ -162,9 +162,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("decimal(4,5)", null, null)]
     public void GetRoutineParameterPrecisionScale_RejectsMalformedPrecisionScale(string typeName, int? expectedPrecision, int? expectedScale)
     {
-        var method = GetMethod("GetRoutineParameterPrecisionScale", new[] { typeof(string) });
-
-        var result = ((byte? Precision, byte? Scale))method.Invoke(null, new object?[] { typeName })!;
+        var result = ScaffoldRoutineTypeMapper.GetRoutineParameterPrecisionScale(typeName);
         var actualPrecision = result.Precision.HasValue ? (int?)result.Precision.Value : null;
         var actualScale = result.Scale.HasValue ? (int?)result.Scale.Value : null;
 
@@ -379,11 +377,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("time with time zone[]", typeof(DateTimeOffset[]))]
     public void TryMapPostgresArrayType_MapsSafeScalarArrays(string detail, Type expected)
     {
-        var m = GetMethod("TryMapPostgresArrayType", new[] { typeof(string), typeof(Type).MakeByRefType() });
-        object?[] args = { detail, null };
-
-        Assert.True((bool)m.Invoke(null, args)!);
-        Assert.Equal(expected, args[1]);
+        Assert.True(ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayType(detail, out var arrayType));
+        Assert.Equal(expected, arrayType);
     }
 
     [Theory]
@@ -391,10 +386,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("USER-DEFINED (my_enum)")]
     public void TryMapPostgresArrayType_RejectsProviderSpecificElementArrays(string detail)
     {
-        var m = GetMethod("TryMapPostgresArrayType", new[] { typeof(string), typeof(Type).MakeByRefType() });
-        object?[] args = { detail, null };
-
-        Assert.False((bool)m.Invoke(null, args)!);
+        Assert.False(ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayType(detail, out _));
     }
 
     [Theory]

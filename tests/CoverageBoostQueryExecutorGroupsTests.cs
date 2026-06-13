@@ -227,9 +227,7 @@ public class DatabaseScaffolderIntegrationTests
     public void GetTypeName_NullableReferenceType_AddsQuestionMark()
     {
         // Line 222: else branch — reference type with allowNull=true
-        var m = _scaffolderType.GetMethod("GetTypeName",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        var result = (string)m.Invoke(null, new object[] { typeof(Uri), true, true })!;
+        var result = ScaffoldTypeNameHelper.GetTypeName(typeof(Uri), allowNull: true, useNullableReferenceTypes: true);
         Assert.Equal("System.Uri?", result);
     }
 

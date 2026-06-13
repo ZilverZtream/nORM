@@ -38,10 +38,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     private static string InvokeGetTypeName(Type type, bool allowNull)
-    {
-        var m = GetMethod("GetTypeName", new[] { typeof(Type), typeof(bool), typeof(bool) });
-        return (string)m.Invoke(null, new object[] { type, allowNull, true })!;
-    }
+        => ScaffoldTypeNameHelper.GetTypeName(type, allowNull);
 
     private static (string Sql, bool Stored) InvokeNormalizeScaffoldComputedSql(string raw)
         => ScaffoldSqlMetadataParser.NormalizeScaffoldComputedSql(raw);
@@ -72,10 +69,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     private static int? InvokeGetScaffoldMaxLength(Type type, object? columnSize)
-    {
-        var m = GetMethod("GetScaffoldMaxLength", new[] { typeof(Type), typeof(DataRow) });
-        return (int?)m.Invoke(null, new object[] { type, CreateSchemaRow(columnSize) });
-    }
+        => ScaffoldEntitySourceBuilder.GetScaffoldMaxLength(type, CreateSchemaRow(columnSize));
 
     private static int? InvokeDynamicGetScaffoldMaxLength(Type type, object? columnSize)
     {
@@ -154,11 +148,17 @@ public partial class DatabaseScaffolderPrivateMethodTests
         return (string)m.Invoke(null, new object?[] { null, "DynamicDecimalPrecision", columns, false })!;
     }
 
-    private static (bool Mapped, Type Type) InvokeTryMapMySqlUnsignedType(Type declaringType, string detail)
+    private static (bool Mapped, Type Type) InvokeStaticTryMapMySqlUnsignedType(string detail)
     {
-        var m = declaringType
+        var mapped = ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(detail, out var type);
+        return (mapped, type);
+    }
+
+    private static (bool Mapped, Type Type) InvokeDynamicTryMapMySqlUnsignedType(string detail)
+    {
+        var m = typeof(DynamicEntityTypeGenerator)
             .GetMethod("TryMapMySqlUnsignedType", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(Type).MakeByRefType() }, null)
-            ?? throw new MissingMethodException(declaringType.Name, "TryMapMySqlUnsignedType");
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryMapMySqlUnsignedType");
         object?[] args = { detail, typeof(object) };
         var mapped = (bool)m.Invoke(null, args)!;
         return (mapped, (Type)args[1]!);
