@@ -87,6 +87,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Parameterized.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Enums.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlTypeClassifier.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlTypeClassifier.QuotedValues.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldMySqlTypeClassifier.Unsigned.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlServerAliasTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlStringLiteralParser.cs"));
 

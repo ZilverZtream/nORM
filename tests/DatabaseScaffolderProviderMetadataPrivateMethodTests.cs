@@ -61,6 +61,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Theory]
     [InlineData("set('read','write','admin')", false)]
     [InlineData("set('read', 'write')", false)]
+    [InlineData("set ('read', 'write')", false)]
     [InlineData("set('a','b','c','d','e','f','g','h')", false)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", true)]
     [InlineData("set('read,write','admin')", true)]
@@ -147,6 +148,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("integer(10) unsigned", typeof(uint))]
     [InlineData("bigint(20) unsigned", typeof(ulong))]
     [InlineData("int unsigned", typeof(uint))]
+    [InlineData("INT(10) UNSIGNED ZEROFILL", typeof(uint))]
     public void TryMapMySqlUnsignedType_StaticAndDynamic_IgnoreDisplayWidth(string detail, Type expected)
     {
         var staticResult = InvokeTryMapMySqlUnsignedType(typeof(DatabaseScaffolder), detail);
@@ -290,6 +292,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Theory]
     [InlineData("set('read','write','admin')", true, 3)]
     [InlineData("set('read', 'write')", true, 2)]
+    [InlineData("set ('read', 'write')", true, 2)]
     [InlineData("set('a','b','c','d','e','f','g','h')", true, 8)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", false, 0)]
     [InlineData("set('read,write','admin')", false, 0)]
@@ -407,6 +410,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("enum", false)]
     [InlineData("enum('draft','paid','cancelled')", true)]
     [InlineData("enum('draft', 'paid')", true)]
+    [InlineData("enum ('draft', 'paid')", true)]
     [InlineData("enum('draft' 'paid')", false)]
     [InlineData("enum('draft',)", false)]
     [InlineData("enum(,'draft')", false)]
@@ -416,6 +420,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("ENUM (public.customer_status: 'draft',)", false)]
     [InlineData("ENUM (public.customer_status: ,'draft')", false)]
     [InlineData("set('read','write','admin')", true)]
+    [InlineData("set ('read', 'write')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", false)]
     [InlineData("set('read,write','admin')", false)]
