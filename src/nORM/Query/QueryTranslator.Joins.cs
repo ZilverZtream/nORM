@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using nORM.Core;
@@ -554,339 +555,183 @@ namespace nORM.Query
                 return node;
             }
 
-            // Check for filtered navigation property: b => b.Posts.Where(p => p.Active)
-            // Also check for DefaultIfEmpty for LEFT JOIN: b => b.Posts.DefaultIfEmpty()
+            var collectionBody = UnwrapSelectManyDefaultIfEmpty(collectionSelector.Body, out var useLeftJoin);
+
+            if (TryHandleNavigationSelectMany(outerMapping, outerAlias, collectionBody, resultSelector, useLeftJoin, smOuterFromOverride))
+                return node;
+
+            if (TryHandleCorrelatedSelectMany(outerMapping, outerAlias, collectionBody, resultSelector, smOuterFromOverride))
+                return node;
+
+            HandleCrossSelectMany(outerMapping, outerAlias, collectionSelector, resultSelector, useLeftJoin, smOuterFromOverride);
+            return node;
+        }
+
+        private static Expression UnwrapSelectManyDefaultIfEmpty(Expression collectionBody, out bool useLeftJoin)
+        {
+            useLeftJoin = false;
+            if (collectionBody is MethodCallExpression defaultIfEmptyCall &&
+                defaultIfEmptyCall.Method.Name == nameof(Queryable.DefaultIfEmpty) &&
+                defaultIfEmptyCall.Arguments.Count >= 1)
+            {
+                useLeftJoin = true;
+                return defaultIfEmptyCall.Arguments[0];
+            }
+
+            return collectionBody;
+        }
+
+        private bool TryHandleNavigationSelectMany(
+            TableMapping outerMapping,
+            string outerAlias,
+            Expression collectionBody,
+            LambdaExpression? resultSelector,
+            bool useLeftJoin,
+            string? outerFromOverride)
+        {
             TableMapping.Relation? relation = null;
             LambdaExpression? filterPredicate = null;
             MemberExpression? navigationMember = null;
-            bool useLeftJoin = false;
-
-            // Check for DefaultIfEmpty wrapper
-            Expression collectionBody = collectionSelector.Body;
-            if (collectionBody is MethodCallExpression defaultIfEmptyCall &&
-                defaultIfEmptyCall.Method.Name == "DefaultIfEmpty" &&
-                defaultIfEmptyCall.Arguments.Count >= 1)
-            {
-                // Unwrap DefaultIfEmpty to get the actual collection
-                collectionBody = defaultIfEmptyCall.Arguments[0];
-                useLeftJoin = true;
-            }
 
             if (collectionBody is MemberExpression memberExpr &&
                 outerMapping.Relations.TryGetValue(memberExpr.Member.Name, out relation))
             {
-                // Simple navigation property without filter
                 navigationMember = memberExpr;
             }
             else if (collectionBody is MethodCallExpression methodCall &&
-                     methodCall.Method.Name == "Where" &&
+                     methodCall.Method.Name == nameof(Queryable.Where) &&
                      methodCall.Arguments.Count == 2 &&
                      methodCall.Arguments[0] is MemberExpression navMember &&
                      outerMapping.Relations.TryGetValue(navMember.Member.Name, out relation))
             {
-                // Filtered navigation property: b.Posts.Where(p => p.Active)
                 navigationMember = navMember;
                 filterPredicate = StripQuotes(methodCall.Arguments[1]) as LambdaExpression;
             }
 
-            // Navigation property: treat as INNER JOIN
-            if (navigationMember != null && relation != null)
+            if (navigationMember == null || relation == null)
+                return false;
+
+            var innerMapping = TrackMapping(relation.DependentType);
+            var innerAlias = EscapeAlias("T" + (++_joinCounter));
+
+            RegisterSelectManyResultSelectorParameters(resultSelector, outerMapping, outerAlias, innerMapping, innerAlias);
+            var composedProjection = ComposeSelectManyProjection(resultSelector);
+            var effectiveProjection = composedProjection ?? _projection;
+
+            _sql.Clear();
+            _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+            if (!AppendNavigationSelectManyColumns(effectiveProjection, resultSelector, outerMapping, innerMapping, outerAlias, innerAlias))
+                AppendSelectManyAllColumns(outerMapping, outerAlias, innerMapping, innerAlias);
+
+            _sql.Append(' ');
+            AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
+            var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
+            _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
+            _sql.Append("ON ");
+            for (var keyIndex = 0; keyIndex < relation.PrincipalKeys.Count; keyIndex++)
             {
-                var innerMapping = TrackMapping(relation.DependentType);
-                var innerAlias = EscapeAlias("T" + (++_joinCounter));
-
-                // Register both result selector parameters for transparent identifier support
-                if (resultSelector != null && resultSelector.Parameters.Count > 1)
-                {
-                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                        _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
-                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                        _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
-                }
-
-                // When an outer .Select() projection exists alongside a result selector,
-                // expand the final projection through the SelectMany result selector so the
-                // SELECT only fetches the columns that the final materializer actually needs.
-                // Register the transparent selector first; otherwise ExpandProjection cannot
-                // rewrite x.Blog.Name / x.Post.Title back to the two join parameters and the
-                // materializer reads the fallback all-column ordinal layout.
-                LambdaExpression? composedProjection = null;
-                if (resultSelector != null && _projection != null)
-                {
-                    var savedProjection = _projection;
-                    var savedTransparent = _transparentIdentifier;
-                    _transparentIdentifier = ComposeTransparentIdentifierSelector(resultSelector);
-                    var expanded = ExpandProjection(savedProjection);
-                    _transparentIdentifier = savedTransparent;
-                    if (!ReferenceEquals(expanded, savedProjection))
-                        composedProjection = expanded;
-                }
-                var effectiveProjection = composedProjection ?? _projection;
-
-                _sql.Clear();
-                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-                bool wroteColumns = false;
-
-                if (effectiveProjection?.Body is NewExpression newExpr)
-                {
-                    var neededColumns = JoinBuilder.ExtractNeededColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
-                    if (neededColumns.Count > 0)
-                    {
-                        for (int i = 0; i < neededColumns.Count; i++)
-                        {
-                            if (i > 0) _sql.Append(", ");
-                            _sql.Append(neededColumns[i]);
-                        }
-                        wroteColumns = true;
-                    }
-                }
-                else if (resultSelector == null)
-                {
-                    // No result selector — select only inner columns
-                    for (int i = 0; i < innerMapping.Columns.Length; i++)
-                    {
-                        if (i > 0) _sql.Append(", ");
-                        _sql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
-                    }
-                    wroteColumns = true;
-                }
-                else if (resultSelector.Body is NewExpression resultNewExpr)
-                {
-                    var neededCols = JoinBuilder.ExtractNeededColumns(resultNewExpr, outerMapping, innerMapping, outerAlias, innerAlias);
-                    if (neededCols.Count > 0)
-                    {
-                        for (int i = 0; i < neededCols.Count; i++)
-                        {
-                            if (i > 0) _sql.Append(", ");
-                            _sql.Append(neededCols[i]);
-                        }
-                        wroteColumns = true;
-                    }
-                }
-                // Bare member-access result selector: `(p, c) => c.Tag`. Emit just the
-                // matching column from the correct alias. Without this branch the
-                // fallback path selects ALL columns and the scalar materialiser reads
-                // column 0 — returning the outer's first column instead of the child's.
-                else if (resultSelector.Body is MemberExpression memberSel
-                         && TableMapping.TryGetMemberAccessRoot(memberSel, out var memParam))
-                {
-                    TableMapping? selMapping = null;
-                    string? selAlias = null;
-                    if (resultSelector.Parameters.Count > 0 && memParam == resultSelector.Parameters[0])
-                    {
-                        selMapping = outerMapping; selAlias = outerAlias;
-                    }
-                    else if (resultSelector.Parameters.Count > 1 && memParam == resultSelector.Parameters[1])
-                    {
-                        selMapping = innerMapping; selAlias = innerAlias;
-                    }
-                    if (selMapping != null && selAlias != null
-                        && selMapping.TryGetColumnForMemberAccess(memberSel, out var memCol))
-                    {
-                        _sql.Append(selAlias).Append('.').Append(memCol.EscCol);
-                        wroteColumns = true;
-                    }
-                }
-
-                if (!wroteColumns)
-                {
-                    // Fallback: select all columns from both tables without LINQ/string interpolation
-                    bool first = true;
-                    for (int i = 0; i < outerMapping.Columns.Length; i++)
-                    {
-                        if (!first) _sql.Append(", ");
-                        _sql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
-                        first = false;
-                    }
-                    for (int i = 0; i < innerMapping.Columns.Length; i++)
-                    {
-                        if (!first) _sql.Append(", ");
-                        _sql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
-                        first = false;
-                    }
-                }
-
-                _sql.Append(' ');
-                _sql.Append("FROM ");
-                if (smOuterFromOverride != null)
-                    _sql.Append('(').Append(smOuterFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
-                else
-                    _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
-                var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
-                _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
-                _sql.Append("ON ");
-                for (var keyIndex = 0; keyIndex < relation.PrincipalKeys.Count; keyIndex++)
-                {
-                    if (keyIndex > 0)
-                        _sql.Append(" AND ");
-                    _sql.Append(outerAlias).Append('.').Append(relation.PrincipalKeys[keyIndex].EscCol)
-                        .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKeys[keyIndex].EscCol);
-                }
-
-                // Apply filter predicate if present
-                if (filterPredicate != null)
-                {
-                    var filterParam = filterPredicate.Parameters[0];
-                    if (!_correlatedParams.ContainsKey(filterParam))
-                        _correlatedParams[filterParam] = (innerMapping, innerAlias);
-
-                    var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                    var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
-                    var filterSql = filterVisitor.Translate(filterPredicate.Body);
-
-                    if (_where.Length > 0)
-                        _where.Append(" AND ");
-                    _where.Append('(').Append(filterSql).Append(')');
-
-                    foreach (var kvp in filterVisitor.GetParameters())
-                        _params[kvp.Key] = kvp.Value;
-                    FastExpressionVisitorPool.Return(filterVisitor);
-                }
-
-                if (resultSelector != null)
-                {
-                    _projection = composedProjection ?? resultSelector;
-                }
-                else
-                {
-                    _mapping = innerMapping;
-                    _rootType = innerMapping.Type;
-                }
-                return node;
-            }
-            // Correlated SelectMany: p => ctx.Query<Child>().Where(c => c.FK == p.PK)
-            // The source of the Where is not a nav-property member — it's a query call.
-            // Translate to INNER JOIN Child T1 ON [correlated predicate] instead of CROSS JOIN.
-            if (collectionBody is MethodCallExpression corrWhereCall
-                && corrWhereCall.Method.Name == "Where"
-                && corrWhereCall.Arguments.Count == 2
-                && corrWhereCall.Arguments[0] is not MemberExpression
-                && StripQuotes(corrWhereCall.Arguments[1]) is LambdaExpression corrPredLambda)
-            {
-                var corrInnerType = GetElementType(collectionBody);
-                var corrInnerMapping = TrackMapping(corrInnerType);
-                var corrInnerAlias = EscapeAlias("T" + (++_joinCounter));
-
-                if (resultSelector != null && resultSelector.Parameters.Count > 1)
-                {
-                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                        _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
-                    if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                        _correlatedParams[resultSelector.Parameters[1]] = (corrInnerMapping, corrInnerAlias);
-                }
-
-                var corrInnerParam = corrPredLambda.Parameters[0];
-                if (!_correlatedParams.ContainsKey(corrInnerParam))
-                    _correlatedParams[corrInnerParam] = (corrInnerMapping, corrInnerAlias);
-
-                var vctxCorr = new VisitorContext(_ctx, corrInnerMapping, _provider, corrInnerParam, corrInnerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
-                var corrPredVisitor = FastExpressionVisitorPool.Get(in vctxCorr);
-                var corrPredSql = corrPredVisitor.Translate(corrPredLambda.Body);
-                foreach (var kvp in corrPredVisitor.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
-                FastExpressionVisitorPool.Return(corrPredVisitor);
-
-                _sql.Clear();
-                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-                bool corrWroteColumns = false;
-
-                NewExpression? corrProjExpr = (_projection?.Body as NewExpression) ?? (resultSelector?.Body as NewExpression);
-                if (corrProjExpr != null)
-                {
-                    var neededColumns = JoinBuilder.ExtractNeededColumns(corrProjExpr, outerMapping, corrInnerMapping, outerAlias, corrInnerAlias);
-                    if (neededColumns.Count > 0)
-                    {
-                        for (int i = 0; i < neededColumns.Count; i++)
-                        {
-                            if (i > 0) _sql.Append(", ");
-                            _sql.Append(neededColumns[i]);
-                        }
-                        corrWroteColumns = true;
-                    }
-                }
-                else if (resultSelector == null)
-                {
-                    for (int i = 0; i < corrInnerMapping.Columns.Length; i++)
-                    {
-                        if (i > 0) _sql.Append(", ");
-                        _sql.Append(corrInnerAlias).Append('.').Append(corrInnerMapping.Columns[i].EscCol);
-                    }
-                    corrWroteColumns = true;
-                }
-
-                if (!corrWroteColumns)
-                {
-                    bool first = true;
-                    for (int i = 0; i < outerMapping.Columns.Length; i++)
-                    {
-                        if (!first) _sql.Append(", ");
-                        _sql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
-                        first = false;
-                    }
-                    for (int i = 0; i < corrInnerMapping.Columns.Length; i++)
-                    {
-                        if (!first) _sql.Append(", ");
-                        _sql.Append(corrInnerAlias).Append('.').Append(corrInnerMapping.Columns[i].EscCol);
-                        first = false;
-                    }
-                }
-
-                _sql.Append(' ');
-                _sql.Append("FROM ");
-                if (smOuterFromOverride != null)
-                    _sql.Append('(').Append(smOuterFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
-                else
-                    _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
-                _sql.Append("INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
-                _sql.Append("ON ").Append(corrPredSql);
-
-                if (resultSelector != null)
-                {
-                    var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
-                    _transparentIdentifier = transparentExpansion;
-                    RegisterTransparentIdentifierTail(transparentExpansion, corrInnerMapping, corrInnerAlias);
-                    if (_projection == null)
-                        _projection = resultSelector;
-                }
-                else
-                {
-                    _mapping = corrInnerMapping;
-                    _rootType = corrInnerMapping.Type;
-                }
-                return node;
+                if (keyIndex > 0)
+                    _sql.Append(" AND ");
+                _sql.Append(outerAlias).Append('.').Append(relation.PrincipalKeys[keyIndex].EscCol)
+                    .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKeys[keyIndex].EscCol);
             }
 
-            // Otherwise treat as CROSS JOIN
+            if (filterPredicate != null)
+                AppendSelectManyFilterPredicate(filterPredicate, innerMapping, innerAlias);
+
+            if (resultSelector != null)
+            {
+                _projection = composedProjection ?? resultSelector;
+            }
+            else
+            {
+                _mapping = innerMapping;
+                _rootType = innerMapping.Type;
+            }
+
+            return true;
+        }
+
+        private bool TryHandleCorrelatedSelectMany(
+            TableMapping outerMapping,
+            string outerAlias,
+            Expression collectionBody,
+            LambdaExpression? resultSelector,
+            string? outerFromOverride)
+        {
+            if (collectionBody is not MethodCallExpression corrWhereCall
+                || corrWhereCall.Method.Name != nameof(Queryable.Where)
+                || corrWhereCall.Arguments.Count != 2
+                || corrWhereCall.Arguments[0] is MemberExpression
+                || StripQuotes(corrWhereCall.Arguments[1]) is not LambdaExpression corrPredLambda)
+            {
+                return false;
+            }
+
+            var corrInnerType = GetElementType(collectionBody);
+            var corrInnerMapping = TrackMapping(corrInnerType);
+            var corrInnerAlias = EscapeAlias("T" + (++_joinCounter));
+
+            RegisterSelectManyResultSelectorParameters(resultSelector, outerMapping, outerAlias, corrInnerMapping, corrInnerAlias);
+
+            var corrInnerParam = corrPredLambda.Parameters[0];
+            if (!_correlatedParams.ContainsKey(corrInnerParam))
+                _correlatedParams[corrInnerParam] = (corrInnerMapping, corrInnerAlias);
+
+            var vctxCorr = new VisitorContext(_ctx, corrInnerMapping, _provider, corrInnerParam, corrInnerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var corrPredVisitor = FastExpressionVisitorPool.Get(in vctxCorr);
+            var corrPredSql = corrPredVisitor.Translate(corrPredLambda.Body);
+            foreach (var kvp in corrPredVisitor.GetParameters())
+                _params[kvp.Key] = kvp.Value;
+            FastExpressionVisitorPool.Return(corrPredVisitor);
+
+            _sql.Clear();
+            _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+            var corrProjExpr = (_projection?.Body as NewExpression) ?? (resultSelector?.Body as NewExpression);
+            if (!AppendProjectedSelectManyColumns(corrProjExpr, outerMapping, corrInnerMapping, outerAlias, corrInnerAlias)
+                && !AppendInnerOnlySelectManyColumns(resultSelector, corrInnerMapping, corrInnerAlias))
+            {
+                AppendSelectManyAllColumns(outerMapping, outerAlias, corrInnerMapping, corrInnerAlias);
+            }
+
+            _sql.Append(' ');
+            AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
+            _sql.Append("INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
+            _sql.Append("ON ").Append(corrPredSql);
+
+            if (resultSelector != null)
+            {
+                var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
+                _transparentIdentifier = transparentExpansion;
+                RegisterTransparentIdentifierTail(transparentExpansion, corrInnerMapping, corrInnerAlias);
+                if (_projection == null)
+                    _projection = resultSelector;
+            }
+            else
+            {
+                _mapping = corrInnerMapping;
+                _rootType = corrInnerMapping.Type;
+            }
+
+            return true;
+        }
+
+        private void HandleCrossSelectMany(
+            TableMapping outerMapping,
+            string outerAlias,
+            LambdaExpression collectionSelector,
+            LambdaExpression? resultSelector,
+            bool useLeftJoin,
+            string? outerFromOverride)
+        {
             var innerType = GetElementType(collectionSelector.Body);
             var crossMapping = TrackMapping(innerType);
             var crossAlias = EscapeAlias("T" + (++_joinCounter));
 
-            // Register both result selector parameters for transparent identifier support
-            if (resultSelector != null && resultSelector.Parameters.Count > 1)
-            {
-                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                    _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
-                if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                    _correlatedParams[resultSelector.Parameters[1]] = (crossMapping, crossAlias);
-            }
+            RegisterSelectManyResultSelectorParameters(resultSelector, outerMapping, outerAlias, crossMapping, crossAlias);
             using var crossSql = new OptimizedSqlBuilder(CrossJoinSqlInitialCapacity);
-            LambdaExpression? crossComposedProjection = null;
-            if (resultSelector != null && _projection != null)
-            {
-                var savedProjection = _projection;
-                var savedTransparent = _transparentIdentifier;
-                _transparentIdentifier = ComposeTransparentIdentifierSelector(resultSelector);
-                var expanded = ExpandProjection(savedProjection);
-                _transparentIdentifier = savedTransparent;
-                if (!ReferenceEquals(expanded, savedProjection))
-                    crossComposedProjection = expanded;
-            }
+            var crossComposedProjection = ComposeSelectManyProjection(resultSelector);
 
-            // When an OUTER projection is already in flight (a later .Select() set _projection),
-            // it expresses the FINAL row shape the caller wants and supersedes any transparent
-            // identifier the SelectMany may have introduced via `(l, r) => new { l, r }`.
-            // Otherwise fall back to the SelectMany's own result selector — which is the
-            // common shape for `from l in L from r in R select new { l.X, r.Y }` (no later Select).
             NewExpression? projectionNewExpr = (crossComposedProjection?.Body as NewExpression)
                 ?? (_projection?.Body as NewExpression)
                 ?? (resultSelector?.Body as NewExpression);
@@ -894,19 +739,9 @@ namespace nORM.Query
             {
                 var neededColumns = JoinBuilder.ExtractNeededColumns(projectionNewExpr, outerMapping, crossMapping, outerAlias, crossAlias);
                 if (neededColumns.Count == 0)
-                {
-                    var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                    var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
-                    crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
-                    crossSql.Append(' ');
-                }
+                    AppendCrossSelectManyAllColumns(crossSql, outerMapping, outerAlias, crossMapping, crossAlias);
                 else
-                {
-                    crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                    crossSql.AppendJoin(", ", neededColumns);
-                    crossSql.Append(' ');
-                }
+                    AppendCrossSelectManyColumns(crossSql, neededColumns);
             }
             else if (resultSelector == null)
             {
@@ -917,33 +752,23 @@ namespace nORM.Query
             }
             else
             {
-                var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
-                var innerCols = crossMapping.Columns.Select(c => $"{crossAlias}.{c.EscCol}");
-                crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
-                crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
-                crossSql.Append(' ');
+                AppendCrossSelectManyAllColumns(crossSql, outerMapping, outerAlias, crossMapping, crossAlias);
             }
-            if (smOuterFromOverride != null)
-                crossSql.Append("FROM (").Append(smOuterFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
+
+            if (outerFromOverride != null)
+                crossSql.Append("FROM (").Append(outerFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
             else
                 crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+
             if (useLeftJoin)
-            {
-                // For DefaultIfEmpty with CROSS JOIN, use LEFT JOIN with trivial condition
                 crossSql.Append($"LEFT JOIN {crossMapping.EscTable} {crossAlias} ON 1=1");
-            }
             else
-            {
                 crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
-            }
+
             _sql.Clear();
             _sql.Append(crossSql.ToSqlString());
             if (resultSelector != null)
             {
-                // Record the transparent-identifier lambda for ExpandProjection — it lets a
-                // downstream Where / Select that consumes `t.l` / `t.r` get rewritten back to
-                // the join's outer/inner parameters. Keep _projection alone so the outer
-                // Select's materializer projection (set BEFORE source visit) survives.
                 var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
                 _transparentIdentifier = transparentExpansion;
                 RegisterTransparentIdentifierTail(transparentExpansion, crossMapping, crossAlias);
@@ -954,7 +779,198 @@ namespace nORM.Query
             {
                 _mapping = crossMapping;
             }
-            return node;
+        }
+
+        private void RegisterSelectManyResultSelectorParameters(
+            LambdaExpression? resultSelector,
+            TableMapping outerMapping,
+            string outerAlias,
+            TableMapping innerMapping,
+            string innerAlias)
+        {
+            if (resultSelector == null || resultSelector.Parameters.Count <= 1)
+                return;
+
+            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                _correlatedParams[resultSelector.Parameters[0]] = (outerMapping, outerAlias);
+            if (!_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
+                _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
+        }
+
+        private LambdaExpression? ComposeSelectManyProjection(LambdaExpression? resultSelector)
+        {
+            if (resultSelector == null || _projection == null)
+                return null;
+
+            var savedProjection = _projection;
+            var savedTransparent = _transparentIdentifier;
+            _transparentIdentifier = ComposeTransparentIdentifierSelector(resultSelector);
+            var expanded = ExpandProjection(savedProjection);
+            _transparentIdentifier = savedTransparent;
+            return ReferenceEquals(expanded, savedProjection) ? null : expanded;
+        }
+
+        private bool AppendNavigationSelectManyColumns(
+            LambdaExpression? effectiveProjection,
+            LambdaExpression? resultSelector,
+            TableMapping outerMapping,
+            TableMapping innerMapping,
+            string outerAlias,
+            string innerAlias)
+        {
+            if (effectiveProjection?.Body is NewExpression newExpr)
+                return AppendProjectedSelectManyColumns(newExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+
+            if (AppendInnerOnlySelectManyColumns(resultSelector, innerMapping, innerAlias))
+                return true;
+
+            if (resultSelector?.Body is NewExpression resultNewExpr)
+                return AppendProjectedSelectManyColumns(resultNewExpr, outerMapping, innerMapping, outerAlias, innerAlias);
+
+            if (resultSelector?.Body is MemberExpression memberSel
+                && TableMapping.TryGetMemberAccessRoot(memberSel, out var memParam))
+            {
+                TableMapping? selMapping = null;
+                string? selAlias = null;
+                if (resultSelector.Parameters.Count > 0 && memParam == resultSelector.Parameters[0])
+                {
+                    selMapping = outerMapping;
+                    selAlias = outerAlias;
+                }
+                else if (resultSelector.Parameters.Count > 1 && memParam == resultSelector.Parameters[1])
+                {
+                    selMapping = innerMapping;
+                    selAlias = innerAlias;
+                }
+
+                if (selMapping != null && selAlias != null
+                    && selMapping.TryGetColumnForMemberAccess(memberSel, out var memCol))
+                {
+                    _sql.Append(selAlias).Append('.').Append(memCol.EscCol);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool AppendProjectedSelectManyColumns(
+            NewExpression? projection,
+            TableMapping outerMapping,
+            TableMapping innerMapping,
+            string outerAlias,
+            string innerAlias)
+        {
+            if (projection == null)
+                return false;
+
+            var neededColumns = JoinBuilder.ExtractNeededColumns(projection, outerMapping, innerMapping, outerAlias, innerAlias);
+            if (neededColumns.Count == 0)
+                return false;
+
+            for (int i = 0; i < neededColumns.Count; i++)
+            {
+                if (i > 0) _sql.Append(", ");
+                _sql.Append(neededColumns[i]);
+            }
+
+            return true;
+        }
+
+        private bool AppendInnerOnlySelectManyColumns(
+            LambdaExpression? resultSelector,
+            TableMapping innerMapping,
+            string innerAlias)
+        {
+            if (resultSelector != null)
+                return false;
+
+            for (int i = 0; i < innerMapping.Columns.Length; i++)
+            {
+                if (i > 0) _sql.Append(", ");
+                _sql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+            }
+
+            return true;
+        }
+
+        private void AppendSelectManyAllColumns(
+            TableMapping outerMapping,
+            string outerAlias,
+            TableMapping innerMapping,
+            string innerAlias)
+        {
+            bool first = true;
+            for (int i = 0; i < outerMapping.Columns.Length; i++)
+            {
+                if (!first) _sql.Append(", ");
+                _sql.Append(outerAlias).Append('.').Append(outerMapping.Columns[i].EscCol);
+                first = false;
+            }
+
+            for (int i = 0; i < innerMapping.Columns.Length; i++)
+            {
+                if (!first) _sql.Append(", ");
+                _sql.Append(innerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+                first = false;
+            }
+        }
+
+        private void AppendSelectManyFilterPredicate(
+            LambdaExpression filterPredicate,
+            TableMapping innerMapping,
+            string innerAlias)
+        {
+            var filterParam = filterPredicate.Parameters[0];
+            if (!_correlatedParams.ContainsKey(filterParam))
+                _correlatedParams[filterParam] = (innerMapping, innerAlias);
+
+            var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
+            var filterSql = filterVisitor.Translate(filterPredicate.Body);
+
+            if (_where.Length > 0)
+                _where.Append(" AND ");
+            _where.Append('(').Append(filterSql).Append(')');
+
+            foreach (var kvp in filterVisitor.GetParameters())
+                _params[kvp.Key] = kvp.Value;
+            FastExpressionVisitorPool.Return(filterVisitor);
+        }
+
+        private void AppendSelectManyOuterFrom(
+            TableMapping outerMapping,
+            string outerAlias,
+            string? outerFromOverride)
+        {
+            _sql.Append("FROM ");
+            if (outerFromOverride != null)
+                _sql.Append('(').Append(outerFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
+            else
+                _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+        }
+
+        private static void AppendCrossSelectManyAllColumns(
+            OptimizedSqlBuilder crossSql,
+            TableMapping outerMapping,
+            string outerAlias,
+            TableMapping innerMapping,
+            string innerAlias)
+        {
+            var outerCols = outerMapping.Columns.Select(c => $"{outerAlias}.{c.EscCol}");
+            var innerCols = innerMapping.Columns.Select(c => $"{innerAlias}.{c.EscCol}");
+            crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
+            crossSql.AppendJoin(", ", outerCols.Concat(innerCols));
+            crossSql.Append(' ');
+        }
+
+        private static void AppendCrossSelectManyColumns(
+            OptimizedSqlBuilder crossSql,
+            IReadOnlyList<string> neededColumns)
+        {
+            crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
+            crossSql.AppendJoin(", ", neededColumns);
+            crossSql.Append(' ');
         }
 
         /// <summary>
