@@ -17,7 +17,7 @@ namespace nORM.Scaffolding
                        NULL AS IsUnicode,
                        CASE WHEN data_type IN ('char', 'binary') THEN 1 ELSE 0 END AS IsFixedLength
                 FROM information_schema.columns
-                WHERE table_schema = DATABASE()
+                WHERE table_schema = COALESCE(@schemaName, DATABASE())
                   AND table_name = @tableName
                   AND data_type IN ('char', 'varchar', 'binary', 'varbinary')
                 """, schemaName, tableName);

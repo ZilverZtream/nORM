@@ -47,6 +47,16 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void DynamicMySqlStringBinaryFacetProbe_UsesSchemaQualifiedCatalogWhenProvided()
+    {
+        var (sql, parameters) = InvokeDynamicMySqlMetadataProbe("GetStringBinaryFacets");
+
+        Assert.Contains("table_schema = COALESCE(@schemaName, DATABASE())", sql, StringComparison.Ordinal);
+        Assert.Equal("tenant_catalog", parameters["@schemaName"]);
+        Assert.Equal("Orders", parameters["@tableName"]);
+    }
+
+    [Fact]
     public void DynamicMySqlSetWriteBlockingProbe_UsesColumnTypeParserInput()
     {
         var (sql, parameters) = InvokeDynamicMySqlMetadataProbe("HasWriteBlockingMySqlSetColumns");
