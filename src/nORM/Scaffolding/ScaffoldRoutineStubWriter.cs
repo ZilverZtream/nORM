@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using static nORM.Scaffolding.ScaffoldRoutineInvocationFormatter;
 
 namespace nORM.Scaffolding
 {
@@ -41,73 +40,45 @@ namespace nORM.Scaffolding
             string nullableReferenceSuffix,
             string nullableObjectType)
         {
-            var metadata = routine.Metadata;
-            var routineType = Convert.ToString(metadata.TryGetValue("routineType", out var type) ? type : null) ?? "routine";
-            var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
-            var outputParameterCount = metadata.TryGetValue("outputParameterCount", out var outputCountValue) && outputCountValue is int outputCount
-                ? outputCount
-                : 0;
-            var inputParameters = GetRoutineInputParameters(metadata, useNullableReferenceTypes);
-            var inputParameterDataTypes = GetRoutineInputParameterDataTypes(metadata);
-            var outputParameters = GetRoutineOutputParameters(metadata);
-            var discoveredInputParameterCount = GetRoutineInputParameterCount(metadata);
-            var routineMemberName = ScaffoldNameHelper.ToScaffoldClrNamePart(routine.Name, useDatabaseNames);
-            var methodBase = ScaffoldNameHelper.MakeUnique(routineMemberName + "Async", memberNames);
-            var parameterType = inputParameters.Count > 0
-                ? ScaffoldNameHelper.MakeUnique(routineMemberName + "Parameters", memberNames)
-                : null;
-            var scalarSetResultColumn = TryGetScalarSetReturningRoutineResultColumn(metadata, useNullableReferenceTypes, out var scalarSetColumn)
-                ? scalarSetColumn
-                : (RoutineResultColumn?)null;
-            var resultColumns = scalarSetResultColumn.HasValue
-                ? new[] { scalarSetColumn }
-                : GetRoutineResultColumns(metadata, useNullableReferenceTypes, useDatabaseNames);
-            var resultType = resultColumns.Count > 0
-                ? ScaffoldNameHelper.MakeUnique(routineMemberName + "Result", memberNames)
-                : null;
-            var isFunctionCallShape = IsFunctionCallShape(callShape);
-            var hasKnownNoResultSet = !isFunctionCallShape
-                && metadata.ContainsKey("resultColumns")
-                && resultColumns.Count == 0;
-            var outputFactory = outputParameters.Count > 0
-                ? ScaffoldNameHelper.MakeUnique("Create" + routineMemberName + "OutputParameters", memberNames)
-                : null;
-            var routineNameExpression = FormatProviderEscapedRoutineName(routine);
-            var parameterSummary = FormatRoutineParameterSummary(metadata);
-            var isScalarFunction = string.Equals(callShape, "scalar-function", StringComparison.OrdinalIgnoreCase);
+            var plan = BuildRoutineStubPlan(
+                routine,
+                memberNames,
+                useNullableReferenceTypes,
+                useDatabaseNames,
+                nullableReferenceSuffix,
+                nullableObjectType);
 
-            AppendRoutineParameterType(sb, parameterType, inputParameters);
-            AppendRoutineResultType(sb, resultType, resultColumns, useNullableReferenceTypes);
-            AppendRoutineDocumentation(sb, routine, routineType, parameterSummary);
+            AppendRoutineParameterType(sb, plan.ParameterType, plan.InputParameters);
+            AppendRoutineResultType(sb, plan.ResultType, plan.ResultColumns, useNullableReferenceTypes);
+            AppendRoutineDocumentation(sb, routine, plan.RoutineType, plan.ParameterSummary);
+            AppendRoutineInvocationMembers(sb, memberNames, routine, plan, useNullableReferenceTypes);
+            AppendRoutineOutputMembers(sb, memberNames, routine, plan);
+        }
 
-            var requiresPositionalFunctionArguments = isFunctionCallShape
-                && discoveredInputParameterCount > 0
-                && inputParameters.Count == 0;
-            var requiresDictionaryRoutineArguments = !isFunctionCallShape
-                && discoveredInputParameterCount > 0
-                && inputParameters.Count == 0;
-            var parameterSignature = requiresPositionalFunctionArguments
-                ? $"{nullableObjectType}[]{nullableReferenceSuffix} arguments = null"
-                : requiresDictionaryRoutineArguments ? $"IReadOnlyDictionary<string, {nullableObjectType}>{nullableReferenceSuffix} parameters = null"
-                : parameterType == null ? $"{nullableObjectType} parameters = null" : $"{parameterType}{nullableReferenceSuffix} parameters = null";
-
-            if (isFunctionCallShape)
+        private static void AppendRoutineInvocationMembers(
+            StringBuilder sb,
+            HashSet<string> memberNames,
+            ScaffoldRoutineStubInfo routine,
+            RoutineStubPlan plan,
+            bool useNullableReferenceTypes)
+        {
+            if (plan.IsFunctionCallShape)
             {
                 AppendFunctionRoutineMembers(
                     sb,
                     memberNames,
-                    routineMemberName,
-                    methodBase,
+                    plan.RoutineMemberName,
+                    plan.MethodBase,
                     routine,
-                    parameterSignature,
-                    parameterType,
-                    inputParameters,
-                    resultType,
-                    isScalarFunction,
-                    requiresPositionalFunctionArguments,
-                    discoveredInputParameterCount,
-                    inputParameterDataTypes,
-                    scalarSetResultColumn.HasValue,
+                    plan.ParameterSignature,
+                    plan.ParameterType,
+                    plan.InputParameters,
+                    plan.ResultType,
+                    plan.IsScalarFunction,
+                    plan.RequiresPositionalFunctionArguments,
+                    plan.DiscoveredInputParameterCount,
+                    plan.InputParameterDataTypes,
+                    plan.ScalarSetReturnsValue,
                     useNullableReferenceTypes);
             }
             else
@@ -115,34 +86,40 @@ namespace nORM.Scaffolding
                 ScaffoldStoredProcedureRoutineStubWriter.AppendStoredProcedureRoutineMembers(
                     sb,
                     memberNames,
-                    routineMemberName,
-                    methodBase,
+                    plan.RoutineMemberName,
+                    plan.MethodBase,
                     routine,
-                    routineType,
-                    parameterSignature,
-                    resultType,
-                    hasKnownNoResultSet,
-                    routineNameExpression,
-                    discoveredInputParameterCount);
+                    plan.RoutineType,
+                    plan.ParameterSignature,
+                    plan.ResultType,
+                    plan.HasKnownNoResultSet,
+                    plan.RoutineNameExpression,
+                    plan.DiscoveredInputParameterCount);
             }
+        }
 
-            if (outputParameterCount > 0 && !isFunctionCallShape)
+        private static void AppendRoutineOutputMembers(
+            StringBuilder sb,
+            HashSet<string> memberNames,
+            ScaffoldRoutineStubInfo routine,
+            RoutineStubPlan plan)
+        {
+            if (plan.OutputParameterCount > 0 && !plan.IsFunctionCallShape)
             {
                 ScaffoldStoredProcedureRoutineStubWriter.AppendRoutineOutputMembers(
                     sb,
                     memberNames,
-                    routineMemberName,
+                    plan.RoutineMemberName,
                     routine,
-                    routineType,
-                    parameterSignature,
-                    resultType,
-                    hasKnownNoResultSet,
-                    routineNameExpression,
-                    discoveredInputParameterCount,
-                    outputFactory,
-                    outputParameters);
+                    plan.RoutineType,
+                    plan.ParameterSignature,
+                    plan.ResultType,
+                    plan.HasKnownNoResultSet,
+                    plan.RoutineNameExpression,
+                    plan.DiscoveredInputParameterCount,
+                    plan.OutputFactory,
+                    plan.OutputParameters);
             }
         }
-
     }
 }
