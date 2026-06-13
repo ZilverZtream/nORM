@@ -584,7 +584,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("unique_constraint.conname", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("FIRST_VALUE(s.column_name)", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("_UNIQUE", indexDiscoverySource, StringComparison.Ordinal);
-        Assert.Contains("GetPrimaryKeyConstraintNamesAsync", source, StringComparison.Ordinal);
+        Assert.Contains("GetPrimaryKeyConstraintNamesAsync", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("kc.is_system_named = 0", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("cls.relname || '_pkey'", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("PrimaryKeyConstraintName", builderSource, StringComparison.Ordinal);

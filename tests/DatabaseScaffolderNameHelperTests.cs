@@ -161,14 +161,6 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void BuildColumnPropertyNameMap_Reserves_Enclosing_Entity_Name()
     {
-        var method = GetMethod(
-            "BuildColumnPropertyNameMap",
-            new[]
-            {
-                typeof(IReadOnlyDictionary<string, IReadOnlyList<string>>),
-                typeof(IReadOnlyDictionary<string, string>),
-                typeof(bool)
-            });
         var orderedColumns = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["User"] = new[] { "User", "Id" }
@@ -178,9 +170,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
             ["User"] = "User"
         };
 
-        var result = (IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>)method.Invoke(
-            null,
-            new object[] { orderedColumns, entityByTable, false })!;
+        var result = ScaffoldColumnPropertyNameBuilder.BuildColumnPropertyNameMap(
+            orderedColumns,
+            entityByTable,
+            useDatabaseNames: false);
 
         Assert.Equal("User2", result["User"]["User"]);
         Assert.Equal("Id", result["User"]["Id"]);

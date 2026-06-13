@@ -356,8 +356,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Names.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Context.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.SchemaMaps.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Context.cs"));
 
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
