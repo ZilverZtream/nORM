@@ -5,6 +5,9 @@ using System.Data;
 using System.Data.Common;
 
 using ColumnInfo = nORM.Scaffolding.DynamicEntityTypeGenerator.ColumnInfo;
+using DynamicScaffoldColumnFacet = nORM.Scaffolding.DynamicEntityTypeGenerator.ScaffoldColumnFacet;
+using DynamicScaffoldComputedColumn = nORM.Scaffolding.DynamicEntityTypeGenerator.ScaffoldComputedColumn;
+using DynamicScaffoldDecimalPrecision = nORM.Scaffolding.DynamicEntityTypeGenerator.ScaffoldDecimalPrecision;
 
 namespace nORM.Scaffolding
 {
@@ -14,29 +17,54 @@ namespace nORM.Scaffolding
         {
             var qualified = DynamicEntityConnectionKind.EscapeQualified(connection, schemaName, tableName);
             var postgresDomainColumnCastTypes = GetPostgresDomainColumnCastTypes(connection, schemaName, tableName);
-            DataTable? schema;
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = BuildSchemaProbeSql(connection, schemaName, tableName, qualified, postgresDomainColumnCastTypes);
-                using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
-                schema = reader.GetSchemaTable();
-            }
+            var schema = ReadSchemaTable(connection, schemaName, tableName, qualified, postgresDomainColumnCastTypes);
 
             if (schema is null)
                 return Array.Empty<ColumnInfo>();
 
             var existingPropertyNames = CreateReservedMemberNameSet();
             existingPropertyNames.Add(EscapeCSharpIdentifier(ToPascalCase(tableName)));
-            var computedColumns = GetComputedColumns(connection, schemaName, tableName);
-            var identityColumns = GetIdentityColumns(connection, schemaName, tableName);
-            var rowVersionColumns = GetRowVersionColumns(connection, schemaName, tableName);
-            var sqliteDeclaredTypes = GetSqliteDeclaredColumnTypes(connection, schemaName, tableName);
-            var columnStoreTypes = GetColumnStoreTypes(connection, schemaName, tableName);
-            var sqlServerAliasBaseTypes = GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
-            var mySqlUnsignedColumnTypes = GetMySqlUnsignedColumnTypes(connection, schemaName, tableName);
-            var decimalPrecisions = GetDecimalPrecisions(connection, schemaName, tableName);
-            var columnFacets = GetStringBinaryFacets(connection, schemaName, tableName);
-            var primaryKeyOrdinals = GetPrimaryKeyOrdinals(connection, schemaName, tableName);
+            var metadata = ReadColumnMetadata(connection, schemaName, tableName, postgresDomainColumnCastTypes);
+            return BuildColumnInfos(connection, schema, existingPropertyNames, metadata);
+        }
+
+        private static DataTable? ReadSchemaTable(
+            DbConnection connection,
+            string? schemaName,
+            string tableName,
+            string qualified,
+            IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = BuildSchemaProbeSql(connection, schemaName, tableName, qualified, postgresDomainColumnCastTypes);
+            using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo);
+            return reader.GetSchemaTable();
+        }
+
+        private static DynamicColumnMetadata ReadColumnMetadata(
+            DbConnection connection,
+            string? schemaName,
+            string tableName,
+            IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
+            => new(
+                postgresDomainColumnCastTypes,
+                GetComputedColumns(connection, schemaName, tableName),
+                GetIdentityColumns(connection, schemaName, tableName),
+                GetRowVersionColumns(connection, schemaName, tableName),
+                GetSqliteDeclaredColumnTypes(connection, schemaName, tableName),
+                GetColumnStoreTypes(connection, schemaName, tableName),
+                GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName),
+                GetMySqlUnsignedColumnTypes(connection, schemaName, tableName),
+                GetDecimalPrecisions(connection, schemaName, tableName),
+                GetStringBinaryFacets(connection, schemaName, tableName),
+                GetPrimaryKeyOrdinals(connection, schemaName, tableName));
+
+        private static List<ColumnInfo> BuildColumnInfos(
+            DbConnection connection,
+            DataTable schema,
+            HashSet<string> existingPropertyNames,
+            DynamicColumnMetadata metadata)
+        {
             var columns = new List<ColumnInfo>(schema.Rows.Count);
             var sourceOrdinal = 0;
             foreach (DataRow row in schema.Rows)
@@ -46,52 +74,171 @@ namespace nORM.Scaffolding
                     continue;
 
                 var currentSourceOrdinal = sourceOrdinal++;
-                var propName = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(colName)), existingPropertyNames);
-                if (row["DataType"] is not Type clrType)
-                    continue;
-
-                var allowNull = row["AllowDBNull"] is bool b && b;
-                var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
-                var keyOrdinal = primaryKeyOrdinals.TryGetValue(colName, out var ordinal)
-                    ? ordinal
-                    : isKey ? currentSourceOrdinal + 1 : 0;
-                var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
-                    || identityColumns.Contains(colName);
-                var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
-                    || computedColumns.ContainsKey(colName);
-                var computedColumn = computedColumns.TryGetValue(colName, out var computed)
-                    ? computed
-                    : (DynamicEntityTypeGenerator.ScaffoldComputedColumn?)null;
-                var isRowVersion = rowVersionColumns.Contains(colName);
-                var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
-                sqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
-                columnStoreTypes.TryGetValue(colName, out var columnStoreType);
-                sqlServerAliasBaseTypes.TryGetValue(colName, out var sqlServerAliasBaseType);
-                var normalizedClrType = NormalizeScaffoldClrType(connection, clrType, effectiveAllowNull, isKey, isAuto, declaredType, columnStoreType);
-                normalizedClrType = ResolveProviderSpecificClrType(
-                    connection,
-                    normalizedClrType,
-                    colName,
-                    postgresDomainColumnCastTypes,
-                    sqlServerAliasBaseType,
-                    mySqlUnsignedColumnTypes);
-
-                var propertyType = GetPropertyType(normalizedClrType, effectiveAllowNull);
-
-                columnFacets.TryGetValue(colName, out var columnFacet);
-                var maxLength = GetScaffoldMaxLength(normalizedClrType, row)
-                    ?? GetSqlServerAliasBaseMaxLengthFromTypeText(sqlServerAliasBaseType);
-                if (!maxLength.HasValue && columnFacet.MaxLength.HasValue)
-                    maxLength = columnFacet.MaxLength;
-                var decimalPrecision = normalizedClrType == typeof(decimal)
-                    && decimalPrecisions.TryGetValue(colName, out var precision)
-                    ? precision
-                    : (DynamicEntityTypeGenerator.ScaffoldDecimalPrecision?)null;
-
-                columns.Add(new ColumnInfo(colName, propName, propertyType, effectiveAllowNull, isKey, keyOrdinal, currentSourceOrdinal, isAuto, isComputed, computedColumn, isRowVersion, maxLength, columnFacet.IsUnicode, columnFacet.IsFixedLength, decimalPrecision));
+                if (TryBuildColumnInfo(
+                        connection,
+                        schema,
+                        row,
+                        colName,
+                        currentSourceOrdinal,
+                        existingPropertyNames,
+                        metadata,
+                        out var column)
+                    && column is not null)
+                {
+                    columns.Add(column);
+                }
             }
 
             return columns;
         }
+
+        private static bool TryBuildColumnInfo(
+            DbConnection connection,
+            DataTable schema,
+            DataRow row,
+            string colName,
+            int currentSourceOrdinal,
+            HashSet<string> existingPropertyNames,
+            DynamicColumnMetadata metadata,
+            out ColumnInfo? column)
+        {
+            var propName = MakeUnique(EscapeCSharpIdentifier(ToPascalCase(colName)), existingPropertyNames);
+            if (row["DataType"] is not Type clrType)
+            {
+                column = null;
+                return false;
+            }
+
+            var flags = ReadColumnSchemaFlags(schema, row, colName, currentSourceOrdinal, metadata);
+            var normalizedClrType = ResolveColumnClrType(connection, clrType, colName, flags, metadata);
+            var propertyType = GetPropertyType(normalizedClrType, flags.EffectiveAllowNull);
+            metadata.ColumnFacets.TryGetValue(colName, out var columnFacet);
+            var maxLength = ResolveColumnMaxLength(normalizedClrType, row, flags.SqlServerAliasBaseType, columnFacet);
+            var decimalPrecision = GetColumnDecimalPrecision(normalizedClrType, colName, metadata);
+
+            column = new ColumnInfo(
+                colName,
+                propName,
+                propertyType,
+                flags.EffectiveAllowNull,
+                flags.IsKey,
+                flags.KeyOrdinal,
+                currentSourceOrdinal,
+                flags.IsAuto,
+                flags.IsComputed,
+                flags.ComputedColumn,
+                flags.IsRowVersion,
+                maxLength,
+                columnFacet.IsUnicode,
+                columnFacet.IsFixedLength,
+                decimalPrecision);
+            return true;
+        }
+
+        private static ColumnSchemaFlags ReadColumnSchemaFlags(
+            DataTable schema,
+            DataRow row,
+            string colName,
+            int currentSourceOrdinal,
+            DynamicColumnMetadata metadata)
+        {
+            var allowNull = row["AllowDBNull"] is bool b && b;
+            var isKey = schema.Columns.Contains("IsKey") && row["IsKey"] is bool key && key;
+            var keyOrdinal = metadata.PrimaryKeyOrdinals.TryGetValue(colName, out var ordinal)
+                ? ordinal
+                : isKey ? currentSourceOrdinal + 1 : 0;
+            var isAuto = (schema.Columns.Contains("IsAutoIncrement") && row["IsAutoIncrement"] is bool ai && ai)
+                || metadata.IdentityColumns.Contains(colName);
+            var isComputed = (schema.Columns.Contains("IsExpression") && row["IsExpression"] is bool expression && expression)
+                || metadata.ComputedColumns.ContainsKey(colName);
+            var computedColumn = metadata.ComputedColumns.TryGetValue(colName, out var computed)
+                ? computed
+                : (DynamicScaffoldComputedColumn?)null;
+            var isRowVersion = metadata.RowVersionColumns.Contains(colName);
+            var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
+            metadata.SqliteDeclaredTypes.TryGetValue(colName, out var declaredType);
+            metadata.ColumnStoreTypes.TryGetValue(colName, out var columnStoreType);
+            metadata.SqlServerAliasBaseTypes.TryGetValue(colName, out var sqlServerAliasBaseType);
+
+            return new ColumnSchemaFlags(
+                isKey,
+                keyOrdinal,
+                isAuto,
+                isComputed,
+                computedColumn,
+                isRowVersion,
+                effectiveAllowNull,
+                declaredType,
+                columnStoreType,
+                sqlServerAliasBaseType);
+        }
+
+        private static Type ResolveColumnClrType(
+            DbConnection connection,
+            Type clrType,
+            string colName,
+            ColumnSchemaFlags flags,
+            DynamicColumnMetadata metadata)
+        {
+            var normalizedClrType = NormalizeScaffoldClrType(
+                connection,
+                clrType,
+                flags.EffectiveAllowNull,
+                flags.IsKey,
+                flags.IsAuto,
+                flags.DeclaredType,
+                flags.ColumnStoreType);
+
+            return ResolveProviderSpecificClrType(
+                connection,
+                normalizedClrType,
+                colName,
+                metadata.PostgresDomainColumnCastTypes,
+                flags.SqlServerAliasBaseType,
+                metadata.MySqlUnsignedColumnTypes);
+        }
+
+        private static int? ResolveColumnMaxLength(
+            Type normalizedClrType,
+            DataRow row,
+            string? sqlServerAliasBaseType,
+            DynamicScaffoldColumnFacet columnFacet)
+            => GetScaffoldMaxLength(normalizedClrType, row)
+               ?? GetSqlServerAliasBaseMaxLengthFromTypeText(sqlServerAliasBaseType)
+               ?? columnFacet.MaxLength;
+
+        private static DynamicScaffoldDecimalPrecision? GetColumnDecimalPrecision(
+            Type normalizedClrType,
+            string colName,
+            DynamicColumnMetadata metadata)
+            => normalizedClrType == typeof(decimal)
+               && metadata.DecimalPrecisions.TryGetValue(colName, out var precision)
+                ? precision
+                : (DynamicScaffoldDecimalPrecision?)null;
+
+        private readonly record struct ColumnSchemaFlags(
+            bool IsKey,
+            int KeyOrdinal,
+            bool IsAuto,
+            bool IsComputed,
+            DynamicScaffoldComputedColumn? ComputedColumn,
+            bool IsRowVersion,
+            bool EffectiveAllowNull,
+            string? DeclaredType,
+            string? ColumnStoreType,
+            string? SqlServerAliasBaseType);
+
+        private readonly record struct DynamicColumnMetadata(
+            IReadOnlyDictionary<string, string> PostgresDomainColumnCastTypes,
+            IReadOnlyDictionary<string, DynamicScaffoldComputedColumn> ComputedColumns,
+            IReadOnlySet<string> IdentityColumns,
+            IReadOnlySet<string> RowVersionColumns,
+            IReadOnlyDictionary<string, string> SqliteDeclaredTypes,
+            IReadOnlyDictionary<string, string> ColumnStoreTypes,
+            IReadOnlyDictionary<string, string> SqlServerAliasBaseTypes,
+            IReadOnlyDictionary<string, string> MySqlUnsignedColumnTypes,
+            IReadOnlyDictionary<string, DynamicScaffoldDecimalPrecision> DecimalPrecisions,
+            IReadOnlyDictionary<string, DynamicScaffoldColumnFacet> ColumnFacets,
+            IReadOnlyDictionary<string, int> PrimaryKeyOrdinals);
     }
 }
