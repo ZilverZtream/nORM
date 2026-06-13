@@ -368,6 +368,11 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceBuilder.Indexes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceInfo.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.Helpers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.SqlServer.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Postgres.cs"),
@@ -489,5 +494,10 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityConnectionKind.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntitySchemaResolver.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.Helpers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"));
 }
