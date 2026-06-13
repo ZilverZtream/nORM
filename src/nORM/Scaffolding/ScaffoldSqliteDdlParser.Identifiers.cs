@@ -1,106 +1,11 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Text;
 
 namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldSqliteDdlParser
     {
-        public static int FindMatchingParenthesis(string sql, int openIndex)
-        {
-            var depth = 0;
-            char? quote = null;
-            for (var i = openIndex; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                        continue;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                {
-                    depth++;
-                }
-                else if (ch == ')')
-                {
-                    depth--;
-                    if (depth == 0)
-                        return i;
-                }
-            }
-
-            return -1;
-        }
-
-        public static IReadOnlyList<string> SplitTopLevelCommaSeparated(string sql)
-        {
-            var result = new List<string>();
-            var start = 0;
-            var depth = 0;
-            char? quote = null;
-            for (var i = 0; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
-
-                        quote = null;
-                        continue;
-                    }
-
-                    continue;
-                }
-
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                    depth++;
-                else if (ch == ')')
-                    depth--;
-                else if (ch == ',' && depth == 0)
-                {
-                    result.Add(sql.Substring(start, i - start));
-                    start = i + 1;
-                }
-            }
-
-            result.Add(sql[start..]);
-            return result;
-        }
-
         private static bool StartsWithTableConstraint(string value)
             => value.StartsWith("CONSTRAINT ", StringComparison.OrdinalIgnoreCase)
                || value.StartsWith("PRIMARY ", StringComparison.OrdinalIgnoreCase)
