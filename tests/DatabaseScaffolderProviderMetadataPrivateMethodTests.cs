@@ -65,6 +65,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("set('a','b','c','d','e','f','g','h')", false)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", true)]
     [InlineData("set('read,write','admin')", true)]
+    [InlineData(@"set('read\,write','admin')", true)]
     [InlineData("set('read','read')", true)]
     [InlineData("set('read' 'write')", true)]
     [InlineData("set('read',)", true)]
@@ -296,6 +297,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("set('a','b','c','d','e','f','g','h')", true, 8)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", false, 0)]
     [InlineData("set('read,write','admin')", false, 0)]
+    [InlineData(@"set('read\,write','admin')", false, 0)]
+    [InlineData(@"set('read\'write','admin')", true, 2)]
     [InlineData("set('read','read')", false, 0)]
     [InlineData("set('read' 'write')", false, 0)]
     [InlineData("set('read',)", false, 0)]
@@ -411,6 +414,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("enum('draft','paid','cancelled')", true)]
     [InlineData("enum('draft', 'paid')", true)]
     [InlineData("enum ('draft', 'paid')", true)]
+    [InlineData(@"enum('draft','it\'s','comma,value')", true)]
     [InlineData("enum('draft' 'paid')", false)]
     [InlineData("enum('draft',)", false)]
     [InlineData("enum(,'draft')", false)]
@@ -421,9 +425,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("ENUM (public.customer_status: ,'draft')", false)]
     [InlineData("set('read','write','admin')", true)]
     [InlineData("set ('read', 'write')", true)]
+    [InlineData(@"set('read\'write','admin')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h')", true)]
     [InlineData("set('a','b','c','d','e','f','g','h','i')", false)]
     [InlineData("set('read,write','admin')", false)]
+    [InlineData(@"set('read\,write','admin')", false)]
     [InlineData("ARRAY (_int4)", true)]
     [InlineData("ARRAY (varchar(64))", true)]
     [InlineData("ARRAY (numeric(10,2))", true)]
@@ -489,6 +495,30 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "DOMAIN (public.payload -> USER-DEFINED (custom_payload))" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" } })!);
         Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Custom"] = "user-defined type (dbo.CustomPayload)" } })!);
+    }
+
+    [Theory]
+    [InlineData(@"enum('draft','it\'s','comma,value')", "Status", "Enum", "Status IN ('draft', 'it''s', 'comma,value')")]
+    [InlineData(@"set('read\'write','admin')", "Flags", "Set", "Flags IN ('', 'read''write', 'admin', 'read''write,admin')")]
+    public void TryBuildProviderValueCheckSql_EscapesMySqlQuotedValues(string detail, string column, string expectedKind, string expectedSql)
+    {
+        var m = GetMethod("TryBuildProviderValueCheckSql", new[] { typeof(string), typeof(string), typeof(string).MakeByRefType(), typeof(string).MakeByRefType() });
+        object?[] args = { column, detail, null, null };
+
+        Assert.True((bool)m.Invoke(null, args)!);
+        Assert.Equal(expectedKind, args[2]);
+        Assert.Equal(expectedSql, args[3]);
+    }
+
+    [Fact]
+    public void TryBuildProviderValueCheckSql_RejectsMySqlSetValuesWithEscapedCommas()
+    {
+        var m = GetMethod("TryBuildProviderValueCheckSql", new[] { typeof(string), typeof(string), typeof(string).MakeByRefType(), typeof(string).MakeByRefType() });
+        object?[] args = { "Flags", @"set('read\,write','admin')", null, null };
+
+        Assert.False((bool)m.Invoke(null, args)!);
+        Assert.Equal(string.Empty, args[2]);
+        Assert.Equal(string.Empty, args[3]);
     }
 
     [Fact]

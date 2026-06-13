@@ -1,8 +1,6 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace nORM.Scaffolding
 {
@@ -31,74 +29,8 @@ namespace nORM.Scaffolding
         public static bool TryParseMySqlQuotedTypeValues(string? detail, string typeName, out string[] values)
         {
             values = Array.Empty<string>();
-            if (!TryGetMySqlQuotedTypeBody(detail, typeName, out var body))
-                return false;
-
-            var parsed = new List<string>();
-            var current = new StringBuilder();
-            var expectingValue = true;
-            var i = 0;
-            while (i < body.Length)
-            {
-                while (i < body.Length && char.IsWhiteSpace(body[i]))
-                    i++;
-
-                if (i >= body.Length)
-                    break;
-
-                if (!expectingValue)
-                {
-                    if (body[i] != ',')
-                        return false;
-
-                    expectingValue = true;
-                    i++;
-                    continue;
-                }
-
-                if (body[i] != '\'')
-                    return false;
-
-                i++;
-                current.Clear();
-                var closed = false;
-                for (; i < body.Length; i++)
-                {
-                    var ch = body[i];
-                    if (ch == '\\' && i + 1 < body.Length)
-                    {
-                        current.Append(body[++i]);
-                        continue;
-                    }
-
-                    if (ch == '\'')
-                    {
-                        if (i + 1 < body.Length && body[i + 1] == '\'')
-                        {
-                            current.Append('\'');
-                            i++;
-                            continue;
-                        }
-
-                        parsed.Add(current.ToString());
-                        expectingValue = false;
-                        closed = true;
-                        i++;
-                        break;
-                    }
-
-                    current.Append(ch);
-                }
-
-                if (!closed)
-                    return false;
-            }
-
-            if (expectingValue || parsed.Count == 0)
-                return false;
-
-            values = parsed.ToArray();
-            return true;
+            return TryGetMySqlQuotedTypeBody(detail, typeName, out var body)
+                   && ScaffoldSqlStringLiteralParser.TryParseSqlStringLiteralList(body, out values);
         }
 
         private static bool TryGetMySqlQuotedTypeBody(string? detail, string typeName, out string body)
