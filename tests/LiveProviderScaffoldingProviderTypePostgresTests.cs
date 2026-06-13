@@ -47,6 +47,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Contains("public Guid TraceId { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public int[]? Scores { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains("public string[]? Tags { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public decimal[]? Ratings { get; set; }", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public string[]? Aliases { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
                 Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
                 AssertScaffoldOutputBuilds(dir);
@@ -79,6 +81,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Equal(typeof(Guid), type.GetProperty("TraceId")!.PropertyType);
                 Assert.Equal(typeof(int[]), type.GetProperty("Scores")!.PropertyType);
                 Assert.Equal(typeof(string[]), type.GetProperty("Tags")!.PropertyType);
+                Assert.Equal(typeof(decimal[]), type.GetProperty("Ratings")!.PropertyType);
+                Assert.Equal(typeof(string[]), type.GetProperty("Aliases")!.PropertyType);
                 Assert.Null(type.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
             }
             finally

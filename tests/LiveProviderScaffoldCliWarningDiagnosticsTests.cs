@@ -229,6 +229,8 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                     Assert.Contains("public Guid TraceId { get; set; }", entityCode, StringComparison.Ordinal);
                     Assert.Contains("public int[]? Scores { get; set; }", entityCode, StringComparison.Ordinal);
                     Assert.Contains("public string[]? Tags { get; set; }", entityCode, StringComparison.Ordinal);
+                    Assert.Contains("public decimal[]? Ratings { get; set; }", entityCode, StringComparison.Ordinal);
+                    Assert.Contains("public string[]? Aliases { get; set; }", entityCode, StringComparison.Ordinal);
                     break;
                 case ProviderKind.MySql:
                     Assert.Contains("public string Payload { get; set; } = default!;", entityCode, StringComparison.Ordinal);

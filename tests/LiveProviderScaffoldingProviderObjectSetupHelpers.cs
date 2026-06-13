@@ -157,7 +157,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
 
         var table = Qualified(provider, "public", PostgresTypedColumnTable);
         await ExecuteAsync(connection,
-            $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("TraceId")} uuid NOT NULL, {provider.Escape("Scores")} integer[] NULL, {provider.Escape("Tags")} text[] NULL)");
+            $"CREATE TABLE {table} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("TraceId")} uuid NOT NULL, {provider.Escape("Scores")} integer[] NULL, {provider.Escape("Tags")} text[] NULL, {provider.Escape("Ratings")} numeric(10,2)[] NULL, {provider.Escape("Aliases")} varchar(32)[] NULL)");
     }
 
     private static async Task SetupMySqlTypedColumnTableAsync(DbConnection connection, DatabaseProvider provider)

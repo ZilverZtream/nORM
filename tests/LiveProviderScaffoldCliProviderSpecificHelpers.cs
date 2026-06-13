@@ -77,7 +77,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 break;
             case ProviderKind.Postgres:
                 Execute(connection,
-                    $"CREATE TABLE {table} ({id} integer NOT NULL PRIMARY KEY, {provider.Escape("TraceId")} uuid NOT NULL, {provider.Escape("Scores")} integer[] NULL, {provider.Escape("Tags")} text[] NULL)");
+                    $"CREATE TABLE {table} ({id} integer NOT NULL PRIMARY KEY, {provider.Escape("TraceId")} uuid NOT NULL, {provider.Escape("Scores")} integer[] NULL, {provider.Escape("Tags")} text[] NULL, {provider.Escape("Ratings")} numeric(10,2)[] NULL, {provider.Escape("Aliases")} varchar(32)[] NULL)");
                 break;
             case ProviderKind.MySql:
                 Execute(connection,
