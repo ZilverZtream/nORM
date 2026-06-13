@@ -9,9 +9,13 @@ namespace nORM.Scaffolding
         {
             var depth = 0;
             char? quote = null;
+            string? dollarQuote = null;
             for (var i = openIndex; i < sql.Length; i++)
             {
                 var ch = sql[i];
+                if (ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
+                    continue;
+
                 if (quote is not null)
                 {
                     var close = quote == '[' ? ']' : quote.Value;
@@ -57,9 +61,13 @@ namespace nORM.Scaffolding
             var start = 0;
             var depth = 0;
             char? quote = null;
+            string? dollarQuote = null;
             for (var i = 0; i < sql.Length; i++)
             {
                 var ch = sql[i];
+                if (ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
+                    continue;
+
                 if (quote is not null)
                 {
                     var close = quote == '[' ? ']' : quote.Value;

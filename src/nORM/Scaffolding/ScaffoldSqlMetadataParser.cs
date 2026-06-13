@@ -27,9 +27,13 @@ namespace nORM.Scaffolding
         public static int FindSqlKeywordOutsideQuotes(string sql, string keyword, int startIndex)
         {
             char? quote = null;
+            string? dollarQuote = null;
             for (var i = startIndex; i < sql.Length; i++)
             {
                 var ch = sql[i];
+                if (TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
+                    continue;
+
                 if (quote is not null)
                 {
                     var close = quote == '[' ? ']' : quote.Value;
@@ -69,9 +73,13 @@ namespace nORM.Scaffolding
         {
             var depth = 0;
             char? quote = null;
+            string? dollarQuote = null;
             for (var i = 0; i < value.Length; i++)
             {
                 var ch = value[i];
+                if (TryAdvancePostgresDollarQuote(value, ref i, ref dollarQuote))
+                    continue;
+
                 if (quote is not null)
                 {
                     var close = quote == '[' ? ']' : quote.Value;
@@ -106,7 +114,50 @@ namespace nORM.Scaffolding
                     return false;
             }
 
-            return depth == 0 && quote is null;
+            return depth == 0 && quote is null && dollarQuote is null;
+        }
+
+        public static bool TryAdvancePostgresDollarQuote(string sql, ref int index, ref string? dollarQuote)
+        {
+            if (dollarQuote is not null)
+            {
+                if (index + dollarQuote.Length <= sql.Length
+                    && sql.AsSpan(index, dollarQuote.Length).Equals(dollarQuote.AsSpan(), StringComparison.Ordinal))
+                {
+                    index += dollarQuote.Length - 1;
+                    dollarQuote = null;
+                }
+
+                return true;
+            }
+
+            if (!TryReadPostgresDollarQuoteTag(sql, index, out var tag))
+                return false;
+
+            dollarQuote = tag;
+            index += tag.Length - 1;
+            return true;
+        }
+
+        public static bool TryReadPostgresDollarQuoteTag(string sql, int index, out string tag)
+        {
+            tag = string.Empty;
+            if (index >= sql.Length || sql[index] != '$')
+                return false;
+
+            var end = sql.IndexOf('$', index + 1);
+            if (end < 0)
+                return false;
+
+            for (var i = index + 1; i < end; i++)
+            {
+                var ch = sql[i];
+                if (!char.IsLetterOrDigit(ch) && ch != '_')
+                    return false;
+            }
+
+            tag = sql.Substring(index, end - index + 1);
+            return true;
         }
 
         private static bool IsSqlIdentifierChar(char value)
