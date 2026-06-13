@@ -79,6 +79,7 @@ public partial class ScaffoldingContractDocTests
         var entityTypeBuilder = ReadEntityTypeBuilderSource();
         var entityTypeConfiguration = ReadRepoFile("src", "nORM", "Configuration", "IEntityTypeConfiguration.cs");
         var scaffolder = ReadDatabaseScaffolderSource();
+        var featureConfigurationBuilder = ReadFeatureConfigurationBuilderSource();
         var contextWriterSource = ReadContextWriterSource();
         var sqlServerMigration = ReadRepoFile("src", "nORM", "Migration", "SqlServerMigrationSqlGenerator.cs");
         var postgresMigration = ReadRepoFile("src", "nORM", "Migration", "PostgresMigrationSqlGenerator.cs");
@@ -103,9 +104,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("IReadOnlyDictionary<PropertyInfo, bool> FixedLengthSettings", entityTypeConfiguration, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> Precisions", entityTypeConfiguration, StringComparison.Ordinal);
         Assert.Contains("ScaffoldColumnFacetConfiguration", scaffolder, StringComparison.Ordinal);
-        Assert.Contains("BuildColumnFacetConfigurations", scaffolder, StringComparison.Ordinal);
+        Assert.Contains("BuildColumnFacetConfigurations", featureConfigurationBuilder, StringComparison.Ordinal);
         Assert.Contains("ScaffoldPrecisionConfiguration", scaffolder, StringComparison.Ordinal);
-        Assert.Contains("BuildPrecisionConfigurations", scaffolder, StringComparison.Ordinal);
+        Assert.Contains("BuildPrecisionConfigurations", featureConfigurationBuilder, StringComparison.Ordinal);
         Assert.Contains(".IsUnicode(", contextWriterSource, StringComparison.Ordinal);
         Assert.Contains(".IsFixedLength(", contextWriterSource, StringComparison.Ordinal);
         Assert.Contains(".HasPrecision(", contextWriterSource, StringComparison.Ordinal);
