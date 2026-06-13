@@ -26,35 +26,71 @@ namespace nORM.Scaffolding
                 && relationshipPairCount > 1;
             var isSelfRelationship = string.Equals(dependentKey, principalKey, StringComparison.OrdinalIgnoreCase);
             var dependentMemberNames = GetOrCreateMemberNames(memberNamesByTable, dependentKey);
-            var referenceBase = ScaffoldNameHelper.ToNavigationName(principalEntity);
-            if (isSelfRelationship || hasMultipleRelationshipsToSamePrincipal)
-            {
-                referenceBase = BuildRelationshipReferenceNavigationBase(roleForeignKeyProperty, principalEntity, rolePrincipalKeyProperty);
-                if (dependentMemberNames.Contains(referenceBase))
-                    referenceBase += "Navigation";
-                if (string.IsNullOrWhiteSpace(referenceBase))
-                    referenceBase = ScaffoldNameHelper.ToNavigationName(principalEntity) + "Navigation";
-            }
-
             var principalMemberNames = GetOrCreateMemberNames(memberNamesByTable, principalKey);
-            var collectionBase = isUniqueDependentKey
-                ? ScaffoldNameHelper.ToNavigationName(dependentEntity)
-                : ScaffoldNameHelper.Pluralize(ScaffoldNameHelper.ToNavigationName(dependentEntity));
-            if (isSelfRelationship
-                || hasMultipleRelationshipsToSamePrincipal
-                || principalMemberNames.Contains(collectionBase))
-            {
-                collectionBase = (isUniqueDependentKey
-                    ? ScaffoldNameHelper.ToNavigationName(dependentEntity)
-                    : ScaffoldNameHelper.Pluralize(ScaffoldNameHelper.ToNavigationName(dependentEntity)))
-                    + "By"
-                    + ScaffoldNameHelper.ToNavigationName(roleForeignKeyProperty);
-            }
+            var referenceBase = BuildReferenceNavigationBase(
+                principalEntity,
+                roleForeignKeyProperty,
+                rolePrincipalKeyProperty,
+                isSelfRelationship,
+                hasMultipleRelationshipsToSamePrincipal,
+                dependentMemberNames);
+            var collectionBase = BuildCollectionNavigationBase(
+                dependentEntity,
+                roleForeignKeyProperty,
+                isUniqueDependentKey,
+                isSelfRelationship,
+                hasMultipleRelationshipsToSamePrincipal,
+                principalMemberNames);
 
             return (
                 ScaffoldNameHelper.MakeUnique(referenceBase, dependentMemberNames),
                 ScaffoldNameHelper.MakeUnique(collectionBase, principalMemberNames));
         }
+
+        private static string BuildReferenceNavigationBase(
+            string principalEntity,
+            string roleForeignKeyProperty,
+            string rolePrincipalKeyProperty,
+            bool isSelfRelationship,
+            bool hasMultipleRelationshipsToSamePrincipal,
+            IReadOnlySet<string> dependentMemberNames)
+        {
+            var referenceBase = ScaffoldNameHelper.ToNavigationName(principalEntity);
+            if (!isSelfRelationship && !hasMultipleRelationshipsToSamePrincipal)
+                return referenceBase;
+
+            referenceBase = BuildRelationshipReferenceNavigationBase(roleForeignKeyProperty, principalEntity, rolePrincipalKeyProperty);
+            if (dependentMemberNames.Contains(referenceBase))
+                referenceBase += "Navigation";
+            if (string.IsNullOrWhiteSpace(referenceBase))
+                referenceBase = ScaffoldNameHelper.ToNavigationName(principalEntity) + "Navigation";
+
+            return referenceBase;
+        }
+
+        private static string BuildCollectionNavigationBase(
+            string dependentEntity,
+            string roleForeignKeyProperty,
+            bool isUniqueDependentKey,
+            bool isSelfRelationship,
+            bool hasMultipleRelationshipsToSamePrincipal,
+            IReadOnlySet<string> principalMemberNames)
+        {
+            var collectionBase = BuildDependentNavigationBase(dependentEntity, isUniqueDependentKey);
+            if (!isSelfRelationship
+                && !hasMultipleRelationshipsToSamePrincipal
+                && !principalMemberNames.Contains(collectionBase))
+            {
+                return collectionBase;
+            }
+
+            return collectionBase + "By" + ScaffoldNameHelper.ToNavigationName(roleForeignKeyProperty);
+        }
+
+        private static string BuildDependentNavigationBase(string dependentEntity, bool isUniqueDependentKey)
+            => isUniqueDependentKey
+                ? ScaffoldNameHelper.ToNavigationName(dependentEntity)
+                : ScaffoldNameHelper.Pluralize(ScaffoldNameHelper.ToNavigationName(dependentEntity));
 
         private static (string ForeignKeyProperty, string PrincipalKeyProperty) SelectRelationshipRoleProperties(
             IReadOnlyList<string> foreignKeyProperties,
