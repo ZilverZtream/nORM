@@ -20,7 +20,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxLiveProviderScaffoldFileLines = 700;
     private const int MaxCliIntegrationFileLines = 1000;
     private const int MaxCoreQueryTranslatorFileLines = 1000;
-    private const int MaxQueryTranslatorPartialFileLines = 1200;
+    private const int MaxQueryTranslatorPartialFileLines = 1000;
     private const int MaxNormQueryProviderPartialFileLines = 1500;
     private const int MaxQueryExecutorPartialFileLines = 1000;
     private const int MaxSelectClauseVisitorPartialFileLines = 1500;
@@ -331,7 +331,7 @@ public sealed class RepositoryHygieneTests
     public void Query_translator_partials_stay_split_by_operator_family()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("Every `QueryTranslator*.cs` partial stays below 1200 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("Every `QueryTranslator*.cs` partial stays below 1000 lines", ownership, StringComparison.Ordinal);
 
         var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "QueryTranslator*.cs")
             .Select(path => new

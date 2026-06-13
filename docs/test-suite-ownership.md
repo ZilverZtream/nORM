@@ -178,7 +178,7 @@ in the matching partial test file or create a new command-area file.
 
 The central `QueryTranslator.cs` file stays below 1000 lines so translator state
 and dispatch do not absorb lifecycle, subquery context, parameter, split-query,
-window-builder, or projection-helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1200 lines. Split each partial by
+window-builder, or projection-helper responsibilities. Every `QueryTranslator*.cs` partial stays below 1000 lines. Split each partial by
 operator family before it grows into a catch-all translator file.
 `RepositoryHygieneTests` enforces both boundaries.
 
