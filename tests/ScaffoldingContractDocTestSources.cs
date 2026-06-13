@@ -211,6 +211,12 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.Postgres.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.MySql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.Queries.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.Fallback.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"));
 
     private static string ReadUnsupportedFeatureMetadataSource()
