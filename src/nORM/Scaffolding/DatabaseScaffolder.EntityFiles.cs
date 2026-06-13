@@ -9,51 +9,6 @@ namespace nORM.Scaffolding
 {
     public static partial class DatabaseScaffolder
     {
-        private static async Task<ScaffoldEntityFileSet> BuildScaffoldEntityFilesAsync(
-            DbConnection connection,
-            DatabaseProvider provider,
-            string outputDirectory,
-            string namespaceName,
-            IReadOnlyList<ScaffoldTable> tables,
-            IReadOnlyDictionary<string, string> entityByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> sqliteDeclaredTypesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnStoreTypesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable,
-            IReadOnlyDictionary<string, ScaffoldComments> commentsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<ScaffoldIndex> indexes,
-            IReadOnlyList<ScaffoldRelationship> relationships,
-            IReadOnlyList<ScaffoldManyToManyJoin> manyToManyJoins,
-            IReadOnlySet<string> manyToManyJoinTableKeys,
-            IReadOnlySet<string> queryArtifactTableKeys,
-            ScaffoldFeatureConfigurations featureConfigurations,
-            ScaffoldOptions options)
-            => await ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(
-                connection,
-                provider,
-                outputDirectory,
-                namespaceName,
-                tables,
-                entityByTable,
-                columnPropertiesByTable,
-                primaryKeyColumnsByTable,
-                nonNullableColumnsByTable,
-                sqliteDeclaredTypesByTable,
-                columnStoreTypesByTable,
-                stringBinaryFacetsByTable,
-                commentsByTable,
-                identityColumnsByTable,
-                indexes,
-                relationships,
-                manyToManyJoins,
-                manyToManyJoinTableKeys,
-                queryArtifactTableKeys,
-                featureConfigurations,
-                options).ConfigureAwait(false);
-
         private static async Task EmitScaffoldOutputAsync(
             string outputDirectory,
             List<(string Path, string Content)> generatedFiles,

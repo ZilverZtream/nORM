@@ -426,6 +426,32 @@ public partial class DatabaseScaffolderPrivateMethodTests
             })!);
     }
 
+    [Fact]
+    public void ShouldMarkScaffoldedEntityReadOnly_UsesAggregatedProviderOwnedWriteBlockingSet()
+    {
+        var emptyTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var writeBlockedTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "dbo.Orders"
+        };
+        var primaryKeys = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["dbo.Orders"] = new[] { "Id" },
+            ["dbo.Customers"] = new[] { "Id" }
+        };
+
+        Assert.True(ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
+            "dbo.Orders",
+            emptyTables,
+            writeBlockedTables,
+            primaryKeys));
+        Assert.False(ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
+            "dbo.Customers",
+            emptyTables,
+            writeBlockedTables,
+            primaryKeys));
+    }
+
     [Theory]
     [InlineData("ARRAY (_int4)", typeof(int[]))]
     [InlineData("ARRAY (_text)", typeof(string[]))]

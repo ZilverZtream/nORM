@@ -8,6 +8,16 @@ namespace nORM.Scaffolding
         public static bool ShouldMarkScaffoldedEntityReadOnly(
             string tableKey,
             IReadOnlySet<string> queryArtifactTableKeys,
+            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
+            => queryArtifactTableKeys.Contains(tableKey)
+               || providerOwnedWriteBlockedTableKeys.Contains(tableKey)
+               || !primaryKeyColumnsByTable.TryGetValue(tableKey, out var primaryKeyColumns)
+               || primaryKeyColumns.Count == 0;
+
+        public static bool ShouldMarkScaffoldedEntityReadOnly(
+            string tableKey,
+            IReadOnlySet<string> queryArtifactTableKeys,
             IReadOnlySet<string> providerNativeTemporalTableKeys,
             IReadOnlySet<string> providerOwnedTriggerTableKeys,
             IReadOnlySet<string> providerSpecificIdentityStrategyTableKeys,

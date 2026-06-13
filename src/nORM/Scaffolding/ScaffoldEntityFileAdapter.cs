@@ -10,49 +10,8 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldEntityFileAdapter
     {
         public static async Task<DatabaseScaffolder.ScaffoldEntityFileSet> BuildScaffoldEntityFilesAsync(
-            DbConnection connection,
-            DatabaseProvider provider,
-            string outputDirectory,
-            string namespaceName,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
-            IReadOnlyDictionary<string, string> entityByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> sqliteDeclaredTypesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnStoreTypesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable,
-            IReadOnlyDictionary<string, ScaffoldComments> commentsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> relationships,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> manyToManyJoins,
-            IReadOnlySet<string> manyToManyJoinTableKeys,
-            IReadOnlySet<string> queryArtifactTableKeys,
-            DatabaseScaffolder.ScaffoldFeatureConfigurations featureConfigurations,
-            ScaffoldOptions options)
-            => await ScaffoldEntityFileSetBuilder.BuildAsync(
-                connection,
-                provider,
-                outputDirectory,
-                namespaceName,
-                tables,
-                entityByTable,
-                columnPropertiesByTable,
-                primaryKeyColumnsByTable,
-                nonNullableColumnsByTable,
-                sqliteDeclaredTypesByTable,
-                columnStoreTypesByTable,
-                stringBinaryFacetsByTable,
-                commentsByTable,
-                identityColumnsByTable,
-                indexes,
-                relationships,
-                manyToManyJoins,
-                manyToManyJoinTableKeys,
-                queryArtifactTableKeys,
-                featureConfigurations,
-                options).ConfigureAwait(false);
+            ScaffoldEntityFileSetRequest request)
+            => await ScaffoldEntityFileSetBuilder.BuildAsync(request).ConfigureAwait(false);
 
         public static Task<string> ScaffoldEntityAsync(
             DbConnection connection,

@@ -26,28 +26,14 @@ namespace nORM.Scaffolding
             ScaffoldOptions options,
             ObjectPool<StringBuilder> stringBuilderPool)
         {
-            var entityFiles = await ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(
+            var entityFiles = await ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(new ScaffoldEntityFileSetRequest(
                 connection,
                 provider,
                 outputDirectory,
                 namespaceName,
-                discovery.Tables,
-                discovery.EntityByTable,
-                discovery.ColumnPropertiesByTable,
-                discovery.PrimaryKeyColumnsByTable,
-                discovery.NonNullableColumnsByTable,
-                discovery.SqliteDeclaredTypesByTable,
-                discovery.ColumnStoreTypesByTable,
-                discovery.StringBinaryFacetsByTable,
-                discovery.CommentsByTable,
-                discovery.IdentityColumnsByTable,
-                discovery.Indexes,
-                composition.Relationships,
-                composition.ManyToManyJoins,
-                composition.ManyToManyJoinTableKeys,
-                discovery.QueryArtifactTableKeys,
-                discovery.FeatureConfigurations,
-                options).ConfigureAwait(false);
+                discovery,
+                composition,
+                options)).ConfigureAwait(false);
             var generatedFiles = entityFiles.GeneratedFiles.ToList();
 
             var routineStubs = options.EmitRoutineStubs
