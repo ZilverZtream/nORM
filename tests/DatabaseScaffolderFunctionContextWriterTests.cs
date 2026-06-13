@@ -142,6 +142,34 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithPostgresFunctionParameterizedArrayTypes_EmitsTypedParameterDto()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "public",
+            "score_campaign",
+            "PostgreSQL function; parameters=2; outputParameters=0; parameterModes=ratings:IN:ARRAY (numeric(10,2)),labels:IN:ARRAY (varchar(32)); dataType=integer");
+
+        Assert.Contains("public decimal[]? ratings { get; init; }", code);
+        Assert.Contains("public string[]? labels { get; init; }", code);
+        Assert.Contains("var casts = new[] { \"numeric[]\", \"character varying[]\" };", code);
+        Assert.DoesNotContain("public object? ratings { get; init; }", code);
+        Assert.DoesNotContain("public object? labels { get; init; }", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_pg_param_array_types_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithFunctionParametersThatCannotBecomeDto_UsesPositionalArguments()
     {
         var code = InvokeScaffoldContextWithRoutine(

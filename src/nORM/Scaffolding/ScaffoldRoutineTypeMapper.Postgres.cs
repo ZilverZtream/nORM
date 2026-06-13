@@ -67,78 +67,38 @@ namespace nORM.Scaffolding
         }
 
         private static bool TryMapPostgresFunctionArrayArgumentCastType(string normalized, out string castType)
-        {
-            castType = string.Empty;
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            if (open < 0)
-                return false;
-
-            var close = normalized.IndexOf(')', open + 1);
-            var element = (close > open
-                    ? normalized.Substring(open + 1, close - open - 1)
-                    : normalized[(open + 1)..])
-                .Trim()
-                .TrimStart('_');
-
-            castType = element switch
-            {
-                "int2" or "smallint" => "smallint[]",
-                "int4" or "integer" => "integer[]",
-                "int8" or "bigint" => "bigint[]",
-                "float4" or "real" => "real[]",
-                "float8" or "double precision" => "double precision[]",
-                "numeric" or "decimal" => "numeric[]",
-                "bool" or "boolean" => "boolean[]",
-                "uuid" => "uuid[]",
-                "text" => "text[]",
-                "varchar" or "character varying" => "character varying[]",
-                "bpchar" or "char" or "character" => "character[]",
-                "citext" => "citext[]",
-                "bytea" => "bytea[]",
-                "date" => "date[]",
-                "time" or "time without time zone" => "time without time zone[]",
-                "timetz" or "time with time zone" => "time with time zone[]",
-                "interval" => "interval[]",
-                "timestamp" or "timestamp without time zone" => "timestamp without time zone[]",
-                "timestamptz" or "timestamp with time zone" => "timestamp with time zone[]",
-                _ => string.Empty
-            };
-
-            return castType.Length > 0;
-        }
+            => ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out castType);
 
         private static bool TryMapPostgresArrayRoutineType(string normalized, out string typeName)
         {
             typeName = string.Empty;
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            var close = normalized.IndexOf(')', open + 1);
-            if (open < 0 || close <= open)
-                return false;
-
-            var element = normalized.Substring(open + 1, close - open - 1).Trim().TrimStart('_');
-            typeName = element switch
+            if (!ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayCastType(normalized, out var arrayType)
+                || !arrayType.IsArray)
             {
-                "int2" or "smallint" => "short[]",
-                "int4" or "integer" => "int[]",
-                "int8" or "bigint" => "long[]",
-                "float4" or "real" => "float[]",
-                "float8" or "double precision" => "double[]",
-                "numeric" or "decimal" => "decimal[]",
-                "bool" or "boolean" => "bool[]",
-                "uuid" => "Guid[]",
-                "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" or "citext" => "string[]",
-                "bytea" => "byte[][]",
-                "date" => "DateOnly[]",
-                "time" or "time without time zone" or "time with time zone" => "TimeOnly[]",
-                "interval" => "TimeSpan[]",
-                "timestamp" or "timestamp without time zone" => "DateTime[]",
-                "timestamptz" or "timestamp with time zone" => "DateTimeOffset[]",
+                return false;
+            }
+
+            var elementType = arrayType.GetElementType();
+            if (elementType is null)
+                return false;
+
+            typeName = elementType switch
+            {
+                var type when type == typeof(short) => "short[]",
+                var type when type == typeof(int) => "int[]",
+                var type when type == typeof(long) => "long[]",
+                var type when type == typeof(float) => "float[]",
+                var type when type == typeof(double) => "double[]",
+                var type when type == typeof(decimal) => "decimal[]",
+                var type when type == typeof(bool) => "bool[]",
+                var type when type == typeof(Guid) => "Guid[]",
+                var type when type == typeof(string) => "string[]",
+                var type when type == typeof(byte[]) => "byte[][]",
+                var type when type == typeof(DateOnly) => "DateOnly[]",
+                var type when type == typeof(TimeOnly) => "TimeOnly[]",
+                var type when type == typeof(TimeSpan) => "TimeSpan[]",
+                var type when type == typeof(DateTime) => "DateTime[]",
+                var type when type == typeof(DateTimeOffset) => "DateTimeOffset[]",
                 _ => string.Empty
             };
 

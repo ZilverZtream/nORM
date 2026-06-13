@@ -8,6 +8,9 @@ namespace nORM.Scaffolding
         private static string NormalizeRoutineDataType(string dataType)
         {
             var normalized = dataType.Trim().ToLowerInvariant();
+            if (ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out var postgresArrayCastType))
+                return postgresArrayCastType;
+
             var isUnsigned = normalized.Contains(" unsigned", StringComparison.Ordinal);
             var paren = normalized.IndexOf('(');
             var baseType = paren >= 0 ? normalized[..paren].Trim() : normalized;

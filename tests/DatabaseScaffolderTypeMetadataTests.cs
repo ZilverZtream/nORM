@@ -461,6 +461,12 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("ARRAY (_time)", typeof(TimeOnly[]))]
     [InlineData("ARRAY (_interval)", typeof(TimeSpan[]))]
     [InlineData("ARRAY (_timestamptz)", typeof(DateTimeOffset[]))]
+    [InlineData("ARRAY (varchar(64))", typeof(string[]))]
+    [InlineData("ARRAY (character varying(64))", typeof(string[]))]
+    [InlineData("ARRAY (numeric(10,2))", typeof(decimal[]))]
+    [InlineData("character varying(64)[]", typeof(string[]))]
+    [InlineData("numeric(10,2)[]", typeof(decimal[]))]
+    [InlineData("DOMAIN (public.score_values -> ARRAY (numeric(10,2)))", typeof(decimal[]))]
     public void TryMapPostgresArrayType_MapsSafeScalarArrays(string detail, Type expected)
     {
         var m = GetMethod("TryMapPostgresArrayType", new[] { typeof(string), typeof(Type).MakeByRefType() });

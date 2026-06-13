@@ -8,29 +8,20 @@ namespace nORM.Scaffolding
         public static bool TryMapPostgresArrayProbeCastType(string normalized, out string castType)
         {
             castType = string.Empty;
-            if (normalized.EndsWith("[]", StringComparison.Ordinal))
-                return TryNormalizePostgresArrayElementCastType(normalized[..^2].Trim(), out castType);
-
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
-                return false;
-
-            var open = normalized.IndexOf('(');
-            if (open < 0)
-                return false;
-
-            var close = normalized.IndexOf(')', open + 1);
-            var element = (close > open
-                    ? normalized.Substring(open + 1, close - open - 1)
-                    : normalized[(open + 1)..])
-                .Trim()
-                .TrimStart('_');
-
-            return TryNormalizePostgresArrayElementCastType(element, out castType);
+            return TryGetPostgresArrayElementType(normalized, out var element)
+                   && TryNormalizePostgresArrayElementCastType(element, out castType);
         }
 
         private static bool TryNormalizePostgresArrayElementCastType(string element, out string castType)
         {
-            castType = element.Trim().TrimStart('_') switch
+            element = element.Trim().TrimStart('_');
+            if (TryNormalizePostgresParameterizedProbeCastType(element, out var parameterizedCastType))
+            {
+                castType = StripPostgresTypeArguments(parameterizedCastType) + "[]";
+                return true;
+            }
+
+            castType = element switch
             {
                 "int2" or "smallint" => "smallint[]",
                 "int4" or "integer" => "integer[]",
@@ -66,20 +57,33 @@ namespace nORM.Scaffolding
             if (normalized.Contains("domain", StringComparison.OrdinalIgnoreCase))
                 normalized = GetPostgresDomainProbeCastType(detail).Trim().ToLowerInvariant();
 
-            if (TryMapPostgresArrayCastType(normalized, out arrayType))
-                return true;
+            return TryMapPostgresArrayCastType(normalized, out arrayType);
+        }
 
-            if (!normalized.StartsWith("array", StringComparison.Ordinal))
+        public static bool TryMapPostgresArrayCastType(string normalized, out Type arrayType)
+        {
+            arrayType = typeof(object[]);
+            if (TryMapPostgresArrayProbeCastType(normalized, out var canonicalCastType))
+                normalized = canonicalCastType;
+
+            if (!TryGetPostgresArrayElementType(normalized, out var element)
+                || !TryMapPostgresArrayElementClrType(element, out var elementType))
+            {
                 return false;
+            }
 
-            var open = normalized.IndexOf('(');
-            var close = normalized.IndexOf(')', open + 1);
-            var element = open >= 0 && close > open
-                ? normalized.Substring(open + 1, close - open - 1).Trim()
-                : string.Empty;
-            element = element.TrimStart('_');
+            arrayType = elementType.MakeArrayType();
+            return true;
+        }
 
-            var elementType = element switch
+        private static bool TryMapPostgresArrayElementClrType(string element, out Type elementType)
+        {
+            elementType = typeof(object);
+            element = element.Trim().TrimStart('_');
+            if (TryNormalizePostgresParameterizedProbeCastType(element, out var parameterizedCastType))
+                element = StripPostgresTypeArguments(parameterizedCastType);
+
+            var mappedType = element switch
             {
                 "int2" or "smallint" => typeof(short),
                 "int4" or "integer" => typeof(int),
@@ -92,55 +96,77 @@ namespace nORM.Scaffolding
                 "text" or "varchar" or "character varying" or "bpchar" or "char" or "character" or "citext" => typeof(string),
                 "bytea" => typeof(byte[]),
                 "date" => typeof(DateOnly),
-                "time" or "time without time zone" or "time with time zone" => typeof(TimeOnly),
+                "time" or "time without time zone" or "time with time zone" or "timetz" => typeof(TimeOnly),
                 "interval" => typeof(TimeSpan),
                 "timestamp" or "timestamp without time zone" => typeof(DateTime),
                 "timestamptz" or "timestamp with time zone" => typeof(DateTimeOffset),
                 _ => null
             };
 
-            if (elementType is null)
+            if (mappedType is null)
                 return false;
 
-            arrayType = elementType.MakeArrayType();
+            elementType = mappedType;
             return true;
         }
 
-        public static bool TryMapPostgresArrayCastType(string normalized, out Type arrayType)
+        private static bool TryGetPostgresArrayElementType(string normalized, out string element)
         {
-            arrayType = typeof(object[]);
-            if (TryMapPostgresArrayProbeCastType(normalized, out var canonicalCastType))
-                normalized = canonicalCastType;
-
-            if (!normalized.EndsWith("[]", StringComparison.Ordinal))
-                return false;
-
-            var element = normalized[..^2].Trim();
-            var elementType = element switch
+            element = string.Empty;
+            normalized = normalized.Trim();
+            if (normalized.EndsWith("[]", StringComparison.Ordinal))
             {
-                "smallint" => typeof(short),
-                "integer" => typeof(int),
-                "bigint" => typeof(long),
-                "real" => typeof(float),
-                "double precision" => typeof(double),
-                "numeric" => typeof(decimal),
-                "boolean" => typeof(bool),
-                "uuid" => typeof(Guid),
-                "text" or "character varying" or "character" or "citext" => typeof(string),
-                "bytea" => typeof(byte[]),
-                "date" => typeof(DateOnly),
-                "time without time zone" or "time with time zone" => typeof(TimeOnly),
-                "interval" => typeof(TimeSpan),
-                "timestamp without time zone" => typeof(DateTime),
-                "timestamp with time zone" => typeof(DateTimeOffset),
-                _ => null
-            };
+                element = normalized[..^2].Trim().TrimStart('_');
+                return element.Length > 0;
+            }
 
-            if (elementType is null)
+            if (!normalized.StartsWith("array", StringComparison.Ordinal))
                 return false;
 
-            arrayType = elementType.MakeArrayType();
-            return true;
+            var afterKeyword = "array".Length;
+            if (afterKeyword < normalized.Length
+                && !char.IsWhiteSpace(normalized[afterKeyword])
+                && normalized[afterKeyword] != '(')
+            {
+                return false;
+            }
+
+            var open = normalized.IndexOf('(', afterKeyword);
+            if (open < 0)
+                return false;
+
+            var close = FindMatchingPostgresTypeParenthesis(normalized, open);
+            if (close <= open)
+                return false;
+
+            element = normalized.Substring(open + 1, close - open - 1).Trim().TrimStart('_');
+            return element.Length > 0;
+        }
+
+        private static int FindMatchingPostgresTypeParenthesis(string value, int open)
+        {
+            var depth = 0;
+            for (var i = open; i < value.Length; i++)
+            {
+                if (value[i] == '(')
+                {
+                    depth++;
+                }
+                else if (value[i] == ')')
+                {
+                    depth--;
+                    if (depth == 0)
+                        return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static string StripPostgresTypeArguments(string typeText)
+        {
+            var open = typeText.IndexOf('(');
+            return open < 0 ? typeText : typeText[..open].Trim();
         }
     }
 }
