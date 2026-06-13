@@ -110,7 +110,12 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.Sqlite.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Nullability.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Queries.cs"));
 
     private static string ReadPostgresUnsupportedFeatureSource()
         => string.Concat(
@@ -182,6 +187,11 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Identity.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Nullability.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Queries.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnPropertyDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCommentDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCommentDiscovery.SqlServer.cs"),
@@ -353,6 +363,11 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntitySourceInfo.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldStoreTypeClrMapper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.MySql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.StoreTypes.Queries.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelMetadataDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelMetadataDiscovery.Filters.cs"),
