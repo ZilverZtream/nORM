@@ -22,6 +22,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxCoreQueryTranslatorFileLines = 1000;
     private const int MaxQueryTranslatorPartialFileLines = 1200;
     private const int MaxNormQueryProviderPartialFileLines = 1500;
+    private const int MaxQueryExecutorPartialFileLines = 1000;
     private const int MaxSelectClauseVisitorPartialFileLines = 1500;
     private const int MaxExpressionToSqlVisitorPartialFileLines = 1200;
     private const int MaxSqliteProviderPartialFileLines = 1500;
@@ -523,6 +524,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split NormQueryProvider code by aggregate rewrite, execution, simple-query, CUD, and streaming/plan responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Query_executor_partials_stay_split_by_materialization_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `QueryExecutor*.cs` partial stays below 1000 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "QueryExecutor*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxQueryExecutorPartialFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split QueryExecutor code by core materialization, group joins, dependent split queries, and support helpers before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]

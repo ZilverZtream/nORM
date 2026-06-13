@@ -189,6 +189,13 @@ rewrites, async execution, simple-query fast paths, CUD, and streaming/plan
 helpers remain separate execution responsibilities. `RepositoryHygieneTests`
 enforces this boundary.
 
+## Query Executor Source Size
+
+Every `QueryExecutor*.cs` partial stays below 1000 lines so core
+materialization, group-join materialization, dependent split-query loading, and
+support helpers remain separate responsibilities. `RepositoryHygieneTests`
+enforces this boundary.
+
 ## Select Clause Visitor Source Size
 
 Every `SelectClauseVisitor*.cs` partial stays below 1500 lines so projection
