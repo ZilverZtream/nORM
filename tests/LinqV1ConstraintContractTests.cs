@@ -26,7 +26,7 @@ public class LinqV1ConstraintContractTests
     [InlineData("`Distinct`", "Supported")]
     [InlineData("`Sum`, `Average`, `Min`, `Max`", "Supported")]
     [InlineData("Inner joins", "Supported")]
-    [InlineData("Set operations: `Union`, `Intersect`, `Except`", "Supported")]
+    [InlineData("Set operations: `Union`, `Intersect`, `Except`, `Concat`", "Supported")]
     [InlineData("`AsSplitQuery`, `AsNoTracking`, caching, temporal `AsOf`", "Supported")]
     [InlineData("Group joins", "Supported")]
     [InlineData("`AsAsyncEnumerable`", "Supported")]

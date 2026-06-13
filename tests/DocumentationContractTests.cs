@@ -70,6 +70,25 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Linq_set_operation_docs_pin_concat_as_union_all_surface()
+    {
+        var root = FindRepositoryRoot();
+        var matrix = File.ReadAllText(Path.Combine(root, "docs", "linq-support.md"));
+        var coverage = File.ReadAllText(Path.Combine(root, "docs", "linq-support-coverage.md"));
+        var liveParity = File.ReadAllText(Path.Combine(root, "docs", "live-provider-linq-parity.md"));
+
+        const string feature = "Set operations: `Union`, `Intersect`, `Except`, `Concat`";
+        Assert.Contains($"| {feature} | Supported |", matrix, StringComparison.Ordinal);
+        Assert.Contains("`Concat` lowers to `UNION ALL`", matrix, StringComparison.Ordinal);
+        Assert.Contains($"| {feature} |", coverage, StringComparison.Ordinal);
+        Assert.Contains("tests/LinqConcatAnonymousProjectionTests.cs", coverage, StringComparison.Ordinal);
+        Assert.Contains("tests/LinqSetOpWithTakeSkipPagingTests.cs", coverage, StringComparison.Ordinal);
+        Assert.Contains("tests/LiveProviderSetOpParityTests.cs", coverage, StringComparison.Ordinal);
+        Assert.Contains("`Union` / `Intersect` / `Except` / `Concat`", liveParity, StringComparison.Ordinal);
+        Assert.Contains("LiveProviderSetOpParityTests", liveParity, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Readme_uses_bounded_v1_claims()
     {
         var root = FindRepositoryRoot();
