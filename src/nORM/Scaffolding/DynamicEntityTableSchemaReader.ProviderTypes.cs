@@ -33,22 +33,8 @@ namespace nORM.Scaffolding
             if (ScaffoldStoreTypeClrMapper.TryMapStoreType(connection, columnStoreType, out var storeClrType))
                 return storeClrType;
 
-            if (DynamicEntityConnectionKind.IsSqlite(connection)
-                && IsSqliteUuidDeclaredType(declaredType))
-            {
-                return typeof(Guid);
-            }
-
-            if (DynamicEntityConnectionKind.IsSqlite(connection)
-                && isKey
-                && isAuto
-                && !allowNull
-                && clrType == typeof(int))
-            {
-                // SQLite INTEGER PRIMARY KEY aliases the 64-bit rowid even when
-                // provider schema metadata reports Int32 for small test values.
-                return typeof(long);
-            }
+            if (TryNormalizeSqliteScaffoldClrType(connection, clrType, allowNull, isKey, isAuto, declaredType, out var sqliteClrType))
+                return sqliteClrType;
 
             return clrType;
         }
@@ -61,43 +47,25 @@ namespace nORM.Scaffolding
             string? sqlServerAliasBaseType,
             IReadOnlyDictionary<string, string> mySqlUnsignedColumnTypes)
         {
-            if (DynamicEntityConnectionKind.IsPostgres(connection)
-                && normalizedClrType == typeof(Array)
-                && postgresDomainColumnCastTypes.TryGetValue(columnName, out var domainCastType)
-                && ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayCastType(domainCastType.Trim().ToLowerInvariant(), out var arrayClrType))
-            {
-                return arrayClrType;
-            }
+            if (TryResolvePostgresProviderSpecificClrType(
+                    connection,
+                    normalizedClrType,
+                    columnName,
+                    postgresDomainColumnCastTypes,
+                    out var postgresClrType))
+                return postgresClrType;
 
-            if (DynamicEntityConnectionKind.IsSqlServer(connection)
-                && ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrTypeName(sqlServerAliasBaseType, out var aliasClrType))
-            {
-                return aliasClrType;
-            }
+            if (TryResolveSqlServerProviderSpecificClrType(connection, sqlServerAliasBaseType, out var sqlServerClrType))
+                return sqlServerClrType;
 
-            if (DynamicEntityConnectionKind.IsMySql(connection)
-                && mySqlUnsignedColumnTypes.TryGetValue(columnName, out var unsignedColumnType)
-                && ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(unsignedColumnType, out var unsignedClrType))
-            {
-                return unsignedClrType;
-            }
+            if (TryResolveMySqlProviderSpecificClrType(
+                    connection,
+                    columnName,
+                    mySqlUnsignedColumnTypes,
+                    out var mySqlClrType))
+                return mySqlClrType;
 
             return normalizedClrType;
         }
-
-        public static bool IsSqliteUuidDeclaredType(string? declaredType)
-        {
-            if (string.IsNullOrWhiteSpace(declaredType))
-                return false;
-
-            var normalized = declaredType.Trim().ToUpperInvariant();
-            return !DynamicEntityReadOnlyClassifier.IsUnsafeSqliteProviderSpecificDeclaredType(normalized)
-                   && DynamicEntityReadOnlyClassifier.ContainsSqliteDeclaredTypeToken(normalized, "UUID");
-        }
-
-        private static int? GetSqlServerAliasBaseMaxLengthFromTypeText(string? typeText)
-            => string.IsNullOrWhiteSpace(typeText)
-                ? null
-                : ScaffoldProviderSpecificTypeClassifier.GetSqlServerAliasBaseMaxLengthFromTypeText(typeText);
     }
 }

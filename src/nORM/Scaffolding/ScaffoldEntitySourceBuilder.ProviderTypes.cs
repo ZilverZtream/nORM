@@ -40,47 +40,19 @@ namespace nORM.Scaffolding
             if (ScaffoldStoreTypeClrMapper.TryMapStoreType(provider, columnStoreType, out var storeClrType))
                 return storeClrType;
 
-            if (ScaffoldProviderKind.IsSqlite(provider) && IsSqliteUuidDeclaredType(declaredType))
-                return typeof(Guid);
+            if (TryNormalizeSqliteScaffoldClrType(provider, clrType, allowNull, isKey, isAuto, declaredType, out var sqliteClrType))
+                return sqliteClrType;
 
-            if (ScaffoldProviderKind.IsPostgres(provider)
-                && ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayType(providerSpecificColumnType, out var arrayType))
-            {
-                return arrayType;
-            }
+            if (TryNormalizePostgresScaffoldClrType(provider, providerSpecificColumnType, out var postgresClrType))
+                return postgresClrType;
 
-            if (ScaffoldProviderKind.IsSqlServer(provider)
-                && ScaffoldProviderSpecificTypeClassifier.TryMapSqlServerAliasBaseClrType(providerSpecificColumnType, out var aliasBaseType))
-            {
-                return aliasBaseType;
-            }
+            if (TryNormalizeSqlServerScaffoldClrType(provider, providerSpecificColumnType, out var sqlServerClrType))
+                return sqlServerClrType;
 
-            if (ScaffoldProviderKind.IsMySql(provider)
-                && ScaffoldProviderSpecificTypeClassifier.TryMapMySqlUnsignedType(providerSpecificColumnType, out var unsignedType))
-            {
-                return unsignedType;
-            }
-
-            if (ScaffoldProviderKind.IsSqlite(provider)
-                && isKey
-                && isAuto
-                && !allowNull
-                && clrType == typeof(int))
-            {
-                return typeof(long);
-            }
+            if (TryNormalizeMySqlScaffoldClrType(provider, providerSpecificColumnType, out var mySqlClrType))
+                return mySqlClrType;
 
             return clrType;
-        }
-
-        public static bool IsSqliteUuidDeclaredType(string? declaredType)
-        {
-            if (string.IsNullOrWhiteSpace(declaredType))
-                return false;
-
-            var normalized = declaredType.Trim().ToUpperInvariant();
-            return !DynamicEntityReadOnlyClassifier.IsUnsafeSqliteProviderSpecificDeclaredType(normalized)
-                   && DynamicEntityReadOnlyClassifier.ContainsSqliteDeclaredTypeToken(normalized, "UUID");
         }
     }
 }
