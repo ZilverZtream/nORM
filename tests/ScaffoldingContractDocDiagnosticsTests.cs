@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text.RegularExpressions;
+using nORM.Scaffolding;
 using Xunit;
 
 namespace nORM.Tests;
@@ -120,52 +120,44 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Referential_action_diagnostic_metadata_includes_relationship_shape()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
-        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
-        var addMethod = scaffolder.GetMethod("AddReferentialActionDiagnostics", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var features = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(featureType))!;
-        var foreignKeys = Array.CreateInstance(foreignKeyType, 2);
-        foreignKeys.SetValue(Activator.CreateInstance(
-            foreignKeyType,
-            "sales",
-            "OrderLine",
-            "TenantId",
-            "sales",
-            "Order",
-            "TenantId",
-            "FK_OrderLine_Order",
-            2,
-            "PROVIDER CASCADE",
-            "NO ACTION",
-            false)!, 0);
-        foreignKeys.SetValue(Activator.CreateInstance(
-            foreignKeyType,
-            "sales",
-            "OrderLine",
-            "OrderId",
-            "sales",
-            "Order",
-            "OrderId",
-            "FK_OrderLine_Order",
-            2,
-            "PROVIDER CASCADE",
-            "NO ACTION",
-            false)!, 1);
-
-        addMethod.Invoke(null, new object[]
+        var features = new List<DatabaseScaffolder.ScaffoldUnsupportedFeature>();
+        var foreignKeys = new[]
         {
-            features,
-            foreignKeys
-        });
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                "sales",
+                "OrderLine",
+                "TenantId",
+                "sales",
+                "Order",
+                "TenantId",
+                "FK_OrderLine_Order",
+                2,
+                "PROVIDER CASCADE",
+                "NO ACTION",
+                false),
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                "sales",
+                "OrderLine",
+                "OrderId",
+                "sales",
+                "Order",
+                "OrderId",
+                "FK_OrderLine_Order",
+                2,
+                "PROVIDER CASCADE",
+                "NO ACTION",
+                false)
+        };
 
-        var feature = Assert.Single(features.Cast<object>());
+        ScaffoldUnsupportedDiagnosticAdapter.AddReferentialActionDiagnostics(features, foreignKeys);
+
+        var feature = Assert.Single(features);
         var metadata = BuildUnsupportedFeatureMetadata(
-            (string)featureType.GetProperty("TableKey")!.GetValue(feature)!,
-            (string)featureType.GetProperty("Kind")!.GetValue(feature)!,
-            (string)featureType.GetProperty("Name")!.GetValue(feature)!,
-            (string)featureType.GetProperty("Detail")!.GetValue(feature)!,
-            (IReadOnlyDictionary<string, object?>?)featureType.GetProperty("Metadata")!.GetValue(feature));
+            feature.TableKey,
+            feature.Kind,
+            feature.Name,
+            feature.Detail,
+            feature.Metadata);
 
         Assert.Equal("sales.OrderLine", metadata["dependentTable"]);
         Assert.Equal(new[] { "TenantId", "OrderId" }, (string[])metadata["dependentColumns"]!);
