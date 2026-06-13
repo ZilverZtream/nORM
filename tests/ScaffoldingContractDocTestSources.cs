@@ -363,7 +363,6 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.Reports.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.UnsupportedFeatures.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.FeatureDiagnostics.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.FeatureConfigurations.Checks.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.FeatureConfigurations.Scalar.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.SchemaMaps.cs"));
 

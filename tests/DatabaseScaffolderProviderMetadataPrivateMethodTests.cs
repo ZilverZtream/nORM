@@ -318,8 +318,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("enum('read','write')", false, 0)]
     public void TryParseBoundedMySqlSetValues_StaticAndDynamic_MatchWriteSafety(string detail, bool expected, int expectedCount)
     {
-        var staticResult = InvokeTryParseBoundedMySqlSetValues(typeof(DatabaseScaffolder), detail);
-        var dynamicResult = InvokeTryParseBoundedMySqlSetValues(typeof(DynamicEntityTypeGenerator), detail);
+        var staticResult = InvokeStaticTryParseBoundedMySqlSetValues(detail);
+        var dynamicResult = InvokeDynamicTryParseBoundedMySqlSetValues(detail);
 
         Assert.Equal(expected, staticResult.Parsed);
         Assert.Equal(expected, dynamicResult.Parsed);
@@ -526,38 +526,26 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData(@"set('read\'write','admin')", "Flags", "Set", "Flags IN ('', 'read''write', 'admin', 'read''write,admin')")]
     public void TryBuildProviderValueCheckSql_EscapesMySqlQuotedValues(string detail, string column, string expectedKind, string expectedSql)
     {
-        var m = GetMethod("TryBuildProviderValueCheckSql", new[] { typeof(string), typeof(string), typeof(string).MakeByRefType(), typeof(string).MakeByRefType() });
-        object?[] args = { column, detail, null, null };
-
-        Assert.True((bool)m.Invoke(null, args)!);
-        Assert.Equal(expectedKind, args[2]);
-        Assert.Equal(expectedSql, args[3]);
+        Assert.True(ScaffoldFeatureConfigurationBuilder.TryBuildProviderValueCheckSql(column, detail, out var checkKind, out var sql));
+        Assert.Equal(expectedKind, checkKind);
+        Assert.Equal(expectedSql, sql);
     }
 
     [Fact]
     public void TryBuildProviderValueCheckSql_RejectsMySqlSetValuesWithEscapedCommas()
     {
-        var m = GetMethod("TryBuildProviderValueCheckSql", new[] { typeof(string), typeof(string), typeof(string).MakeByRefType(), typeof(string).MakeByRefType() });
-        object?[] args = { "Flags", @"set('read\,write','admin')", null, null };
-
-        Assert.False((bool)m.Invoke(null, args)!);
-        Assert.Equal(string.Empty, args[2]);
-        Assert.Equal(string.Empty, args[3]);
+        Assert.False(ScaffoldFeatureConfigurationBuilder.TryBuildProviderValueCheckSql(
+            "Flags",
+            @"set('read\,write','admin')",
+            out var checkKind,
+            out var sql));
+        Assert.Equal(string.Empty, checkKind);
+        Assert.Equal(string.Empty, sql);
     }
 
     [Fact]
     public void BuildEnumCheckConstraintConfigurations_EmitsCheckForPostgresDomainEnum()
     {
-        var scaffolder = typeof(DatabaseScaffolder);
-        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
-        var method = GetMethod(
-            "BuildEnumCheckConstraintConfigurations",
-            new[]
-            {
-                typeof(IReadOnlyDictionary<string, string>),
-                typeof(IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>),
-                typeof(IEnumerable<>).MakeGenericType(featureType)
-            });
         var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["public.Customers"] = "Customer"
@@ -569,66 +557,57 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 ["Status"] = "Status"
             }
         };
-        var features = Array.CreateInstance(featureType, 1);
-        features.SetValue(Activator.CreateInstance(
-            featureType,
-            "public.Customers",
-            "ProviderSpecificColumnType",
-            "Status",
-            "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))")!, 0);
+        var features = new[]
+        {
+            new ScaffoldFeatureInput(
+                0,
+                new ScaffoldUnsupportedFeatureInfo(
+                    "public.Customers",
+                    "ProviderSpecificColumnType",
+                    "Status",
+                    "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))"))
+        };
 
-        var result = ((System.Collections.IEnumerable)method.Invoke(
-                null,
-                new object[] { entityByTable, propertiesByTable, features })!)
-            .Cast<object>()
-            .ToArray();
+        var result = ScaffoldFeatureConfigurationBuilder.BuildEnumCheckConstraintConfigurations(
+            entityByTable,
+            propertiesByTable,
+            features);
 
         var check = Assert.Single(result);
-        Assert.Equal("public.Customers", check.GetType().GetProperty("TableKey")!.GetValue(check));
-        Assert.Equal("Customer", check.GetType().GetProperty("EntityName")!.GetValue(check));
-        Assert.Equal("CK_Customer_Status_Enum", check.GetType().GetProperty("Name")!.GetValue(check));
-        Assert.Equal("Status IN ('draft', 'active', 'archived')", check.GetType().GetProperty("Sql")!.GetValue(check));
+        Assert.Equal("public.Customers", check.TableKey);
+        Assert.Equal("Customer", check.EntityName);
+        Assert.Equal("CK_Customer_Status_Enum", check.Name);
+        Assert.Equal("Status IN ('draft', 'active', 'archived')", check.Sql);
     }
 
     [Fact]
     public void BuildCheckConstraintConfigurations_ReplacesSyntheticConstraintNameWithStableName()
     {
-        var scaffolder = typeof(DatabaseScaffolder);
-        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
-        var method = GetMethod(
-            "BuildCheckConstraintConfigurations",
-            new[]
-            {
-                typeof(IReadOnlyDictionary<string, string>),
-                typeof(IEnumerable<>).MakeGenericType(featureType)
-            });
         var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["dbo.Orders"] = "Order"
         };
-        var feature = Activator.CreateInstance(
-            featureType,
-            "dbo.Orders",
-            "CheckConstraint",
-            "CK__Orders__Amount__12345678",
-            "([Amount]>(0))")!;
-        featureType.GetProperty("Metadata")!.SetValue(
-            feature,
-            new Dictionary<string, object?> { ["isSyntheticName"] = true });
-        var features = Array.CreateInstance(featureType, 1);
-        features.SetValue(feature, 0);
+        var features = new[]
+        {
+            new ScaffoldFeatureInput(
+                0,
+                new ScaffoldUnsupportedFeatureInfo(
+                    "dbo.Orders",
+                    "CheckConstraint",
+                    "CK__Orders__Amount__12345678",
+                    "([Amount]>(0))")
+                {
+                    Metadata = new Dictionary<string, object?> { ["isSyntheticName"] = true }
+                })
+        };
 
-        var result = ((System.Collections.IEnumerable)method.Invoke(
-                null,
-                new object[] { entityByTable, features })!)
-            .Cast<object>()
-            .ToArray();
+        var result = ScaffoldFeatureConfigurationBuilder.BuildCheckConstraintConfigurations(entityByTable, features);
 
         var check = Assert.Single(result);
-        var name = Assert.IsType<string>(check.GetType().GetProperty("Name")!.GetValue(check));
+        var name = check.Name;
         Assert.StartsWith("CK_Order_", name, StringComparison.Ordinal);
         Assert.DoesNotContain("CK__Orders__", name, StringComparison.Ordinal);
-        Assert.Equal("[Amount]>(0)", check.GetType().GetProperty("Sql")!.GetValue(check));
+        Assert.Equal("[Amount]>(0)", check.Sql);
     }
 
     [Theory]

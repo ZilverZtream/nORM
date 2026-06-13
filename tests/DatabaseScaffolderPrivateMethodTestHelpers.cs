@@ -164,11 +164,17 @@ public partial class DatabaseScaffolderPrivateMethodTests
         return (mapped, (Type)args[1]!);
     }
 
-    private static (bool Parsed, string[] Values) InvokeTryParseBoundedMySqlSetValues(Type declaringType, string detail)
+    private static (bool Parsed, string[] Values) InvokeStaticTryParseBoundedMySqlSetValues(string detail)
     {
-        var m = declaringType
+        var parsed = ScaffoldProviderSpecificTypeClassifier.TryParseBoundedMySqlSetValues(detail, out var values);
+        return (parsed, values);
+    }
+
+    private static (bool Parsed, string[] Values) InvokeDynamicTryParseBoundedMySqlSetValues(string detail)
+    {
+        var m = typeof(DynamicEntityTypeGenerator)
             .GetMethod("TryParseBoundedMySqlSetValues", BindingFlags.NonPublic | BindingFlags.Static, null, new[] { typeof(string), typeof(string[]).MakeByRefType() }, null)
-            ?? throw new MissingMethodException(declaringType.Name, "TryParseBoundedMySqlSetValues");
+            ?? throw new MissingMethodException(nameof(DynamicEntityTypeGenerator), "TryParseBoundedMySqlSetValues");
         object?[] args = { detail, Array.Empty<string>() };
         var parsed = (bool)m.Invoke(null, args)!;
         return (parsed, (string[])args[1]!);
