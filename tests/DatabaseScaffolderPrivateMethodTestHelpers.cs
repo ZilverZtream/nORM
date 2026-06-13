@@ -44,23 +44,15 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     private static (string Sql, bool Stored) InvokeNormalizeScaffoldComputedSql(string raw)
-    {
-        var m = GetMethod("NormalizeScaffoldComputedSql", new[] { typeof(string) });
-        return ((string Sql, bool Stored))m.Invoke(null, new object[] { raw })!;
-    }
+        => ScaffoldSqlMetadataParser.NormalizeScaffoldComputedSql(raw);
 
     private static string InvokeNormalizeScaffoldCheckSql(string raw)
-    {
-        var m = GetMethod("NormalizeScaffoldCheckSql", new[] { typeof(string) });
-        return (string)m.Invoke(null, new object[] { raw })!;
-    }
+        => ScaffoldSqlMetadataParser.NormalizeScaffoldCheckSql(raw);
 
     private static (bool Normalized, string Sql) InvokeTryNormalizeScaffoldDefaultSql(string? raw)
     {
-        var m = GetMethod("TryNormalizeScaffoldDefaultSql", new[] { typeof(string), typeof(string).MakeByRefType() });
-        object?[] args = { raw, string.Empty };
-        var normalized = (bool)m.Invoke(null, args)!;
-        return (normalized, (string)args[1]!);
+        var normalized = ScaffoldSqlMetadataParser.TryNormalizeScaffoldDefaultSql(raw, out var sql);
+        return (normalized, sql);
     }
 
     private static (bool Normalized, string Sql) InvokeTryNormalizeDynamicDefaultSql(string? raw)
@@ -75,10 +67,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
     private static (bool Parsed, long Seed, long Increment) InvokeTryParseIdentityOptions(string? detail)
     {
-        var m = GetMethod("TryParseIdentityOptions", new[] { typeof(string), typeof(long).MakeByRefType(), typeof(long).MakeByRefType() });
-        object?[] args = { detail, 0L, 0L };
-        var parsed = (bool)m.Invoke(null, args)!;
-        return (parsed, (long)args[1]!, (long)args[2]!);
+        var parsed = ScaffoldSqlMetadataParser.TryParseIdentityOptions(detail, out var seed, out var increment);
+        return (parsed, seed, increment);
     }
 
     private static int? InvokeGetScaffoldMaxLength(Type type, object? columnSize)

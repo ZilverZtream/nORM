@@ -98,14 +98,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("decimal(4,5)", false, 0, null)]
     public void TryParseDecimalPrecision_ParsesProviderNumericDeclarations(string typeName, bool expected, int expectedPrecision, int? expectedScale)
     {
-        var method = GetMethod("TryParseDecimalPrecision", new[] { typeof(string), typeof(int).MakeByRefType(), typeof(int?).MakeByRefType() });
-        var args = new object?[] { typeName, 0, null };
-
-        var result = (bool)method.Invoke(null, args)!;
+        var result = ScaffoldSqlMetadataParser.TryParseDecimalPrecision(typeName, out var precision, out var scale);
 
         Assert.Equal(expected, result);
-        Assert.Equal(expectedPrecision, (int)args[1]!);
-        Assert.Equal(expectedScale, args[2] is int scale ? scale : null);
+        Assert.Equal(expectedPrecision, precision);
+        Assert.Equal(expectedScale, scale);
     }
 
     [Theory]
