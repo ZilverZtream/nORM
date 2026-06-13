@@ -78,7 +78,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 break;
             case ProviderKind.Postgres:
                 Execute(connection,
-                    $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(routineName)}(ids integer[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) $$");
+                    $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(routineName)}(ids integer[], ratings numeric(10,2)[], labels varchar(32)[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) + COALESCE(array_length(ratings, 1), 0) + COALESCE(array_length(labels, 1), 0) $$");
                 break;
             case ProviderKind.MySql:
                 Execute(connection,
@@ -104,7 +104,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                     $"IF OBJECT_ID(N'dbo.{routineName}', N'FN') IS NOT NULL DROP FUNCTION {provider.Escape("dbo")}.{provider.Escape(routineName)}");
                 break;
             case ProviderKind.Postgres:
-                Execute(connection, $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(routineName)}(integer[], uuid)");
+                Execute(connection, $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(routineName)}(integer[], numeric[], character varying[], uuid)");
                 break;
             case ProviderKind.MySql:
                 Execute(connection, $"DROP FUNCTION IF EXISTS {provider.Escape(routineName)}");

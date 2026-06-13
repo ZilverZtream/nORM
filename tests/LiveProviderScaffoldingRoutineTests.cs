@@ -236,10 +236,21 @@ public sealed partial class LiveProviderScaffoldingParityTests
 
                 Assert.Contains($"public sealed class {PostgresTypedRoutineName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public int[]? ids { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public decimal[]? ratings { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public string[]? labels { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public Guid? trace_id { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("var casts = new[] { \"integer[]\", \"numeric[]\", \"character varying[]\", \"uuid\" };", contextCode, StringComparison.Ordinal);
                 Assert.Contains(parameters, item =>
                     item.GetProperty("name").GetString() == "ids" &&
                     item.GetProperty("clrType").GetString() == "int[]?" &&
+                    item.GetProperty("dbType").GetString() == "Object");
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "ratings" &&
+                    item.GetProperty("clrType").GetString() == "decimal[]?" &&
+                    item.GetProperty("dbType").GetString() == "Object");
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "labels" &&
+                    item.GetProperty("clrType").GetString() == "string[]?" &&
                     item.GetProperty("dbType").GetString() == "Object");
                 Assert.Contains(parameters, item =>
                     item.GetProperty("name").GetString() == "trace_id" &&

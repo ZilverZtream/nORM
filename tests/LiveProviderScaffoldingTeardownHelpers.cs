@@ -384,7 +384,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection,
-                $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(integer[], uuid)");
+                $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(integer[], numeric[], character varying[], uuid)");
         }
         catch
         {

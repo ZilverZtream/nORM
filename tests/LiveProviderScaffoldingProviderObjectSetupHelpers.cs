@@ -118,7 +118,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
         await TeardownPostgresTypedRoutineAsync(connection, provider);
 
         await ExecuteAsync(connection,
-            $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(ids integer[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) $$");
+            $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(ids integer[], ratings numeric(10,2)[], labels varchar(32)[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) + COALESCE(array_length(ratings, 1), 0) + COALESCE(array_length(labels, 1), 0) $$");
     }
 
     private static async Task SetupPostgresOverloadedRoutineAsync(DbConnection connection, DatabaseProvider provider)
