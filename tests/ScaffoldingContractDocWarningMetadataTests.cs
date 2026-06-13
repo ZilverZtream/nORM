@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using nORM.Scaffolding;
 using Xunit;
 
@@ -445,37 +444,25 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Precision_scale_warning_uses_stable_code_and_action()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
-        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var indexType = scaffolder.GetNestedType("ScaffoldIndex", BindingFlags.NonPublic)!;
-        var features = Array.CreateInstance(featureType, 1);
-        features.SetValue(
-            Activator.CreateInstance(
-                featureType,
+        var features = new[]
+        {
+            new DatabaseScaffolder.ScaffoldUnsupportedFeature(
                 "dbo.Orders",
                 "PrecisionScale",
                 "Amount",
-                "decimal(provider)")!,
-            0);
-        var method = scaffolder.GetMethod("ScaffoldDiagnosticsJson", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var json = (string)method.Invoke(
-            null,
-            new object[]
-            {
-                Array.CreateInstance(foreignKeyType, 0),
-                features,
-                Array.CreateInstance(skippedObjectType, 0),
-                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
-                Array.CreateInstance(indexType, 0),
-                new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase),
-                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
-                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
-                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
-                null!
-            })!;
+                "decimal(provider)")
+        };
+        var json = ScaffoldDiagnosticsAdapter.ScaffoldDiagnosticsJson(
+            Array.Empty<DatabaseScaffolder.ScaffoldForeignKey>(),
+            features,
+            Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>(),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+            Array.Empty<DatabaseScaffolder.ScaffoldIndex>(),
+            new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         var diagnostic = Assert.Single(doc.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray());
