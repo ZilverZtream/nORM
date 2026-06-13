@@ -122,11 +122,9 @@ namespace nORM.Scaffolding
         private static async Task<string?> GetSqliteIndexFilterSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)
         {
             var sql = await GetSqliteIndexSqlAsync(connection, provider, schemaName, indexName).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(sql))
-                return null;
-
-            var where = sql.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
-            return where < 0 ? null : sql[(where + 7)..].Trim();
+            return string.IsNullOrWhiteSpace(sql)
+                ? null
+                : ScaffoldSqlMetadataParser.ExtractCreateIndexWhereClause(sql);
         }
 
         private static async Task<string?> GetSqliteIndexSqlAsync(DbConnection connection, DatabaseProvider provider, string? schemaName, string indexName)

@@ -151,6 +151,40 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithFormattedSqlitePartialIndex_EmitsFilterMetadata()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IndexedFormattedPartial (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                Active INTEGER NOT NULL
+            );
+            CREATE INDEX IX_IndexedFormattedPartial_Name_Active
+                ON IndexedFormattedPartial(Name)
+                WHERE Active = 1;
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "FormattedPartialIndexCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "IndexedFormattedPartial.cs"));
+
+            Assert.Contains("[Index(\"IX_IndexedFormattedPartial_Name_Active\", FilterSql = \"Active = 1\")]", entityCode);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithDescendingIndex_EmitsIndexMetadata()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
