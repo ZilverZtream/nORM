@@ -30,6 +30,9 @@ namespace nORM.Scaffolding
                || ContainsDeclaredTypeToken(normalizedDeclaredType, "INET")
                || ContainsDeclaredTypeToken(normalizedDeclaredType, "CIDR")
                || ContainsDeclaredTypeToken(normalizedDeclaredType, "MACADDR")
+               || ContainsDeclaredTypeToken(normalizedDeclaredType, "MACADDR8")
+               || ContainsDeclaredTypeToken(normalizedDeclaredType, "TSVECTOR")
+               || ContainsDeclaredTypeToken(normalizedDeclaredType, "TSQUERY")
                || StartsWithDeclaredTypeToken(normalizedDeclaredType, "ENUM")
                || StartsWithDeclaredTypeToken(normalizedDeclaredType, "SET")
                || normalizedDeclaredType.EndsWith("[]", StringComparison.Ordinal);

@@ -133,6 +133,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 XmlPayload XML NULL,
                 Shape GEOMETRY NULL,
                 ShapeId GEOMETRY_UUID NULL,
+                SearchVector TSVECTOR NULL,
+                NetworkCard MACADDR8 NULL,
                 PortableText TEXT NOT NULL
             );
             """;
@@ -152,6 +154,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("XmlPayload |", warnings);
             Assert.Contains("Shape", warnings);
             Assert.Contains("ShapeId", warnings);
+            Assert.Contains("SearchVector", warnings);
+            Assert.Contains("NetworkCard", warnings);
             Assert.DoesNotContain("PortableText |", warnings);
             Assert.Contains("using System;", entityCode);
             Assert.Contains("using nORM.Configuration;", entityCode);
@@ -161,11 +165,15 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public string? XmlPayload { get; set; }", entityCode);
             Assert.Contains("public string? ShapeId { get; set; }", entityCode);
             Assert.DoesNotContain("public Guid? ShapeId { get; set; }", entityCode);
+            Assert.Contains("public string? SearchVector { get; set; }", entityCode);
+            Assert.Contains("public string? NetworkCard { get; set; }", entityCode);
             var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "ProviderTyped");
             Assert.Equal(typeof(string), dynamicType.GetProperty("Payload")!.PropertyType);
             Assert.Equal(typeof(Guid), dynamicType.GetProperty("ExternalUuid")!.PropertyType);
             Assert.Equal(typeof(string), dynamicType.GetProperty("XmlPayload")!.PropertyType);
             Assert.Equal(typeof(string), dynamicType.GetProperty("ShapeId")!.PropertyType);
+            Assert.Equal(typeof(string), dynamicType.GetProperty("SearchVector")!.PropertyType);
+            Assert.Equal(typeof(string), dynamicType.GetProperty("NetworkCard")!.PropertyType);
             Assert.NotNull(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
 
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
@@ -181,6 +189,18 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
                 item.GetProperty("name").GetString() == "ShapeId" &&
                 item.GetProperty("metadata").GetProperty("providerType").GetString() == "GEOMETRY_UUID" &&
+                item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
+                !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean());
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                item.GetProperty("name").GetString() == "SearchVector" &&
+                item.GetProperty("metadata").GetProperty("providerType").GetString() == "TSVECTOR" &&
+                item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
+                !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean());
+            Assert.Contains(providerOwned.EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "ProviderSpecificColumnType" &&
+                item.GetProperty("name").GetString() == "NetworkCard" &&
+                item.GetProperty("metadata").GetProperty("providerType").GetString() == "MACADDR8" &&
                 item.GetProperty("metadata").GetProperty("readOnlyEntity").GetBoolean() &&
                 !item.GetProperty("metadata").GetProperty("generatedWritesSupported").GetBoolean());
             AssertScaffoldOutputBuildsAsConsumerProject(dir);

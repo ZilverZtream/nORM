@@ -49,6 +49,9 @@ namespace nORM.Scaffolding
                || ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, "INET")
                || ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, "CIDR")
                || ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, "MACADDR")
+               || ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, "MACADDR8")
+               || ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, "TSVECTOR")
+               || ContainsSqliteDeclaredTypeToken(normalizedDeclaredType, "TSQUERY")
                || StartsWithSqliteDeclaredTypeToken(normalizedDeclaredType, "ENUM")
                || StartsWithSqliteDeclaredTypeToken(normalizedDeclaredType, "SET")
                || normalizedDeclaredType.EndsWith("[]", StringComparison.Ordinal);
