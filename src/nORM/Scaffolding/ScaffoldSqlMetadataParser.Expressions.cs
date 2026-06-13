@@ -13,11 +13,13 @@ namespace nORM.Scaffolding
                 return (string.Empty, false);
             var stored = false;
 
-            if (candidate.StartsWith("GENERATED", StringComparison.OrdinalIgnoreCase))
+            var generatedIndex = 0;
+            if (TryConsumeSqlKeyword(candidate, ref generatedIndex, "GENERATED"))
             {
-                var open = candidate.IndexOf('(');
+                var asIndex = FindSqlKeywordOutsideQuotes(candidate, "AS", generatedIndex);
+                var open = asIndex >= 0 ? FindNextSqlTokenStart(candidate, asIndex + "AS".Length) : -1;
                 var close = open >= 0 ? ScaffoldSqliteDdlParser.FindMatchingParenthesis(candidate, open) : -1;
-                if (open >= 0 && close > open)
+                if (open >= 0 && open < candidate.Length && candidate[open] == '(' && close > open)
                 {
                     var suffix = candidate[(close + 1)..];
                     stored = FindSqlKeywordOutsideQuotes(suffix, "STORED", 0) >= 0
@@ -71,9 +73,9 @@ namespace nORM.Scaffolding
             var keywordIndex = 0;
             if (TryConsumeSqlKeyword(candidate, ref keywordIndex, "CHECK"))
             {
-                var open = candidate.IndexOf('(', keywordIndex);
+                var open = FindNextSqlTokenStart(candidate, keywordIndex);
                 var close = open >= 0 ? ScaffoldSqliteDdlParser.FindMatchingParenthesis(candidate, open) : -1;
-                if (open >= 0 && close > open)
+                if (open >= 0 && open < candidate.Length && candidate[open] == '(' && close > open)
                     candidate = candidate.Substring(open + 1, close - open - 1).Trim();
             }
 

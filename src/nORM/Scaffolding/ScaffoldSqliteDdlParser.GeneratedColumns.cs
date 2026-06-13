@@ -34,8 +34,15 @@ namespace nORM.Scaffolding
                 if (generatedIndex < 0)
                     continue;
 
-                var openIndex = trimmed.IndexOf('(', generatedIndex);
-                if (openIndex < 0)
+                var asIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(
+                    trimmed,
+                    "AS",
+                    generatedIndex + "GENERATED".Length);
+                if (asIndex < 0)
+                    continue;
+
+                var openIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(trimmed, asIndex + "AS".Length);
+                if (openIndex < 0 || trimmed[openIndex] != '(')
                     continue;
 
                 var closeIndex = FindMatchingParenthesis(trimmed, openIndex);

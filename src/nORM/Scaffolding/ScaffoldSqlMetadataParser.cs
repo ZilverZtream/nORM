@@ -188,6 +188,26 @@ namespace nORM.Scaffolding
             return false;
         }
 
+        public static int FindNextSqlTokenStart(string sql, int index)
+        {
+            while (index < sql.Length)
+            {
+                while (index < sql.Length && char.IsWhiteSpace(sql[index]))
+                    index++;
+
+                var commentStart = index;
+                if (!TryAdvanceSqlComment(sql, ref index))
+                    return index < sql.Length ? index : -1;
+
+                if (index == commentStart)
+                    return -1;
+
+                index++;
+            }
+
+            return -1;
+        }
+
         private static void SkipSqlTrivia(string sql, ref int index)
         {
             while (index < sql.Length)

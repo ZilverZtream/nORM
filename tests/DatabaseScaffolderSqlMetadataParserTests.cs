@@ -61,6 +61,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("([Total]+[Tax]) PERSISTED", "[Total]+[Tax]", true)]
     [InlineData("GENERATED ALWAYS AS (Price * Quantity) STORED", "Price * Quantity", true)]
     [InlineData("GENERATED ALWAYS AS (Price * Quantity) VIRTUAL", "Price * Quantity", false)]
+    [InlineData("GENERATED /* (ignored) */ ALWAYS AS /* (ignored) */ (Price * Quantity) STORED", "Price * Quantity", true)]
     [InlineData("' STORED' VIRTUAL", "' STORED'", false)]
     [InlineData("GENERATED ALWAYS AS (' STORED') VIRTUAL", "' STORED'", false)]
     [InlineData("CONCAT(Name, ' PERSISTED')", "CONCAT(Name, ' PERSISTED')", false)]
@@ -96,7 +97,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
             CREATE TABLE "Metrics" (
                 "Note" TEXT DEFAULT 'GENERATED ALWAYS AS (ignored) STORED',
                 "Total" INTEGER GENERATED ALWAYS AS (([Quantity] * [Price])) PERSISTED,
-                "Virtual" TEXT GENERATED ALWAYS AS ('PERSISTED') VIRTUAL
+                "Virtual" TEXT GENERATED ALWAYS AS ('PERSISTED') VIRTUAL,
+                "Commented" INTEGER GENERATED /* (ignored) */ ALWAYS AS /* (ignored) */ ([Quantity] + 1) STORED
             )
             """);
 
@@ -105,6 +107,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.True(columns["Total"].Stored);
         Assert.Equal("'PERSISTED'", columns["Virtual"].Sql);
         Assert.False(columns["Virtual"].Stored);
+        Assert.Equal("[Quantity] + 1", columns["Commented"].Sql);
+        Assert.True(columns["Commented"].Stored);
     }
 
     [Fact]
@@ -180,6 +184,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Theory]
     [InlineData("CHECK ((length(\"Paren)Name\") > 0))", "length(\"Paren)Name\") > 0")]
     [InlineData("CHECK (([Paren)Name] > 0))", "[Paren)Name] > 0")]
+    [InlineData("CHECK /* (ignored) */ ((length(Name) > 0))", "length(Name) > 0")]
     [InlineData("CHECK (CHECKSUM([Name]) > 0)", "CHECKSUM([Name]) > 0")]
     [InlineData("CHECKSUM([Name]) > 0", "CHECKSUM([Name]) > 0")]
     public void NormalizeScaffoldCheckSql_StripsOuterParenthesesAroundQuotedIdentifiers(

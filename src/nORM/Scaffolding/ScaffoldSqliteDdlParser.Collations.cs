@@ -32,7 +32,7 @@ namespace nORM.Scaffolding
                 if (collateIndex < 0)
                     continue;
 
-                var nameIndex = FindNextSqlTokenStart(trimmed, collateIndex + "COLLATE".Length);
+                var nameIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(trimmed, collateIndex + "COLLATE".Length);
                 if (nameIndex < 0 || !TryReadSqliteCollationName(trimmed, nameIndex, out var collationName))
                     continue;
 

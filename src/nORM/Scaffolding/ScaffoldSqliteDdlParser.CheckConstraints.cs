@@ -33,7 +33,7 @@ namespace nORM.Scaffolding
                 if (checkIndex < 0)
                     continue;
 
-                var openIndex = FindNextSqlTokenStart(trimmed, checkIndex + "CHECK".Length);
+                var openIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(trimmed, checkIndex + "CHECK".Length);
                 if (openIndex < 0 || trimmed[openIndex] != '(')
                     continue;
 
@@ -70,31 +70,11 @@ namespace nORM.Scaffolding
             if (constraintIndex < 0)
                 return false;
 
-            var identifierIndex = FindNextSqlTokenStart(sql, constraintIndex + "CONSTRAINT".Length);
+            var identifierIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(sql, constraintIndex + "CONSTRAINT".Length);
             return identifierIndex >= 0
                    && identifierIndex < checkIndex
                    && TryReadSqlIdentifier(sql, identifierIndex, out name, out var nextIndex)
                    && nextIndex <= checkIndex;
-        }
-
-        private static int FindNextSqlTokenStart(string sql, int index)
-        {
-            while (index < sql.Length)
-            {
-                while (index < sql.Length && char.IsWhiteSpace(sql[index]))
-                    index++;
-
-                var commentStart = index;
-                if (!ScaffoldSqlMetadataParser.TryAdvanceSqlComment(sql, ref index))
-                    return index < sql.Length ? index : -1;
-
-                if (index == commentStart)
-                    return -1;
-
-                index++;
-            }
-
-            return -1;
         }
     }
 }
