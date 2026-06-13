@@ -249,6 +249,49 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildExpressionIndexConfigurations_ParsesIndexFacetsAcrossProviderWhitespace()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Documents"] = "Document"
+        };
+        const string indexSql = "CREATE INDEX \"IX_Documents_LowerName_Include\"\r\nON\tpublic.\"Documents\"\r\nUSING btree\r\n(lower(\"Name\"))\r\nINCLUDE\r\n(\"Score\", \"Rank\")\r\nWHERE \"Name\" IS NOT NULL";
+        var features = Array.CreateInstance(featureType, 2);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LowerName_Include",
+            indexSql)!, 0);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "IncludedColumnIndex",
+            "IX_Documents_LowerName_Include",
+            indexSql)!, 1);
+
+        var result = Assert.Single(((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>());
+
+        Assert.Equal(
+            "lower(\"Name\")",
+            result.GetType().GetProperty("ExpressionSql")!.GetValue(result));
+        Assert.Equal(
+            "\"Name\" IS NOT NULL",
+            result.GetType().GetProperty("FilterSql")!.GetValue(result));
+        Assert.Equal(
+            new[] { "Score", "Rank" },
+            Assert.IsType<string[]>(result.GetType().GetProperty("IncludedColumnNames")!.GetValue(result)));
+    }
+
+    [Fact]
     public void BuildExpressionIndexConfigurations_DetectsUniqueOnlyFromCreateIndexPrefix()
     {
         var scaffolder = typeof(DatabaseScaffolder);

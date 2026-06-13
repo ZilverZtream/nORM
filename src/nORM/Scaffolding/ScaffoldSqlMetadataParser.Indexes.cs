@@ -8,20 +8,11 @@ namespace nORM.Scaffolding
     {
         public static string? ExtractCreateIndexWhereClause(string sql)
         {
-            if (string.IsNullOrWhiteSpace(sql))
+            if (string.IsNullOrWhiteSpace(sql)
+                || !TryGetCreateIndexKeyListBounds(sql, out _, out var closeIndex))
+            {
                 return null;
-
-            var onIndex = sql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
-            if (onIndex < 0)
-                return null;
-
-            var openIndex = FindCreateIndexKeyListOpen(sql, onIndex);
-            if (openIndex < 0)
-                return null;
-
-            var closeIndex = ScaffoldSqliteDdlParser.FindMatchingParenthesis(sql, openIndex);
-            if (closeIndex <= openIndex)
-                return null;
+            }
 
             var where = FindSqlKeywordOutsideQuotes(sql, "WHERE", closeIndex + 1);
             return where < 0 ? null : sql[(where + 5)..].Trim();
@@ -39,40 +30,22 @@ namespace nORM.Scaffolding
 
         public static string? ExtractCreateIndexExpressionSql(string? createIndexSql)
         {
-            if (string.IsNullOrWhiteSpace(createIndexSql))
+            if (string.IsNullOrWhiteSpace(createIndexSql)
+                || !TryGetCreateIndexKeyListBounds(createIndexSql, out var openIndex, out var closeIndex))
+            {
                 return null;
-
-            var onIndex = createIndexSql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
-            if (onIndex < 0)
-                return null;
-
-            var openIndex = FindCreateIndexKeyListOpen(createIndexSql, onIndex);
-            if (openIndex < 0)
-                return null;
-
-            var closeIndex = ScaffoldSqliteDdlParser.FindMatchingParenthesis(createIndexSql, openIndex);
-            if (closeIndex <= openIndex)
-                return null;
+            }
 
             return createIndexSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
         }
 
         public static string[] ExtractCreateIndexIncludedColumnNames(string? createIndexSql)
         {
-            if (string.IsNullOrWhiteSpace(createIndexSql))
+            if (string.IsNullOrWhiteSpace(createIndexSql)
+                || !TryGetCreateIndexKeyListBounds(createIndexSql, out _, out var closeIndex))
+            {
                 return Array.Empty<string>();
-
-            var onIndex = createIndexSql.IndexOf(" ON ", StringComparison.OrdinalIgnoreCase);
-            if (onIndex < 0)
-                return Array.Empty<string>();
-
-            var openIndex = FindCreateIndexKeyListOpen(createIndexSql, onIndex);
-            if (openIndex < 0)
-                return Array.Empty<string>();
-
-            var closeIndex = ScaffoldSqliteDdlParser.FindMatchingParenthesis(createIndexSql, openIndex);
-            if (closeIndex <= openIndex)
-                return Array.Empty<string>();
+            }
 
             var includeIndex = FindSqlKeywordOutsideQuotes(createIndexSql, "INCLUDE", closeIndex + 1);
             if (includeIndex < 0)
@@ -95,56 +68,24 @@ namespace nORM.Scaffolding
                 .ToArray();
         }
 
-        public static int FindCreateIndexKeyListOpen(string sql, int startIndex)
+        private static bool TryGetCreateIndexKeyListBounds(string sql, out int openIndex, out int closeIndex)
         {
-            char? quote = null;
-            for (var i = startIndex; i < sql.Length; i++)
-            {
-                var ch = sql[i];
-                if (quote is not null)
-                {
-                    var close = quote == '[' ? ']' : quote.Value;
-                    if (ch == close)
-                    {
-                        if (i + 1 < sql.Length && sql[i + 1] == close)
-                        {
-                            i++;
-                            continue;
-                        }
+            openIndex = -1;
+            closeIndex = -1;
 
-                        quote = null;
-                    }
+            var onIndex = FindCreateIndexOnKeyword(sql);
+            if (onIndex < 0)
+                return false;
 
-                    continue;
-                }
+            openIndex = FindCreateIndexKeyListOpen(sql, onIndex);
+            if (openIndex < 0)
+                return false;
 
-                if (ch is '\'' or '"' or '`' or '[')
-                {
-                    quote = ch;
-                    continue;
-                }
-
-                if (ch == '(')
-                    return i;
-            }
-
-            return -1;
+            closeIndex = ScaffoldSqliteDdlParser.FindMatchingParenthesis(sql, openIndex);
+            return closeIndex > openIndex;
         }
 
-        private static string UnquoteCreateIndexIdentifier(string identifier)
-        {
-            var trimmed = identifier.Trim();
-            if (trimmed.Length < 2)
-                return trimmed;
-
-            if (trimmed[0] == '[' && trimmed[^1] == ']')
-                return trimmed[1..^1].Replace("]]", "]", StringComparison.Ordinal);
-
-            var quote = trimmed[0];
-            if ((quote == '"' || quote == '`') && trimmed[^1] == quote)
-                return trimmed[1..^1].Replace(new string(quote, 2), quote.ToString(), StringComparison.Ordinal);
-
-            return trimmed;
-        }
+        private static int FindCreateIndexOnKeyword(string sql)
+            => FindSqlKeywordOutsideQuotes(sql, "ON", 0);
     }
 }
