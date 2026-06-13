@@ -102,6 +102,25 @@ function Copy-CurrentWorkspaceForBenchmarkIsolation {
         Copy-Item -Destination $Destination -Recurse -Force
 }
 
+function Get-SourceCommitForBenchmarkEvidence {
+    $environmentCommit = [Environment]::GetEnvironmentVariable('NORM_BENCHMARK_COMMIT')
+    if (-not [string]::IsNullOrWhiteSpace($environmentCommit)) {
+        return $environmentCommit.Trim()
+    }
+
+    $gitCommit = @(& git -C $root rev-parse HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0) {
+        $commitLine = $gitCommit |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            Select-Object -First 1
+        if ($commitLine) {
+            return ([string]$commitLine).Trim()
+        }
+    }
+
+    return ''
+}
+
 function Invoke-BenchmarkSlice {
     param(
         [string]$Provider,
@@ -260,11 +279,18 @@ if (-not $NoIsolation) {
             $forwardArgs += '-KeepWorktree'
         }
 
+        $previousBenchmarkCommit = [Environment]::GetEnvironmentVariable('NORM_BENCHMARK_COMMIT')
+        $benchmarkCommit = Get-SourceCommitForBenchmarkEvidence
+        if (-not [string]::IsNullOrWhiteSpace($benchmarkCommit)) {
+            [Environment]::SetEnvironmentVariable('NORM_BENCHMARK_COMMIT', $benchmarkCommit, 'Process')
+        }
+
         try {
             powershell @forwardArgs
             $childExitCode = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } else { 0 }
         }
         finally {
+            [Environment]::SetEnvironmentVariable('NORM_BENCHMARK_COMMIT', $previousBenchmarkCommit, 'Process')
             if (-not $KeepWorktree) {
                 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $tempRoot
             }

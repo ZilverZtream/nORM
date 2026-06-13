@@ -73,6 +73,21 @@ function Get-ProviderSetting {
     }
 }
 
+function Get-BenchmarkEvidenceDisplayPath {
+    param([string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $fullRoot = [System.IO.Path]::GetFullPath($root).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar)
+    $rootPrefix = $fullRoot + [System.IO.Path]::DirectorySeparatorChar
+    if ($fullPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        return $fullPath.Substring($rootPrefix.Length)
+    }
+
+    return $fullPath
+}
+
 function Convert-MeanToNanoseconds {
     param([string]$Mean)
 
@@ -119,6 +134,31 @@ function Get-DriverPackageVersions {
     }
 }
 
+function Get-BenchmarkEvidenceCommit {
+    param([string]$EvidenceMode)
+
+    $environmentCommit = [Environment]::GetEnvironmentVariable('NORM_BENCHMARK_COMMIT')
+    if (-not [string]::IsNullOrWhiteSpace($environmentCommit)) {
+        return $environmentCommit.Trim()
+    }
+
+    $gitCommit = @(& git -C $root rev-parse HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0) {
+        $commitLine = $gitCommit |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } |
+            Select-Object -First 1
+        if ($commitLine) {
+            return ([string]$commitLine).Trim()
+        }
+    }
+
+    if ($EvidenceMode -in @('rc', 'full')) {
+        throw "Benchmark evidence requires git commit metadata. Run from a git working tree or set NORM_BENCHMARK_COMMIT before collecting release evidence."
+    }
+
+    return 'unknown'
+}
+
 if (-not (Test-Path $ResultsDirectory)) {
     throw "Benchmark results directory not found: $ResultsDirectory"
 }
@@ -143,7 +183,7 @@ if ($Mode -in @('rc', 'full')) {
 
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
-$commit = (& git -C $root rev-parse HEAD).Trim()
+$commit = Get-BenchmarkEvidenceCommit $Mode
 $sdkVersion = (& dotnet --version).Trim()
 $os = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
 $processArch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
@@ -156,8 +196,7 @@ $drivers = @(Get-DriverPackageVersions)
 
 $reports = New-Object System.Collections.Generic.List[string]
 foreach ($csvFile in $csvFiles) {
-    $relativePath = $csvFile.FullName.Substring($root.Length) -replace '^[\\/]+', ''
-    $reports.Add($relativePath)
+    $reports.Add((Get-BenchmarkEvidenceDisplayPath $csvFile.FullName))
 }
 
 $summaries = New-Object System.Collections.Generic.List[object]

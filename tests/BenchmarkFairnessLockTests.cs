@@ -276,6 +276,23 @@ public sealed class BenchmarkFairnessLockTests
     }
 
     [Fact]
+    public void BenchmarkEvidence_CarriesSourceCommitAcrossIsolatedProviderSlices()
+    {
+        var evidence = ReadRepoFile("eng/benchmark-evidence.ps1");
+        var sliceRunner = ReadRepoFile("eng/run-provider-benchmark-slice.ps1");
+
+        Assert.Contains("Get-BenchmarkEvidenceCommit", evidence);
+        Assert.Contains("Get-BenchmarkEvidenceDisplayPath", evidence);
+        Assert.Contains("NORM_BENCHMARK_COMMIT", evidence);
+        Assert.Contains("Benchmark evidence requires git commit metadata", evidence);
+        Assert.DoesNotContain("$csvFile.FullName.Substring($root.Length)", evidence);
+        Assert.Contains("Get-SourceCommitForBenchmarkEvidence", sliceRunner);
+        Assert.Contains("NORM_BENCHMARK_COMMIT", sliceRunner);
+        Assert.Contains("[Environment]::SetEnvironmentVariable('NORM_BENCHMARK_COMMIT', $benchmarkCommit, 'Process')", sliceRunner);
+        Assert.Contains("[Environment]::SetEnvironmentVariable('NORM_BENCHMARK_COMMIT', $previousBenchmarkCommit, 'Process')", sliceRunner);
+    }
+
+    [Fact]
     public void TenantTemporalBenchmarks_MeasureLikeForLikeTenantOverheadAndSplitTemporalWrites()
     {
         var code = ReadRepoFile("benchmarks/TenantTemporalBenchmarks.cs");
