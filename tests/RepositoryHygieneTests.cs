@@ -23,7 +23,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxQueryTranslatorPartialFileLines = 1200;
     private const int MaxNormQueryProviderPartialFileLines = 1500;
     private const int MaxSelectClauseVisitorPartialFileLines = 1500;
-    private const int MaxExpressionToSqlVisitorPartialFileLines = 1500;
+    private const int MaxExpressionToSqlVisitorPartialFileLines = 1200;
     private const int MaxSqliteProviderPartialFileLines = 1500;
     private const int MaxConcreteProviderPartialFileLines = 1500;
     private const int MaxDatabaseProviderPartialFileLines = 1500;
@@ -551,7 +551,7 @@ public sealed class RepositoryHygieneTests
     public void Expression_to_sql_visitor_partials_stay_split_by_translation_responsibility()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("Every `ExpressionToSqlVisitor*.cs` partial stays below 1500 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("Every `ExpressionToSqlVisitor*.cs` partial stays below 1200 lines", ownership, StringComparison.Ordinal);
 
         var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Query"), "ExpressionToSqlVisitor*.cs")
             .Select(path => new
@@ -566,7 +566,7 @@ public sealed class RepositoryHygieneTests
 
         Assert.True(
             oversizedFiles.Length == 0,
-            "Split ExpressionToSqlVisitor code by binary/null, member/constant, control-flow, method-call, navigation, and support responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
+            "Split ExpressionToSqlVisitor code by binary/null, member/constant, control-flow, string method-call, Enumerable/Queryable method-call, navigation, and support responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     private static string[] GetTrackedFiles()
