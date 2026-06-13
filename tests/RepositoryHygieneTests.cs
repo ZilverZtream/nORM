@@ -11,6 +11,7 @@ public sealed class RepositoryHygieneTests
 {
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
     private const int MaxProductionScaffoldingFileLines = 250;
+    private const int MaxDatabaseScaffolderAggregateLines = 1600;
     private const int MaxCliScaffoldingFileLines = 200;
     private const int MaxCliDesignTimeFileLines = 200;
     private const int MaxProviderMobilityCertificationFileLines = 200;
@@ -159,6 +160,27 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split production scaffolding code before it becomes a god object: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void DatabaseScaffolder_facade_stays_below_aggregate_line_budget()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("DatabaseScaffolder` facade also stays below 1600 aggregate lines", ownership, StringComparison.Ordinal);
+
+        var scaffoldingDirectory = Path.Combine(RepoRoot, "src", "nORM", "Scaffolding");
+        var facadeFiles = Directory.EnumerateFiles(scaffoldingDirectory, "DatabaseScaffolder*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .ToArray();
+        var aggregateLineCount = facadeFiles.Sum(file => file.LineCount);
+
+        Assert.True(
+            aggregateLineCount <= MaxDatabaseScaffolderAggregateLines,
+            $"Move DatabaseScaffolder facade behavior into focused collaborators before it becomes a god object again. Current total: {aggregateLineCount} lines across {facadeFiles.Length} files.");
     }
 
     [Fact]

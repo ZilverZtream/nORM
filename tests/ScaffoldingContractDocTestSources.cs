@@ -187,7 +187,8 @@ public partial class ScaffoldingContractDocTests
 
     private static string ReadScaffoldProviderDispatchSource()
         => string.Concat(
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.Selection.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldModelDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldObjectSelectionBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.SqlServer.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldColumnDiscovery.Facets.Postgres.cs"),
@@ -352,13 +353,12 @@ public partial class ScaffoldingContractDocTests
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Names.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.TypeMapping.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Context.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.Probes.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Discovery.Selection.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.JoinTables.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.Metadata.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Diagnostics.Reports.cs"),

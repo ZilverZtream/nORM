@@ -41,7 +41,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyList<ScaffoldIndex> indexes)
-            => features.AddRange(ConvertUnsupportedFeatures(
+            => features.AddRange(ScaffoldSchemaDiscoveryAdapter.ConvertUnsupportedFeatures(
                 ScaffoldRelationshipDiagnosticBuilder.BuildPrincipalKeyDiagnostics(
                     ConvertForeignKeyInfos(foreignKeys),
                     primaryKeyColumnsByTable,
@@ -51,7 +51,7 @@ namespace nORM.Scaffolding
             List<ScaffoldUnsupportedFeature> features,
             IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
-            => features.AddRange(ConvertUnsupportedFeatures(
+            => features.AddRange(ScaffoldSchemaDiscoveryAdapter.ConvertUnsupportedFeatures(
                 ScaffoldRelationshipDiagnosticBuilder.BuildDependentKeyDiagnostics(
                     ConvertForeignKeyInfos(foreignKeys),
                     primaryKeyColumnsByTable)));

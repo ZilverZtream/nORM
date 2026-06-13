@@ -64,8 +64,8 @@ namespace nORM.Scaffolding
                     $"Scaffold namespace '{namespaceName}' is not a valid C# namespace. " +
                     "Use a dot-separated namespace such as 'MyApp.Data'.");
             options ??= new ScaffoldOptions();
-            var contextNamespace = NormalizeContextNamespace(namespaceName, options.ContextNamespace);
-            var contextOutputDirectory = ResolveContextOutputDirectory(outputDirectory, options.ContextDirectory, options.ContextOutputDirectory);
+            var contextNamespace = ScaffoldOutputManager.NormalizeContextNamespace(namespaceName, options.ContextNamespace);
+            var contextOutputDirectory = ScaffoldOutputManager.ResolveContextOutputDirectory(outputDirectory, options.ContextDirectory, options.ContextOutputDirectory);
             var safeContextName = EscapeCSharpIdentifier(ToPascalCase(contextName));
 
             var connectionWasOpen = connection.State == ConnectionState.Open;

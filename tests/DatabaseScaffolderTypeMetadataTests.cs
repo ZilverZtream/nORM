@@ -498,8 +498,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("SQL Server synonym; baseObject=[remote].[dbo].[Orders]; baseType=", false)]
     public void IsTableLikeSqlServerSynonym_AllowsOnlyResolvedTableOrViewTargets(string detail, bool expected)
     {
-        var m = GetMethod("IsTableLikeSqlServerSynonym", new[] { typeof(string) });
-        Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
+        Assert.Equal(expected, ScaffoldSkippedObjectMetadataBuilder.IsTableLikeSqlServerSynonym(detail));
     }
 
     [Theory]
