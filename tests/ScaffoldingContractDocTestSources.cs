@@ -197,6 +197,9 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSchemaDiscoveryAdapter.UnsupportedFeatures.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSkippedObjectQuery.MySql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"));
 

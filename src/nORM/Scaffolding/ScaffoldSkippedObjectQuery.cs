@@ -7,7 +7,7 @@ using nORM.Providers;
 
 namespace nORM.Scaffolding
 {
-    internal static class ScaffoldSkippedObjectQuery
+    internal static partial class ScaffoldSkippedObjectQuery
     {
         public static async Task<IReadOnlyList<ScaffoldSkippedObjectInfo>> QuerySkippedObjectsAsync(DbConnection connection, string sql)
         {
@@ -61,72 +61,13 @@ namespace nORM.Scaffolding
             DatabaseProvider provider)
         {
             if (ScaffoldProviderKind.IsSqlServer(provider))
-            {
-                return await QuerySkippedObjectCommentsAsync(connection, """
-                    SELECT SCHEMA_NAME(o.schema_id) AS ObjectSchema,
-                           o.name AS ObjectName,
-                           'Routine' AS Kind,
-                           CAST(comment.value AS nvarchar(max)) AS ObjectComment
-                    FROM sys.objects o
-                    LEFT JOIN sys.extended_properties comment
-                      ON comment.major_id = o.object_id
-                     AND comment.minor_id = 0
-                     AND comment.name = N'MS_Description'
-                    WHERE o.is_ms_shipped = 0
-                      AND o.type IN ('P', 'FN', 'IF', 'TF')
-                    UNION ALL
-                    SELECT SCHEMA_NAME(seq.schema_id),
-                           seq.name,
-                           'Sequence',
-                           CAST(comment.value AS nvarchar(max))
-                    FROM sys.sequences seq
-                    LEFT JOIN sys.extended_properties comment
-                      ON comment.major_id = seq.object_id
-                     AND comment.minor_id = 0
-                     AND comment.name = N'MS_Description'
-                    """).ConfigureAwait(false);
-            }
+                return await GetSqlServerSkippedObjectCommentsAsync(connection).ConfigureAwait(false);
 
             if (ScaffoldProviderKind.IsPostgres(provider))
-            {
-                return await QuerySkippedObjectCommentsAsync(connection, """
-                    SELECT n.nspname AS ObjectSchema,
-                           p.proname AS ObjectName,
-                           'Routine' AS Kind,
-                           obj_description(p.oid, 'pg_proc') AS ObjectComment
-                    FROM pg_proc p
-                    INNER JOIN pg_namespace n ON n.oid = p.pronamespace
-                    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM pg_proc sibling
-                          WHERE sibling.pronamespace = p.pronamespace
-                            AND sibling.proname = p.proname
-                            AND sibling.oid <> p.oid
-                      )
-                    UNION ALL
-                    SELECT n.nspname,
-                           cls.relname,
-                           'Sequence',
-                           obj_description(cls.oid, 'pg_class')
-                    FROM pg_class cls
-                    INNER JOIN pg_namespace n ON n.oid = cls.relnamespace
-                    WHERE cls.relkind = 'S'
-                      AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-                    """).ConfigureAwait(false);
-            }
+                return await GetPostgresSkippedObjectCommentsAsync(connection).ConfigureAwait(false);
 
             if (ScaffoldProviderKind.IsMySql(provider))
-            {
-                return await QuerySkippedObjectCommentsAsync(connection, """
-                    SELECT NULL AS ObjectSchema,
-                           routine_name AS ObjectName,
-                           'Routine' AS Kind,
-                           routine_comment AS ObjectComment
-                    FROM information_schema.routines
-                    WHERE routine_schema = DATABASE()
-                    """).ConfigureAwait(false);
-            }
+                return await GetMySqlSkippedObjectCommentsAsync(connection).ConfigureAwait(false);
 
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
