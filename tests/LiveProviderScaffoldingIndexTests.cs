@@ -158,7 +158,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_reports_mysql_expression_index_as_provider_owned()
+    public async Task ScaffoldAsync_emits_supported_mysql_expression_index_metadata()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
         if (Skip.If(live is null, "Live provider MySQL not configured")) return;
