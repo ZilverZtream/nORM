@@ -38,7 +38,10 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "dotnet-norm", "Program.Shared.cs"));
         var scaffolderSource = string.Concat(
             ReadDatabaseScaffolderSource(),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.Context.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanBuilder.Diagnostics.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputPlanRequest.cs"));
         var tableFilterSource = string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"),

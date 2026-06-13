@@ -82,7 +82,7 @@ namespace nORM.Scaffolding
                 var discovery = await ScaffoldModelDiscovery.BuildAsync(connection, provider, options).ConfigureAwait(false);
                 safeContextName = MakeUniqueContextName(safeContextName, discovery.EntityByTable.Values);
                 var composition = ScaffoldModelCompositionBuilder.Build(discovery);
-                var outputPlan = await ScaffoldOutputPlanBuilder.BuildAsync(
+                var outputPlan = await ScaffoldOutputPlanBuilder.BuildAsync(new ScaffoldOutputPlanRequest(
                     connection,
                     provider,
                     outputDirectory,
@@ -93,7 +93,7 @@ namespace nORM.Scaffolding
                     discovery,
                     composition,
                     options,
-                    _stringBuilderPool).ConfigureAwait(false);
+                    _stringBuilderPool)).ConfigureAwait(false);
                 await EmitScaffoldOutputAsync(
                     outputDirectory,
                     outputPlan.GeneratedFiles,

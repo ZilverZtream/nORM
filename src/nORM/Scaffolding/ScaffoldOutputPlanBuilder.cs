@@ -1,102 +1,35 @@
 #nullable enable
-using System;
 using System.Collections.Generic;
-using System.Data.Common;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.ObjectPool;
-using nORM.Providers;
 
 namespace nORM.Scaffolding
 {
-    internal static class ScaffoldOutputPlanBuilder
+    internal static partial class ScaffoldOutputPlanBuilder
     {
         public static async Task<ScaffoldOutputPlan> BuildAsync(
-            DbConnection connection,
-            DatabaseProvider provider,
-            string outputDirectory,
-            string contextOutputDirectory,
-            string namespaceName,
-            string contextNamespace,
-            string safeContextName,
-            ScaffoldModelDiscoveryResult discovery,
-            ScaffoldModelComposition composition,
-            ScaffoldOptions options,
-            ObjectPool<StringBuilder> stringBuilderPool)
+            ScaffoldOutputPlanRequest request)
         {
-            var entityFiles = await ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(new ScaffoldEntityFileSetRequest(
-                connection,
-                provider,
-                outputDirectory,
-                namespaceName,
-                discovery,
-                composition,
-                options)).ConfigureAwait(false);
+            var entityFiles = await BuildEntityFilesAsync(request).ConfigureAwait(false);
             var generatedFiles = entityFiles.GeneratedFiles.ToList();
+            generatedFiles.Add(BuildContextFile(request, entityFiles));
 
-            var routineStubs = options.EmitRoutineStubs
-                ? discovery.SkippedObjects.Where(static obj => string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase)).ToArray()
-                : Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>();
-            var sequenceStubs = options.EmitSequenceStubs
-                ? discovery.SkippedObjects.Where(static obj => string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase)).ToArray()
-                : Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>();
-            var ctxCode = ScaffoldContextAdapter.Write(
-                contextNamespace,
-                safeContextName,
-                entityFiles.EntityNames,
-                composition.Relationships,
-                composition.ManyToManyJoins,
-                routineStubs,
-                composition.CompositePrimaryKeys,
-                composition.DefaultValueConfigurations,
-                composition.CheckConstraints,
-                composition.ComputedColumnConfigurations,
-                composition.ExpressionIndexConfigurations,
-                composition.CollationConfigurations,
-                sequenceStubs,
-                composition.IdentityOptionConfigurations,
-                composition.PrecisionConfigurations,
-                composition.ColumnFacetConfigurations,
-                options.UsePluralizer,
-                options.UseNullableReferenceTypes,
-                namespaceName,
-                options.UseDatabaseNames);
-            generatedFiles.Add((Path.Combine(contextOutputDirectory, safeContextName + ".cs"), ctxCode));
-
-            var computedColumnsByTable = discovery.FeatureConfigurations.ComputedColumnsByTable;
-            var providerOwnedWriteBlockedTableKeys = discovery.FeatureConfigurations.ProviderOwnedWriteBlockedTableKeys;
-            var diagnostics = ScaffoldDiagnosticsAdapter.ScaffoldDiagnostics(
-                discovery.ForeignKeys,
-                discovery.UnsupportedFeatures,
-                discovery.SkippedObjects,
-                discovery.PrimaryKeyColumnsByTable,
-                discovery.Indexes,
-                discovery.ColumnPropertiesByTable,
-                discovery.NonNullableColumnsByTable,
-                computedColumnsByTable,
-                discovery.IdentityColumnsByTable,
-                providerOwnedWriteBlockedTableKeys,
-                composition.ManyToManyJoinTableKeys,
-                stringBuilderPool);
-            var diagnosticsJson = string.IsNullOrWhiteSpace(diagnostics)
-                ? null
-                : ScaffoldDiagnosticsAdapter.ScaffoldDiagnosticsJson(
-                    discovery.ForeignKeys,
-                    discovery.UnsupportedFeatures,
-                    discovery.SkippedObjects,
-                    discovery.PrimaryKeyColumnsByTable,
-                    discovery.Indexes,
-                    discovery.ColumnPropertiesByTable,
-                    discovery.NonNullableColumnsByTable,
-                    computedColumnsByTable,
-                    discovery.IdentityColumnsByTable,
-                    providerOwnedWriteBlockedTableKeys,
-                    composition.ManyToManyJoinTableKeys);
+            var diagnostics = BuildDiagnostics(request);
+            var diagnosticsJson = BuildDiagnosticsJson(request, diagnostics);
 
             return new ScaffoldOutputPlan(generatedFiles, diagnostics, diagnosticsJson);
         }
+
+        private static Task<DatabaseScaffolder.ScaffoldEntityFileSet> BuildEntityFilesAsync(
+            ScaffoldOutputPlanRequest request)
+            => ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(new ScaffoldEntityFileSetRequest(
+                request.Connection,
+                request.Provider,
+                request.OutputDirectory,
+                request.NamespaceName,
+                request.Discovery,
+                request.Composition,
+                request.Options));
     }
 
     internal sealed record ScaffoldOutputPlan(
