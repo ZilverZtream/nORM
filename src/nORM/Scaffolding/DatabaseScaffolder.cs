@@ -94,7 +94,7 @@ namespace nORM.Scaffolding
                     composition,
                     options,
                     _stringBuilderPool)).ConfigureAwait(false);
-                await EmitScaffoldOutputAsync(
+                await ScaffoldOutputManager.EmitAsync(
                     outputDirectory,
                     outputPlan.GeneratedFiles,
                     outputPlan.Diagnostics,
