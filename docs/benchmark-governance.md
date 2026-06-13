@@ -108,6 +108,8 @@ process tree and report stdout/stderr log paths plus recent log tails.
 Official public release evidence must still come from the intended release
 commit. A benchmark-enabled run from a dirty working tree is local validation
 only until those changes are committed and the release evidence is regenerated.
+The benchmark-enabled RC gate and `eng/benchmark-evidence.ps1 -Mode rc` refuse
+a dirty working tree before minting release-grade benchmark evidence.
 
 ## BenchmarkDotNet Configuration
 

@@ -8,6 +8,28 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
+function Get-WorkingTreeStatus {
+    $statusLines = @(& git -C $root status --porcelain)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to read git working tree status."
+    }
+
+    return @($statusLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Assert-CleanReleaseEvidenceWorkspace {
+    param([string]$Context)
+
+    $dirty = @(Get-WorkingTreeStatus)
+    if ($dirty.Count -eq 0) {
+        return
+    }
+
+    $preview = ($dirty | Select-Object -First 20) -join [Environment]::NewLine
+    $overflow = if ($dirty.Count -gt 20) { "`n... $($dirty.Count - 20) more dirty path(s)" } else { '' }
+    throw "$Context requires a clean git working tree before collecting release benchmark evidence. Commit or stash changes, then rerun. Dirty paths:`n$preview$overflow"
+}
+
 function Redact-ConnectionString {
     param([string]$Value)
 
@@ -99,6 +121,10 @@ function Get-DriverPackageVersions {
 
 if (-not (Test-Path $ResultsDirectory)) {
     throw "Benchmark results directory not found: $ResultsDirectory"
+}
+
+if ($Mode -in @('rc', 'full')) {
+    Assert-CleanReleaseEvidenceWorkspace 'Benchmark evidence'
 }
 
 $csvFiles = Get-ChildItem -LiteralPath $ResultsDirectory -File -Filter '*-report.csv' |

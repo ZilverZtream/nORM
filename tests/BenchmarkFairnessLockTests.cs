@@ -174,6 +174,13 @@ public sealed class BenchmarkFairnessLockTests
 
         Assert.Contains("benchmark evidence manifest", gate);
         Assert.Contains("eng/benchmark-evidence.ps1", gate);
+        Assert.Contains("Assert-CleanReleaseEvidenceWorkspace", gate);
+        Assert.Contains("Mode -eq 'rc' -and -not $SkipBenchmark", gate);
+        Assert.Contains("RC benchmark evidence", gate);
+        Assert.Contains("requires a clean git working tree before collecting release benchmark evidence", gate);
+        Assert.Contains("Assert-CleanReleaseEvidenceWorkspace", evidence);
+        Assert.Contains("Mode -in @('rc', 'full')", evidence);
+        Assert.Contains("requires a clean git working tree before collecting release benchmark evidence", evidence);
         Assert.Contains("$benchmarkEvidenceMode = if ($Mode -eq 'full') { 'smoke' } else { $Mode }", gate);
         Assert.Contains("$benchmarkEvidenceFilter = if ($Mode -eq 'full') { '--fast Query_Complex' } else { $ProviderMatrixBenchmarkFilter }", gate);
         Assert.Contains("-BenchmarkFilter $benchmarkEvidenceFilter", gate);
@@ -214,6 +221,7 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence", governance);
         Assert.Contains("Scheduling And Time Bounds", governance);
         Assert.Contains("daytime correctness validation", governance);
+        Assert.Contains("dirty working tree before minting release-grade benchmark evidence", governance);
         Assert.Contains("NORM_BENCHMARK_STEP_TIMEOUT_MINUTES", governance);
         Assert.Contains("NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES", governance);
         Assert.Contains("BulkInsert_Idiomatic_*", governance);

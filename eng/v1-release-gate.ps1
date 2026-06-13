@@ -268,6 +268,28 @@ function Test-ProviderConfigured {
         [Environment]::GetEnvironmentVariable("NORM_TEST_${Name}_CS"))
 }
 
+function Get-WorkingTreeStatus {
+    $statusLines = @(& git -C $root status --porcelain)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to read git working tree status."
+    }
+
+    return @($statusLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Assert-CleanReleaseEvidenceWorkspace {
+    param([string]$Context)
+
+    $dirty = @(Get-WorkingTreeStatus)
+    if ($dirty.Count -eq 0) {
+        return
+    }
+
+    $preview = ($dirty | Select-Object -First 20) -join [Environment]::NewLine
+    $overflow = if ($dirty.Count -gt 20) { "`n... $($dirty.Count - 20) more dirty path(s)" } else { '' }
+    throw "$Context requires a clean git working tree before collecting release benchmark evidence. Commit or stash changes, then rerun. Dirty paths:`n$preview$overflow"
+}
+
 function Get-NormVersion {
     $propsPath = Join-Path $root 'Directory.Build.props'
     [xml]$props = Get-Content $propsPath
@@ -545,6 +567,11 @@ Write-Host "  Test hang timeout:   $TestStepHangTimeoutMinutes min"
 Write-Host "  Package version:     $normVersion"
 
 Invoke-Step 'clean orphaned test hosts' { Stop-OrphanedTestHosts }
+if ($Mode -eq 'rc' -and -not $SkipBenchmark) {
+    Invoke-Step 'clean release evidence working tree check' {
+        Assert-CleanReleaseEvidenceWorkspace 'RC benchmark evidence'
+    }
+}
 Invoke-Step 'clean package outputs before build' {
     Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'nORM'
     Clear-PackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm'
