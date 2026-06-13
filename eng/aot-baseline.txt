@@ -6,7 +6,7 @@ src/nORM/Core/ConnectionManager.cs:330:IL2075
 src/nORM/Core/DbConnectionFactory.cs:71:IL2070
 src/nORM/Core/DbContext.PreparedStatements.cs:209:IL2026
 src/nORM/Core/DbContext.PreparedStatements.cs:209:IL3050
-src/nORM/Core/NormValidator.cs:140:IL2070
+src/nORM/Core/NormValidator.EntityGraph.cs:85:IL2070
 src/nORM/Internal/CommandInterceptorExtensions.cs:699:IL2093
 src/nORM/Internal/ExpressionCompiler.cs:149:IL2026
 src/nORM/Internal/ExpressionCompiler.cs:149:IL3050
@@ -91,8 +91,6 @@ src/nORM/Query/MaterializerFactory.Types.cs:242:IL2093
 src/nORM/Query/MaterializerFactory.Types.cs:70:IL2093
 src/nORM/Query/NormQueryProvider.StreamingPlans.cs:393:IL2026
 src/nORM/Query/NormQueryProvider.StreamingPlans.cs:393:IL3050
-src/nORM/Query/QueryTranslator.Lifecycle.cs:209:IL2026
-src/nORM/Query/QueryTranslator.Lifecycle.cs:209:IL3050
 src/nORM/Query/QueryTranslator.FilterProjectionTranslators.cs:129:IL2026
 src/nORM/Query/QueryTranslator.FilterProjectionTranslators.cs:129:IL3050
 src/nORM/Query/QueryTranslator.FilterProjectionTranslators.cs:216:IL2026
@@ -130,7 +128,6 @@ src/nORM/Query/QueryTranslator.IncludeTranslators.cs:198:IL2026
 src/nORM/Query/QueryTranslator.IncludeTranslators.cs:198:IL3050
 src/nORM/Query/QueryTranslator.IncludeTranslators.cs:86:IL2026
 src/nORM/Query/QueryTranslator.IncludeTranslators.cs:86:IL3050
-src/nORM/Query/QueryTranslator.Joins.cs:1140:IL3050
 src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:123:IL2026
 src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:123:IL3050
 src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:139:IL2026
@@ -159,6 +156,9 @@ src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:339:IL2026
 src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:339:IL3050
 src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:85:IL2026
 src/nORM/Query/QueryTranslator.KeyedSetTranslators.cs:85:IL3050
+src/nORM/Query/QueryTranslator.LeftJoins.cs:195:IL3050
+src/nORM/Query/QueryTranslator.Lifecycle.cs:209:IL2026
+src/nORM/Query/QueryTranslator.Lifecycle.cs:209:IL3050
 src/nORM/Query/QueryTranslator.PagingTranslators.cs:116:IL2026
 src/nORM/Query/QueryTranslator.PagingTranslators.cs:116:IL3050
 src/nORM/Query/QueryTranslator.PagingTranslators.cs:136:IL2026
@@ -302,5 +302,4 @@ src/nORM/Scaffolding/DynamicEntityTypeBuilder.PropertyAttributes.cs:75:IL2026
 src/nORM/Scaffolding/ScaffoldContextWriter.Shell.cs:109:IL2026
 src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:54:IL2026
 src/nORM/Scaffolding/ScaffoldDiagnosticsWriter.cs:54:IL3050
-src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:105:IL3050
-src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:142:IL3050
+src/nORM/Scaffolding/ScaffoldPostgresTypeClassifier.Arrays.cs:75:IL3050
