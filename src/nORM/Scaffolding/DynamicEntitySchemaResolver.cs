@@ -1,14 +1,13 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
 using System.Linq;
 using nORM.Core;
 
 namespace nORM.Scaffolding
 {
-    internal static class DynamicEntitySchemaResolver
+    internal static partial class DynamicEntitySchemaResolver
     {
         public static (string? Schema, string Table) SplitSchema(string identifier)
         {
@@ -99,93 +98,12 @@ namespace nORM.Scaffolding
                 return GetSqliteMatchingObjectSchemas(connection, tableName);
 
             if (DynamicEntityConnectionKind.IsSqlServer(connection))
-            {
-                return QuerySchemaNameList(connection, """
-                    SELECT s.name AS SchemaName
-                    FROM sys.objects o
-                    INNER JOIN sys.schemas s ON s.schema_id = o.schema_id
-                    WHERE o.name = @tableName
-                      AND o.type IN ('U', 'V')
-                      AND o.is_ms_shipped = 0
-                    ORDER BY s.name
-                    """, tableName);
-            }
+                return GetSqlServerMatchingObjectSchemas(connection, tableName);
 
             if (DynamicEntityConnectionKind.IsPostgres(connection))
-            {
-                return QuerySchemaNameList(connection, """
-                    SELECT table_schema AS SchemaName
-                    FROM information_schema.tables
-                    WHERE table_name = @tableName
-                      AND table_schema NOT IN ('pg_catalog', 'information_schema')
-                      AND table_type IN ('BASE TABLE', 'VIEW')
-                    ORDER BY table_schema
-                    """, tableName);
-            }
+                return GetPostgresMatchingObjectSchemas(connection, tableName);
 
             return Array.Empty<string>();
-        }
-
-        public static IReadOnlyList<string> GetSqliteMatchingObjectSchemas(DbConnection connection, string tableName)
-        {
-            var schemas = new List<string>();
-            using (var schemaCommand = connection.CreateCommand())
-            {
-                schemaCommand.CommandText = "PRAGMA database_list";
-                using var reader = schemaCommand.ExecuteReader();
-                while (reader.Read())
-                {
-                    var schemaName = ReaderHasColumn(reader, "name")
-                        ? Convert.ToString(reader["name"])
-                        : reader.FieldCount > 1 ? Convert.ToString(reader[1]) : null;
-                    if (!string.IsNullOrWhiteSpace(schemaName))
-                        schemas.Add(schemaName);
-                }
-            }
-
-            var matches = new List<string>();
-            foreach (var schema in schemas.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                using var command = connection.CreateCommand();
-                command.CommandText = $"SELECT name FROM {DynamicEntityConnectionKind.EscapeIdentifier(connection, schema)}.sqlite_master WHERE type IN ('table', 'view') AND name = @tableName LIMIT 1";
-                AddStringParameter(command, "@tableName", tableName);
-                if (command.ExecuteScalar() is not null)
-                    matches.Add(schema);
-            }
-
-            return matches;
-        }
-
-        public static IReadOnlyList<string> QuerySchemaNameList(DbConnection connection, string sql, string tableName)
-        {
-            var result = new List<string>();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            AddStringParameter(cmd, "@tableName", tableName);
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var schemaName = Convert.ToString(reader["SchemaName"]);
-                if (!string.IsNullOrWhiteSpace(schemaName))
-                    result.Add(schemaName);
-            }
-
-            return result
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(schema => schema, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-
-        public static bool ReaderHasColumn(DbDataReader reader, string name)
-            => ScaffoldDataReaderHelper.HasColumn(reader, name);
-
-        private static void AddStringParameter(DbCommand command, string name, string? value)
-        {
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = name;
-            parameter.DbType = DbType.String;
-            parameter.Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : value;
-            command.Parameters.Add(parameter);
         }
     }
 }
