@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using nORM.Scaffolding;
 using Xunit;
 
 namespace nORM.Tests;
@@ -10,21 +11,36 @@ namespace nORM.Tests;
 [Trait("Category", TestCategory.Fast)]
 public partial class ScaffoldingContractDocTests
 {
+    private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(
+        string? schema,
+        string name,
+        string kind,
+        string detail,
+        string? comment = null)
+        => ScaffoldSkippedObjectMetadataBuilder.BuildMetadata(
+            new ScaffoldSkippedObjectInfo(schema, name, kind, detail, comment));
+
+    private static IReadOnlyDictionary<string, object?> BuildUnsupportedFeatureMetadata(
+        string tableKey,
+        string kind,
+        string name,
+        string detail,
+        IReadOnlyDictionary<string, object?>? metadata = null)
+        => ScaffoldUnsupportedFeatureMetadataBuilder.BuildMetadata(
+            new ScaffoldUnsupportedFeatureInfo(tableKey, kind, name, detail)
+            {
+                Metadata = metadata
+            });
+
     [Fact]
     public void Routine_warning_metadata_is_structured_for_ci_inventory()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "GetRevenue",
             "Routine",
             "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@tenantId:IN:int,@total:OUT:decimal; resultColumns=Id:int:0|Name:nvarchar(40):1",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
         var resultColumns = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["resultColumns"]!;
 
@@ -49,18 +65,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Routine_warning_metadata_preserves_colon_characters_in_provider_names()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "GetOddNames",
             "Routine",
             "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenant:id:IN:int; resultColumns=Order:Id:int:0|Line:Name:nvarchar(40):1",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
         var resultColumns = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["resultColumns"]!;
 
@@ -78,18 +88,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Routine_warning_metadata_preserves_mode_like_text_inside_parameter_names()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "GetOddNames",
             "Routine",
             "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenant:IN:name:IN:int; resultColumns=",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
 
         Assert.Equal("@tenant:IN:name", parameters[0]["name"]);
@@ -100,18 +104,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Routine_warning_metadata_preserves_semicolon_characters_inside_values()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "GetOddNames",
             "Routine",
             "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenant;id:IN:int; resultColumns=Order;Id:int:0|Line;Name:nvarchar(40):1",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
         var resultColumns = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["resultColumns"]!;
 
@@ -129,18 +127,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Routine_warning_metadata_splits_lists_after_complete_entries()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "GetOddNames",
             "Routine",
             "SQL Server stored procedure; parameters=2; outputParameters=0; parameterModes=@tenant,id:IN:int,@search,text:IN:nvarchar(40); resultColumns=Order|Id:int:0|Line|Name:nvarchar(40):1",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
         var resultColumns = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["resultColumns"]!;
 
@@ -161,18 +153,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Routine_warning_metadata_preserves_unknown_key_like_text_inside_values()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "GetOddNames",
             "Routine",
             "SQL Server stored procedure; parameters=1; outputParameters=0; parameterModes=@tenant; note=retained:IN:int; resultColumns=Order; note=retained:int:0",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
         var resultColumns = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["resultColumns"]!;
 
@@ -187,18 +173,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Routine_warning_metadata_preserves_allowlisted_key_text_inside_values()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var routine = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "public",
             "calculate_odd",
             "Routine",
             "PostgreSQL function; parameters=1; outputParameters=0; parameterModes=tenant; dataType=retained:IN:integer; dataType=integer",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { routine })!;
+            null);
         var parameters = (IReadOnlyList<IReadOnlyDictionary<string, object?>>)metadata["parameters"]!;
 
         Assert.Equal("tenant; dataType=retained", parameters[0]["name"]);
@@ -211,18 +191,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Sequence_warning_metadata_is_structured_for_ci_inventory()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var sequence = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "OrderNo",
             "Sequence",
             "SQL Server sequence; dataType=bigint",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { sequence })!;
+            null);
 
         Assert.Equal("SQL Server", metadata["provider"]);
         Assert.Equal("bigint", metadata["dataType"]);
@@ -233,18 +207,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Synonym_warning_metadata_is_structured_for_ci_inventory()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var synonym = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "dbo",
             "OrderAlias",
             "Synonym",
             "SQL Server synonym; baseObject=[dbo].[Orders; note=retained]; baseType=U",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { synonym })!;
+            null);
 
         Assert.Equal("SQL Server", metadata["provider"]);
         Assert.Equal("[dbo].[Orders; note=retained]", metadata["baseObject"]);
@@ -256,18 +224,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Event_warning_metadata_is_structured_for_ci_inventory()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var scheduledEvent = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             null,
             "RefreshLedger",
             "Event",
             "MySQL event; eventType=RECURRING; status=ENABLED; intervalValue=1; intervalField=DAY; starts=2026-01-01 00:00:00",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { scheduledEvent })!;
+            null);
 
         Assert.Equal("MySQL", metadata["provider"]);
         Assert.Equal("RECURRING", metadata["eventType"]);
@@ -280,18 +242,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Query_object_warning_metadata_is_structured_for_ci_inventory()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var view = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "reporting",
             "OpenOrders",
             "View",
             "PostgreSQL view",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { view })!;
+            null);
 
         Assert.Equal("PostgreSQL", metadata["provider"]);
         Assert.Equal("View", metadata["targetKind"]);
@@ -301,18 +257,12 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Virtual_table_shadow_warning_metadata_includes_owner()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var skippedObjectType = scaffolder.GetNestedType("ScaffoldSkippedObject", BindingFlags.NonPublic)!;
-        var shadow = Activator.CreateInstance(
-            skippedObjectType,
+        var metadata = BuildSkippedObjectMetadata(
             "main",
             "SearchDocs_content",
             "VirtualTableShadow",
             "SQLite virtual table shadow table",
-            null)!;
-        var method = scaffolder.GetMethod("BuildSkippedObjectMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        var metadata = (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { shadow })!;
+            null);
 
         Assert.Equal("SQLite", metadata["provider"]);
         Assert.Equal("VirtualTableShadow", metadata["targetKind"]);
@@ -323,15 +273,8 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Provider_owned_feature_warning_metadata_is_structured_for_ci_inventory()
     {
-        var scaffolder = typeof(nORM.Scaffolding.DatabaseScaffolder);
-        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
-        var method = scaffolder.GetMethod("BuildUnsupportedFeatureMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
-
         IReadOnlyDictionary<string, object?> Metadata(string kind, string name, string detail, string tableKey = "dbo.Orders")
-        {
-            var feature = Activator.CreateInstance(featureType, tableKey, kind, name, detail)!;
-            return (IReadOnlyDictionary<string, object?>)method.Invoke(null, new[] { feature })!;
-        }
+            => BuildUnsupportedFeatureMetadata(tableKey, kind, name, detail);
 
         var missingPrimaryKey = Metadata("MissingPrimaryKey", "OrderReport", "Table has no primary key.", "dbo.OrderReport");
         Assert.Equal(true, missingPrimaryKey["readOnlyEntity"]);

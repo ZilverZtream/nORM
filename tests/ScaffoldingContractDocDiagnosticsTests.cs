@@ -124,7 +124,6 @@ public partial class ScaffoldingContractDocTests
         var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
         var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
         var addMethod = scaffolder.GetMethod("AddReferentialActionDiagnostics", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var metadataMethod = scaffolder.GetMethod("BuildUnsupportedFeatureMetadata", BindingFlags.NonPublic | BindingFlags.Static)!;
         var features = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(featureType))!;
         var foreignKeys = Array.CreateInstance(foreignKeyType, 2);
         foreignKeys.SetValue(Activator.CreateInstance(
@@ -161,7 +160,12 @@ public partial class ScaffoldingContractDocTests
         });
 
         var feature = Assert.Single(features.Cast<object>());
-        var metadata = (IReadOnlyDictionary<string, object?>)metadataMethod.Invoke(null, new[] { feature })!;
+        var metadata = BuildUnsupportedFeatureMetadata(
+            (string)featureType.GetProperty("TableKey")!.GetValue(feature)!,
+            (string)featureType.GetProperty("Kind")!.GetValue(feature)!,
+            (string)featureType.GetProperty("Name")!.GetValue(feature)!,
+            (string)featureType.GetProperty("Detail")!.GetValue(feature)!,
+            (IReadOnlyDictionary<string, object?>?)featureType.GetProperty("Metadata")!.GetValue(feature));
 
         Assert.Equal("sales.OrderLine", metadata["dependentTable"]);
         Assert.Equal(new[] { "TenantId", "OrderId" }, (string[])metadata["dependentColumns"]!);
