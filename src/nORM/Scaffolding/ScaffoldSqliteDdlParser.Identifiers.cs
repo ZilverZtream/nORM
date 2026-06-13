@@ -14,13 +14,16 @@ namespace nORM.Scaffolding
                || value.StartsWith("CHECK ", StringComparison.OrdinalIgnoreCase);
 
         private static bool TryReadLeadingSqlIdentifier(string value, out string identifier, out int nextIndex)
+            => TryReadSqlIdentifier(value, 0, out identifier, out nextIndex);
+
+        private static bool TryReadSqlIdentifier(string value, int startIndex, out string identifier, out int nextIndex)
         {
             identifier = string.Empty;
-            nextIndex = 0;
+            nextIndex = startIndex;
             if (string.IsNullOrWhiteSpace(value))
                 return false;
 
-            var i = 0;
+            var i = startIndex;
             while (i < value.Length && char.IsWhiteSpace(value[i]))
                 i++;
             if (i >= value.Length)

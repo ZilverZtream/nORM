@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 
 namespace nORM.Scaffolding
 {
@@ -14,30 +13,88 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(createTableSql))
                 return Array.Empty<(string Name, string Sql)>();
 
+            var bodyOpen = createTableSql.IndexOf('(');
+            if (bodyOpen < 0)
+                return Array.Empty<(string Name, string Sql)>();
+
+            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
+            if (bodyClose <= bodyOpen)
+                return Array.Empty<(string Name, string Sql)>();
+
             var result = new List<(string Name, string Sql)>();
-            var regex = new Regex(
-                @"(?:(?:CONSTRAINT)\s+(?:""(?<name>[^""]+)""|\[(?<name>[^\]]+)\]|`(?<name>[^`]+)`|(?<name>[A-Za-z_][A-Za-z0-9_]*))\s+)?CHECK\s*\(",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             var ordinal = 0;
-            foreach (Match match in regex.Matches(createTableSql))
+            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
             {
-                var openIndex = createTableSql.IndexOf('(', match.Index + match.Length - 1);
-                if (openIndex < 0)
+                var trimmed = part.Trim();
+                if (trimmed.Length == 0)
                     continue;
 
-                var closeIndex = FindMatchingParenthesis(createTableSql, openIndex);
+                var checkIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(trimmed, "CHECK", 0);
+                if (checkIndex < 0)
+                    continue;
+
+                var openIndex = FindNextSqlTokenStart(trimmed, checkIndex + "CHECK".Length);
+                if (openIndex < 0 || trimmed[openIndex] != '(')
+                    continue;
+
+                var closeIndex = FindMatchingParenthesis(trimmed, openIndex);
                 if (closeIndex <= openIndex)
                     continue;
 
-                var name = match.Groups["name"].Success
-                    ? match.Groups["name"].Value
+                var name = TryReadCheckConstraintName(trimmed, checkIndex, out var constraintName)
+                    ? constraintName
                     : $"CK_{ScaffoldNameHelper.ToPascalCase(tableName)}_{++ordinal}";
-                var sql = createTableSql.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
+                var sql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
                 if (!string.IsNullOrWhiteSpace(sql))
                     result.Add((name, sql));
             }
 
             return result;
+        }
+
+        private static bool TryReadCheckConstraintName(string sql, int checkIndex, out string name)
+        {
+            name = string.Empty;
+            var searchIndex = 0;
+            var constraintIndex = -1;
+            while (searchIndex < checkIndex)
+            {
+                var next = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, "CONSTRAINT", searchIndex);
+                if (next < 0 || next >= checkIndex)
+                    break;
+
+                constraintIndex = next;
+                searchIndex = next + "CONSTRAINT".Length;
+            }
+
+            if (constraintIndex < 0)
+                return false;
+
+            var identifierIndex = FindNextSqlTokenStart(sql, constraintIndex + "CONSTRAINT".Length);
+            return identifierIndex >= 0
+                   && identifierIndex < checkIndex
+                   && TryReadSqlIdentifier(sql, identifierIndex, out name, out var nextIndex)
+                   && nextIndex <= checkIndex;
+        }
+
+        private static int FindNextSqlTokenStart(string sql, int index)
+        {
+            while (index < sql.Length)
+            {
+                while (index < sql.Length && char.IsWhiteSpace(sql[index]))
+                    index++;
+
+                var commentStart = index;
+                if (!ScaffoldSqlMetadataParser.TryAdvanceSqlComment(sql, ref index))
+                    return index < sql.Length ? index : -1;
+
+                if (index == commentStart)
+                    return -1;
+
+                index++;
+            }
+
+            return -1;
         }
     }
 }

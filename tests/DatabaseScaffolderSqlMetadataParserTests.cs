@@ -132,6 +132,29 @@ public partial class DatabaseScaffolderPrivateMethodTests
             ScaffoldSqlMetadataParser.ExtractCreateIndexWhereClause(sql));
     }
 
+    [Fact]
+    public void SqliteCheckConstraintParser_IgnoresSqlCommentsAndStringLiterals()
+    {
+        const string sql = """
+            CREATE TABLE "Orders" (
+                "Id" INTEGER PRIMARY KEY,
+                "Note" TEXT DEFAULT 'CHECK (ignored string literal)',
+                "Commented" INTEGER /* CHECK (ignored block comment) */,
+                CONSTRAINT "CK_Orders_Amount" CHECK ("Amount" > 0 /* ) ignored comment */),
+                "Status" TEXT CONSTRAINT [CK_Orders_Status] CHECK ("Status" IN ('new', 'done')),
+                -- CHECK (ignored line comment)
+                "Flag" INTEGER CHECK /* CHECK (ignored trivia comment) */ ("Flag" IN (0, 1))
+            );
+            """;
+
+        var checks = ScaffoldSqliteDdlParser.ExtractCheckConstraints("Orders", sql);
+
+        Assert.Equal(3, checks.Count);
+        Assert.Equal(("CK_Orders_Amount", "\"Amount\" > 0 /* ) ignored comment */"), checks[0]);
+        Assert.Equal(("CK_Orders_Status", "\"Status\" IN ('new', 'done')"), checks[1]);
+        Assert.Equal(("CK_Orders_1", "\"Flag\" IN (0, 1)"), checks[2]);
+    }
+
     [Theory]
     [InlineData("CHECK ((length(\"Paren)Name\") > 0))", "length(\"Paren)Name\") > 0")]
     [InlineData("CHECK (([Paren)Name] > 0))", "[Paren)Name] > 0")]
