@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -205,41 +204,39 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void BuildManyToManyJoins_WithUnknownReferentialAction_SuppressesUsingTable()
     {
-        var scaffolder = typeof(DatabaseScaffolder);
-        var tableType = scaffolder.GetNestedType("ScaffoldTable", BindingFlags.NonPublic)!;
-        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
-        var indexType = scaffolder.GetNestedType("ScaffoldIndex", BindingFlags.NonPublic)!;
-        var tables = Array.CreateInstance(tableType, 3);
-        tables.SetValue(Activator.CreateInstance(tableType, "Author", null)!, 0);
-        tables.SetValue(Activator.CreateInstance(tableType, "Book", null)!, 1);
-        tables.SetValue(Activator.CreateInstance(tableType, "AuthorBook", null)!, 2);
-        var foreignKeys = Array.CreateInstance(foreignKeyType, 2);
-        foreignKeys.SetValue(Activator.CreateInstance(
-            foreignKeyType,
-            null,
-            "AuthorBook",
-            "AuthorId",
-            null,
-            "Author",
-            "Id",
-            "FK_AuthorBook_Author",
-            1,
-            "PROVIDER CASCADE",
-            "NO ACTION",
-            false)!, 0);
-        foreignKeys.SetValue(Activator.CreateInstance(
-            foreignKeyType,
-            null,
-            "AuthorBook",
-            "BookId",
-            null,
-            "Book",
-            "Id",
-            "FK_AuthorBook_Book",
-            1,
-            "NO ACTION",
-            "NO ACTION",
-            false)!, 1);
+        var tables = new[]
+        {
+            new DatabaseScaffolder.ScaffoldTable("Author", null),
+            new DatabaseScaffolder.ScaffoldTable("Book", null),
+            new DatabaseScaffolder.ScaffoldTable("AuthorBook", null)
+        };
+        var foreignKeys = new[]
+        {
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                null,
+                "AuthorBook",
+                "AuthorId",
+                null,
+                "Author",
+                "Id",
+                "FK_AuthorBook_Author",
+                1,
+                "PROVIDER CASCADE",
+                "NO ACTION",
+                false),
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                null,
+                "AuthorBook",
+                "BookId",
+                null,
+                "Book",
+                "Id",
+                "FK_AuthorBook_Book",
+                1,
+                "NO ACTION",
+                "NO ACTION",
+                false)
+        };
 
         var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -265,7 +262,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         };
         var emptySets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
         var emptyTableKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var indexes = Array.CreateInstance(indexType, 0);
+        var indexes = Array.Empty<DatabaseScaffolder.ScaffoldIndex>();
         var nonNullableColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Author"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase),
@@ -273,12 +270,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             ["AuthorBook"] = new HashSet<string>(new[] { "AuthorId", "BookId" }, StringComparer.OrdinalIgnoreCase)
         };
         var memberNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        var buildJoins = scaffolder
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .Single(m => m.Name == "BuildManyToManyJoins");
-
-        var joins = (System.Collections.IEnumerable)buildJoins.Invoke(null, new object?[]
-        {
+        var joins = ScaffoldRelationshipAdapter.BuildManyToManyJoins(
             foreignKeys,
             tables,
             entityByTable,
@@ -289,14 +281,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
             indexes,
             nonNullableColumns,
             emptyTableKeys,
-            memberNames
-        })!;
+            memberNames);
 
-        Assert.Empty(joins.Cast<object>());
+        Assert.Empty(joins);
 
-        var reasonsMethod = scaffolder.GetMethod("BuildPossibleJoinTableReasons", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var reasons = (string[])reasonsMethod.Invoke(null, new object?[]
-        {
+        var reasons = ScaffoldDiagnosticsAdapter.BuildPossibleJoinTableReasons(
             "AuthorBook",
             foreignKeys,
             primaryKeys,
@@ -305,8 +294,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             emptySets,
             emptySets,
             indexes,
-            emptyTableKeys
-        })!;
+            emptyTableKeys);
 
         Assert.Contains("referential-action-not-scaffoldable", reasons);
     }

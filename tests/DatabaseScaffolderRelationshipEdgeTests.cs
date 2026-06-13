@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Providers;
@@ -250,23 +249,21 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void BuildRelationships_WithUnknownReferentialAction_SuppressesRelationship()
     {
-        var scaffolder = typeof(DatabaseScaffolder);
-        var foreignKeyType = scaffolder.GetNestedType("ScaffoldForeignKey", BindingFlags.NonPublic)!;
-        var indexType = scaffolder.GetNestedType("ScaffoldIndex", BindingFlags.NonPublic)!;
-        var foreignKeys = Array.CreateInstance(foreignKeyType, 1);
-        foreignKeys.SetValue(Activator.CreateInstance(
-            foreignKeyType,
-            null,
-            "Child",
-            "ParentId",
-            null,
-            "Parent",
-            "Id",
-            "FK_Child_Parent",
-            1,
-            "PROVIDER CASCADE",
-            "NO ACTION",
-            false)!, 0);
+        var foreignKeys = new[]
+        {
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                null,
+                "Child",
+                "ParentId",
+                null,
+                "Parent",
+                "Id",
+                "FK_Child_Parent",
+                1,
+                "PROVIDER CASCADE",
+                "NO ACTION",
+                false)
+        };
 
         var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -296,23 +293,17 @@ public partial class DatabaseScaffolderPrivateMethodTests
             ["Parent"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase)
         };
         var memberNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        var indexes = Array.CreateInstance(indexType, 0);
-        var method = scaffolder
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .Single(m => m.Name == "BuildRelationships");
-
-        var relationships = (System.Collections.IEnumerable)method.Invoke(null, new object?[]
-        {
+        var indexes = Array.Empty<DatabaseScaffolder.ScaffoldIndex>();
+        var relationships = ScaffoldRelationshipAdapter.BuildRelationships(
             foreignKeys,
             entityByTable,
             columnProperties,
             primaryKeys,
             indexes,
             nonNullableColumns,
-            memberNames
-        })!;
+            memberNames);
 
-        Assert.Empty(relationships.Cast<object>());
+        Assert.Empty(relationships);
     }
 
 }
