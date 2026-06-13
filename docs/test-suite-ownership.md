@@ -247,6 +247,13 @@ save orchestration, owned collections, many-to-many sync, batched writes, write
 guards, and timeout helpers remain separate responsibilities.
 `RepositoryHygieneTests` enforces this boundary.
 
+## NormValidator Source Size
+
+Every `NormValidator*.cs` partial stays below 1000 lines so entity graph
+validation, raw SQL/query safety, connection string validation, and
+bulk-operation limits remain separate responsibilities. `RepositoryHygieneTests`
+enforces this boundary.
+
 ## Schema Snapshot Source Size
 
 Every `SchemaSnapshot*.cs` file stays below 1500 lines so snapshot DTOs, model
