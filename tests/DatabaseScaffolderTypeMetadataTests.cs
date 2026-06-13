@@ -261,19 +261,6 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void ShouldMarkScaffoldedEntityReadOnly_BlocksUnparsedIdentityStrategyAndUnmodeledDefaults()
     {
-        var m = GetMethod(
-            "ShouldMarkScaffoldedEntityReadOnly",
-            new[]
-            {
-                typeof(string),
-                typeof(IReadOnlySet<string>),
-                typeof(IReadOnlySet<string>),
-                typeof(IReadOnlySet<string>),
-                typeof(IReadOnlySet<string>),
-                typeof(IReadOnlySet<string>),
-                typeof(IReadOnlyDictionary<string, string>),
-                typeof(IReadOnlyDictionary<string, IReadOnlyList<string>>)
-            });
         var emptyTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var identityStrategyTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -291,136 +278,59 @@ public partial class DatabaseScaffolderPrivateMethodTests
             ["public.Customers"] = new[] { "Id" }
         };
 
-        Assert.True((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "dbo.Orders",
+        bool ShouldMarkReadOnly(
+            string tableKey,
+            IReadOnlySet<string> providerSpecificIdentityStrategyTableKeys,
+            IReadOnlySet<string> providerSpecificDefaultTableKeys,
+            IReadOnlyDictionary<string, string>? providerSpecificColumnTypes)
+            => ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
+                tableKey,
                 emptyTables,
                 emptyTables,
                 emptyTables,
-                identityStrategyTables,
-                emptyTables,
-                null,
-                primaryKeys
-            })!);
-        Assert.True((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "dbo.AuditRows",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                defaultTables,
-                null,
-                primaryKeys
-            })!);
-        Assert.False((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "dbo.Orders",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                null,
-                primaryKeys
-            })!);
-        Assert.False((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "public.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" },
-                primaryKeys
-            })!);
-        Assert.False((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "public.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Email"] = "USER-DEFINED (citext)" },
-                primaryKeys
-            })!);
-        Assert.False((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "public.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" },
-                primaryKeys
-            })!);
-        Assert.False((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "dbo.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" },
-                primaryKeys
-            })!);
-        Assert.False((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "dbo.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Amount"] = "user-defined type (dbo.MoneyAmount -> decimal(18,4))" },
-                primaryKeys
-            })!);
-        Assert.True((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "public.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_address -> inet)" },
-                primaryKeys
-            })!);
-        Assert.True((bool)m.Invoke(
-            null,
-            new object?[]
-            {
-                "dbo.Customers",
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                emptyTables,
-                new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" },
-                primaryKeys
-            })!);
+                providerSpecificIdentityStrategyTableKeys,
+                providerSpecificDefaultTableKeys,
+                providerSpecificColumnTypes,
+                primaryKeys);
+
+        Assert.True(ShouldMarkReadOnly("dbo.Orders", identityStrategyTables, emptyTables, null));
+        Assert.True(ShouldMarkReadOnly("dbo.AuditRows", emptyTables, defaultTables, null));
+        Assert.False(ShouldMarkReadOnly("dbo.Orders", emptyTables, emptyTables, null));
+        Assert.False(ShouldMarkReadOnly(
+            "public.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" }));
+        Assert.False(ShouldMarkReadOnly(
+            "public.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Email"] = "USER-DEFINED (citext)" }));
+        Assert.False(ShouldMarkReadOnly(
+            "public.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" }));
+        Assert.False(ShouldMarkReadOnly(
+            "dbo.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" }));
+        Assert.False(ShouldMarkReadOnly(
+            "dbo.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Amount"] = "user-defined type (dbo.MoneyAmount -> decimal(18,4))" }));
+        Assert.True(ShouldMarkReadOnly(
+            "public.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_address -> inet)" }));
+        Assert.True(ShouldMarkReadOnly(
+            "dbo.Customers",
+            emptyTables,
+            emptyTables,
+            new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" }));
     }
 
     [Fact]

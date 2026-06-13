@@ -355,8 +355,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("INTEGER", false)]
     public void IsSqliteProviderSpecificDeclaredType_FlagsProviderShapedTypes(string declaredType, bool expected)
     {
-        var m = GetMethod("IsSqliteProviderSpecificDeclaredType", new[] { typeof(string) });
-        Assert.Equal(expected, (bool)m.Invoke(null, new object[] { declaredType })!);
+        Assert.Equal(expected, ScaffoldSqliteDdlParser.IsProviderSpecificDeclaredType(declaredType));
     }
 
     [Theory]
@@ -473,52 +472,52 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("bigint unsigned", false)]
     public void IsScaffoldableProviderSpecificColumnType_PromotesSafeScalarStorage(string detail, bool expected)
     {
-        var m = GetMethod("IsScaffoldableProviderSpecificColumnType", new[] { typeof(string) });
-        Assert.Equal(expected, (bool)m.Invoke(null, new object[] { detail })!);
+        Assert.Equal(expected, ScaffoldProviderSpecificTypeClassifier.IsScaffoldableProviderSpecificColumnType(detail));
     }
 
     [Fact]
     public void HasWriteBlockingProviderSpecificColumnTypes_AllowsSafeScalarsAndUnsignedButBlocksProviderOwnedTypes()
     {
-        var m = GetMethod("HasWriteBlockingProviderSpecificColumnTypes", new[] { typeof(IReadOnlyDictionary<string, string>) });
+        static bool HasWriteBlocking(IReadOnlyDictionary<string, string> columns)
+            => ScaffoldProviderSpecificTypeClassifier.HasWriteBlockingProviderSpecificColumnTypes(columns);
 
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "json" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "USER-DEFINED (citext)" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Year"] = "year" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Count"] = "int unsigned" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Amount"] = "decimal(18,4) unsigned" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Amount"] = "numeric(18,4) unsigned" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_address -> character varying)" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "DOMAIN (public.score_values -> ARRAY (_int4))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "DOMAIN (public.score_values -> ARRAY (numeric(10,2)))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "integer[]" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "int4[]" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "ARRAY (numeric(10,2))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Scores"] = "numeric(10,2)[]" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Ids"] = "uuid[]" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar)" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Amount"] = "user-defined type (dbo.MoneyAmount -> decimal(18,4))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Token"] = "user-defined type (dbo.TokenBytes -> varbinary(64))" } })!);
-        Assert.False((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Token"] = "user-defined type (dbo.ExternalToken -> uniqueidentifier)" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "geometry" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "geography" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Path"] = "hierarchyid" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "sql_variant" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Address"] = "inet" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Addresses"] = "inet[]" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "cidr" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Mac"] = "macaddr" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Search"] = "tsvector" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "point" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "multipolygon" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_address -> inet)" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_range -> cidr)" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Payload"] = "DOMAIN (public.payload -> USER-DEFINED (custom_payload))" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" } })!);
-        Assert.True((bool)m.Invoke(null, new object?[] { new Dictionary<string, string> { ["Custom"] = "user-defined type (dbo.CustomPayload)" } })!);
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Payload"] = "json" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Email"] = "USER-DEFINED (citext)" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Year"] = "year" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Count"] = "int unsigned" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Amount"] = "decimal(18,4) unsigned" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Amount"] = "numeric(18,4) unsigned" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_address -> character varying)" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Email"] = "DOMAIN (public.email_ci -> USER-DEFINED (citext))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Scores"] = "DOMAIN (public.score_values -> ARRAY (_int4))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Scores"] = "DOMAIN (public.score_values -> ARRAY (numeric(10,2)))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Scores"] = "integer[]" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Scores"] = "int4[]" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Scores"] = "ARRAY (numeric(10,2))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Scores"] = "numeric(10,2)[]" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Ids"] = "uuid[]" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Status"] = "DOMAIN (public.customer_status_domain -> ENUM (public.customer_status: 'draft','active','archived'))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar)" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Email"] = "user-defined type (dbo.EmailAddress -> nvarchar(320))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Amount"] = "user-defined type (dbo.MoneyAmount -> decimal(18,4))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Token"] = "user-defined type (dbo.TokenBytes -> varbinary(64))" }));
+        Assert.False(HasWriteBlocking(new Dictionary<string, string> { ["Token"] = "user-defined type (dbo.ExternalToken -> uniqueidentifier)" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Shape"] = "geometry" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Shape"] = "geography" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Path"] = "hierarchyid" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Payload"] = "sql_variant" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Address"] = "inet" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Addresses"] = "inet[]" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Network"] = "cidr" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Mac"] = "macaddr" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Search"] = "tsvector" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Shape"] = "point" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Shape"] = "multipolygon" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_address -> inet)" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Network"] = "DOMAIN (public.network_range -> cidr)" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Payload"] = "DOMAIN (public.payload -> USER-DEFINED (custom_payload))" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Shape"] = "user-defined type (dbo.Shape -> geography)" }));
+        Assert.True(HasWriteBlocking(new Dictionary<string, string> { ["Custom"] = "user-defined type (dbo.CustomPayload)" }));
     }
 
     [Theory]
