@@ -67,7 +67,7 @@ namespace nORM.Scaffolding
             bool hasKnownNoResultSet,
             string routineNameExpression,
             int discoveredInputParameterCount,
-            string outputFactory,
+            string? outputFactory,
             IReadOnlyList<RoutineOutputParameter> outputParameters)
             => ScaffoldStoredProcedureOutputRoutineStubWriter.AppendRoutineOutputMembers(
                 sb,

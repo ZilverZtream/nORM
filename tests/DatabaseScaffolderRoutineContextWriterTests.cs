@@ -125,6 +125,34 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithUnscaffoldableRoutineOutputName_EmitsExplicitOutputOverloadOnly()
+    {
+        var code = InvokeScaffoldContextWithRoutine(
+            "dbo",
+            "WeirdOutput",
+            "SQL Server stored procedure; parameters=1; outputParameters=1; parameterModes=@bad name:OUT:int; resultColumns=");
+
+        Assert.Contains("Task<int> WeirdOutputAsync(object? parameters = null, CancellationToken ct = default)", code);
+        Assert.Contains("Task<StoredProcedureNonQueryResult> WeirdOutputWithOutputAsync(object? parameters = null, CancellationToken ct = default, params OutputParameter[] outputParameters)", code);
+        Assert.Contains("ExecuteStoredProcedureNonQueryWithOutputAsync(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"WeirdOutput\"), ct, parameters, outputParameters)", code);
+        Assert.DoesNotContain("CreateWeirdOutputOutputParameters", code);
+        Assert.DoesNotContain("output parameters discovered at scaffold time", code);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_unscaffoldable_output_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithPrecisionOnlyRoutineOutput_EmitsNullableScaleOutputParameter()
     {
         var code = InvokeScaffoldContextWithRoutine(

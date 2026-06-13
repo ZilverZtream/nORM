@@ -19,7 +19,7 @@ namespace nORM.Scaffolding
             bool hasKnownNoResultSet,
             string routineNameExpression,
             int discoveredInputParameterCount,
-            string outputFactory,
+            string? outputFactory,
             IReadOnlyList<RoutineOutputParameter> outputParameters)
         {
             var outputMethod = ScaffoldNameHelper.MakeUnique(routineMemberName + "WithOutputAsync", memberNames);
@@ -47,7 +47,10 @@ namespace nORM.Scaffolding
                 }
             }
 
-            AppendScaffoldedOutputParameterOverloads(sb, routine, routineType, parameterSignature, resultType, hasKnownNoResultSet, routineNameExpression, storedProcedureParameters, outputMethod, outputFactory, outputParameters);
+            if (outputFactory != null && outputParameters.Count > 0)
+            {
+                AppendScaffoldedOutputParameterOverloads(sb, routine, routineType, parameterSignature, resultType, hasKnownNoResultSet, routineNameExpression, storedProcedureParameters, outputMethod, outputFactory, outputParameters);
+            }
         }
     }
 }

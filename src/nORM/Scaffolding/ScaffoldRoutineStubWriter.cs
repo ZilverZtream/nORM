@@ -126,7 +126,7 @@ namespace nORM.Scaffolding
                     discoveredInputParameterCount);
             }
 
-            if (outputParameterCount > 0 && !isFunctionCallShape && outputFactory != null)
+            if (outputParameterCount > 0 && !isFunctionCallShape)
             {
                 ScaffoldStoredProcedureRoutineStubWriter.AppendRoutineOutputMembers(
                     sb,
