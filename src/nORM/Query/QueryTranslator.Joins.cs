@@ -23,26 +23,6 @@ namespace nORM.Query
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
-            // Detect `Select(proj).Distinct().Join(...)` and similar outer sources that
-            // would need a subquery wrap (the join's outer key selector references the
-            // projected element rather than a column on the entity). nORM doesn't yet
-            // emit `FROM (SELECT DISTINCT ... FROM tbl) AS T0 INNER JOIN ...` — without
-            // the wrap the outer key resolves to an empty fragment and SQLite throws a
-            // `near "=": syntax error`. Surface a clear exception with two concrete
-            // workarounds: materialize-then-Contains or pre-filter via Where.
-            if (outerQuery is MethodCallExpression outerMce
-                && outerMce.Method.Name == nameof(Queryable.Distinct))
-            {
-                throw new NormUnsupportedFeatureException(
-                    "Join over a `.Distinct()` outer source isn't supported — nORM doesn't yet emit " +
-                    "the subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 INNER JOIN ...`) " +
-                    "that this shape needs. Workarounds: " +
-                    "(1) materialize the distinct keys first and feed them through Contains: " +
-                    "`var keys = await ctx.Query<L>().Select(l => l.Code).Distinct().ToListAsync();` " +
-                    "then `ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync()`; " +
-                    "(2) push the join through first and apply DISTINCT to the result: " +
-                    "`ctx.Query<L>().Join(ctx.Query<R>(), l => l.Code, r => r.Code, (l, r) => new {...}).Distinct()`.");
-            }
             // Join over a Take/Skip-windowed outer source — wrap the windowed outer as a
             // derived table so the join matches only the LIMITed/Skipped outer rows.
             // Sister of the post-Take/Skip silent-wrongness family.
@@ -50,7 +30,35 @@ namespace nORM.Query
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
             var outerAlias = EscapeAlias("T0");
-            if (SourceHasTakeOrSkip(outerQuery))
+            var effectiveOuterKeySelector = outerKeySelector;
+            var effectiveResultSelector = resultSelector;
+            if (outerQuery is MethodCallExpression outerMce
+                && outerMce.Method.Name == nameof(Queryable.Distinct))
+            {
+                if (!TryPrepareDistinctScalarJoinOuter(
+                        outerQuery,
+                        outerKeySelector,
+                        resultSelector,
+                        outerAlias,
+                        out var distinctOuter))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Join over this `.Distinct()` outer source isn't supported yet. nORM supports " +
+                        "`Select(mappedColumn).Distinct().Join(...)` by emitting a derived-table join, " +
+                        "but this shape is more complex. Workarounds: " +
+                        "(1) materialize the distinct keys first and feed them through Contains: " +
+                        "`var keys = await ctx.Query<L>().Select(l => l.Code).Distinct().ToListAsync();` " +
+                        "then `ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync()`; " +
+                        "(2) push the join through first and apply DISTINCT to the result: " +
+                        "`ctx.Query<L>().Join(ctx.Query<R>(), l => l.Code, r => r.Code, (l, r) => new {...}).Distinct()`.");
+                }
+
+                _mapping = distinctOuter.Mapping;
+                outerFromOverride = distinctOuter.FromSql;
+                effectiveOuterKeySelector = distinctOuter.OuterKeySelector;
+                effectiveResultSelector = distinctOuter.ResultSelector;
+            }
+            else if (SourceHasTakeOrSkip(outerQuery))
             {
                 var subOuter = TranslateInSubContext(outerQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subOuterMap);
                 _mapping = subOuterMap;
@@ -62,24 +70,24 @@ namespace nORM.Query
                 Visit(outerQuery);
             }
             var currentOuterType = CurrentPostMaterializeElementType ?? _projection?.Body.Type ?? _mapping.Type;
-            var projectsWholeEntity = resultSelector.Body is NewExpression wholeEntityNew
-                                      && wholeEntityNew.Arguments.Any(a => a == resultSelector.Parameters[0] || a == resultSelector.Parameters[1]);
+            var projectsWholeEntity = effectiveResultSelector.Body is NewExpression wholeEntityNew
+                                      && wholeEntityNew.Arguments.Any(a => a == effectiveResultSelector.Parameters[0] || a == effectiveResultSelector.Parameters[1]);
             if ((IsPostMaterializeTailMode
                  || projectsWholeEntity
                  || outerQuery is MethodCallExpression chainedJoinSource && chainedJoinSource.Method.Name == nameof(Queryable.Join))
-                && currentOuterType == outerKeySelector.Parameters[0].Type)
+                && currentOuterType == effectiveOuterKeySelector.Parameters[0].Type)
             {
-                AppendPostMaterializeInnerJoin(innerQuery, outerKeySelector, innerKeySelector, resultSelector);
+                AppendPostMaterializeInnerJoin(innerQuery, effectiveOuterKeySelector, innerKeySelector, effectiveResultSelector);
                 return node;
             }
             if (IsPostMaterializeTailMode
-                && CurrentPostMaterializeElementType == outerKeySelector.Parameters[0].Type)
+                && CurrentPostMaterializeElementType == effectiveOuterKeySelector.Parameters[0].Type)
             {
-                AppendPostMaterializeGroupJoin(innerQuery, outerKeySelector, innerKeySelector, resultSelector);
+                AppendPostMaterializeGroupJoin(innerQuery, effectiveOuterKeySelector, innerKeySelector, effectiveResultSelector);
                 return node;
             }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
-            var sqlOuterKeySelector = ExpandProjection(outerKeySelector);
+            var sqlOuterKeySelector = ExpandProjection(effectiveOuterKeySelector);
             if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
                 _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
@@ -104,8 +112,8 @@ namespace nORM.Query
             var additionalOnSql = innerOnConditions.Count > 0
                 ? string.Join(" AND ", innerOnConditions.Select(c => "(" + c + ")"))
                 : null;
-            var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
-            JoinBuilder.SetupJoinProjection(resultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+            var transparentExpansion = ComposeTransparentIdentifierSelector(effectiveResultSelector);
+            JoinBuilder.SetupJoinProjection(effectiveResultSelector, _mapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
             _transparentIdentifier = transparentExpansion;
             RegisterTransparentIdentifierTail(transparentExpansion, innerMapping, innerAlias);
             _sql.Clear();
@@ -125,6 +133,119 @@ namespace nORM.Query
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape);
             return node;
+        }
+
+        private bool TryPrepareDistinctScalarJoinOuter(
+            Expression outerQuery,
+            LambdaExpression outerKeySelector,
+            LambdaExpression resultSelector,
+            string outerAlias,
+            out DistinctScalarJoinOuter distinctOuter)
+        {
+            distinctOuter = default;
+
+            if (outerQuery is not MethodCallExpression distinctCall
+                || distinctCall.Arguments.Count == 0
+                || distinctCall.Arguments[0] is not MethodCallExpression selectCall
+                || selectCall.Method.Name != nameof(Queryable.Select)
+                || selectCall.Arguments.Count < 2
+                || StripQuotes(selectCall.Arguments[1]) is not LambdaExpression projectionSelector
+                || projectionSelector.Parameters.Count != 1
+                || outerKeySelector.Parameters.Count != 1
+                || resultSelector.Parameters.Count != 2)
+            {
+                return false;
+            }
+
+            var projectedSource = selectCall.Arguments[0];
+            var projectedSourceType = GetElementType(projectedSource);
+            var projectedSourceMapping = TrackMapping(projectedSourceType);
+
+            if (!TryGetMappedScalarProjection(projectionSelector, projectedSourceMapping, out var projectedBody))
+                return false;
+
+            if (outerKeySelector.Parameters[0].Type != projectedBody.Type
+                || resultSelector.Parameters[0].Type != projectedBody.Type)
+            {
+                return false;
+            }
+
+            var rewrittenOuterKeyBody = new ParameterReplacer(outerKeySelector.Parameters[0], projectedBody)
+                .Visit(outerKeySelector.Body)!;
+            var rewrittenOuterKeySelector = Expression.Lambda(rewrittenOuterKeyBody, projectionSelector.Parameters);
+
+            var rewrittenResultBody = new ParameterReplacer(resultSelector.Parameters[0], projectedBody)
+                .Visit(resultSelector.Body)!;
+            var rewrittenResultSelector = Expression.Lambda(
+                rewrittenResultBody,
+                projectionSelector.Parameters[0],
+                resultSelector.Parameters[1]);
+
+            var subOuter = TranslateInSubContext(
+                outerQuery,
+                projectedSourceMapping,
+                _parameterManager.Index,
+                _joinCounter,
+                _recursionDepth + 1,
+                out var subOuterMap);
+            MergeSubPlanParameters(subOuter);
+
+            distinctOuter = new DistinctScalarJoinOuter(
+                subOuterMap,
+                "(" + subOuter.Sql + ") AS " + outerAlias,
+                rewrittenOuterKeySelector,
+                rewrittenResultSelector);
+            return true;
+        }
+
+        private static bool TryGetMappedScalarProjection(
+            LambdaExpression projectionSelector,
+            TableMapping mapping,
+            out Expression projectedBody)
+        {
+            projectedBody = projectionSelector.Body;
+            var mappedBody = StripConvert(projectedBody);
+            if (mappedBody is not MemberExpression member
+                || !TableMapping.TryGetMemberAccessRoot(member, out var root)
+                || root != projectionSelector.Parameters[0]
+                || !mapping.TryGetColumnForMemberAccess(member, out _))
+            {
+                projectedBody = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static Expression StripConvert(Expression expression)
+        {
+            while (expression is UnaryExpression unary
+                   && unary.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+            {
+                expression = unary.Operand;
+            }
+
+            return expression;
+        }
+
+        private readonly struct DistinctScalarJoinOuter
+        {
+            public DistinctScalarJoinOuter(
+                TableMapping mapping,
+                string fromSql,
+                LambdaExpression outerKeySelector,
+                LambdaExpression resultSelector)
+            {
+                Mapping = mapping;
+                FromSql = fromSql;
+                OuterKeySelector = outerKeySelector;
+                ResultSelector = resultSelector;
+            }
+
+            public TableMapping Mapping { get; }
+            public string FromSql { get; }
+            public LambdaExpression OuterKeySelector { get; }
+            public LambdaExpression ResultSelector { get; }
         }
 
         private string TranslateJoinProjectionExpression(Expression expression)

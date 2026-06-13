@@ -10,13 +10,9 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins the deterministic error message when callers chain
-/// <c>Select(proj).Distinct().Join(...)</c>. nORM doesn't yet emit the
-/// subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 INNER JOIN ...`)
-/// that this shape needs — without the wrap the outer key resolves to an
-/// empty fragment and SQLite throws a cryptic `near "=": syntax error`.
-/// Detect the shape at translation time and surface a clear exception with
-/// the two supported workarounds.
+/// Pins <c>Select(mappedColumn).Distinct().Join(...)</c>. The DISTINCT must run
+/// in a derived outer table before the join; joining first would duplicate
+/// right-side rows for duplicate left-side keys.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqDistinctBeforeJoinTests : IAsyncLifetime
@@ -46,19 +42,18 @@ public class LinqDistinctBeforeJoinTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Distinct_then_join_throws_with_actionable_message()
+    public async Task Distinct_then_join_executes_against_distinct_outer_keys()
     {
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await _ctx.Query<DbjLeft>()
-                .Select(l => l.Code)
-                .Distinct()
-                .Join(_ctx.Query<DbjRight>(), code => code, r => r.Code, (code, r) => new { code, r.Tag })
-                .ToListAsync();
-        });
-        // Message must identify the constraint and point at the supported workarounds.
-        Assert.Contains("Distinct", ex.Message, System.StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Contains", ex.Message, System.StringComparison.OrdinalIgnoreCase);
+        var rows = await _ctx.Query<DbjLeft>()
+            .Select(l => l.Code)
+            .Distinct()
+            .Join(_ctx.Query<DbjRight>(), code => code, r => r.Code, (code, r) => new { code, r.Tag })
+            .OrderBy(row => row.code)
+            .ToListAsync();
+
+        Assert.Equal(
+            new[] { ("A", "alpha"), ("B", "beta"), ("C", "gamma") },
+            rows.Select(row => (row.code, row.Tag)).ToArray());
     }
 
     [Table("DbjLeft")]
