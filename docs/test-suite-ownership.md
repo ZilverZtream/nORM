@@ -189,6 +189,13 @@ rewrites, async execution, simple-query fast paths, CUD, and streaming/plan
 helpers remain separate execution responsibilities. `RepositoryHygieneTests`
 enforces this boundary.
 
+## Fast Path Query Executor Source Size
+
+Every `FastPathQueryExecutor*.cs` partial stays below 1000 lines so dispatch,
+pattern recognition, filtered ordered paging, simple where/take/count execution,
+and support helpers remain separate responsibilities. `RepositoryHygieneTests`
+enforces this boundary.
+
 ## Query Executor Source Size
 
 Every `QueryExecutor*.cs` partial stays below 1000 lines so core
