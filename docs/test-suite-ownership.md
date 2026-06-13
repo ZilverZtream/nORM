@@ -256,7 +256,7 @@ enforces this boundary.
 
 ## Schema Snapshot Source Size
 
-Every `SchemaSnapshot*.cs` file stays below 1500 lines so snapshot DTOs, model
+Every `SchemaSnapshot*.cs` file stays below 1000 lines so snapshot DTOs, model
 scanning, destructive-change diagnostics, and diffing remain separate migration
 responsibilities. `RepositoryHygieneTests` enforces this boundary.
 
