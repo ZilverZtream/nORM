@@ -402,7 +402,9 @@ public class DocumentationContractTests
     {
         var root = FindRepositoryRoot();
         var builder = File.ReadAllText(Path.Combine(root, "src", "nORM", "Query", "BulkCudBuilder.cs"));
-        var provider = File.ReadAllText(Path.Combine(root, "src", "nORM", "Query", "NormQueryProvider.cs"));
+        var provider = string.Concat(
+            File.ReadAllText(Path.Combine(root, "src", "nORM", "Query", "NormQueryProvider.cs")),
+            File.ReadAllText(Path.Combine(root, "src", "nORM", "Query", "NormQueryProvider.SyncCud.cs")));
 
         Assert.Contains("ValidateCudPlan(BulkCudQueryShape? shape)", builder, StringComparison.Ordinal);
         Assert.Contains("GetWhereClause(BulkCudQueryShape? shape)", builder, StringComparison.Ordinal);
@@ -600,6 +602,11 @@ public class DocumentationContractTests
         Assert.DoesNotContain("| 41 |", map, StringComparison.Ordinal);
         Assert.Contains("exactly 40 blockers", map, StringComparison.Ordinal);
         Assert.Contains("Rebuild benchmark evidence", map, StringComparison.Ordinal);
+        Assert.Contains("| 40 | Run and publish a real RC release gate | In Progress |", map, StringComparison.Ordinal);
+        Assert.Contains("Historical RC evidence exists", map, StringComparison.Ordinal);
+        Assert.Contains("no longer sufficient for current HEAD", map, StringComparison.Ordinal);
+        Assert.Contains("fresh benchmark-enabled RC gate from the intended release commit", map, StringComparison.Ordinal);
+        Assert.Contains("Benchmark skipped: False", map, StringComparison.Ordinal);
         Assert.Contains("Closure Rule", map, StringComparison.Ordinal);
         Assert.Contains("Open", map, StringComparison.Ordinal);
         Assert.Contains("In Progress", map, StringComparison.Ordinal);
