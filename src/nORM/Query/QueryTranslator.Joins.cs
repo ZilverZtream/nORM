@@ -424,25 +424,6 @@ namespace nORM.Query
             var resultSelector = StripQuotes(node.Arguments[4]) as LambdaExpression;
             if (outerKeySelector == null || innerKeySelector == null || resultSelector == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "Join selectors must be lambda expressions"));
-            // Sister of the HandleInnerJoin guard above: `Select(proj).Distinct().GroupJoin(...)`
-            // also needs the subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 LEFT
-            // JOIN ...`) that nORM doesn't yet emit. Without it the outer key resolves to an
-            // empty fragment and execution dies inside the group-join materializer with an
-            // opaque "Unexpected error in MaterializeGroupJoin". Surface the same actionable
-            // exception so callers can apply the same Contains / post-join-Distinct rewrite.
-            if (outerQuery is MethodCallExpression outerMce
-                && outerMce.Method.Name == nameof(Queryable.Distinct))
-            {
-                throw new NormUnsupportedFeatureException(
-                    "GroupJoin over a `.Distinct()` outer source isn't supported — nORM doesn't yet emit " +
-                    "the subquery wrap (`FROM (SELECT DISTINCT ... FROM tbl) AS T0 LEFT JOIN ...`) " +
-                    "that this shape needs. Workarounds: " +
-                    "(1) materialize the distinct keys first and project the right-side groups via Contains: " +
-                    "`var keys = await ctx.Query<L>().Select(l => l.Code).Distinct().ToListAsync();` " +
-                    "then `var rs = await ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync();` " +
-                    "and group client-side with `keys.Select(k => new { k, Rs = rs.Where(r => r.Code == k).ToList() })`; " +
-                    "(2) push the GroupJoin through first and apply DISTINCT to the result.");
-            }
             // GroupJoin over a Take/Skip-windowed outer source — wrap the windowed outer
             // as a derived table so LEFT JOIN runs against the windowed rows only.
             // Sister of HandleInnerJoin's windowed branch above.
@@ -450,7 +431,39 @@ namespace nORM.Query
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
             var outerAlias = EscapeAlias("T0");
-            if (SourceHasTakeOrSkip(outerQuery))
+            var effectiveOuterKeySelector = outerKeySelector;
+            var sqlResultSelector = resultSelector;
+            var runtimeResultSelector = resultSelector;
+            LambdaExpression? sqlProjectionOverride = null;
+            var groupJoinOuterIsEntity = true;
+            var groupJoinOuterColumnCount = -1;
+            if (outerQuery is MethodCallExpression outerMce
+                && outerMce.Method.Name == nameof(Queryable.Distinct))
+            {
+                if (!TryPrepareDistinctScalarJoinOuter(
+                        outerQuery,
+                        outerKeySelector,
+                        resultSelector,
+                        outerAlias,
+                        out var distinctOuter))
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "GroupJoin over this `.Distinct()` outer source isn't supported yet. nORM supports " +
+                        "`Select(mappedColumn).Distinct().GroupJoin(...)` by emitting a derived-table " +
+                        "left join, but this shape is more complex. Workarounds: " +
+                        "(1) materialize the distinct keys first and project the right-side groups via Contains; " +
+                        "(2) push the GroupJoin through first and apply DISTINCT to the result.");
+                }
+
+                _mapping = distinctOuter.Mapping;
+                gjOuterFromOverride = distinctOuter.FromSql;
+                effectiveOuterKeySelector = distinctOuter.OuterKeySelector;
+                sqlResultSelector = distinctOuter.ResultSelector;
+                sqlProjectionOverride = CreateScalarGroupJoinSqlProjection(effectiveOuterKeySelector, innerKeySelector);
+                groupJoinOuterIsEntity = false;
+                groupJoinOuterColumnCount = 1;
+            }
+            else if (SourceHasTakeOrSkip(outerQuery))
             {
                 var subOuter = TranslateInSubContext(outerQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subOuterMap);
                 _mapping = subOuterMap;
@@ -462,13 +475,13 @@ namespace nORM.Query
                 Visit(outerQuery);
             }
             if (IsPostMaterializeTailMode
-                && CurrentPostMaterializeElementType == outerKeySelector.Parameters[0].Type)
+                && CurrentPostMaterializeElementType == effectiveOuterKeySelector.Parameters[0].Type)
             {
-                AppendPostMaterializeGroupJoin(innerQuery, outerKeySelector, innerKeySelector, resultSelector);
+                AppendPostMaterializeGroupJoin(innerQuery, effectiveOuterKeySelector, innerKeySelector, sqlResultSelector);
                 return node;
             }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
-            var sqlOuterKeySelector = ExpandProjection(outerKeySelector);
+            var sqlOuterKeySelector = ExpandProjection(effectiveOuterKeySelector);
             if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
                 _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
@@ -494,21 +507,21 @@ namespace nORM.Query
             // cannot reuse `_projection` for this — the materialiser would try to build
             // a 2-parameter projection materialiser and crash; the GroupJoin materialiser
             // path uses the compiled `GroupJoinInfo.ResultSelector` Func instead.
-            _groupJoinResultSelector = resultSelector;
-            _groupJoinExpansionSelector = ComposeGroupJoinExpansionSelector(resultSelector);
+            _groupJoinResultSelector = sqlResultSelector;
+            _groupJoinExpansionSelector = ComposeGroupJoinExpansionSelector(sqlResultSelector);
             // The result selector's parameter instances are DIFFERENT from the key-selector's
             // (each lambda has its own scope). Pre-register them in _correlatedParams so a
             // downstream OrderBy/Where that's ExpandProjection-ed through this selector
             // resolves `p.Name` against the outer alias (T0) rather than auto-registering
             // with `_joinCounter` (which is now the inner alias index, producing wrong-table
             // references like `T1.Name`).
-            if (resultSelector.Parameters.Count >= 1
-                && !_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
-                _correlatedParams[resultSelector.Parameters[0]] = (_mapping, outerAlias);
-            if (resultSelector.Parameters.Count >= 2
-                && !_correlatedParams.ContainsKey(resultSelector.Parameters[1]))
-                _correlatedParams[resultSelector.Parameters[1]] = (innerMapping, innerAlias);
-            if (_groupJoinExpansionSelector.Parameters.Count > resultSelector.Parameters.Count)
+            if (sqlResultSelector.Parameters.Count >= 1
+                && !_correlatedParams.ContainsKey(sqlResultSelector.Parameters[0]))
+                _correlatedParams[sqlResultSelector.Parameters[0]] = (_mapping, outerAlias);
+            if (sqlResultSelector.Parameters.Count >= 2
+                && !_correlatedParams.ContainsKey(sqlResultSelector.Parameters[1]))
+                _correlatedParams[sqlResultSelector.Parameters[1]] = (innerMapping, innerAlias);
+            if (_groupJoinExpansionSelector.Parameters.Count > sqlResultSelector.Parameters.Count)
             {
                 var composedInner = _groupJoinExpansionSelector.Parameters[^1];
                 if (!_correlatedParams.ContainsKey(composedInner))
@@ -519,28 +532,54 @@ namespace nORM.Query
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
             // outer-key contiguity (needed for streaming group segmentation) is always first.
             _sql.Clear();
-            JoinBuilder.BuildJoinClauseInto(_sql, _projection, _mapping, outerAlias, innerMapping, innerAlias, "LEFT JOIN", outerKeySql, innerKeySql, orderBy: null, distinct: _isDistinct, outerFromOverride: gjOuterFromOverride);
+            JoinBuilder.BuildJoinClauseInto(
+                _sql,
+                sqlProjectionOverride ?? _projection,
+                _mapping,
+                outerAlias,
+                innerMapping,
+                innerAlias,
+                "LEFT JOIN",
+                outerKeySql,
+                innerKeySql,
+                orderBy: null,
+                distinct: _isDistinct,
+                outerFromOverride: gjOuterFromOverride);
             // Insert outer-key sort at the front of _orderBy so it is always first.
             _orderBy.Insert(0, (outerKeySql, true));
-            var outerType = outerKeySelector.Parameters[0].Type;
+            var outerType = runtimeResultSelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
-            var resultType = resultSelector.Body.Type;
+            var resultType = runtimeResultSelector.Body.Type;
             var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
                 ExtractPropertyName(innerKeySelector.Body) == c.PropName);
             if (innerKeyColumn != null)
             {
                 var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
-                var resultSelectorFunc = CompileGroupJoinResultSelector(resultSelector);
+                var resultSelectorFunc = CompileGroupJoinResultSelector(runtimeResultSelector);
                 _groupJoinInfo = new GroupJoinInfo(
                     outerType,
                     innerType,
                     resultType,
                     outerKeyFunc,
                     innerKeyColumn,
-                    resultSelectorFunc
+                    resultSelectorFunc,
+                    groupJoinOuterIsEntity,
+                    groupJoinOuterColumnCount
                 );
             }
             return node;
+        }
+
+        private static LambdaExpression CreateScalarGroupJoinSqlProjection(
+            LambdaExpression outerKeySelector,
+            LambdaExpression innerKeySelector)
+        {
+            var innerParameter = innerKeySelector.Parameters[0];
+            var tupleType = typeof(ValueTuple<,>).MakeGenericType(outerKeySelector.Body.Type, innerParameter.Type);
+            var ctor = tupleType.GetConstructor(new[] { outerKeySelector.Body.Type, innerParameter.Type })
+                ?? throw new NormQueryException("Unable to build GroupJoin SQL projection.");
+            var body = Expression.New(ctor, outerKeySelector.Body, innerParameter);
+            return Expression.Lambda(body, outerKeySelector.Parameters[0], innerParameter);
         }
         /// <summary>
         /// Translates LINQ SelectMany operations into SQL JOIN clauses, handling collection flattening

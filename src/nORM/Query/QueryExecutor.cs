@@ -526,6 +526,59 @@ namespace nORM.Query
             return _ctx.Options.DefaultTrackingBehavior == QueryTrackingBehavior.NoTracking;
         }
 
+        /// <summary>Prepares shared column offsets and tracking flags for GroupJoin materializers.</summary>
+        /// <param name="plan">The query plan describing mappings and selectors.</param>
+        private GroupJoinMaterializationState PrepareGroupJoinMaterialization(QueryPlan plan)
+        {
+            var info = plan.GroupJoinInfo!;
+            var trackOuter = info.OuterIsEntity
+                             && !plan.NoTracking
+                             && info.OuterType.IsClass
+                             && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+            var trackInner = !plan.NoTracking
+                             && info.InnerType.IsClass
+                             && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
+
+            var outerColumnCount = info.OuterColumnCount;
+            if (outerColumnCount < 0)
+            {
+                if (!info.OuterIsEntity)
+                    throw new InvalidOperationException("GroupJoin scalar outer source did not provide an outer column count.");
+
+                outerColumnCount = _ctx.GetMapping(info.OuterType).Columns.Length;
+            }
+
+            var innerMap = _ctx.GetMapping(info.InnerType);
+            var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
+            if (innerKeyOffset < 0)
+            {
+                innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
+                    string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
+                    || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
+            }
+
+            if (innerKeyOffset < 0)
+            {
+                throw new InvalidOperationException(
+                    $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
+                    $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
+            }
+
+            return new GroupJoinMaterializationState(
+                innerMap,
+                outerColumnCount,
+                outerColumnCount + innerKeyOffset,
+                trackOuter,
+                trackInner);
+        }
+
+        private readonly record struct GroupJoinMaterializationState(
+            TableMapping InnerMap,
+            int OuterColumnCount,
+            int InnerKeyIndex,
+            bool TrackOuter,
+            bool TrackInner);
+
         /// <summary>
         /// Materializes the results of a LINQ <c>GroupJoin</c> operation by streaming records from
         /// the provided command and constructing the grouped results in memory.
@@ -543,25 +596,12 @@ namespace nORM.Query
                 // Use cached list factory instead of Activator.CreateInstance.
                 var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-
-                var outerMap = _ctx.GetMapping(info.OuterType);
-                var innerMap = _ctx.GetMapping(info.InnerType);
-
-                var outerColumnCount = outerMap.Columns.Length;
-                var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-                if (innerKeyOffset < 0)
-                {
-                    innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
-                        string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
-                        || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
-                }
-                if (innerKeyOffset < 0)
-                    throw new InvalidOperationException(
-                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
-                        $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
-                var innerKeyIndex = outerColumnCount + innerKeyOffset;
+                var state = PrepareGroupJoinMaterialization(plan);
+                var trackOuter = state.TrackOuter;
+                var trackInner = state.TrackInner;
+                var innerMap = state.InnerMap;
+                var outerColumnCount = state.OuterColumnCount;
+                var innerKeyIndex = state.InnerKeyIndex;
 
                 // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
                 // access would cause a backward seek (Npgsql ThrowInvalidSequentialSeek).
@@ -686,20 +726,12 @@ namespace nORM.Query
         {
             var info = plan.GroupJoinInfo!;
 
-            var trackOuter = !plan.NoTracking && info.OuterType.IsClass &&
-                             !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-            var trackInner = !plan.NoTracking && info.InnerType.IsClass &&
-                             !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-
-            var outerMap = _ctx.GetMapping(info.OuterType);
-            var innerMap = _ctx.GetMapping(info.InnerType);
-
-            var outerColumnCount = outerMap.Columns.Length;
-            var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-            if (innerKeyOffset < 0)
-                throw new InvalidOperationException(
-                    $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'.");
-            var innerKeyIndex = outerColumnCount + innerKeyOffset;
+            var state = PrepareGroupJoinMaterialization(plan);
+            var trackOuter = state.TrackOuter;
+            var trackInner = state.TrackInner;
+            var innerMap = state.InnerMap;
+            var outerColumnCount = state.OuterColumnCount;
+            var innerKeyIndex = state.InnerKeyIndex;
 
             // Non-sequential read: innerKeyIndex may be read before inner columns are consumed.
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
@@ -806,25 +838,12 @@ namespace nORM.Query
             {
                 var resultList = CreateList(info.ResultType, DefaultListCapacity);
 
-                var trackOuter = !plan.NoTracking && info.OuterType.IsClass && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-                var trackInner = !plan.NoTracking && info.InnerType.IsClass && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-
-                var outerMap = _ctx.GetMapping(info.OuterType);
-                var innerMap = _ctx.GetMapping(info.InnerType);
-
-                var outerColumnCount = outerMap.Columns.Length;
-                var innerKeyOffset = Array.IndexOf(innerMap.Columns, info.InnerKeyColumn);
-                if (innerKeyOffset < 0)
-                {
-                    innerKeyOffset = Array.FindIndex(innerMap.Columns, c =>
-                        string.Equals(c.PropName, info.InnerKeyColumn.PropName, StringComparison.Ordinal)
-                        || string.Equals(c.Name, info.InnerKeyColumn.Name, StringComparison.Ordinal));
-                }
-                if (innerKeyOffset < 0)
-                    throw new InvalidOperationException(
-                        $"GroupJoin inner key column '{info.InnerKeyColumn?.Name ?? "(null)"}' not found in mapping for '{info.InnerType.Name}'. " +
-                        $"Available columns: {string.Join(", ", innerMap.Columns.Select(c => c.Name))}.");
-                var innerKeyIndex = outerColumnCount + innerKeyOffset;
+                var state = PrepareGroupJoinMaterialization(plan);
+                var trackOuter = state.TrackOuter;
+                var trackInner = state.TrackInner;
+                var innerMap = state.InnerMap;
+                var outerColumnCount = state.OuterColumnCount;
+                var innerKeyIndex = state.InnerKeyIndex;
 
                 // GroupJoin reads innerKeyIndex BEFORE materializing inner columns — sequential
                 // access would cause a backward seek (Npgsql ThrowInvalidSequentialSeek).

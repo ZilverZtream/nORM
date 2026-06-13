@@ -125,7 +125,9 @@ namespace nORM.Query
         Type ResultType,
         Func<object, object?> OuterKeySelector,
         Column InnerKeyColumn,
-        Func<object, IEnumerable<object>, object> ResultSelector
+        Func<object, IEnumerable<object>, object> ResultSelector,
+        bool OuterIsEntity = true,
+        int OuterColumnCount = -1
     );
 
     /// <summary>
