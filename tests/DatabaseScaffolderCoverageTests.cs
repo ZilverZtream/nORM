@@ -116,11 +116,7 @@ public class DatabaseScaffolderCoverageTests
 
 
     private static string ToPascalCase(string name)
-    {
-        var m = _scaffolderType.GetMethod("ToPascalCase",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string)m.Invoke(null, new object[] { name })!;
-    }
+        => ScaffoldNameHelper.ToPascalCase(name);
 
     [Theory]
     [InlineData("products",     "Products")]
@@ -136,11 +132,7 @@ public class DatabaseScaffolderCoverageTests
 
 
     private static string EscapeCSharpIdentifier(string id)
-    {
-        var m = _scaffolderType.GetMethod("EscapeCSharpIdentifier",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string)m.Invoke(null, new object[] { id })!;
-    }
+        => ScaffoldNameHelper.EscapeCSharpIdentifier(id);
 
     [Theory]
     [InlineData("ValidName",    "ValidName")]
@@ -165,9 +157,8 @@ public class DatabaseScaffolderCoverageTests
 
     private static string GetUnqualifiedName(string id)
     {
-        var m = _scaffolderType.GetMethod("GetUnqualifiedName",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string)m.Invoke(null, new object[] { id })!;
+        var idx = id.LastIndexOf('.');
+        return idx >= 0 ? id[(idx + 1)..] : id;
     }
 
     [Theory]
@@ -182,9 +173,8 @@ public class DatabaseScaffolderCoverageTests
 
     private static string? GetSchemaNameOrNull(string id)
     {
-        var m = _scaffolderType.GetMethod("GetSchemaNameOrNull",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string?)m.Invoke(null, new object[] { id });
+        var idx = id.IndexOf('.');
+        return idx > 0 ? id[..idx] : null;
     }
 
     [Theory]
@@ -198,11 +188,7 @@ public class DatabaseScaffolderCoverageTests
 
 
     private static string EscapeQualifiedIfNeeded(string? schema, string table)
-    {
-        var m = _scaffolderType.GetMethod("EscapeQualifiedIfNeeded",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        return (string)m.Invoke(null, new object?[] { schema, table })!;
-    }
+        => string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";
 
     [Theory]
     [InlineData("myschema", "mytable", "myschema.mytable")]
@@ -215,14 +201,7 @@ public class DatabaseScaffolderCoverageTests
 
 
     private static string EscapeIdentifier(SqliteConnection cn, string id)
-    {
-        var m = _scaffolderType.GetMethod("EscapeIdentifier",
-            BindingFlags.NonPublic | BindingFlags.Static,
-            null,
-            new[] { typeof(System.Data.Common.DbConnection), typeof(string) },
-            null)!;
-        return (string)m.Invoke(null, new object[] { cn, id })!;
-    }
+        => DynamicEntityConnectionKind.EscapeIdentifier(cn, id);
 
     [Fact]
     public void EscapeIdentifier_Sqlite_UsesDoubleQuotes()

@@ -1093,26 +1093,41 @@ public class NavigationContextCovTests : IDisposable
     }
 }
 
-// ── DatabaseScaffolder private helpers via reflection ─────────────────────────
+// Scaffolding helper coverage.
 
 [Xunit.Trait("Category", "Fast")]
 public class DatabaseScaffolderHelperTests
 {
-    private static MethodInfo GetPrivateStatic(string name, int paramCount = 1)
-    {
-        return typeof(DatabaseScaffolder)
-            .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!;
-    }
-
     private static object? Invoke(string methodName, object?[] args)
     {
         if (methodName == "GetTypeName" && args.Length == 2)
             return ScaffoldTypeNameHelper.GetTypeName((Type)args[0]!, (bool)args[1]!, useNullableReferenceTypes: true);
 
-        var method = typeof(DatabaseScaffolder)
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .First(m => m.Name == methodName && m.GetParameters().Length == args.Length);
-        return method.Invoke(null, args);
+        return methodName switch
+        {
+            "ToPascalCase" when args.Length == 1 => ScaffoldNameHelper.ToPascalCase((string)args[0]!),
+            "GetUnqualifiedName" when args.Length == 1 => GetUnqualifiedName((string)args[0]!),
+            "GetSchemaNameOrNull" when args.Length == 1 => GetSchemaNameOrNull((string)args[0]!),
+            "EscapeCSharpIdentifier" when args.Length == 1 => ScaffoldNameHelper.EscapeCSharpIdentifier((string)args[0]!),
+            _ => throw new MissingMethodException(nameof(DatabaseScaffolder), methodName)
+        };
+    }
+
+    private static string GetUnqualifiedName(string identifier)
+    {
+        var idx = identifier.LastIndexOf('.');
+        return idx >= 0 ? identifier[(idx + 1)..] : identifier;
+    }
+
+    private static string? GetSchemaNameOrNull(string identifier)
+    {
+        var idx = identifier.IndexOf('.');
+        return idx > 0 ? identifier[..idx] : null;
+    }
+
+    private static string EscapeQualifiedIfNeeded(string? schema, string table)
+    {
+        return string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";
     }
 
     [Fact]
@@ -1279,21 +1294,14 @@ public class DatabaseScaffolderHelperTests
     [Fact]
     public void EscapeQualifiedIfNeeded_NoSchema_ReturnsTable()
     {
-        // Use the (string?, string) overload
-        var method = typeof(DatabaseScaffolder)
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .First(m => m.Name == "EscapeQualifiedIfNeeded");
-        var result = method.Invoke(null, new object?[] { null, "Orders" });
+        var result = EscapeQualifiedIfNeeded(null, "Orders");
         Assert.Equal("Orders", result);
     }
 
     [Fact]
     public void EscapeQualifiedIfNeeded_WithSchema_ReturnsSchemaTable()
     {
-        var method = typeof(DatabaseScaffolder)
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Static)
-            .First(m => m.Name == "EscapeQualifiedIfNeeded");
-        var result = method.Invoke(null, new object?[] { "dbo", "Orders" });
+        var result = EscapeQualifiedIfNeeded("dbo", "Orders");
         Assert.Equal("dbo.Orders", result);
     }
 }

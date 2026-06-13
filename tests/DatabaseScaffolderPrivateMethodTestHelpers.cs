@@ -18,16 +18,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
            ?? throw new MissingMethodException(nameof(DatabaseScaffolder), name);
 
     private static string InvokeToPascalCase(string input)
-    {
-        var m = GetMethod("ToPascalCase", new[] { typeof(string) });
-        return (string)m.Invoke(null, new object[] { input })!;
-    }
+        => ScaffoldNameHelper.ToPascalCase(input);
 
     private static string InvokeEscapeCSharpIdentifier(string input)
-    {
-        var m = GetMethod("EscapeCSharpIdentifier", new[] { typeof(string) });
-        return (string)m.Invoke(null, new object[] { input })!;
-    }
+        => ScaffoldNameHelper.EscapeCSharpIdentifier(input);
 
     private static string InvokeDynamicEscapeCSharpIdentifier(string input)
     {

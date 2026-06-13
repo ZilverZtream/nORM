@@ -28,9 +28,7 @@ using Xunit;
 namespace nORM.Tests;
 
 // GROUP 59 — DatabaseScaffolder full integration via ScaffoldAsync
-// Covers: ScaffoldAsync (lines 43-77), ScaffoldEntityAsync (90-158),
-//         GetTypeName nullable reference path (line 222),
-//         EscapeQualified(string,string) dead-code path (line 258)
+// Covers: ScaffoldAsync integration, nullable reference type names, and qualified table keys.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
@@ -98,8 +96,6 @@ internal sealed class FakeSchemaDbConnection : System.Data.Common.DbConnection
 [Xunit.Trait("Category", "Fast")]
 public class DatabaseScaffolderIntegrationTests
 {
-    private static readonly Type _scaffolderType = typeof(DatabaseScaffolder);
-
     [Fact]
     public async Task ScaffoldAsync_WithSqliteTable_GeneratesEntityAndContextFiles()
     {
@@ -234,26 +230,14 @@ public class DatabaseScaffolderIntegrationTests
     [Fact]
     public void EscapeQualified_StringStringOverload_CombinesWithDot()
     {
-        // Line 258: EscapeQualified(string schema, string table) — dead-code path via reflection
-        var m = _scaffolderType.GetMethod("EscapeQualified",
-            BindingFlags.NonPublic | BindingFlags.Static,
-            null,
-            new[] { typeof(string), typeof(string) },
-            null)!;
-        var result = (string)m.Invoke(null, new object[] { "myschema", "mytable" })!;
+        var result = ScaffoldForeignKeyShape.TableKey("myschema", "mytable");
         Assert.Equal("myschema.mytable", result);
     }
 
     [Fact]
     public void EscapeQualified_ProviderWithSchema_IncludesSchemaPrefix()
     {
-        // Line 271: EscapeQualified(provider, schema, table) with non-null schema
-        var m = _scaffolderType.GetMethod("EscapeQualified",
-            BindingFlags.NonPublic | BindingFlags.Static,
-            null,
-            new[] { typeof(DatabaseProvider), typeof(string), typeof(string) },
-            null)!;
-        var result = (string)m.Invoke(null, new object?[] { new SqliteProvider(), "myschema", "mytable" })!;
+        var result = IdentifierEscaping.EscapeTable(new SqliteProvider(), "mytable", "myschema");
         Assert.Contains("myschema", result);
         Assert.Contains("mytable", result);
         Assert.Contains(".", result);
@@ -262,11 +246,7 @@ public class DatabaseScaffolderIntegrationTests
     [Fact]
     public void ToPascalCase_SingleCharSegment_HandlesShortPart()
     {
-        // Line 244 else branch: part.Length == 1 (no part[1..] access)
-        var m = _scaffolderType.GetMethod("ToPascalCase",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-        var result = (string)m.Invoke(null, new object[] { "a_b_c" })!;
-        // Each part is 1 char, should be uppercased: "A" + "B" + "C" = "ABC"
+        var result = ScaffoldNameHelper.ToPascalCase("a_b_c");
         Assert.Equal("ABC", result);
     }
 }

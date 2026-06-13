@@ -59,14 +59,14 @@ namespace nORM.Scaffolding
             if (outputDirectory is null) throw new ArgumentNullException(nameof(outputDirectory));
             if (namespaceName is null) throw new ArgumentNullException(nameof(namespaceName));
             if (string.IsNullOrWhiteSpace(contextName)) throw new ArgumentException("Value cannot be null or whitespace.", nameof(contextName));
-            if (!IsValidNamespaceName(namespaceName))
+            if (!ScaffoldNameHelper.IsValidNamespaceName(namespaceName))
                 throw new NormConfigurationException(
                     $"Scaffold namespace '{namespaceName}' is not a valid C# namespace. " +
                     "Use a dot-separated namespace such as 'MyApp.Data'.");
             options ??= new ScaffoldOptions();
             var contextNamespace = ScaffoldOutputManager.NormalizeContextNamespace(namespaceName, options.ContextNamespace);
             var contextOutputDirectory = ScaffoldOutputManager.ResolveContextOutputDirectory(outputDirectory, options.ContextDirectory, options.ContextOutputDirectory);
-            var safeContextName = EscapeCSharpIdentifier(ToPascalCase(contextName));
+            var safeContextName = ScaffoldNameHelper.EscapeCSharpIdentifier(ScaffoldNameHelper.ToPascalCase(contextName));
 
             var connectionWasOpen = connection.State == ConnectionState.Open;
             if (!connectionWasOpen)
@@ -80,7 +80,7 @@ namespace nORM.Scaffolding
                     Directory.CreateDirectory(contextOutputDirectory);
                 }
                 var discovery = await ScaffoldModelDiscovery.BuildAsync(connection, provider, options).ConfigureAwait(false);
-                safeContextName = MakeUniqueContextName(safeContextName, discovery.EntityByTable.Values);
+                safeContextName = ScaffoldNameHelper.MakeUniqueContextName(safeContextName, discovery.EntityByTable.Values);
                 var composition = ScaffoldModelCompositionBuilder.Build(discovery);
                 var outputPlan = await ScaffoldOutputPlanBuilder.BuildAsync(new ScaffoldOutputPlanRequest(
                     connection,

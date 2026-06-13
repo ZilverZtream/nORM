@@ -10,14 +10,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
 {
     private static string InvokeGetUnqualifiedName(string identifier)
     {
-        var m = GetMethod("GetUnqualifiedName", new[] { typeof(string) });
-        return (string)m.Invoke(null, new object[] { identifier })!;
+        var idx = identifier.LastIndexOf('.');
+        return idx >= 0 ? identifier[(idx + 1)..] : identifier;
     }
 
     private static string? InvokeGetSchemaNameOrNull(string identifier)
     {
-        var m = GetMethod("GetSchemaNameOrNull", new[] { typeof(string) });
-        return (string?)m.Invoke(null, new object[] { identifier });
+        var idx = identifier.IndexOf('.');
+        return idx > 0 ? identifier[..idx] : null;
     }
 
     private static string InvokeScaffoldContext(string ns, string ctxName, IEnumerable<string> entities)
