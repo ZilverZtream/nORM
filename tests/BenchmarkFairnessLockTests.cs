@@ -322,6 +322,24 @@ public sealed class BenchmarkFairnessLockTests
         Assert.Contains("Copy-Item -LiteralPath $src -Destination $pkgBundleDir -Force", manifest);
     }
 
+    [Fact]
+    public void RcArtifactManifest_RequiresBenchmarkEvidenceForBenchmarkEnabledRcManifests()
+    {
+        var manifest = ReadRepoFile("eng/rc-artifact-manifest.ps1");
+        var gates = ReadRepoFile("docs/release-gates.md");
+
+        Assert.Contains("Assert-RcReleaseEvidenceComplete", manifest);
+        Assert.Contains("$Mode -ne 'rc' -or $BenchmarkSkipped", manifest);
+        Assert.Contains("Benchmark-enabled RC artifact manifests require a clean git working tree", manifest);
+        Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence/benchmark-evidence.json", manifest);
+        Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence/benchmark-evidence.md", manifest);
+        Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence/benchmark-thresholds.json", manifest);
+        Assert.Contains("BenchmarkDotNet.Artifacts/v1-evidence/benchmark-thresholds.md", manifest);
+        Assert.Contains("*-report.csv", manifest);
+        Assert.Contains("benchmark evidence, threshold summaries, and raw BenchmarkDotNet CSV reports", manifest);
+        Assert.Contains("refuses `BenchmarkSkipped=false` unless the bundle includes benchmark evidence", gates);
+    }
+
     private static void AssertMethodContains(string code, string methodName, string expected)
     {
         var pattern = $@"public\s+(?:async\s+)?(?:Task<[^>]+>|Task|ValueTask<[^>]+>|[A-Za-z0-9_<>,\s]+)\s+{Regex.Escape(methodName)}\s*\([^)]*\)\s*(?:=>|{{)";

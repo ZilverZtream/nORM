@@ -58,7 +58,37 @@ function New-ProviderFloorEvidence {
     }
 }
 
-New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+function Assert-RcReleaseEvidenceComplete {
+    param(
+        [string]$Status,
+        [string[]]$BenchmarkArtifacts,
+        [string[]]$ReleaseEvidence
+    )
+
+    if ($Mode -ne 'rc' -or $BenchmarkSkipped) {
+        return
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Status)) {
+        throw "Benchmark-enabled RC artifact manifests require a clean git working tree. Commit or stash changes, then rerun."
+    }
+
+    $requiredEvidence = @(
+        'BenchmarkDotNet.Artifacts/v1-evidence/benchmark-evidence.json',
+        'BenchmarkDotNet.Artifacts/v1-evidence/benchmark-evidence.md',
+        'BenchmarkDotNet.Artifacts/v1-evidence/benchmark-thresholds.json',
+        'BenchmarkDotNet.Artifacts/v1-evidence/benchmark-thresholds.md'
+    )
+
+    $missingEvidence = @($requiredEvidence | Where-Object { $ReleaseEvidence -notcontains $_ })
+    $rawReports = @($BenchmarkArtifacts | Where-Object { $_ -like '*-report.csv' })
+
+    if ($missingEvidence.Count -gt 0 -or $rawReports.Count -eq 0) {
+        $missingText = if ($missingEvidence.Count -gt 0) { " Missing release evidence: $($missingEvidence -join ', ')." } else { '' }
+        $rawReportText = if ($rawReports.Count -eq 0) { ' No raw BenchmarkDotNet CSV reports were found in the artifact bundle.' } else { '' }
+        throw "Benchmark-enabled RC artifact manifests require benchmark evidence, threshold summaries, and raw BenchmarkDotNet CSV reports.$missingText$rawReportText"
+    }
+}
 
 $commit = (& git -C $root rev-parse HEAD).Trim()
 $statusOutput = & git -C $root status --short
@@ -162,6 +192,10 @@ else {
     $benchmarkArtifacts = Get-RelativeFiles @('BenchmarkDotNet.Artifacts', 'benchmarks/BenchmarkDotNet.Artifacts')
     $releaseEvidence = Get-RelativeFiles @('BenchmarkDotNet.Artifacts/v1-evidence')
 }
+
+Assert-RcReleaseEvidenceComplete -Status $status -BenchmarkArtifacts $benchmarkArtifacts -ReleaseEvidence $releaseEvidence
+
+New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $manifest = [ordered]@{
     GeneratedUtc = $generatedUtc

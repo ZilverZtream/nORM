@@ -299,7 +299,9 @@ the validated commit, mode, SDK, configured providers, TRX files, package files,
 BenchmarkDotNet outputs, and benchmark evidence/threshold summaries. A release
 tag should point at the commit in this manifest, not merely at a locally passing
 working tree. Benchmark-enabled RC runs refuse a dirty working tree before
-collecting release-grade benchmark evidence.
+collecting release-grade benchmark evidence, and the RC artifact manifest
+refuses `BenchmarkSkipped=false` unless the bundle includes benchmark evidence,
+threshold summaries, and raw BenchmarkDotNet CSV reports.
 
 The public API baseline is documented in `docs\public-api-policy.md`. The v1.0
 release checklist is documented in `docs\v1-readiness.md`.
