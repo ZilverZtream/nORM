@@ -245,14 +245,12 @@ public class DatabaseScaffolderCoverageTests
 
 
     private static string ScaffoldContext(string namespaceName, string contextName, IEnumerable<string> entities)
-    {
-        var m = _scaffolderType.GetMethod("ScaffoldContext",
-            BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            types: new[] { typeof(string), typeof(string), typeof(IEnumerable<string>) },
-            modifiers: null)!;
-        return (string)m.Invoke(null, new object[] { namespaceName, contextName, entities })!;
-    }
+        => ScaffoldContextAdapter.Write(
+            namespaceName,
+            contextName,
+            entities,
+            Array.Empty<DatabaseScaffolder.ScaffoldRelationship>(),
+            Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>());
 
     [Fact]
     public void ScaffoldContext_GeneratesClassWithQueryProperties()
