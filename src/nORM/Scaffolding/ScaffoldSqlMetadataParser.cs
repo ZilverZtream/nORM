@@ -7,8 +7,7 @@ namespace nORM.Scaffolding
     {
         public static bool TryConsumeSqlKeyword(string sql, ref int index, string keyword)
         {
-            while (index < sql.Length && char.IsWhiteSpace(sql[index]))
-                index++;
+            SkipSqlTrivia(sql, ref index);
 
             if (index + keyword.Length > sql.Length
                 || !sql.AsSpan(index, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase))
@@ -32,6 +31,8 @@ namespace nORM.Scaffolding
             {
                 var ch = sql[i];
                 if (TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
+                    continue;
+                if (TryAdvanceSqlComment(sql, ref i))
                     continue;
 
                 if (quote is not null)
@@ -78,6 +79,8 @@ namespace nORM.Scaffolding
             {
                 var ch = value[i];
                 if (TryAdvancePostgresDollarQuote(value, ref i, ref dollarQuote))
+                    continue;
+                if (TryAdvanceSqlComment(value, ref i))
                     continue;
 
                 if (quote is not null)
@@ -158,6 +161,49 @@ namespace nORM.Scaffolding
 
             tag = sql.Substring(index, end - index + 1);
             return true;
+        }
+
+        public static bool TryAdvanceSqlComment(string sql, ref int index)
+        {
+            if (index + 1 >= sql.Length)
+                return false;
+
+            if (sql[index] == '-' && sql[index + 1] == '-')
+            {
+                var end = index + 2;
+                while (end < sql.Length && sql[end] is not '\r' and not '\n')
+                    end++;
+
+                index = end < sql.Length ? end : sql.Length - 1;
+                return true;
+            }
+
+            if (sql[index] == '/' && sql[index + 1] == '*')
+            {
+                var end = sql.IndexOf("*/", index + 2, StringComparison.Ordinal);
+                index = end < 0 ? sql.Length - 1 : end + 1;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void SkipSqlTrivia(string sql, ref int index)
+        {
+            while (index < sql.Length)
+            {
+                while (index < sql.Length && char.IsWhiteSpace(sql[index]))
+                    index++;
+
+                var commentStart = index;
+                if (!TryAdvanceSqlComment(sql, ref index))
+                    return;
+
+                if (index == commentStart)
+                    return;
+
+                index++;
+            }
         }
 
         private static bool IsSqlIdentifierChar(char value)

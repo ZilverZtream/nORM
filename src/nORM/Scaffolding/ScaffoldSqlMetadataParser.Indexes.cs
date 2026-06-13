@@ -67,7 +67,7 @@ namespace nORM.Scaffolding
 
             var body = createIndexSql.Substring(index + 1, includeCloseIndex - index - 1);
             return ScaffoldSqliteDdlParser.SplitTopLevelCommaSeparated(body)
-                .Select(UnquoteCreateIndexIdentifier)
+                .Select(NormalizeCreateIndexIdentifier)
                 .Where(static name => name.Length > 0)
                 .ToArray();
         }

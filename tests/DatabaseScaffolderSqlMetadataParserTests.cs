@@ -107,6 +107,31 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.False(columns["Virtual"].Stored);
     }
 
+    [Fact]
+    public void CreateIndexMetadataParser_IgnoresSqlCommentsWhenLocatingClauses()
+    {
+        const string sql = """
+            CREATE /* ON fake.Table (broken) */ UNIQUE INDEX "IX_Documents_Commented"
+            ON public."Documents"
+            USING btree
+            (lower("Name") /* ) WHERE "Commented" IS NULL */)
+            INCLUDE ("Score", /* ) , "Ignored" */ "Rank")
+            /* WHERE "Ignored" = 1 */
+            WHERE "Name" IS NOT NULL;
+            """;
+
+        Assert.True(ScaffoldSqlMetadataParser.IsCreateIndexUnique(sql));
+        Assert.Equal(
+            "lower(\"Name\") /* ) WHERE \"Commented\" IS NULL */",
+            ScaffoldSqlMetadataParser.ExtractCreateIndexExpressionSql(sql));
+        Assert.Equal(
+            new[] { "Score", "Rank" },
+            ScaffoldSqlMetadataParser.ExtractCreateIndexIncludedColumnNames(sql));
+        Assert.Equal(
+            "\"Name\" IS NOT NULL",
+            ScaffoldSqlMetadataParser.ExtractCreateIndexWhereClause(sql));
+    }
+
     [Theory]
     [InlineData("CHECK ((length(\"Paren)Name\") > 0))", "length(\"Paren)Name\") > 0")]
     [InlineData("CHECK (([Paren)Name] > 0))", "[Paren)Name] > 0")]

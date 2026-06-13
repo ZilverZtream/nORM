@@ -15,6 +15,8 @@ namespace nORM.Scaffolding
                 var ch = sql[i];
                 if (ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
                     continue;
+                if (ScaffoldSqlMetadataParser.TryAdvanceSqlComment(sql, ref i))
+                    continue;
 
                 if (quote is not null)
                 {
@@ -66,6 +68,8 @@ namespace nORM.Scaffolding
             {
                 var ch = sql[i];
                 if (ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
+                    continue;
+                if (ScaffoldSqlMetadataParser.TryAdvanceSqlComment(sql, ref i))
                     continue;
 
                 if (quote is not null)
