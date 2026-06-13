@@ -143,6 +143,48 @@ namespace nORM.Migration
         private static string BuildUniqueConstraintSql(TableSchema table, ColumnSchema column)
             => $"CONSTRAINT {Esc(GetUniqueConstraintName(table, column))} UNIQUE ({Esc(column.Name)})";
 
+        private static string BuildCreateColumnDefinition(ColumnSchema column)
+        {
+            if (IsComputedColumn(column))
+                return BuildComputedColumnDefinition(column);
+
+            var defaultPart = !string.IsNullOrEmpty(column.DefaultValue)
+                ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
+                : "";
+
+            if (column.IsIdentity && column.IsPrimaryKey)
+                return $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+
+            return $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+        }
+
+        private static string BuildCreateTableSql(TableSchema table)
+        {
+            var colDefs = table.Columns.Select(BuildCreateColumnDefinition).ToList();
+            var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
+            if (pkCols.Count > 0 && !pkCols.Any(c => c.IsIdentity))
+                colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
+
+            foreach (var uniqueColumn in table.Columns.Where(IsImplicitUniqueColumn))
+                colDefs.Add(BuildUniqueConstraintSql(table, uniqueColumn));
+            foreach (var fk in table.ForeignKeys)
+                colDefs.Add(BuildFkConstraintSql(fk));
+            foreach (var check in table.CheckConstraints)
+                colDefs.Add(BuildCheckConstraintSql(check));
+
+            return $"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})";
+        }
+
+        private static void AddCreateTableWithIndexes(List<string> statements, TableSchema table)
+        {
+            statements.Add(BuildCreateTableSql(table));
+
+            foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
+                statements.Add(BuildIndexSql(table, index.IndexName, index.IsUnique, index.ColumnNames, index.Descending));
+            foreach (var expressionIndex in table.ExpressionIndexes)
+                statements.Add(BuildExpressionIndexSql(table, expressionIndex));
+        }
+
         private static bool RequiresRecreateForAddedColumn(ColumnSchema column)
             => column.IsPrimaryKey;
 
@@ -355,50 +397,7 @@ namespace nORM.Migration
 
             foreach (var table in diff.AddedTables)
             {
-                var colDefs = table.Columns.Select(c =>
-                {
-                    if (IsComputedColumn(c))
-                        return BuildComputedColumnDefinition(c);
-                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
-                        : "";
-                    // SQLite AUTOINCREMENT requires inline "INTEGER PRIMARY KEY AUTOINCREMENT" on the column definition
-                    if (c.IsIdentity && c.IsPrimaryKey)
-                        return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
-                }).ToList();
-
-                // Emit PRIMARY KEY constraint for PK columns.
-                var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
-                if (pkCols.Count > 0)
-                {
-                    // SQLite AUTOINCREMENT requires "INTEGER PRIMARY KEY AUTOINCREMENT" inline, not table-level constraint
-                    if (!pkCols.Any(c => c.IsIdentity))
-                        colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
-                }
-
-                foreach (var uc in table.Columns.Where(IsImplicitUniqueColumn))
-                    colDefs.Add(BuildUniqueConstraintSql(table, uc));
-
-                // MG-1: Emit inline FOREIGN KEY constraints
-                foreach (var fk in table.ForeignKeys)
-                    colDefs.Add(BuildFkConstraintSql(fk));
-                foreach (var check in table.CheckConstraints)
-                    colDefs.Add(BuildCheckConstraintSql(check));
-
-                up.Add($"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})");
-
-                foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
-                {
-                    var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
-                    EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
-                    up.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatFilter(index.FilterSql)}");
-                }
-                foreach (var expressionIndex in table.ExpressionIndexes)
-                    up.Add(BuildExpressionIndexSql(table, expressionIndex));
-
+                AddCreateTableWithIndexes(up, table);
                 down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
             }
 
@@ -483,42 +482,7 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
             {
                 up.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
-                // Down: recreate the table with full constraint metadata
-                var colDefs = table.Columns.Select(c =>
-                {
-                    if (IsComputedColumn(c))
-                        return BuildComputedColumnDefinition(c);
-                    var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
-                        : "";
-                    if (c.IsIdentity && c.IsPrimaryKey)
-                        return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
-                }).ToList();
-                var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
-                if (pkCols.Count > 0)
-                {
-                    if (!pkCols.Any(c => c.IsIdentity))
-                        colDefs.Add(BuildPrimaryKeyConstraintSql(table, pkCols));
-                }
-                foreach (var uc in table.Columns.Where(IsImplicitUniqueColumn))
-                    colDefs.Add(BuildUniqueConstraintSql(table, uc));
-                // MG-1: Restore FK constraints in Down recreation
-                foreach (var fk in table.ForeignKeys)
-                    colDefs.Add(BuildFkConstraintSql(fk));
-                foreach (var check in table.CheckConstraints)
-                    colDefs.Add(BuildCheckConstraintSql(check));
-                down.Add($"CREATE TABLE {EscTable(table.Name)} ({string.Join(", ", colDefs)})");
-                foreach (var index in SchemaDiffer.GetExplicitIndexes(table))
-                {
-                    var unique = index.IsUnique ? "UNIQUE " : string.Empty;
-                    EnsureNoIncludedColumns(index.IncludedColumnNames, index.IndexName);
-                    EnsureNoNullsNotDistinct(index.NullsNotDistinct, index.IndexName);
-                    EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
-                    down.Add($"CREATE {unique}INDEX {EscIndexName(table.Name, index.IndexName)} ON {EscIndexTargetTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatFilter(index.FilterSql)}");
-                }
-                foreach (var expressionIndex in table.ExpressionIndexes)
-                    down.Add(BuildExpressionIndexSql(table, expressionIndex));
+                AddCreateTableWithIndexes(down, table);
             }
 
             // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
