@@ -1,9 +1,57 @@
 #nullable enable
+using System.Collections.Generic;
 
 namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldSemicolonParser
     {
+        private static List<SemicolonValueMarker> FindSemicolonValueMarkers(string detail)
+        {
+            var markers = new List<SemicolonValueMarker>();
+            char? quote = null;
+            string? dollarQuote = null;
+            for (var i = 0; i < detail.Length; i++)
+            {
+                var ch = detail[i];
+                if (dollarQuote is not null)
+                {
+                    ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(detail, ref i, ref dollarQuote);
+                    continue;
+                }
+
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < detail.Length && detail[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(detail, ref i, ref dollarQuote))
+                    continue;
+
+                if (ch == ';' && TryReadSemicolonValueMarker(detail, i, out var key, out var valueStart))
+                    markers.Add(new SemicolonValueMarker(i, key, valueStart));
+            }
+
+            return markers;
+        }
+
         private static bool TryReadSemicolonValueMarker(
             string detail,
             int semicolonIndex,

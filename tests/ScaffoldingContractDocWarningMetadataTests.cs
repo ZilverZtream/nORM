@@ -451,6 +451,21 @@ public partial class ScaffoldingContractDocTests
         Assert.Equal(true, postgresProviderIndex["isUnique"]);
         Assert.Equal("Name NULLS FIRST", postgresProviderIndex["keySql"]);
 
+        var postgresQuotedProviderIndex = Metadata(
+            "ProviderSpecificIndex",
+            "IX_Orders_Quoted",
+            "PostgreSQL btree index with provider-specific key options; accessMethod=btree; hasNullsNotDistinct=false; hasNonDefaultOperatorClass=false; hasIndexCollation=false; hasNonDefaultNullOrdering=true; indexSql=CREATE INDEX IX ON Orders (regexp_replace(Name, $tag$; accessMethod=gin; hasIndexCollation=true; indexSql=wrong$tag$, '', 'g') NULLS FIRST)");
+        Assert.Equal("btree", postgresQuotedProviderIndex["accessMethod"]);
+        Assert.Equal(false, postgresQuotedProviderIndex["hasNullsNotDistinct"]);
+        Assert.Equal(false, postgresQuotedProviderIndex["hasIndexCollation"]);
+        Assert.Equal(true, postgresQuotedProviderIndex["hasNonDefaultNullOrdering"]);
+        Assert.Equal(
+            "regexp_replace(Name, $tag$; accessMethod=gin; hasIndexCollation=true; indexSql=wrong$tag$, '', 'g') NULLS FIRST",
+            postgresQuotedProviderIndex["keySql"]);
+        Assert.Contains(
+            "$tag$; accessMethod=gin; hasIndexCollation=true; indexSql=wrong$tag$",
+            Assert.IsType<string>(postgresQuotedProviderIndex["indexSql"]));
+
         var trigger = Metadata("Trigger", "TR_Orders_Audit", "PostgreSQL trigger; timing=BEFORE; event=INSERT; orientation=ROW");
         Assert.Equal("PostgreSQL", trigger["provider"]);
         Assert.Equal("Trigger", trigger["providerObjectKind"]);

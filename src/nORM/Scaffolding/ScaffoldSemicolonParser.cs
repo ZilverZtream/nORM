@@ -21,12 +21,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<IReadOnlyList<string>>? keyOrders,
             Func<string, string, bool>? isCompleteValue)
         {
-            var markers = new List<SemicolonValueMarker>();
-            for (var i = 0; i < detail.Length; i++)
-            {
-                if (detail[i] == ';' && TryReadSemicolonValueMarker(detail, i, out var key, out var valueStart))
-                    markers.Add(new SemicolonValueMarker(i, key, valueStart));
-            }
+            var markers = FindSemicolonValueMarkers(detail);
 
             if (keyOrders is { Count: > 0 })
                 markers = SelectBestOrderedSemicolonValueMarkers(detail, markers, keyOrders, isCompleteValue);
