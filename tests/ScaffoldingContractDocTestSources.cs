@@ -99,6 +99,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Indexes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.IndexScanning.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Expressions.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Scanning.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqlMetadataParser.Types.cs"));
 
     private static string ReadSemicolonParserSource()

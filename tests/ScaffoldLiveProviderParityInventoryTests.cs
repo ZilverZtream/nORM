@@ -238,7 +238,7 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
 
     private static IEnumerable<PartialCoverage> FindPartialLiveProviderCoverage()
     {
-        var providerRegex = new Regex(@"InlineData\(ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)\)", RegexOptions.Compiled);
+        var providerRegex = new Regex(@"InlineData\(ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)(?:\s*,|\))", RegexOptions.Compiled);
         var methodRegex = new Regex(@"public\s+(?:async\s+)?(?:Task|void)\s+([A-Za-z0-9_]+)\s*\(", RegexOptions.Compiled);
         foreach (var file in Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "LiveProviderScaffold*.cs"))
         {
