@@ -189,14 +189,40 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
 
     [Fact]
     public void Live_provider_scaffold_coverage_keeps_each_provider_substantial()
+        => AssertProviderCoverageSubstantial(
+            "all live scaffold tests",
+            "LiveProviderScaffold*.cs",
+            minReferenceRatio: 0.60,
+            minFileRatio: 0.80);
+
+    [Fact]
+    public void Live_provider_scaffold_coverage_keeps_each_surface_substantial()
     {
-        var summaries = BuildProviderCoverageSummaries().ToArray();
+        AssertProviderCoverageSubstantial(
+            "live scaffold CLI tests",
+            "LiveProviderScaffoldCli*.cs",
+            minReferenceRatio: 0.60,
+            minFileRatio: 0.80);
+        AssertProviderCoverageSubstantial(
+            "live direct scaffolder tests",
+            "LiveProviderScaffolding*.cs",
+            minReferenceRatio: 0.50,
+            minFileRatio: 0.75);
+    }
+
+    private static void AssertProviderCoverageSubstantial(
+        string label,
+        string filePattern,
+        double minReferenceRatio,
+        double minFileRatio)
+    {
+        var summaries = BuildProviderCoverageSummaries(filePattern).ToArray();
         Assert.Equal(AllProviders, summaries.Select(summary => summary.Provider).OrderBy(ProviderOrder));
 
         var maxReferences = summaries.Max(summary => summary.ReferenceCount);
         var maxFiles = summaries.Max(summary => summary.FileCount);
-        var minReferenceCount = (int)Math.Floor(maxReferences * 0.60);
-        var minFileCount = (int)Math.Floor(maxFiles * 0.80);
+        var minReferenceCount = (int)Math.Floor(maxReferences * minReferenceRatio);
+        var minFileCount = (int)Math.Floor(maxFiles * minFileRatio);
         var weakProviders = summaries
             .Where(summary => summary.ReferenceCount < minReferenceCount || summary.FileCount < minFileCount)
             .Select(summary =>
@@ -206,7 +232,7 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
 
         Assert.True(
             weakProviders.Length == 0,
-            "Live scaffold coverage must stay materially all-four-provider even after legitimate provider-specific tests are added: " +
+            $"{label} coverage must stay materially all-four-provider even after legitimate provider-specific tests are added: " +
             string.Join("; ", weakProviders));
     }
 
@@ -269,7 +295,7 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
         }
     }
 
-    private static IEnumerable<ProviderCoverageSummary> BuildProviderCoverageSummaries()
+    private static IEnumerable<ProviderCoverageSummary> BuildProviderCoverageSummaries(string filePattern)
     {
         var providerRegex = new Regex(@"ProviderKind\.(Sqlite|SqlServer|Postgres|MySql)", RegexOptions.Compiled);
         var summaries = AllProviders.ToDictionary(
@@ -277,7 +303,7 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
             provider => new ProviderCoverageBuilder(provider),
             StringComparer.Ordinal);
 
-        foreach (var file in Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "LiveProviderScaffold*.cs"))
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), filePattern))
         {
             var fileName = Path.GetFileName(file);
             var providerCounts = providerRegex.Matches(File.ReadAllText(file))
