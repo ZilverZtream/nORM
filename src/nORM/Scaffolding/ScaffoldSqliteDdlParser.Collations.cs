@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 
 namespace nORM.Scaffolding
 {
@@ -29,17 +28,41 @@ namespace nORM.Scaffolding
                 if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
                     continue;
 
-                var match = Regex.Match(
-                    trimmed,
-                    @"\bCOLLATE\s+(?<name>""[^""]+""|\[[^\]]+\]|`[^`]+`|[A-Za-z_][A-Za-z0-9_-]*)",
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-                if (!match.Success)
+                var collateIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(trimmed, "COLLATE", 0);
+                if (collateIndex < 0)
                     continue;
 
-                result[columnName] = UnquoteSqlIdentifier(match.Groups["name"].Value);
+                var nameIndex = FindNextSqlTokenStart(trimmed, collateIndex + "COLLATE".Length);
+                if (nameIndex < 0 || !TryReadSqliteCollationName(trimmed, nameIndex, out var collationName))
+                    continue;
+
+                result[columnName] = collationName;
             }
 
             return result;
+        }
+
+        private static bool TryReadSqliteCollationName(string value, int index, out string name)
+        {
+            name = string.Empty;
+            if (index >= value.Length)
+                return false;
+
+            if (value[index] is '"' or '`' or '[')
+                return TryReadSqlIdentifier(value, index, out name, out _);
+
+            if (!char.IsLetter(value[index]) && value[index] != '_')
+                return false;
+
+            var start = index;
+            while (index < value.Length
+                   && (char.IsLetterOrDigit(value[index]) || value[index] is '_' or '-' or '$'))
+            {
+                index++;
+            }
+
+            name = value.Substring(start, index - start);
+            return name.Length > 0;
         }
     }
 }

@@ -155,6 +155,28 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Equal(("CK_Orders_1", "\"Flag\" IN (0, 1)"), checks[2]);
     }
 
+    [Fact]
+    public void SqliteCollationParser_IgnoresSqlCommentsAndStringLiterals()
+    {
+        const string sql = """
+            CREATE TABLE "Documents" (
+                "Id" INTEGER PRIMARY KEY,
+                "Name" TEXT DEFAULT 'COLLATE ignored' COLLATE NOCASE,
+                "Commented" TEXT /* COLLATE ignored */,
+                "Tagged" TEXT COLLATE /* COLLATE ignored trivia */ "custom-name",
+                "Flag" TEXT COLLATE [BINARY]
+            );
+            """;
+
+        var collations = ScaffoldSqliteDdlParser.ExtractColumnCollations(sql);
+
+        Assert.Equal(3, collations.Count);
+        Assert.Equal("NOCASE", collations["Name"]);
+        Assert.Equal("custom-name", collations["Tagged"]);
+        Assert.Equal("BINARY", collations["Flag"]);
+        Assert.False(collations.ContainsKey("Commented"));
+    }
+
     [Theory]
     [InlineData("CHECK ((length(\"Paren)Name\") > 0))", "length(\"Paren)Name\") > 0")]
     [InlineData("CHECK (([Paren)Name] > 0))", "[Paren)Name] > 0")]
