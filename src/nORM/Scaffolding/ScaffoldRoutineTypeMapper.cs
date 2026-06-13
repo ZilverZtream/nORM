@@ -53,7 +53,8 @@ namespace nORM.Scaffolding
                 "double precision" => "double",
                 "timestamp without time zone" => "timestamp",
                 "timestamp with time zone" => "timestamptz",
-                "time without time zone" or "time with time zone" => "time",
+                "time without time zone" => "time",
+                "time with time zone" => "timetz",
                 _ => normalized
             };
     }

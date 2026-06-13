@@ -49,7 +49,7 @@ must be reviewed and edited like handwritten model code.
   semantics unless the application adds explicit provider-bound queries.
   Provider catalog `date`/`time` store types map to CLR temporal types where the mapping is unambiguous:
   SQL Server and PostgreSQL `date`/`time`, MySQL `date`, PostgreSQL `interval`,
-  SQL Server `datetimeoffset`, and SQLite declared
+  PostgreSQL `time with time zone`, SQL Server `datetimeoffset`, and SQLite declared
   `DATE`/`TIME`/`DATETIME`/`TIMESTAMP`/`DATETIMEOFFSET` are applied before
   falling back to provider schema-row CLR metadata. MySQL `TIME` is left to
   provider metadata rather than guessed because it can represent time-of-day or
@@ -71,7 +71,7 @@ must be reviewed and edited like handwritten model code.
   runtime dynamic generated entity types read-only; definitions with malformed comma structure
   are treated the same way.
   PostgreSQL arrays over safe scalar elements, including numeric, text/citext,
-  UUID, binary, date/time, interval, and timestamp arrays, scaffold as CLR
+  UUID, binary, date/time including `time with time zone`, interval, and timestamp arrays, scaffold as CLR
   arrays so the model compiles and materializes with Npgsql; they remain
   provider-specific schema for provider-mobility review because
   SQL Server/MySQL/SQLite do not share native array DDL.

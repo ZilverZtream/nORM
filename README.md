@@ -312,7 +312,7 @@ columns scaffold as string storage. SQL Server `xml`, PostgreSQL
 `citext`/`json`/`jsonb`/`xml`/`uuid`, and MySQL `json`/`year` columns also scaffold as
 safe scalar CLR storage while native JSON/XML operator semantics stay provider-bound,
 and PostgreSQL arrays over safe scalar elements, including numeric, text/citext,
-UUID, binary, date/time, interval, and timestamp arrays, scaffold as CLR arrays
+UUID, binary, date/time including `time with time zone`, interval, and timestamp arrays, scaffold as CLR arrays
 while remaining provider-specific schema for provider-mobility review,
 and dynamic `Query(string)` scaffolding mirrors static required/generated
 metadata for supported shapes.

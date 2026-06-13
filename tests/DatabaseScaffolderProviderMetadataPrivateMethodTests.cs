@@ -214,6 +214,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("sqlserver", "uniqueidentifier", typeof(object), typeof(Guid))]
     [InlineData("postgres", "date", typeof(DateTime), typeof(DateOnly))]
     [InlineData("postgres", "time without time zone", typeof(TimeSpan), typeof(TimeOnly))]
+    [InlineData("postgres", "time with time zone", typeof(TimeSpan), typeof(DateTimeOffset))]
+    [InlineData("postgres", "timetz", typeof(TimeSpan), typeof(DateTimeOffset))]
     [InlineData("postgres", "timestamp with time zone", typeof(DateTime), typeof(DateTimeOffset))]
     [InlineData("postgres", "interval", typeof(TimeSpan), typeof(TimeSpan))]
     [InlineData("postgres", "uuid", typeof(object), typeof(Guid))]
@@ -636,6 +638,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("ARRAY (_text)", "text[]")]
     [InlineData("ARRAY (_bytea)", "bytea[]")]
     [InlineData("ARRAY (_timestamptz)", "timestamp with time zone[]")]
+    [InlineData("ARRAY (_timetz)", "time with time zone[]")]
     [InlineData("ARRAY (varchar(64))", "character varying[]")]
     [InlineData("ARRAY (numeric(10,2))", "numeric[]")]
     [InlineData("integer[]", "integer[]")]
@@ -645,6 +648,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("character varying(64)[]", "character varying[]")]
     [InlineData("numeric(10,2)[]", "numeric[]")]
     [InlineData("uuid[]", "uuid[]")]
+    [InlineData("time with time zone[]", "time with time zone[]")]
+    [InlineData("timetz[]", "time with time zone[]")]
     public void NormalizePostgresDomainProbeCastType_StaticAndDynamic_NormalizesSafeFacetsAndTextCastsMalformedTypes(string typeText, string expected)
     {
         var staticMethod = GetMethod("NormalizePostgresDomainProbeCastType", new[] { typeof(string) });

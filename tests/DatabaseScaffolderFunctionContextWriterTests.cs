@@ -111,7 +111,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         var code = InvokeScaffoldContextWithRoutine(
             "public",
             "calculate_campaign",
-            "PostgreSQL function; parameters=6; outputParameters=0; parameterModes=tenant_id:IN:integer,duration:IN:interval,customer_ids:IN:ARRAY (_int4),labels:IN:ARRAY (_text),note:IN:USER-DEFINED (citext),trace_id:IN:USER-DEFINED (uuid); dataType=integer");
+            "PostgreSQL function; parameters=7; outputParameters=0; parameterModes=tenant_id:IN:integer,duration:IN:interval,customer_ids:IN:ARRAY (_int4),labels:IN:ARRAY (_text),note:IN:USER-DEFINED (citext),trace_id:IN:USER-DEFINED (uuid),offset_time:IN:time with time zone; dataType=integer");
 
         Assert.Contains("using System;", code);
         Assert.Contains("public int? tenant_id { get; init; }", code);
@@ -120,12 +120,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public string[]? labels { get; init; }", code);
         Assert.Contains("public string? note { get; init; }", code);
         Assert.Contains("public Guid? trace_id { get; init; }", code);
-        Assert.Contains("if (args.Length != 6)", code);
-        Assert.Contains("var casts = new[] { \"integer\", \"interval\", \"integer[]\", \"text[]\", \"citext\", \"uuid\" };", code);
+        Assert.Contains("public DateTimeOffset? offset_time { get; init; }", code);
+        Assert.Contains("if (args.Length != 7)", code);
+        Assert.Contains("var casts = new[] { \"integer\", \"interval\", \"integer[]\", \"text[]\", \"citext\", \"uuid\", \"time with time zone\" };", code);
         Assert.Contains("Provider.ParamPrefix + \"p\" + i + \"::\" + casts[i]", code);
         Assert.DoesNotContain("public object? duration { get; init; }", code);
         Assert.DoesNotContain("public object? customer_ids { get; init; }", code);
         Assert.DoesNotContain("public object? trace_id { get; init; }", code);
+        Assert.DoesNotContain("public TimeOnly? offset_time { get; init; }", code);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_pg_routine_types_" + Guid.NewGuid().ToString("N"));
         try
