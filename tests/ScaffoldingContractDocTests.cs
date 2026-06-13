@@ -321,6 +321,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.Planning.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.Facets.cs"));
         var indexDiscoverySource = ReadIndexDiscoverySource();
+        var sqlMetadataParserSource = ReadSqlMetadataParserSource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var sqliteUnsupportedSource = ReadSqliteUnsupportedFeatureSource();
@@ -356,8 +357,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("TryApplyProviderSpecificExpressionIndexFacets", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("providerSpecificIndexes", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("includedColumnIndexes", expressionIndexConfigurationBuilderSource, StringComparison.Ordinal);
-        Assert.Contains("FindCreateIndexKeyListOpen", source, StringComparison.Ordinal);
-        Assert.Contains("FindSqlKeywordOutsideQuotes", source, StringComparison.Ordinal);
+        Assert.Contains("FindCreateIndexKeyListOpen", sqlMetadataParserSource, StringComparison.Ordinal);
+        Assert.Contains("FindSqlKeywordOutsideQuotes", sqlMetadataParserSource, StringComparison.Ordinal);
         Assert.Contains("GetSqliteIndexFilterSqlAsync(connection, provider, table.Schema, name)", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("index_xinfo", sqliteUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("\"PartialIndex\"", sqliteUnsupportedSource, StringComparison.Ordinal);
