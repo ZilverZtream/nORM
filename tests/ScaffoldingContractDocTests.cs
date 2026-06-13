@@ -316,7 +316,10 @@ public partial class ScaffoldingContractDocTests
         var source = ReadStaticEntityScaffoldSource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
         var featureConfigurationBuilderSource = ReadFeatureConfigurationBuilderSource();
-        var expressionIndexConfigurationBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.cs");
+        var expressionIndexConfigurationBuilderSource = string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.Planning.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldExpressionIndexConfigurationBuilder.Facets.cs"));
         var indexDiscoverySource = ReadIndexDiscoverySource();
         var postgresUnsupportedSource = ReadPostgresUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
