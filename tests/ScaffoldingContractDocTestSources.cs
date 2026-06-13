@@ -37,6 +37,7 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.cs"),
             ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Builder.cs"),
+            ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Builder.ColumnFacets.cs"),
             ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Diff.cs"),
             ReadRepoFile("src", "nORM", "Migration", "SchemaSnapshot.Differ.cs"));
 
