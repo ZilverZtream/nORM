@@ -249,6 +249,39 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildExpressionIndexConfigurations_TrimsFilterStatementTerminator()
+    {
+        var scaffolder = typeof(DatabaseScaffolder);
+        var featureType = scaffolder.GetNestedType("ScaffoldUnsupportedFeature", BindingFlags.NonPublic)!;
+        var method = GetMethod(
+            "BuildExpressionIndexConfigurations",
+            new[] { typeof(IReadOnlyDictionary<string, string>), typeof(IEnumerable<>).MakeGenericType(featureType) });
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Documents"] = "Document"
+        };
+        var features = Array.CreateInstance(featureType, 1);
+        features.SetValue(Activator.CreateInstance(
+            featureType,
+            "public.Documents",
+            "ExpressionIndex",
+            "IX_Documents_LiteralTerminator_Filtered",
+            "CREATE INDEX \"IX_Documents_LiteralTerminator_Filtered\" ON public.\"Documents\" USING btree (strpos(\"Name\", ';')) WHERE \"Name\" <> ';';")!, 0);
+
+        var result = Assert.Single(((System.Collections.IEnumerable)method.Invoke(
+                null,
+                new object[] { entityByTable, features })!)
+            .Cast<object>());
+
+        Assert.Equal(
+            "strpos(\"Name\", ';')",
+            result.GetType().GetProperty("ExpressionSql")!.GetValue(result));
+        Assert.Equal(
+            "\"Name\" <> ';'",
+            result.GetType().GetProperty("FilterSql")!.GetValue(result));
+    }
+
+    [Fact]
     public void BuildExpressionIndexConfigurations_ParsesIndexFacetsAcrossProviderWhitespace()
     {
         var scaffolder = typeof(DatabaseScaffolder);

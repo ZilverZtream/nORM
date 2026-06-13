@@ -15,7 +15,11 @@ namespace nORM.Scaffolding
             }
 
             var where = FindSqlKeywordOutsideQuotes(sql, "WHERE", closeIndex + 1);
-            return where < 0 ? null : sql[(where + 5)..].Trim();
+            if (where < 0)
+                return null;
+
+            var filterSql = TrimTrailingSqlStatementTerminator(sql[(where + 5)..]);
+            return filterSql.Length == 0 ? null : filterSql;
         }
 
         public static bool IsCreateIndexUnique(string? createIndexSql)
@@ -87,5 +91,14 @@ namespace nORM.Scaffolding
 
         private static int FindCreateIndexOnKeyword(string sql)
             => FindSqlKeywordOutsideQuotes(sql, "ON", 0);
+
+        private static string TrimTrailingSqlStatementTerminator(string sql)
+        {
+            var trimmed = sql.Trim();
+            while (trimmed.EndsWith(";", StringComparison.Ordinal))
+                trimmed = trimmed[..^1].TrimEnd();
+
+            return trimmed;
+        }
     }
 }
