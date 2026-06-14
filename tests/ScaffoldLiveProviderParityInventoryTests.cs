@@ -32,7 +32,7 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQLite has no stored routine catalog to scaffold.", "SqlServer", "Postgres", "MySql"),
             ["LiveProviderScaffoldCliRoutineSequenceTests.cs::Dotnet_norm_scaffold_emits_routine_output_and_non_query_wrappers_on_live_provider"] =
                 Expect("PostgreSQL and SQLite do not expose this stored-procedure output/non-query wrapper shape.", "SqlServer", "MySql"),
-            ["LiveProviderScaffoldCliRoutineSequenceTests.cs::Dotnet_norm_scaffold_emits_sequence_stubs_on_live_provider"] =
+            ["LiveProviderScaffoldCliSequenceTests.cs::Dotnet_norm_scaffold_emits_sequence_stubs_on_live_provider"] =
                 Expect("SQLite and MySQL have no standalone sequence catalog equivalent for this scaffold surface.", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldCliProviderSpecificDiagnosticsTests.cs::Dotnet_norm_scaffold_preserves_writable_provider_specific_diagnostics_on_live_provider"] =
                 Expect("This test covers writable provider-specific type systems that SQLite does not expose beyond its declared-type path.", "SqlServer", "Postgres", "MySql"),
