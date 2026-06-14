@@ -1,11 +1,46 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace nORM.Scaffolding
 {
     internal static class ScaffoldSqlServerAliasTypeClassifier
     {
+        private static readonly IReadOnlyDictionary<string, Type> SafeAliasBaseClrTypes =
+            new Dictionary<string, Type>(StringComparer.Ordinal)
+            {
+                ["int"] = typeof(int),
+                ["bigint"] = typeof(long),
+                ["smallint"] = typeof(short),
+                ["tinyint"] = typeof(byte),
+                ["bit"] = typeof(bool),
+                ["decimal"] = typeof(decimal),
+                ["numeric"] = typeof(decimal),
+                ["money"] = typeof(decimal),
+                ["smallmoney"] = typeof(decimal),
+                ["float"] = typeof(double),
+                ["real"] = typeof(float),
+                ["date"] = typeof(DateOnly),
+                ["time"] = typeof(TimeOnly),
+                ["datetime"] = typeof(DateTime),
+                ["datetime2"] = typeof(DateTime),
+                ["smalldatetime"] = typeof(DateTime),
+                ["datetimeoffset"] = typeof(DateTimeOffset),
+                ["uniqueidentifier"] = typeof(Guid),
+                ["sysname"] = typeof(string),
+                ["char"] = typeof(string),
+                ["varchar"] = typeof(string),
+                ["nchar"] = typeof(string),
+                ["nvarchar"] = typeof(string),
+                ["text"] = typeof(string),
+                ["ntext"] = typeof(string),
+                ["xml"] = typeof(string),
+                ["binary"] = typeof(byte[]),
+                ["varbinary"] = typeof(byte[]),
+                ["image"] = typeof(byte[])
+            };
+
         public static bool IsSafeSqlServerAliasColumnType(string? detail)
             => TryGetSqlServerAliasBaseTypeText(detail, out var typeText)
                && IsSafeSqlServerAliasBaseType(typeText);
@@ -34,38 +69,7 @@ namespace nORM.Scaffolding
         }
 
         public static bool IsSafeSqlServerAliasBaseType(string typeText)
-        {
-            var normalized = NormalizeSqlServerAliasBaseTypeName(typeText);
-            return normalized is "int"
-                or "bigint"
-                or "smallint"
-                or "tinyint"
-                or "bit"
-                or "decimal"
-                or "numeric"
-                or "money"
-                or "smallmoney"
-                or "float"
-                or "real"
-                or "date"
-                or "time"
-                or "datetime"
-                or "datetime2"
-                or "smalldatetime"
-                or "datetimeoffset"
-                or "uniqueidentifier"
-                or "sysname"
-                or "char"
-                or "varchar"
-                or "nchar"
-                or "nvarchar"
-                or "text"
-                or "ntext"
-                or "xml"
-                or "binary"
-                or "varbinary"
-                or "image";
-        }
+            => SafeAliasBaseClrTypes.ContainsKey(NormalizeSqlServerAliasBaseTypeName(typeText));
 
         public static bool TryMapSqlServerAliasBaseClrType(string? detail, out Type type)
         {
@@ -85,29 +89,13 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(typeText))
                 return false;
 
-            var normalized = NormalizeSqlServerAliasBaseTypeName(typeText);
-            type = normalized switch
+            if (SafeAliasBaseClrTypes.TryGetValue(NormalizeSqlServerAliasBaseTypeName(typeText), out var mappedType))
             {
-                "int" => typeof(int),
-                "bigint" => typeof(long),
-                "smallint" => typeof(short),
-                "tinyint" => typeof(byte),
-                "bit" => typeof(bool),
-                "decimal" or "numeric" or "money" or "smallmoney" => typeof(decimal),
-                "float" => typeof(double),
-                "real" => typeof(float),
-                "date" => typeof(DateOnly),
-                "time" => typeof(TimeOnly),
-                "datetime" or "datetime2" or "smalldatetime" => typeof(DateTime),
-                "datetimeoffset" => typeof(DateTimeOffset),
-                "uniqueidentifier" => typeof(Guid),
-                "sysname" => typeof(string),
-                "char" or "varchar" or "nchar" or "nvarchar" or "text" or "ntext" or "xml" => typeof(string),
-                "binary" or "varbinary" or "image" => typeof(byte[]),
-                _ => typeof(object)
-            };
+                type = mappedType;
+                return true;
+            }
 
-            return type != typeof(object);
+            return false;
         }
 
         public static string NormalizeSqlServerAliasBaseTypeName(string typeText)

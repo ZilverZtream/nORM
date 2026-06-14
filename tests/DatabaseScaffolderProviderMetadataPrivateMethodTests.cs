@@ -54,6 +54,12 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("user-defined type (dbo.CreatedOn -> datetimeoffset)", "datetimeoffset", typeof(DateTimeOffset))]
     [InlineData("user-defined type (dbo.WorkDay -> date)", "date", typeof(DateOnly))]
     [InlineData("user-defined type (dbo.StartAt -> time)", "time", typeof(TimeOnly))]
+    [InlineData("user-defined type (dbo.IsActive -> bit)", "bit", typeof(bool))]
+    [InlineData("user-defined type (dbo.LegacyAmount -> smallmoney)", "smallmoney", typeof(decimal))]
+    [InlineData("user-defined type (dbo.LegacyCreatedOn -> smalldatetime)", "smalldatetime", typeof(DateTime))]
+    [InlineData("user-defined type (dbo.LoginName -> sysname)", "sysname", typeof(string))]
+    [InlineData("user-defined type (dbo.XmlPayload -> xml)", "xml", typeof(string))]
+    [InlineData("user-defined type (dbo.LegacyImage -> image)", "image", typeof(byte[]))]
     public void NormalizeScaffoldClrType_MapsSafeSqlServerAliasBaseTypeWhenSchemaTypeIsVague(string detail, string baseType, Type expected)
     {
         var dynamicMethod = typeof(DynamicEntityTypeGenerator)
@@ -71,6 +77,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
         object?[] dynamicArgs = { baseType, null };
 
         Assert.Equal(expected, result);
+        Assert.True(ScaffoldProviderSpecificTypeClassifier.IsSafeSqlServerAliasBaseType(baseType));
+        Assert.True(ScaffoldProviderSpecificTypeClassifier.IsSafeSqlServerAliasColumnType(detail));
         Assert.True((bool)dynamicMethod.Invoke(null, dynamicArgs)!);
         Assert.Equal(expected, (Type)dynamicArgs[1]!);
     }
@@ -93,6 +101,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
         object?[] dynamicArgs = { "geography", null };
 
         Assert.Equal(typeof(object), result);
+        Assert.False(ScaffoldProviderSpecificTypeClassifier.IsSafeSqlServerAliasBaseType("geography"));
+        Assert.False(ScaffoldProviderSpecificTypeClassifier.IsSafeSqlServerAliasColumnType("user-defined type (dbo.Shape -> geography)"));
         Assert.False((bool)dynamicMethod.Invoke(null, dynamicArgs)!);
     }
 
