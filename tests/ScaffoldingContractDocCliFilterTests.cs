@@ -73,7 +73,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Collisions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.QueryArtifacts.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Validation.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Validation.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Validation.Selectable.cs"));
         var contextWriterSource = ReadContextWriterSource();
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var rootReadme = ReadRepoFile("README.md");
