@@ -525,7 +525,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 dir,
                 "TestNs",
                 "VirtualQueryCtx",
-                new ScaffoldOptions { Tables = new[] { "SearchDocs" }, EmitQueryArtifacts = true });
+                new ScaffoldOptions { Tables = new[] { "SearchDocs" }, EmitViewEntities = true });
 
             var entityCode = File.ReadAllText(Path.Combine(dir, "SearchDoc.cs"));
             var contextCode = File.ReadAllText(Path.Combine(dir, "VirtualQueryCtx.cs"));
