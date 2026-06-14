@@ -66,6 +66,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableReasonBuilder.Principals.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCompositeForeignKeyMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.Keys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.References.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableShape.cs"));
 
@@ -78,6 +80,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipNavigationNameBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipNavigationNameBuilder.Roles.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.Keys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.References.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"));
 
     private static string ReadForeignKeyDiscoverySource()
@@ -99,6 +103,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyJoinDiscovery.Principals.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldManyToManyNavigationNameBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.Keys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.References.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableShape.cs"));
 
@@ -478,6 +484,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsAdapter.Reports.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDataReaderHelper.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.Keys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.References.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiagnosticBuilder.cs"));
 
