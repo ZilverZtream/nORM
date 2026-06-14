@@ -18,9 +18,9 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
     private static readonly IReadOnlyDictionary<string, PartialCoverageExpectation> IntentionalPartialCoverage =
         new Dictionary<string, PartialCoverageExpectation>(StringComparer.Ordinal)
         {
-            ["LiveProviderScaffoldCliManyToManyTests.cs::Dotnet_norm_scaffold_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
+            ["LiveProviderScaffoldCliManyToManyEdgeTests.cs::Dotnet_norm_scaffold_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
                 Expect("MySQL does not expose filtered unique indexes; this diagnostic is for providers with partial-index metadata.", "Sqlite", "SqlServer", "Postgres"),
-            ["LiveProviderScaffoldCliManyToManyTests.cs::Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider"] =
+            ["LiveProviderScaffoldCliManyToManyEdgeTests.cs::Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider"] =
                 Expect("MySQL has database/catalog names rather than schema-qualified table namespaces in this scaffold shape.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldCliReferentialActionTests.cs::Dotnet_norm_scaffold_preserves_restrict_fk_referential_actions_on_live_provider"] =
                 Expect("SQL Server does not accept RESTRICT as a foreign-key referential action.", "Sqlite", "Postgres", "MySql"),
