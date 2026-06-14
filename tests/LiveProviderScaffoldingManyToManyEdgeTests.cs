@@ -230,4 +230,70 @@ public sealed partial class LiveProviderScaffoldingParityTests
             }
         }
     }
+
+    [Fact]
+    public async Task ScaffoldAsync_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider()
+    {
+        const ProviderKind kind = ProviderKind.MySql;
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, "Live provider MySql not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        var scratchDatabase = "norm_runtime_m2m_catalog_" + Guid.NewGuid().ToString("N")[..8].ToLowerInvariant();
+        var originalDatabase = connection.Database;
+        await using (connection)
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_catalog_m2m_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}");
+                await ExecuteAsync(connection, $"CREATE DATABASE {provider.Escape(scratchDatabase)}");
+                connection.ChangeDatabase(scratchDatabase);
+                await SetupSurrogateManyToManyAsync(connection, provider, kind);
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlCatalogManyToManyContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[]
+                        {
+                            scratchDatabase + "." + SurrogateAuthorTable,
+                            scratchDatabase + "." + SurrogateBookTable,
+                            scratchDatabase + "." + SurrogateAuthorBookTable
+                        },
+                        OverwriteFiles = false
+                    });
+
+                var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, SurrogateAuthorTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlCatalogManyToManyContext.cs"));
+
+                Assert.False(File.Exists(Path.Combine(dir, SurrogateAuthorBookTable + ".cs")));
+                Assert.DoesNotContain("Schema =", authorCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{SurrogateAuthorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(originalDatabase))
+                        connection.ChangeDatabase(originalDatabase);
+                    await ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}");
+                }
+                catch
+                {
+                    // Best-effort cleanup; test body reports operational failures.
+                }
+            }
+        }
+    }
 }

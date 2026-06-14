@@ -113,6 +113,10 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL materialized views are PostgreSQL-specific query artifacts.", "Postgres"),
             ["LiveProviderScaffoldingQueryArtifactTests.cs::ScaffoldAsync_emits_sqlserver_local_table_synonym_as_read_only_query_artifact"] =
                 Expect("SQL Server local table/view synonyms are SQL Server-specific query artifacts.", "SqlServer"),
+            ["LiveProviderScaffoldCliManyToManyEdgeTests.cs::Dotnet_norm_scaffold_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider"] =
+                Expect("MySQL catalog-qualified table filters are the MySQL counterpart to schema-qualified many-to-many filtering; MySQL catalogs are not emitted as nORM schemas.", "MySql"),
+            ["LiveProviderScaffoldingManyToManyEdgeTests.cs::ScaffoldAsync_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider"] =
+                Expect("MySQL catalog-qualified table filters are the MySQL counterpart to schema-qualified many-to-many filtering; MySQL catalogs are not emitted as nORM schemas.", "MySql"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider"] =
                 Expect("SQL Server table-valued parameters are SQL Server-specific routine metadata.", "SqlServer"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_scalar_and_table_valued_function_wrappers_on_live_provider"] =

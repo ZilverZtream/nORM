@@ -998,6 +998,9 @@ must be reviewed and edited like handwritten model code.
   `provider-owned-write-blocking-schema` diagnostics instead of unsafe skip navigations.
   Schema-qualified many-to-many join tables are verified through the real CLI
   with schema-aware `UsingTable` mapping.
+  MySQL current-catalog-qualified many-to-many table filters are verified through
+  direct and real CLI scaffolds; the catalog qualifies selection only and is not
+  emitted as a nORM schema in generated entity or `UsingTable` mappings.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
@@ -1030,6 +1033,7 @@ must be reviewed and edited like handwritten model code.
   and composite primary-key ordinal order across live providers,
   nullable-FK many-to-many bridge rejection,
   provider-owned many-to-many bridge rejection,
+  MySQL catalog-qualified many-to-many filter parity,
   provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
