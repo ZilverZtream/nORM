@@ -63,6 +63,7 @@ namespace nORM.Scaffolding
             discovery.SqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
             discovery.FeatureConfigurations.ProviderSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
 
+            var isQueryArtifact = discovery.QueryArtifactTableKeys.Contains(tableKey);
             var isReadOnlyEntity = ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
                 tableKey,
                 discovery.QueryArtifactTableKeys,
@@ -87,6 +88,7 @@ namespace nORM.Scaffolding
                 columnFacets,
                 comments,
                 isReadOnlyEntity,
+                isQueryArtifact,
                 request.Options.UseNullableReferenceTypes,
                 nonNullableColumns,
                 sqliteDeclaredTypes,

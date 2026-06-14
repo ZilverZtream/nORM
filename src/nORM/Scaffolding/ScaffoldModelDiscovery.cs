@@ -32,6 +32,7 @@ namespace nORM.Scaffolding
                 tables,
                 tableInfos,
                 entityByTable,
+                queryArtifactTableKeys,
                 options.UseDatabaseNames).ConfigureAwait(false);
 
             return new ScaffoldModelDiscoveryResult(

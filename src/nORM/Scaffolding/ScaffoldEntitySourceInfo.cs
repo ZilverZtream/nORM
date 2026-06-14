@@ -25,6 +25,7 @@ namespace nORM.Scaffolding
         IReadOnlyDictionary<string, ScaffoldColumnFacet>? ColumnFacets,
         ScaffoldComments? Comments,
         bool IsReadOnlyEntity,
+        bool SuppressWriteMetadata,
         bool UseNullableReferenceTypes,
         IReadOnlySet<string>? NonNullableColumns,
         IReadOnlyDictionary<string, string>? SqliteDeclaredTypes,

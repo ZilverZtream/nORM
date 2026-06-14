@@ -629,6 +629,9 @@ must be reviewed and edited like handwritten model code.
   `[ReadOnlyEntity]` even when a provider exposes key-like metadata, so nORM can
   materialize them through queries but rejects insert/update/delete and tracked
   `SaveChanges` writes before SQL generation.
+  Key-looking view columns such as `Id` and `ParentId` remain scalar properties
+  on read-only query artifacts; scaffolding does not infer keys, relationships,
+  or generated write semantics from view column names.
   SQL Server synonyms whose local base object resolves as a table or view can
   also be emitted as read-oriented query artifacts; procedure synonyms, remote
   synonyms, and unresolved synonyms remain provider-owned diagnostics.
@@ -909,7 +912,9 @@ must be reviewed and edited like handwritten model code.
   scaffolds also prove relationships to unselected principal tables are
   suppressed rather than emitted as broken navigations, and selected ordinary
   views are emitted as read-only query artifacts without requiring
-  `--emit-query-artifacts`. Default and schema-scoped CLI discovery also
+  `--emit-query-artifacts`. Key-looking view columns are verified through the
+  direct API and real CLI across all four providers so `Id`/`ParentId` naming
+  does not create generated keys, relationships, or write semantics. Default and schema-scoped CLI discovery also
   verifies ordinary views are emitted with discovered tables as read-only query
   artifacts across all four live providers. Provider query-artifact opt-in is
   also verified through the real CLI with `--emit-query-artifacts` for SQLite
@@ -1039,6 +1044,7 @@ must be reviewed and edited like handwritten model code.
   provider-owned many-to-many bridge rejection,
   MySQL catalog-qualified many-to-many filter parity,
   inference-boundary non-inference for owned types and inheritance,
+  key-looking view read-only boundary coverage,
   provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.

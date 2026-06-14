@@ -87,9 +87,11 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
             Assert.Contains("[Table(\"ExistingView\")]", viewCode);
             Assert.Contains("[ReadOnlyEntity]", viewCode);
-            Assert.Contains("public long Id { get; set; }", viewCode);
+            Assert.Matches(@"public long\?? Id \{ get; set; \}", viewCode);
             Assert.Contains("public string", viewCode);
             Assert.Contains("Name { get; set; }", viewCode);
+            Assert.DoesNotContain("[Key]", viewCode);
+            Assert.DoesNotContain("HasKey", contextCode);
             Assert.Contains("IQueryable<ExistingView> ExistingViews", contextCode);
             Assert.Contains("MissingPrimaryKey", warnings);
             Assert.DoesNotContain("View ExistingView", warnings);

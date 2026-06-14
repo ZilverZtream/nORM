@@ -348,6 +348,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldCliPluralizationTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliRoutineSequenceTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliQueryArtifactTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliViewBoundaryTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliReferentialActionTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCompatibilityTests.cs"));
 
@@ -374,6 +375,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderObjectTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingQueryArtifactTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingDefaultQueryArtifactTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingViewBoundaryTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingDynamicTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingCommentTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingSyntheticNameTests.cs"),

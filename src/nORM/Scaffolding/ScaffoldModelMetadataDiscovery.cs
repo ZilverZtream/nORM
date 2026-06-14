@@ -16,6 +16,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
             IReadOnlyList<ScaffoldTableInfo> tableInfos,
             IReadOnlyDictionary<string, string> entityByTable,
+            IReadOnlySet<string> queryArtifactTableKeys,
             bool useDatabaseNames)
         {
             var columnPropertiesByTable = await ScaffoldColumnPropertyDiscovery.GetColumnPropertyNamesAsync(
@@ -26,6 +27,7 @@ namespace nORM.Scaffolding
                 useDatabaseNames).ConfigureAwait(false);
             var memberNamesByTable = ScaffoldColumnPropertyNameBuilder.BuildMemberNameMap(columnPropertiesByTable, entityByTable);
             var primaryKeyColumnsByTable = await ScaffoldKeyDiscovery.GetPrimaryKeyColumnNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
+            var scaffoldModelPrimaryKeyColumnsByTable = FilterQueryArtifactPrimaryKeys(primaryKeyColumnsByTable, queryArtifactTableKeys);
             var primaryKeyConstraintNamesByTable = await ScaffoldKeyDiscovery.GetPrimaryKeyConstraintNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
             var nonNullableColumnsByTable = await ScaffoldColumnDiscovery.GetNonNullableColumnNamesAsync(connection, provider, tableInfos).ConfigureAwait(false);
             var sqliteDeclaredTypesByTable = ScaffoldProviderKind.IsSqlite(provider)
@@ -49,7 +51,7 @@ namespace nORM.Scaffolding
                 connection,
                 provider,
                 tables,
-                primaryKeyColumnsByTable,
+                scaffoldModelPrimaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 indexes,
                 foreignKeys).ConfigureAwait(false);
@@ -62,7 +64,7 @@ namespace nORM.Scaffolding
             return new ScaffoldModelMetadataDiscoveryResult(
                 columnPropertiesByTable,
                 memberNamesByTable,
-                primaryKeyColumnsByTable,
+                scaffoldModelPrimaryKeyColumnsByTable,
                 primaryKeyConstraintNamesByTable,
                 nonNullableColumnsByTable,
                 sqliteDeclaredTypesByTable,
@@ -75,6 +77,21 @@ namespace nORM.Scaffolding
                 foreignKeys,
                 unsupportedFeatures,
                 featureConfigurations);
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyList<string>> FilterQueryArtifactPrimaryKeys(
+            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
+            IReadOnlySet<string> queryArtifactTableKeys)
+        {
+            if (queryArtifactTableKeys.Count == 0)
+                return primaryKeyColumnsByTable;
+
+            return primaryKeyColumnsByTable
+                .Where(pair => !queryArtifactTableKeys.Contains(pair.Key))
+                .ToDictionary(
+                    static pair => pair.Key,
+                    static pair => pair.Value,
+                    StringComparer.OrdinalIgnoreCase);
         }
     }
 }

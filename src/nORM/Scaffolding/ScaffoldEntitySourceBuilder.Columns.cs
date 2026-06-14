@@ -25,11 +25,14 @@ namespace nORM.Scaffolding
             var colName = row["ColumnName"]!.ToString()!;
             var propName = ResolveColumnPropertyName(entity, colName);
             var allowNull = ResolveColumnNullability(entity, row, colName);
-            var isKey = GetSchemaBoolean(row, "IsKey");
-            var isAuto = GetSchemaBoolean(row, "IsAutoIncrement")
-                || entity.IdentityColumns?.Contains(colName) == true;
-            var isComputed = entity.ComputedColumns?.Contains(colName) == true;
-            var isRowVersion = entity.RowVersionColumns?.Contains(colName) == true;
+            var isKey = !entity.SuppressWriteMetadata && GetSchemaBoolean(row, "IsKey");
+            var isAuto = !entity.SuppressWriteMetadata
+                && (GetSchemaBoolean(row, "IsAutoIncrement")
+                    || entity.IdentityColumns?.Contains(colName) == true);
+            var isComputed = !entity.SuppressWriteMetadata
+                && entity.ComputedColumns?.Contains(colName) == true;
+            var isRowVersion = !entity.SuppressWriteMetadata
+                && entity.RowVersionColumns?.Contains(colName) == true;
             var effectiveAllowNull = allowNull && !isKey && !isRowVersion;
             string? declaredType = null;
             entity.SqliteDeclaredTypes?.TryGetValue(colName, out declaredType);
