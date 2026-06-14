@@ -21,6 +21,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("public sealed class GetRevenueParameters", code);
         Assert.Contains("public int? tenantId { get; init; }", code);
         Assert.Contains("public string? message { get; init; }", code);
+        Assert.DoesNotContain("public decimal? total { get; init; }", code);
         Assert.Contains("public sealed class GetRevenueResult", code);
         Assert.Contains("public int Id { get; set; }", code);
         Assert.Contains("public string Name { get; set; } = default!;", code);
@@ -171,6 +172,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
         Assert.Contains("Parameters discovered at scaffold time: @orderId IN int, return RETURN int", code);
         Assert.Contains("public int? orderId { get; init; }", code);
+        Assert.DoesNotContain("public int? @return { get; init; }", code);
         Assert.Contains("Task<StoredProcedureResult<TResult>> ApplyDiscountWithOutputAsync<TResult>", code);
         Assert.Contains("ExecuteStoredProcedureWithOutputAsync<TResult>(Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"ApplyDiscount\"), ct, RequireScaffoldedRoutineParameters(parameters, 1, Provider.Escape(\"dbo\") + \".\" + Provider.Escape(\"ApplyDiscount\")), CreateApplyDiscountOutputParameters())", code);
         Assert.Contains("new OutputParameter(\"return\", System.Data.DbType.Int32, null, System.Data.ParameterDirection.ReturnValue)", code);
