@@ -149,6 +149,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL catalog-qualified table filters are the MySQL counterpart to schema-qualified many-to-many filtering; MySQL catalogs are not emitted as nORM schemas.", "MySql"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider"] =
                 Expect("SQL Server table-valued parameters are SQL Server-specific routine metadata.", "SqlServer"),
+            ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider"] =
+                Expect("SQL Server table-valued parameters are SQL Server-specific routine metadata.", "SqlServer"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_scalar_and_table_valued_function_wrappers_on_live_provider"] =
                 Expect("SQL Server scalar and table-valued function catalog shapes are SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_sqlserver_no_result_procedure_as_non_query_wrapper"] =
@@ -159,6 +161,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL overloaded functions are PostgreSQL-specific routine metadata.", "Postgres"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_quoted_parameter_function_as_positional_arguments"] =
                 Expect("PostgreSQL quoted routine parameter names require PostgreSQL-specific invocation handling.", "Postgres"),
+            ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_postgres_overloaded_and_quoted_parameter_function_wrappers_on_live_provider"] =
+                Expect("PostgreSQL overloaded functions and quoted routine parameter names require PostgreSQL-specific invocation handling.", "Postgres"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_mysql_unsigned_routine_parameters_on_live_provider"] =
                 Expect("MySQL unsigned routine parameter metadata is MySQL-specific.", "MySql")
         };

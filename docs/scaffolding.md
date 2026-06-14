@@ -942,7 +942,9 @@ must be reviewed and edited like handwritten model code.
   Advanced routine wrappers
   are verified through the real CLI for SQL Server scalar/table-valued
   functions, PostgreSQL array/UUID routine parameters, and MySQL unsigned
-  routine parameters. SQL Server and MySQL output-parameter routine factories,
+  routine parameters. SQL Server table-valued parameters and PostgreSQL
+  overloaded and quoted-parameter function wrappers are also verified through
+  the real CLI with consumer builds. SQL Server and MySQL output-parameter routine factories,
   plus SQL Server no-result stored procedure non-query wrappers, are also
   verified through the real CLI. Trigger-owned tables are
   also scaffolded as read-only entities while the JSON warning report preserves

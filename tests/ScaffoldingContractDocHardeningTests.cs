@@ -374,6 +374,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("SQL Server scalar/table-valued", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL array/UUID routine parameters", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL unsigned", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server table-valued parameters", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL overloaded and quoted-parameter function wrappers", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_emits_postgres_overloaded_and_quoted_parameter_function_wrappers_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("output-parameter routine factories", doc, StringComparison.Ordinal);
         Assert.Contains("no-result stored procedure non-query wrappers", doc, StringComparison.Ordinal);
         Assert.Contains("Provider-bound sequence stubs are verified through the real CLI", doc, StringComparison.Ordinal);
