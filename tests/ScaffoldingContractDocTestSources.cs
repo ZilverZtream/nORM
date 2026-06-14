@@ -438,6 +438,9 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.Files.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.Namespaces.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.Paths.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.RelationalModels.cs"));
 
