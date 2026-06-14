@@ -465,7 +465,8 @@ must be reviewed and edited like handwritten model code.
   arguments are ignored because nORM does not execute startup code. When no
   pass-through environment is supplied, `ASPNETCORE_ENVIRONMENT` and then
   `DOTNET_ENVIRONMENT` select the matching `appsettings.{Environment}.json`
-  file. Unmatched scaffold tokens before `--` still fail fast so option typos are not swallowed.
+  file. An explicit blank `--environment` value is rejected. Unmatched scaffold
+  tokens before `--` still fail fast so option typos are not swallowed.
 - EF-style `.config/dotnet-ef.json` defaults are read for `project`,
   `startupProject`, `outputDir`/`output`, `namespace`, `context`,
   `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,

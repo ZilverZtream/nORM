@@ -77,15 +77,24 @@ partial class Program
                 if (i + 1 >= passThroughTokens.Count || passThroughTokens[i + 1].StartsWith("--", StringComparison.Ordinal))
                     throw new NormConfigurationException("EF-style application argument '--environment' requires a value.");
 
-                return NullIfWhiteSpace(passThroughTokens[i + 1]);
+                return RequireScaffoldPassThroughEnvironmentValue(passThroughTokens[i + 1]);
             }
 
             const string environmentPrefix = "--environment=";
             if (token.StartsWith(environmentPrefix, StringComparison.OrdinalIgnoreCase))
-                return NullIfWhiteSpace(token[environmentPrefix.Length..]);
+                return RequireScaffoldPassThroughEnvironmentValue(token[environmentPrefix.Length..]);
         }
 
         return null;
+    }
+
+    static string RequireScaffoldPassThroughEnvironmentValue(string? value)
+    {
+        var environment = NullIfWhiteSpace(value);
+        if (environment is null)
+            throw new NormConfigurationException("EF-style application argument '--environment' requires a value.");
+
+        return environment;
     }
 
     static List<string> GetEfPassThroughTokens(IReadOnlyList<string> commandLineArgs)

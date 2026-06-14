@@ -124,6 +124,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`appsettings.Production.json`", doc, StringComparison.Ordinal);
         Assert.Contains("`ASPNETCORE_ENVIRONMENT`", doc, StringComparison.Ordinal);
         Assert.Contains("`DOTNET_ENVIRONMENT`", doc, StringComparison.Ordinal);
+        Assert.Contains("blank `--environment` value is rejected", doc, StringComparison.Ordinal);
         Assert.Contains("typos are not swallowed", doc, StringComparison.Ordinal);
         Assert.Contains("`.config/dotnet-ef.json` defaults", doc, StringComparison.Ordinal);
         Assert.Contains("`outputDir`/`output`", doc, StringComparison.Ordinal);
@@ -179,6 +180,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ValidateScaffoldUnmatchedTokens", cliSource, StringComparison.Ordinal);
         Assert.Contains("AreEfPassThroughTokens", cliSource, StringComparison.Ordinal);
         Assert.Contains("GetScaffoldPassThroughEnvironment", cliSource, StringComparison.Ordinal);
+        Assert.Contains("RequireScaffoldPassThroughEnvironmentValue", cliSource, StringComparison.Ordinal);
         Assert.Contains("GetEfPassThroughTokens", cliSource, StringComparison.Ordinal);
         Assert.Contains("NormalizeEfStyleCommandArgs", cliSource, StringComparison.Ordinal);
         Assert.Contains("new Command(\"dbcontext\"", cliSource, StringComparison.Ordinal);
@@ -305,6 +307,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`--msbuildprojectextensionspath`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("application arguments after `--`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`-- --environment Production`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("blank `--environment` value is rejected", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`.config/dotnet-ef.json` defaults", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`outputDir`/`output`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`schema`/`schemas`", cliReadme, StringComparison.Ordinal);
@@ -370,6 +373,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`--msbuildprojectextensionspath`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("application arguments after `--`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`-- --environment Production`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("blank `--environment` value is rejected", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`.config/dotnet-ef.json` defaults", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`outputDir`/`output`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`schema`/`schemas`", rootReadme, StringComparison.Ordinal);

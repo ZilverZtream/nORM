@@ -22,6 +22,21 @@ public partial class CliIntegrationTests
         Assert.Contains("EF-style application argument '--environment' requires a value", result.Stderr, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("-- --environment \"\"")]
+    [InlineData("-- --environment=")]
+    public void Scaffold_pass_through_environment_blank_value_fails(string applicationArgs)
+    {
+        var root = FindRepositoryRoot();
+
+        var result = RunCli(
+            $"scaffold {Quote("Data Source=:memory:")} sqlite {applicationArgs}",
+            root);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("EF-style application argument '--environment' requires a value", result.Stderr, StringComparison.Ordinal);
+    }
+
 
     [Fact]
     public void Scaffold_ignores_ef_style_application_args_after_double_dash()
