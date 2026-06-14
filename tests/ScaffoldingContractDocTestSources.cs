@@ -313,6 +313,7 @@ public partial class ScaffoldingContractDocTests
     private static string ReadLiveProviderScaffoldCliParitySource()
         => string.Concat(
             ReadRepoFile("tests", "LiveProviderScaffoldCliParityTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliDiagnosticAssertions.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCurrentDirectoryConfigurationTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliNamedConnectionConfigurationTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliNamedConnectionEnvironmentTests.cs"),
