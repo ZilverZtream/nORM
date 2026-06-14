@@ -38,6 +38,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Execution.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Handler.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Request.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Request.Helpers.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.EfToolConfig.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Project.cs"),
@@ -291,8 +292,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("options.UseDatabaseNames", scaffolderSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldRoutineStubWriter.AppendRoutineStubs(sb, context.RoutineStubs, queryPropertyNames, context.UseNullableReferenceTypes, context.UseDatabaseNames)", contextWriterSource, StringComparison.Ordinal);
         Assert.Contains("AppendSequenceStubs(sb, context.SequenceStubs, queryPropertyNames, context.UseDatabaseNames)", contextWriterSource, StringComparison.Ordinal);
-        Assert.Contains("ContextOutputDirectory = contextOutputDirectory", cliSource, StringComparison.Ordinal);
-        Assert.Contains("ContextNamespace = contextNamespace", cliSource, StringComparison.Ordinal);
+        Assert.Contains("ContextOutputDirectory = naming.ContextOutputDirectory", cliSource, StringComparison.Ordinal);
+        Assert.Contains("ContextNamespace = naming.ContextNamespace", cliSource, StringComparison.Ordinal);
         Assert.Contains("ParseSchemaFilters", cliSource, StringComparison.Ordinal);
         Assert.Contains("ParseTableFilters", cliSource, StringComparison.Ordinal);
         Assert.Contains("ParseCliCsvList", cliSource, StringComparison.Ordinal);
