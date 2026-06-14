@@ -359,6 +359,45 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_dotnet_ef_config_blank_string_property_fails_as_config_error()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_blank_string_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                """
+                {
+                  "outputDir": " "
+                }
+                """,
+                Encoding.UTF8);
+
+            var result = RunCli(
+                $"scaffold {Quote("Data Source=:memory:")} Microsoft.EntityFrameworkCore.Sqlite --json",
+                workDir);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.True(string.IsNullOrWhiteSpace(result.Stderr), result.Stderr);
+
+            using var document = JsonDocument.Parse(result.Stdout);
+            var json = document.RootElement;
+            Assert.Equal("failed", json.GetProperty("status").GetString());
+            Assert.Contains("EF tool configuration property 'outputDir' must not be blank.", json.GetProperty("error").GetString(), StringComparison.Ordinal);
+            Assert.False(json.GetProperty("warnings").GetProperty("hasDiagnostics").GetBoolean());
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void Scaffold_dotnet_ef_config_json_validation_failure_uses_effective_output_and_dry_run()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_json_failure_" + Guid.NewGuid().ToString("N"));

@@ -141,9 +141,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`emitViewEntities`", doc, StringComparison.Ordinal);
         Assert.Contains("`emitQueryArtifacts`", doc, StringComparison.Ordinal);
         Assert.Contains("array table/schema defaults are accepted", doc, StringComparison.Ordinal);
+        Assert.Contains("present string properties must", doc, StringComparison.Ordinal);
+        Assert.Contains("be non-blank", doc, StringComparison.Ordinal);
         Assert.Contains("expand the explicit selection", doc, StringComparison.Ordinal);
         Assert.Contains("override the opposite config default", doc, StringComparison.Ordinal);
-        Assert.Contains("precedence over configuration file values", doc, StringComparison.Ordinal);
+        Assert.Contains("take precedence over configuration file", doc, StringComparison.Ordinal);
         Assert.Contains("EF common output switches", doc, StringComparison.Ordinal);
         Assert.Contains("`--json` emits a machine-readable", doc, StringComparison.Ordinal);
         Assert.Contains("`--no-onconfiguring` is accepted", doc, StringComparison.Ordinal);
@@ -325,8 +327,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`emitSequenceStubs`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`emitViewEntities`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`emitQueryArtifacts`", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("expand the explicit selection", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("override the opposite config default", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("present string properties must be non-blank", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("cannot expand the explicit", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("opposite config default", cliReadme, StringComparison.Ordinal);
         Assert.Contains("matching supported query artifacts", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--json` emits a machine-readable", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--verbose`/`-v`", cliReadme, StringComparison.Ordinal);
@@ -391,8 +394,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`emitSequenceStubs`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`emitViewEntities`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`emitQueryArtifacts`", rootReadme, StringComparison.Ordinal);
-        Assert.Contains("expand the explicit selection", rootReadme, StringComparison.Ordinal);
-        Assert.Contains("override the opposite config default", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("present string properties must be non-blank", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("cannot expand the explicit", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("opposite config default", rootReadme, StringComparison.Ordinal);
         Assert.Contains("matching supported query artifacts", rootReadme, StringComparison.Ordinal);
         Assert.Contains("Unfiltered ordinary views", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`--json` emits a machine-readable", rootReadme, StringComparison.Ordinal);

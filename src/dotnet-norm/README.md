@@ -177,11 +177,11 @@ EF-style `.config/dotnet-ef.json` defaults are read for `project`,
 `failOnWarnings`, `emitRoutineStubs`,
 `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`; relative project paths are resolved relative to the
 parent of `.config`, comma-separated or array table/schema defaults are
-accepted, and explicit CLI options override config values. When any CLI
-table/schema filter is supplied, config table/schema defaults are ignored so
-they cannot expand the explicit selection. Explicit CLI `--force` and
-`--no-overwrite` values also override the opposite config default instead of
-conflicting with it.
+accepted, present string properties must be non-blank, and explicit CLI
+options override config values. When any CLI table/schema filter is supplied,
+config table/schema defaults are ignored so they cannot expand the explicit
+selection. Explicit CLI `--force` and `--no-overwrite` values also override the
+opposite config default instead of conflicting with it.
 `--json` emits a machine-readable scaffold result summary for successful runs
 and scaffold failures. `--verbose`/`-v`,
 `--no-color`, and `--prefix-output` are accepted for EF Core command-line

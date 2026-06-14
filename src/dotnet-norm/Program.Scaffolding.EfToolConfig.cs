@@ -82,7 +82,11 @@ partial class Program
         if (property.ValueKind != JsonValueKind.String)
             throw new NormConfigurationException($"EF tool configuration property '{propertyName}' must be a string.");
 
-        return NullIfWhiteSpace(property.GetString());
+        var value = NullIfWhiteSpace(property.GetString());
+        if (value is null)
+            throw new NormConfigurationException($"EF tool configuration property '{propertyName}' must not be blank.");
+
+        return value;
     }
 
     static string? ReadFirstEfToolConfigString(JsonElement root, params string[] propertyNames)

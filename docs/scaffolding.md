@@ -476,12 +476,13 @@ must be reviewed and edited like handwritten model code.
   `force`, `noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
   `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`. Relative project paths are
   resolved relative to the parent directory of `.config`, comma-separated or
-  array table/schema defaults are accepted, and explicit CLI options take
-  precedence over configuration file values. When any CLI table/schema filter
-  is supplied, `.config/dotnet-ef.json` table/schema defaults are ignored so
-  they cannot expand the explicit selection. Explicit CLI `--force` and
-  `--no-overwrite` values also override the opposite config default instead of
-  conflicting with it.
+  array table/schema defaults are accepted, and present string properties must
+  be non-blank. Explicit CLI options take precedence over configuration file
+  values. When any CLI table/schema filter is supplied,
+  `.config/dotnet-ef.json` table/schema defaults are ignored so they cannot
+  expand the explicit selection. Explicit CLI `--force` and `--no-overwrite`
+  values also override the opposite config default instead of conflicting with
+  it.
   Build/runtime defaults remain compatibility-only because nORM does not build
   or execute startup code during scaffolding.
 - EF common output switches are accepted: `--json` emits a machine-readable
