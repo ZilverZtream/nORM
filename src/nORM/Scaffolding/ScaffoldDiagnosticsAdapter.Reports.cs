@@ -8,55 +8,28 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldDiagnosticsAdapter
     {
         public static string ScaffoldDiagnostics(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> unsupportedFeatures,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> skippedObjects,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
-            IReadOnlySet<string>? emittedManyToManyJoinTableKeys,
+            ScaffoldDiagnosticsRequest request,
             ObjectPool<StringBuilder> stringBuilderPool)
             => ScaffoldDiagnosticReportBuilder.WriteMarkdown(
-                ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(foreignKeys),
-                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
-                ScaffoldSchemaDiscoveryAdapter.ConvertSkippedObjectInfos(skippedObjects),
-                primaryKeyColumnsByTable,
-                ScaffoldRelationshipAdapter.ConvertIndexInfos(indexes),
-                columnPropertiesByTable,
-                nonNullableColumnsByTable,
-                databaseGeneratedColumnsByTable,
-                identityColumnsByTable,
-                providerOwnedWriteBlockedTableKeys,
-                emittedManyToManyJoinTableKeys,
+                ConvertReportRequest(request),
                 stringBuilderPool);
 
-        public static string ScaffoldDiagnosticsJson(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> unsupportedFeatures,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> skippedObjects,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
-            IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
+        public static string ScaffoldDiagnosticsJson(ScaffoldDiagnosticsRequest request)
             => ScaffoldDiagnosticReportBuilder.WriteJson(
-                ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(foreignKeys),
-                ConvertUnsupportedFeatureInfos(unsupportedFeatures),
-                ScaffoldSchemaDiscoveryAdapter.ConvertSkippedObjectInfos(skippedObjects),
-                primaryKeyColumnsByTable,
-                ScaffoldRelationshipAdapter.ConvertIndexInfos(indexes),
-                columnPropertiesByTable,
-                nonNullableColumnsByTable,
-                databaseGeneratedColumnsByTable,
-                identityColumnsByTable,
-                providerOwnedWriteBlockedTableKeys,
-                emittedManyToManyJoinTableKeys);
+                ConvertReportRequest(request));
+
+        private static ScaffoldDiagnosticReportRequest ConvertReportRequest(ScaffoldDiagnosticsRequest request)
+            => new(
+                ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(request.ForeignKeys),
+                ConvertUnsupportedFeatureInfos(request.UnsupportedFeatures),
+                ScaffoldSchemaDiscoveryAdapter.ConvertSkippedObjectInfos(request.SkippedObjects),
+                request.PrimaryKeyColumnsByTable,
+                ScaffoldRelationshipAdapter.ConvertIndexInfos(request.Indexes),
+                request.ColumnPropertiesByTable,
+                request.NonNullableColumnsByTable,
+                request.DatabaseGeneratedColumnsByTable,
+                request.IdentityColumnsByTable,
+                request.ProviderOwnedWriteBlockedTableKeys,
+                request.EmittedManyToManyJoinTableKeys);
     }
 }

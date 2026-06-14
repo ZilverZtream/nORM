@@ -6,19 +6,8 @@ namespace nORM.Scaffolding
     {
         private static string BuildDiagnostics(ScaffoldOutputPlanRequest request)
         {
-            var discovery = request.Discovery;
             return ScaffoldDiagnosticsAdapter.ScaffoldDiagnostics(
-                discovery.ForeignKeys,
-                discovery.UnsupportedFeatures,
-                discovery.SkippedObjects,
-                discovery.PrimaryKeyColumnsByTable,
-                discovery.Indexes,
-                discovery.ColumnPropertiesByTable,
-                discovery.NonNullableColumnsByTable,
-                discovery.FeatureConfigurations.ComputedColumnsByTable,
-                discovery.IdentityColumnsByTable,
-                discovery.FeatureConfigurations.ProviderOwnedWriteBlockedTableKeys,
-                request.Composition.ManyToManyJoinTableKeys,
+                BuildDiagnosticsRequest(request),
                 request.StringBuilderPool);
         }
 
@@ -29,8 +18,14 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(diagnostics))
                 return null;
 
-            var discovery = request.Discovery;
             return ScaffoldDiagnosticsAdapter.ScaffoldDiagnosticsJson(
+                BuildDiagnosticsRequest(request));
+        }
+
+        private static ScaffoldDiagnosticsRequest BuildDiagnosticsRequest(ScaffoldOutputPlanRequest request)
+        {
+            var discovery = request.Discovery;
+            return new ScaffoldDiagnosticsRequest(
                 discovery.ForeignKeys,
                 discovery.UnsupportedFeatures,
                 discovery.SkippedObjects,

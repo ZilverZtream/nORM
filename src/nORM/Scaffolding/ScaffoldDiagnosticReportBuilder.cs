@@ -8,31 +8,10 @@ namespace nORM.Scaffolding
     internal static class ScaffoldDiagnosticReportBuilder
     {
         public static string WriteMarkdown(
-            IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys,
-            IReadOnlyList<ScaffoldUnsupportedFeatureInfo> unsupportedFeatures,
-            IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndexInfo> indexes,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
-            IReadOnlySet<string>? emittedManyToManyJoinTableKeys,
+            ScaffoldDiagnosticReportRequest request,
             ObjectPool<StringBuilder> stringBuilderPool)
         {
-            var report = BuildReport(
-                foreignKeys,
-                unsupportedFeatures,
-                skippedObjects,
-                primaryKeyColumnsByTable,
-                indexes,
-                columnPropertiesByTable,
-                nonNullableColumnsByTable,
-                databaseGeneratedColumnsByTable,
-                identityColumnsByTable,
-                providerOwnedWriteBlockedTableKeys,
-                emittedManyToManyJoinTableKeys);
+            var report = BuildReport(request);
 
             if (report.IsEmpty)
                 return string.Empty;
@@ -55,31 +34,9 @@ namespace nORM.Scaffolding
             }
         }
 
-        public static string WriteJson(
-            IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys,
-            IReadOnlyList<ScaffoldUnsupportedFeatureInfo> unsupportedFeatures,
-            IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndexInfo> indexes,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
-            IReadOnlySet<string>? emittedManyToManyJoinTableKeys)
+        public static string WriteJson(ScaffoldDiagnosticReportRequest request)
         {
-            var report = BuildReport(
-                foreignKeys,
-                unsupportedFeatures,
-                skippedObjects,
-                primaryKeyColumnsByTable,
-                indexes,
-                columnPropertiesByTable,
-                nonNullableColumnsByTable,
-                databaseGeneratedColumnsByTable,
-                identityColumnsByTable,
-                providerOwnedWriteBlockedTableKeys,
-                emittedManyToManyJoinTableKeys);
+            var report = BuildReport(request);
 
             return ScaffoldDiagnosticsWriter.WriteJson(
                 report.CompositeForeignKeys,
@@ -88,40 +45,29 @@ namespace nORM.Scaffolding
                 report.SkippedObjects);
         }
 
-        private static ScaffoldDiagnosticReport BuildReport(
-            IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys,
-            IReadOnlyList<ScaffoldUnsupportedFeatureInfo> unsupportedFeatures,
-            IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<ScaffoldIndexInfo> indexes,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
-            IReadOnlySet<string>? emittedManyToManyJoinTableKeys)
+        private static ScaffoldDiagnosticReport BuildReport(ScaffoldDiagnosticReportRequest request)
         {
             var compositeForeignKeys = ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyDiagnostics(
-                foreignKeys,
-                primaryKeyColumnsByTable,
-                indexes,
-                nonNullableColumnsByTable);
+                request.ForeignKeys,
+                request.PrimaryKeyColumnsByTable,
+                request.Indexes,
+                request.NonNullableColumnsByTable);
             var possibleJoinTables = ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableDiagnostics(
-                foreignKeys,
-                primaryKeyColumnsByTable,
-                columnPropertiesByTable,
-                nonNullableColumnsByTable,
-                databaseGeneratedColumnsByTable,
-                identityColumnsByTable,
-                indexes,
-                providerOwnedWriteBlockedTableKeys,
-                emittedManyToManyJoinTableKeys);
+                request.ForeignKeys,
+                request.PrimaryKeyColumnsByTable,
+                request.ColumnPropertiesByTable,
+                request.NonNullableColumnsByTable,
+                request.DatabaseGeneratedColumnsByTable,
+                request.IdentityColumnsByTable,
+                request.Indexes,
+                request.ProviderOwnedWriteBlockedTableKeys,
+                request.EmittedManyToManyJoinTableKeys);
 
             return new ScaffoldDiagnosticReport(
                 compositeForeignKeys,
                 possibleJoinTables,
-                unsupportedFeatures,
-                skippedObjects);
+                request.UnsupportedFeatures,
+                request.SkippedObjects);
         }
 
         private readonly record struct ScaffoldDiagnosticReport(

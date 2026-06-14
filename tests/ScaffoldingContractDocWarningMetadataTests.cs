@@ -453,16 +453,18 @@ public partial class ScaffoldingContractDocTests
                 "decimal(provider)")
         };
         var json = ScaffoldDiagnosticsAdapter.ScaffoldDiagnosticsJson(
-            Array.Empty<DatabaseScaffolder.ScaffoldForeignKey>(),
-            features,
-            Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>(),
-            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
-            Array.Empty<DatabaseScaffolder.ScaffoldIndex>(),
-            new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase),
-            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
-            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
-            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            new ScaffoldDiagnosticsRequest(
+                Array.Empty<DatabaseScaffolder.ScaffoldForeignKey>(),
+                features,
+                Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>(),
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+                Array.Empty<DatabaseScaffolder.ScaffoldIndex>(),
+                new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                null));
 
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         var diagnostic = Assert.Single(doc.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray());
