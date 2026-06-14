@@ -56,6 +56,9 @@ public partial class ScaffoldingContractDocTests
     private static string ReadRelationshipDiscoverySource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiscovery.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiscovery.Counts.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiscovery.Planning.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiscovery.Helpers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipNavigationNameBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipNavigationNameBuilder.Roles.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
