@@ -239,7 +239,10 @@ must be reviewed and edited like handwritten model code.
   outside those default patterns are preserved. `ON DELETE CASCADE` is preserved as nORM tracked-graph
   cascade behavior; valid database referential actions (`NO ACTION`,
   `CASCADE`, `SET NULL`, `RESTRICT`, `SET DEFAULT`) are emitted into generated
-  fluent configuration, including `ON UPDATE` actions. Relationships are emitted when the FK targets the
+  fluent configuration, including `ON UPDATE` actions. Provider-owned FK
+  timing/match semantics such as PostgreSQL `DEFERRABLE` and `MATCH FULL`
+  remain relationship diagnostics instead of being flattened into ordinary
+  generated navigations. Relationships are emitted when the FK targets the
   generated principal primary key or an exact ordered unfiltered unique index exposed by provider
   metadata. Composite relationships are emitted when the ordered FK columns
   reference the exact generated composite primary key or an exact ordered unfiltered unique index.
@@ -933,7 +936,10 @@ must be reviewed and edited like handwritten model code.
   The real CLI path also builds nullable and non-null alternate-key FK relationships from live provider metadata, including the
   unique index, navigation attributes, and generated fluent FK mapping, and
   preserves non-default FK delete/update referential actions, including
-  RESTRICT and SET DEFAULT referential actions where providers expose them. It also
+  RESTRICT and SET DEFAULT referential actions where providers expose them.
+  PostgreSQL deferrable FK timing semantics are verified as relationship
+  diagnostics through the real CLI so they are not silently normalized into
+  ordinary generated navigations. It also
   proves safe string/binary defaults, table CHECK constraints, computed/generated columns,
   column collations, provider-native table/column comments,
   explicit SQL Server/PostgreSQL primary-key constraint names,
@@ -1103,13 +1109,14 @@ must be reviewed and edited like handwritten model code.
   model configuration. FKs that target keyless principals, start from keyless
   dependents, or target non-unique alternate columns are discovered and reported
   in scaffold diagnostics.
-- FK referential-action modeling outside the common provider action set.
+- FK referential-action and provider-owned FK semantic modeling outside the common provider action set.
   `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` are emitted
   into generated fluent configuration for delete/update actions. Unknown
-  provider-specific action tokens are discovered and reported in scaffold
-  diagnostics, and generated navigations/fluent relationships for those FKs are
-  suppressed so unknown delete/update behavior is not silently normalized to
-  `NO ACTION`.
+  provider-specific action tokens and FK timing/match semantics such as
+  PostgreSQL `DEFERRABLE`, `INITIALLY DEFERRED`, and `MATCH FULL` are
+  discovered and reported in scaffold diagnostics, and generated
+  navigations/fluent relationships for those FKs are suppressed so unknown
+  provider behavior is not silently normalized to `NO ACTION`.
 - Owned types and inheritance inference.
 - Payload bridge tables are modeled as explicit join entities, not skip
   navigations. Many-to-many joins whose bridge columns are nullable, whose key
@@ -1353,7 +1360,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `citext`/`json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` plus bounded simple `set(...)` are scaffolded as supported storage; MySQL unsigned integer and decimal/numeric columns, SQL Server alias types over scaffoldable scalar/binary bases, and PostgreSQL domains over safe scalar/array/enum base types preserve generated writes and bounded facets where provider metadata exposes them while remaining diagnostics because the DDL is provider-specific. Unsafe provider-specific declarations such as SQL Server/SQLite/MySQL spatial types like `GEOMETRY`/`POINT`, PostgreSQL network/search types such as `inet`, and larger or ambiguous MySQL `set(...)` declarations remain diagnostics and make the generated entity `[ReadOnlyEntity]` so generated writes fail closed. |
 | `SCF105` | `schema-feature` | Decimal precision/scale metadata discovered but not emitted. Parsed precision and precision/scale facets are emitted as `HasPrecision`; remaining rows indicate provider numeric facet text that needs explicit model configuration or provider migration DDL. |
-| `SCF106` | `relationship` | Unsupported/provider-specific FK referential action discovered. Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted in generated fluent configuration. |
+| `SCF106` | `relationship` | Unsupported/provider-specific FK referential action or FK timing/match semantic discovered. Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted in generated fluent configuration; PostgreSQL `DEFERRABLE`, `INITIALLY DEFERRED`, and `MATCH FULL` remain diagnostics so generated navigations are suppressed. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unfiltered unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. Static and dynamic scaffolding emit `[Timestamp]` plus computed database-generation metadata so generated writes and concurrency checks can use the column; exact provider rowversion/timestamp DDL remains provider-owned. |
 | `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |

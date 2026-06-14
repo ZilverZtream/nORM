@@ -2,6 +2,8 @@
 
 using System;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using nORM.Scaffolding;
 using Xunit;
@@ -129,6 +131,71 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownSetDefaultReferentialActionAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_postgres_deferrable_fk_semantics_as_relationship_diagnostic()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.Postgres);
+        if (Skip.If(live is null, "Live provider Postgres not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var parentTable = "ScaffoldLiveDeferrableParent" + suffix;
+        var childTable = "ScaffoldLiveDeferrableChild" + suffix;
+        var fkName = "FK_ScaffoldLiveDeferrable_" + suffix;
+        await using (connection)
+        {
+            var parent = provider.Escape(parentTable);
+            var child = provider.Escape(childTable);
+            await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, childTable, child));
+            await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, parentTable, parent));
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_pg_deferrable_fk_" + suffix);
+            try
+            {
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {parent} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY)");
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {child} ({provider.Escape("Id")} integer NOT NULL PRIMARY KEY, {provider.Escape("ParentId")} integer NOT NULL, " +
+                    $"CONSTRAINT {provider.Escape(fkName)} FOREIGN KEY ({provider.Escape("ParentId")}) REFERENCES {parent} ({provider.Escape("Id")}) DEFERRABLE INITIALLY DEFERRED)");
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldPostgresDeferrableFkContext",
+                    new ScaffoldOptions { Tables = new[] { parentTable, childTable }, OverwriteFiles = false });
+
+                var childCode = await File.ReadAllTextAsync(Path.Combine(dir, childTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresDeferrableFkContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("public int ParentId { get; set; }", childCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"public {parentTable}", childCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(".HasForeignKey(", contextCode, StringComparison.Ordinal);
+                var diagnostic = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ReferentialAction" &&
+                    item.GetProperty("name").GetString() == fkName);
+                Assert.Equal("SCF106", diagnostic.GetProperty("code").GetString());
+                Assert.Contains("DEFERRABLE", diagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                var metadata = diagnostic.GetProperty("metadata");
+                Assert.True(metadata.GetProperty("navigationSuppressed").GetBoolean());
+                Assert.False(metadata.GetProperty("generatedNavigationSupported").GetBoolean());
+                Assert.Equal("referential-action-not-scaffoldable", metadata.GetProperty("reason").GetString());
+                Assert.Contains("DEFERRABLE", metadata.GetProperty("onUpdate").GetString(), StringComparison.OrdinalIgnoreCase);
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, childTable, child));
+                await ExecuteAsync(connection, DropTable(ProviderKind.Postgres, parentTable, parent));
             }
         }
     }

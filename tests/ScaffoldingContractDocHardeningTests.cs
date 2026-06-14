@@ -20,6 +20,7 @@ public partial class ScaffoldingContractDocTests
         var source = ReadStaticEntityScaffoldSource();
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
+        var foreignKeyDiscoverySqlSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sql.cs");
         var featureMapBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.cs");
         var columnDiscoverySource = ReadColumnDiscoverySource();
         var contextWriterSource = ReadContextWriterSource();
@@ -415,6 +416,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("nullable and non-null alternate-key FK relationships", doc, StringComparison.Ordinal);
         Assert.Contains("non-default FK delete/update referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("RESTRICT and SET DEFAULT referential actions where providers expose them", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL deferrable FK timing semantics are verified as relationship", doc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_reports_postgres_deferrable_fk_semantics_as_relationship_diagnostic", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_reports_postgres_deferrable_fk_semantics_as_relationship_diagnostic", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("con.condeferrable", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
+        Assert.Contains("con.confmatchtype", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
         Assert.Contains("safe string/binary defaults, table CHECK constraints", doc, StringComparison.Ordinal);
         Assert.Contains("computed/generated columns", doc, StringComparison.Ordinal);
         Assert.Contains("provider-native table/column comments", doc, StringComparison.Ordinal);
@@ -571,7 +577,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("CURRENT_TIMESTAMP()", doc, StringComparison.Ordinal);
         Assert.Contains("CURRENT_TIMESTAMP(6)", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL `ON UPDATE` timestamp defaults remain provider-specific diagnostics", doc, StringComparison.Ordinal);
-        Assert.Contains("Unsupported/provider-specific FK referential action discovered", doc, StringComparison.Ordinal);
+        Assert.Contains("Unsupported/provider-specific FK referential action or FK timing/match semantic discovered", doc, StringComparison.Ordinal);
+        Assert.Contains("FK timing/match semantic", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL `DEFERRABLE`", doc, StringComparison.Ordinal);
         Assert.Contains("Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted", doc, StringComparison.Ordinal);
         Assert.Contains("'draft'::text", doc, StringComparison.Ordinal);
         Assert.Contains("0xDEADBEEF", doc, StringComparison.Ordinal);

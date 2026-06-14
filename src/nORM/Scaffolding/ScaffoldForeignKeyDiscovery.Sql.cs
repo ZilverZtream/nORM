@@ -63,6 +63,16 @@ namespace nORM.Scaffolding
                     WHEN 'd' THEN 'SET DEFAULT'
                     WHEN 'r' THEN 'RESTRICT'
                     ELSE 'NO ACTION'
+                END ||
+                CASE con.confmatchtype
+                    WHEN 'f' THEN ' MATCH FULL'
+                    WHEN 'p' THEN ' MATCH PARTIAL'
+                    ELSE ''
+                END ||
+                CASE
+                    WHEN con.condeferrable AND con.condeferred THEN ' DEFERRABLE INITIALLY DEFERRED'
+                    WHEN con.condeferrable THEN ' DEFERRABLE INITIALLY IMMEDIATE'
+                    ELSE ''
                 END AS OnUpdate
             FROM pg_constraint con
             INNER JOIN pg_class dep ON dep.oid = con.conrelid
