@@ -165,6 +165,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_startup_project_directory_named_connection_overrides_target_appsettings_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_startup_project_named_connection_shorthand_overrides_target_appsettings_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_startup_project_user_secrets_override_target_user_secrets_and_appsettings_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_respects_context_directory_namespace_and_nullable_options_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_omitted_context_uses_named_connection_leaf_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_named_connection_shorthand_reads_project_appsettings_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_named_connection_user_secrets_override_project_appsettings_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
