@@ -89,6 +89,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldProviderSpecificTypeClassifier.SqlServer.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Arrays.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Arrays.Mapping.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Arrays.Parsing.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Domains.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.DomainCastTypes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresTypeClassifier.Parameterized.cs"),
