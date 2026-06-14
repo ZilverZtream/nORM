@@ -97,6 +97,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQL Server procedure synonyms are SQL Server-specific provider objects.", "SqlServer"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_mysql_event_diagnostics_on_live_provider"] =
                 Expect("MySQL scheduled events are a MySQL-only routine/object catalog shape.", "MySql"),
+            ["LiveProviderScaffoldCliMySqlEventDiagnosticsTests.cs::Dotnet_norm_scaffold_reports_mysql_event_diagnostics_on_live_provider"] =
+                Expect("MySQL scheduled events are a MySQL-only routine/object catalog shape.", "MySql"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact"] =
                 Expect("SQLite virtual tables and shadow-table diagnostics are SQLite-specific.", "Sqlite"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =
