@@ -49,6 +49,7 @@ public partial class ScaffoldingContractDocTests
         var contextWriterSource = ReadContextWriterSource();
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var rootReadme = ReadRepoFile("README.md");
+        var publicApiPolicy = ReadRepoFile("docs", "public-api-policy.md");
 
         Assert.Contains("repeatable CLI `--table`", doc, StringComparison.Ordinal);
         Assert.Contains("repeatable CLI `--schema`", doc, StringComparison.Ordinal);
@@ -59,6 +60,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldOptions.Schemas", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UsePluralizer", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseDatabaseNames", doc, StringComparison.Ordinal);
+        Assert.Contains("nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames", publicApiPolicy, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_preserves_database_names_on_live_provider", publicApiPolicy, StringComparison.Ordinal);
         Assert.Contains("routine result-column names", doc, StringComparison.Ordinal);
         Assert.Contains("Synthetic navigation", doc, StringComparison.Ordinal);
         Assert.Contains("EF-style CLI aliases", doc, StringComparison.Ordinal);
