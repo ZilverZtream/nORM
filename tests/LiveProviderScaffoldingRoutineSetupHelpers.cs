@@ -121,6 +121,23 @@ public sealed partial class LiveProviderScaffoldingParityTests
             $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(PostgresTypedRoutineName)}(ids integer[], ratings numeric(10,2)[], labels varchar(32)[], trace_id uuid) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ids, 1), 0) + COALESCE(array_length(ratings, 1), 0) + COALESCE(array_length(labels, 1), 0) $$");
     }
 
+    private static async Task SetupPostgresDomainRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        await TeardownPostgresDomainRoutineAsync(connection, provider);
+
+        var emailDomain = provider.Escape("public") + "." + provider.Escape(PostgresRoutineEmailDomainName);
+        var ratingsDomain = provider.Escape("public") + "." + provider.Escape(PostgresRoutineRatingsDomainName);
+        var statusEnum = provider.Escape("public") + "." + provider.Escape(PostgresRoutineStatusEnumName);
+        var statusDomain = provider.Escape("public") + "." + provider.Escape(PostgresRoutineStatusDomainName);
+        var routine = provider.Escape("public") + "." + provider.Escape(PostgresDomainRoutineName);
+        await ExecuteAsync(connection, $"CREATE TYPE {statusEnum} AS ENUM ('draft', 'active')");
+        await ExecuteAsync(connection, $"CREATE DOMAIN {emailDomain} AS varchar(320) CHECK (VALUE LIKE '%@%')");
+        await ExecuteAsync(connection, $"CREATE DOMAIN {ratingsDomain} AS numeric(10,2)[]");
+        await ExecuteAsync(connection, $"CREATE DOMAIN {statusDomain} AS {statusEnum}");
+        await ExecuteAsync(connection,
+            $"CREATE FUNCTION {routine}(email {emailDomain}, ratings {ratingsDomain}, status {statusDomain}) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ratings, 1), 0) $$");
+    }
+
     private static async Task SetupPostgresOverloadedRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         await TeardownPostgresOverloadedRoutineAsync(connection, provider);

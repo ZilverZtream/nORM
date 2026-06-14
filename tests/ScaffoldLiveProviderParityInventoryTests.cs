@@ -169,6 +169,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQL Server no-result stored procedures with output metadata are SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_array_and_uuid_routine_parameters_on_live_provider"] =
                 Expect("PostgreSQL array and UUID routine parameters are PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingRoutineDomainTests.cs::ScaffoldAsync_emits_postgres_domain_routine_parameters_on_live_provider"] =
+                Expect("PostgreSQL routine domains and enum-base domains are PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_overloaded_function_wrappers_without_collisions"] =
                 Expect("PostgreSQL overloaded functions are PostgreSQL-specific routine metadata.", "Postgres"),
             ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_postgres_scalar_set_returning_function_wrapper_on_live_provider"] =
@@ -177,6 +179,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL quoted routine parameter names require PostgreSQL-specific invocation handling.", "Postgres"),
             ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_postgres_overloaded_and_quoted_parameter_function_wrappers_on_live_provider"] =
                 Expect("PostgreSQL overloaded functions and quoted routine parameter names require PostgreSQL-specific invocation handling.", "Postgres"),
+            ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_postgres_domain_routine_parameters_on_live_provider"] =
+                Expect("PostgreSQL routine domains and enum-base domains are PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_mysql_unsigned_routine_parameters_on_live_provider"] =
                 Expect("MySQL unsigned routine parameter metadata is MySQL-specific.", "MySql")
         };

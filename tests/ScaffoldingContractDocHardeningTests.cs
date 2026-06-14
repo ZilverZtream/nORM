@@ -388,6 +388,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL overloaded and quoted-parameter function wrappers", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL scalar set-returning functions", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_emits_postgres_domain_routine_parameters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_overloaded_and_quoted_parameter_function_wrappers_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_scalar_set_returning_function_wrapper_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("output-parameter routine factories", doc, StringComparison.Ordinal);

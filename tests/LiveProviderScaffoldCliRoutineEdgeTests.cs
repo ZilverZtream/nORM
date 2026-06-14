@@ -92,6 +92,69 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     }
 
     [Fact]
+    public void Dotnet_norm_scaffold_emits_postgres_domain_routine_parameters_on_live_provider()
+    {
+        var suffix = IdentifierSuffix().ToLowerInvariant();
+        var routineName = "CliPostgresDomainRoutine" + suffix;
+        var emailDomainName = "cli_pg_routine_email_" + suffix;
+        var ratingsDomainName = "cli_pg_routine_ratings_" + suffix;
+        var statusEnumName = "cli_pg_routine_status_" + suffix;
+        var statusDomainName = "cli_pg_routine_status_domain_" + suffix;
+
+        RunRoutineEdgeCliTest(
+            ProviderKind.Postgres,
+            "norm_live_cli_postgres_domain_routine_",
+            "CliLivePostgresDomainRoutineCtx",
+            (connection, provider) => SetupPostgresDomainRoutine(
+                connection,
+                provider,
+                routineName,
+                emailDomainName,
+                ratingsDomainName,
+                statusEnumName,
+                statusDomainName),
+            (connection, provider) => CleanupPostgresDomainRoutine(
+                connection,
+                provider,
+                routineName,
+                emailDomainName,
+                ratingsDomainName,
+                statusEnumName,
+                statusDomainName),
+            (contextCode, routines) =>
+            {
+                var routine = Assert.Single(routines, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString()!.EndsWith(routineName, StringComparison.Ordinal));
+                var parameters = routine.GetProperty("metadata").GetProperty("parameters").EnumerateArray().ToArray();
+
+                Assert.Contains($"public sealed class {routineName}Parameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public string? email { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public decimal[]? ratings { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public string? status { get; init; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains(
+                    $"var casts = new[] {{ \"public.{emailDomainName}\", \"public.{ratingsDomainName}\", \"public.{statusDomainName}\" }};",
+                    contextCode,
+                    StringComparison.Ordinal);
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "email" &&
+                    item.GetProperty("dataType").GetString()!.Contains(emailDomainName, StringComparison.Ordinal) &&
+                    item.GetProperty("clrType").GetString() == "string?" &&
+                    item.GetProperty("dbType").GetString() == "String");
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "ratings" &&
+                    item.GetProperty("dataType").GetString()!.Contains(ratingsDomainName, StringComparison.Ordinal) &&
+                    item.GetProperty("clrType").GetString() == "decimal[]?" &&
+                    item.GetProperty("dbType").GetString() == "Object");
+                Assert.Contains(parameters, item =>
+                    item.GetProperty("name").GetString() == "status" &&
+                    item.GetProperty("dataType").GetString()!.Contains(statusDomainName, StringComparison.Ordinal) &&
+                    item.GetProperty("clrType").GetString() == "string?" &&
+                    item.GetProperty("dbType").GetString() == "String");
+            });
+    }
+
+    [Fact]
     public void Dotnet_norm_scaffold_emits_postgres_scalar_set_returning_function_wrapper_on_live_provider()
     {
         var suffix = IdentifierSuffix();
@@ -245,6 +308,59 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(quotedName)}(integer, text)",
             $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(overloadedName)}(integer)",
             $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(overloadedName)}(text)");
+    }
+
+    private static void SetupPostgresDomainRoutine(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string routineName,
+        string emailDomainName,
+        string ratingsDomainName,
+        string statusEnumName,
+        string statusDomainName)
+    {
+        CleanupPostgresDomainRoutine(
+            connection,
+            provider,
+            routineName,
+            emailDomainName,
+            ratingsDomainName,
+            statusEnumName,
+            statusDomainName);
+
+        var emailDomain = provider.Escape("public") + "." + provider.Escape(emailDomainName);
+        var ratingsDomain = provider.Escape("public") + "." + provider.Escape(ratingsDomainName);
+        var statusEnum = provider.Escape("public") + "." + provider.Escape(statusEnumName);
+        var statusDomain = provider.Escape("public") + "." + provider.Escape(statusDomainName);
+        var routine = provider.Escape("public") + "." + provider.Escape(routineName);
+        Execute(connection,
+            $"CREATE TYPE {statusEnum} AS ENUM ('draft', 'active')",
+            $"CREATE DOMAIN {emailDomain} AS varchar(320) CHECK (VALUE LIKE '%@%')",
+            $"CREATE DOMAIN {ratingsDomain} AS numeric(10,2)[]",
+            $"CREATE DOMAIN {statusDomain} AS {statusEnum}",
+            $"CREATE FUNCTION {routine}(email {emailDomain}, ratings {ratingsDomain}, status {statusDomain}) RETURNS integer LANGUAGE SQL AS $$ SELECT COALESCE(array_length(ratings, 1), 0) $$");
+    }
+
+    private static void CleanupPostgresDomainRoutine(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string routineName,
+        string emailDomainName,
+        string ratingsDomainName,
+        string statusEnumName,
+        string statusDomainName)
+    {
+        var emailDomain = provider.Escape("public") + "." + provider.Escape(emailDomainName);
+        var ratingsDomain = provider.Escape("public") + "." + provider.Escape(ratingsDomainName);
+        var statusEnum = provider.Escape("public") + "." + provider.Escape(statusEnumName);
+        var statusDomain = provider.Escape("public") + "." + provider.Escape(statusDomainName);
+        var routine = provider.Escape("public") + "." + provider.Escape(routineName);
+        Execute(connection,
+            $"DROP FUNCTION IF EXISTS {routine}({emailDomain}, {ratingsDomain}, {statusDomain})",
+            $"DROP DOMAIN IF EXISTS {statusDomain}",
+            $"DROP DOMAIN IF EXISTS {ratingsDomain}",
+            $"DROP DOMAIN IF EXISTS {emailDomain}",
+            $"DROP TYPE IF EXISTS {statusEnum}");
     }
 
     private static void SetupPostgresScalarSetReturningRoutine(

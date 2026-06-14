@@ -223,6 +223,11 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string SequenceName = "ScaffoldLiveOrderNo";
     private const string PostgresSetReturningRoutineName = "ScaffoldLiveSetReturningRevenue";
     private const string PostgresTypedRoutineName = "ScaffoldLiveTypedRoutine";
+    private const string PostgresDomainRoutineName = "ScaffoldLiveDomainRoutine";
+    private const string PostgresRoutineEmailDomainName = "scaffold_live_routine_email_address";
+    private const string PostgresRoutineRatingsDomainName = "scaffold_live_routine_ratings";
+    private const string PostgresRoutineStatusEnumName = "scaffold_live_routine_status";
+    private const string PostgresRoutineStatusDomainName = "scaffold_live_routine_status_domain";
     private const string PostgresOverloadedRoutineName = "ScaffoldLiveOverloadedRoutine";
     private const string PostgresQuotedParameterRoutineName = "ScaffoldLiveQuotedParameterRoutine";
     private const string MySqlUnsignedRoutineName = "ScaffoldLiveUnsignedRoutine";

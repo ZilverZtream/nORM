@@ -139,6 +139,27 @@ public sealed partial class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task TeardownPostgresDomainRoutineAsync(DbConnection connection, DatabaseProvider provider)
+    {
+        try
+        {
+            var emailDomain = provider.Escape("public") + "." + provider.Escape(PostgresRoutineEmailDomainName);
+            var ratingsDomain = provider.Escape("public") + "." + provider.Escape(PostgresRoutineRatingsDomainName);
+            var statusEnum = provider.Escape("public") + "." + provider.Escape(PostgresRoutineStatusEnumName);
+            var statusDomain = provider.Escape("public") + "." + provider.Escape(PostgresRoutineStatusDomainName);
+            var routine = provider.Escape("public") + "." + provider.Escape(PostgresDomainRoutineName);
+            await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {routine}({emailDomain}, {ratingsDomain}, {statusDomain})");
+            await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {statusDomain}");
+            await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {ratingsDomain}");
+            await ExecuteAsync(connection, $"DROP DOMAIN IF EXISTS {emailDomain}");
+            await ExecuteAsync(connection, $"DROP TYPE IF EXISTS {statusEnum}");
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
     private static async Task TeardownPostgresOverloadedRoutineAsync(DbConnection connection, DatabaseProvider provider)
     {
         try
