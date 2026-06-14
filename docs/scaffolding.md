@@ -908,8 +908,8 @@ must be reviewed and edited like handwritten model code.
   Explicit SQL Server/PostgreSQL primary-key constraint names are also verified
   through the real CLI while MySQL's fixed `PRIMARY` metadata and SQLite's
   PRAGMA-only key shape stay as unnamed `HasKey(...)` configuration.
-  Table-filtered CLI
-  scaffolds also prove relationships to unselected principal tables are
+  Table-filtered direct API and CLI
+  scaffolds both prove relationships to unselected principal tables are
   suppressed rather than emitted as broken navigations, and selected ordinary
   views are emitted as read-only query artifacts without requiring
   `--emit-query-artifacts`. Key-looking view columns are verified through the
