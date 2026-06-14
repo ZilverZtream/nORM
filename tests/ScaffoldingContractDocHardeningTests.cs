@@ -182,6 +182,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_accepts_no_onconfiguring_data_annotations_and_no_pluralize_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_singularizes_plural_table_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_singularizes_plural_table_names_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_preserves_plural_table_names_when_pluralizer_is_disabled_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_routine_stubs_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_advanced_routine_stubs_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_routine_output_and_non_query_wrappers_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
