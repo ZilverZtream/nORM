@@ -492,7 +492,7 @@ must be reviewed and edited like handwritten model code.
   it.
   Build/runtime defaults remain compatibility-only because nORM does not build
   or execute startup code during scaffolding.
-- EF common output switches are accepted: `--json` emits a machine-readable
+- EF common output switches are accepted: `--json` or config `json` emits a machine-readable
   scaffold result summary for successful runs and scaffold failures, while `--verbose`/`-v`, `--no-color`, and
   `--prefix-output` are compatibility switches because nORM scaffold output is
   already plain and explicit.

@@ -188,7 +188,7 @@ options override config values. When any CLI table/schema filter is supplied,
 config table/schema defaults are ignored so they cannot expand the explicit
 selection. Explicit CLI `--force` and `--no-overwrite` values also override the
 opposite config default instead of conflicting with it.
-`--json` emits a machine-readable scaffold result summary for successful runs
+`--json` or config `json` emits a machine-readable scaffold result summary for successful runs
 and scaffold failures. `--verbose`/`-v`,
 `--no-color`, and `--prefix-output` are accepted for EF Core command-line
 compatibility because nORM scaffold output is already plain and explicit.

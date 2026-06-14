@@ -377,13 +377,14 @@ public partial class CliIntegrationTests
                 Path.Combine(configDir, "dotnet-ef.json"),
                 """
                 {
+                  "json": true,
                   "outputDir": " "
                 }
                 """,
                 Encoding.UTF8);
 
             var result = RunCli(
-                $"scaffold {Quote("Data Source=:memory:")} Microsoft.EntityFrameworkCore.Sqlite --json",
+                $"scaffold {Quote("Data Source=:memory:")} Microsoft.EntityFrameworkCore.Sqlite",
                 workDir);
 
             Assert.NotEqual(0, result.ExitCode);
