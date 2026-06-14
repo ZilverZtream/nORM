@@ -9,20 +9,32 @@ public partial class ScaffoldingContractDocTests
 {
     private static string ReadDoc()
     {
-        var asmDir = Path.GetDirectoryName(typeof(ScaffoldingContractDocTests).Assembly.Location)!;
-        var repoRoot = Path.GetFullPath(Path.Combine(asmDir, "..", "..", "..", ".."));
-        var path = Path.Combine(repoRoot, "docs", "scaffolding.md");
+        var path = Path.Combine(GetRepoRoot(), "docs", "scaffolding.md");
         Assert.True(File.Exists(path));
         return File.ReadAllText(path);
     }
 
     private static string ReadRepoFile(params string[] pathParts)
     {
-        var asmDir = Path.GetDirectoryName(typeof(ScaffoldingContractDocTests).Assembly.Location)!;
-        var repoRoot = Path.GetFullPath(Path.Combine(asmDir, "..", "..", "..", ".."));
-        var path = Path.Combine(new[] { repoRoot }.Concat(pathParts).ToArray());
+        var path = Path.Combine(new[] { GetRepoRoot() }.Concat(pathParts).ToArray());
         Assert.True(File.Exists(path));
         return File.ReadAllText(path);
+    }
+
+    private static string ReadRepoFiles(string directory, string searchPattern)
+    {
+        var path = Path.Combine(GetRepoRoot(), directory);
+        Assert.True(Directory.Exists(path));
+        return string.Concat(
+            Directory.EnumerateFiles(path, searchPattern)
+                .OrderBy(Path.GetFileName, StringComparer.Ordinal)
+                .Select(File.ReadAllText));
+    }
+
+    private static string GetRepoRoot()
+    {
+        var asmDir = Path.GetDirectoryName(typeof(ScaffoldingContractDocTests).Assembly.Location)!;
+        return Path.GetFullPath(Path.Combine(asmDir, "..", "..", "..", ".."));
     }
 
     private static string ReadEntityTypeBuilderSource()
@@ -349,99 +361,10 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"));
 
     private static string ReadLiveProviderScaffoldCliParitySource()
-        => string.Concat(
-            ReadRepoFile("tests", "LiveProviderScaffoldCliParityTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliDiagnosticAssertions.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCurrentDirectoryConfigurationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliNoProjectConfigurationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliNamedConnectionConfigurationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliNamedConnectionEnvironmentTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliEnvironmentConfigurationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliStartupEnvironmentTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliStartupConfigurationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliStartupSecretsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliManyToManyTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliManyToManyGeneratedTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliManyToManyEdgeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliProjectConfigurationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliProjectAliasTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliEfConfigDefaultsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliRelationshipTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliOneToOneTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCompositeOneToOneTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSelfRelationshipTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliOutputFilterTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSchemaFilterTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliEfSwitchTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliDiagnosticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCommentFacetTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliIndexDiagnosticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliExpressionIndexTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliProviderSpecificIndexTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliMySqlPrefixIndexTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliPostgresIndexFacetTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliPostgresExpressionIndexFacetTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliPostgresExpressionIndexDiagnosticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliWarningDiagnosticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliProviderSpecificDiagnosticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerRowVersionTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerTemporalTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCoreShapeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCoreManyToManyTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCoreStoreTypeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliInferenceBoundaryTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliNamingTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliPluralizationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliRoutineSequenceTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliRoutineEdgeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSequenceTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliQueryArtifactTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerSynonymQueryArtifactTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerProcedureSynonymTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliMySqlEventDiagnosticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliPostgresSerialTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliViewBoundaryTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliReferentialActionTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliPostgresFkSemanticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerFkSemanticsTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldCliCompatibilityTests.cs"));
+        => ReadRepoFiles("tests", "LiveProviderScaffoldCli*.cs");
 
     private static string ReadLiveProviderScaffoldingParitySource()
-        => string.Concat(
-            ReadRepoFile("tests", "LiveProviderScaffoldingParityTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingSqlHelpers.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyCompositeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyAlternateTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyEdgeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingReferentialActionTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingRelationshipTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingOneToOneTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingSelfRelationshipTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypePostgresTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeMySqlTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeSqlServerTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingIndexTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingIndexProviderSpecificTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingRoutineTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingRoutineOutputTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingRoutineDomainTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingProviderObjectTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingQueryArtifactTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingSqlServerSynonymQueryArtifactTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingDefaultQueryArtifactTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingViewBoundaryTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingDynamicTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingCommentTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingSyntheticNameTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingFilterTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingFilterRelationshipTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingInferenceBoundaryTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingPluralizationTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingOutputOptionTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingWarningOptionTests.cs"),
-            ReadRepoFile("tests", "LiveProviderScaffoldingDiagnosticsTests.cs"));
+        => ReadRepoFiles("tests", "LiveProviderScaffolding*.cs");
 
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
