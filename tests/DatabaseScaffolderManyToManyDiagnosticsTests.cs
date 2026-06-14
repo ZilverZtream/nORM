@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Providers;
 using nORM.Scaffolding;
 using Xunit;
@@ -215,6 +216,91 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildManyToManyJoins_WithComputedSurrogatePrimaryKey_EmitsUsingTable()
+    {
+        var shape = CreateSyntheticBridgeShape(
+            joinPrimaryKeyColumns: new[] { "BridgeHash" },
+            joinColumnNames: new[] { "BridgeHash", "AuthorId", "BookId" },
+            databaseGeneratedColumns: new[] { "BridgeHash" },
+            identityColumns: Array.Empty<string>(),
+            includeUniqueForeignKeyIndex: true);
+
+        var joins = ScaffoldRelationshipAdapter.BuildManyToManyJoins(
+            shape.ForeignKeys,
+            shape.Tables,
+            shape.EntityByTable,
+            shape.ColumnProperties,
+            shape.PrimaryKeys,
+            shape.IdentityColumns,
+            shape.DatabaseGeneratedColumns,
+            shape.Indexes,
+            shape.NonNullableColumns,
+            shape.ProviderOwnedWriteBlockedTableKeys,
+            shape.MemberNames);
+
+        var join = Assert.Single(joins);
+        Assert.Equal("AuthorBook", join.JoinTableName);
+        Assert.Equal(new[] { "AuthorId" }, join.LeftForeignKeyColumns);
+        Assert.Equal(new[] { "BookId" }, join.RightForeignKeyColumns);
+
+        var metadata = ScaffoldDiagnosticsAdapter.BuildPossibleJoinTableMetadata(
+            "AuthorBook",
+            shape.ForeignKeys,
+            shape.PrimaryKeys,
+            shape.ColumnProperties,
+            shape.NonNullableColumns,
+            shape.DatabaseGeneratedColumns,
+            shape.IdentityColumns,
+            shape.Indexes,
+            shape.ProviderOwnedWriteBlockedTableKeys);
+        Assert.Empty((string[])metadata["payloadColumns"]!);
+        Assert.True((bool)metadata["hasGeneratedSurrogatePrimaryKey"]!);
+    }
+
+    [Fact]
+    public void BuildManyToManyJoins_WithIdentityNonPayloadBridgeColumn_EmitsUsingTable()
+    {
+        var shape = CreateSyntheticBridgeShape(
+            joinPrimaryKeyColumns: new[] { "AuthorId", "BookId" },
+            joinColumnNames: new[] { "AuditId", "AuthorId", "BookId" },
+            databaseGeneratedColumns: Array.Empty<string>(),
+            identityColumns: new[] { "AuditId" },
+            includeUniqueForeignKeyIndex: false);
+
+        var joins = ScaffoldRelationshipAdapter.BuildManyToManyJoins(
+            shape.ForeignKeys,
+            shape.Tables,
+            shape.EntityByTable,
+            shape.ColumnProperties,
+            shape.PrimaryKeys,
+            shape.IdentityColumns,
+            shape.DatabaseGeneratedColumns,
+            shape.Indexes,
+            shape.NonNullableColumns,
+            shape.ProviderOwnedWriteBlockedTableKeys,
+            shape.MemberNames);
+
+        var join = Assert.Single(joins);
+        Assert.Equal("AuthorBook", join.JoinTableName);
+        Assert.Equal(new[] { "AuthorId" }, join.LeftForeignKeyColumns);
+        Assert.Equal(new[] { "BookId" }, join.RightForeignKeyColumns);
+
+        var metadata = ScaffoldDiagnosticsAdapter.BuildPossibleJoinTableMetadata(
+            "AuthorBook",
+            shape.ForeignKeys,
+            shape.PrimaryKeys,
+            shape.ColumnProperties,
+            shape.NonNullableColumns,
+            shape.DatabaseGeneratedColumns,
+            shape.IdentityColumns,
+            shape.Indexes,
+            shape.ProviderOwnedWriteBlockedTableKeys);
+        Assert.Empty((string[])metadata["payloadColumns"]!);
+        Assert.True((bool)metadata["hasExactBridgePrimaryKey"]!);
+        Assert.False((bool)metadata["hasGeneratedSurrogatePrimaryKey"]!);
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithPayloadJoinTable_EmitsExplicitJoinEntityAndDiagnostics()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -352,4 +438,134 @@ public partial class DatabaseScaffolderPrivateMethodTests
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
+
+    private static SyntheticBridgeShape CreateSyntheticBridgeShape(
+        IReadOnlyList<string> joinPrimaryKeyColumns,
+        IReadOnlyList<string> joinColumnNames,
+        IReadOnlyList<string> databaseGeneratedColumns,
+        IReadOnlyList<string> identityColumns,
+        bool includeUniqueForeignKeyIndex)
+    {
+        var tables = new[]
+        {
+            new DatabaseScaffolder.ScaffoldTable("Author", null),
+            new DatabaseScaffolder.ScaffoldTable("Book", null),
+            new DatabaseScaffolder.ScaffoldTable("AuthorBook", null)
+        };
+        var foreignKeys = new[]
+        {
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                null,
+                "AuthorBook",
+                "AuthorId",
+                null,
+                "Author",
+                "Id",
+                "FK_AuthorBook_Author",
+                1),
+            new DatabaseScaffolder.ScaffoldForeignKey(
+                null,
+                "AuthorBook",
+                "BookId",
+                null,
+                "Book",
+                "Id",
+                "FK_AuthorBook_Book",
+                1)
+        };
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = "Author",
+            ["Book"] = "Book",
+            ["AuthorBook"] = "AuthorBook"
+        };
+        var columnProperties = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Id"] = "Id" },
+            ["Book"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Id"] = "Id" },
+            ["AuthorBook"] = joinColumnNames.ToDictionary(
+                static name => name,
+                static name => name,
+                StringComparer.OrdinalIgnoreCase)
+        };
+        var primaryKeys = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = new[] { "Id" },
+            ["Book"] = new[] { "Id" },
+            ["AuthorBook"] = joinPrimaryKeyColumns.ToArray()
+        };
+        var databaseGenerated = databaseGeneratedColumns.Count == 0
+            ? new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["AuthorBook"] = new HashSet<string>(databaseGeneratedColumns, StringComparer.OrdinalIgnoreCase)
+            };
+        var identity = identityColumns.Count == 0
+            ? new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["AuthorBook"] = new HashSet<string>(identityColumns, StringComparer.OrdinalIgnoreCase)
+            };
+        var nonNullableColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Author"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase),
+            ["Book"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase),
+            ["AuthorBook"] = new HashSet<string>(joinColumnNames, StringComparer.OrdinalIgnoreCase)
+        };
+        var indexes = includeUniqueForeignKeyIndex
+            ? new[]
+            {
+                new DatabaseScaffolder.ScaffoldIndex(
+                    "AuthorBook",
+                    "AuthorId",
+                    "UX_AuthorBook_AuthorId_BookId",
+                    true,
+                    2,
+                    0,
+                    false,
+                    false,
+                    IndexNullSortOrder.Default,
+                    false,
+                    null),
+                new DatabaseScaffolder.ScaffoldIndex(
+                    "AuthorBook",
+                    "BookId",
+                    "UX_AuthorBook_AuthorId_BookId",
+                    true,
+                    2,
+                    1,
+                    false,
+                    false,
+                    IndexNullSortOrder.Default,
+                    false,
+                    null)
+            }
+            : Array.Empty<DatabaseScaffolder.ScaffoldIndex>();
+
+        return new SyntheticBridgeShape(
+            tables,
+            foreignKeys,
+            entityByTable,
+            columnProperties,
+            primaryKeys,
+            databaseGenerated,
+            identity,
+            indexes,
+            nonNullableColumns,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private sealed record SyntheticBridgeShape(
+        IReadOnlyList<DatabaseScaffolder.ScaffoldTable> Tables,
+        IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> ForeignKeys,
+        IReadOnlyDictionary<string, string> EntityByTable,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ColumnProperties,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> PrimaryKeys,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> DatabaseGeneratedColumns,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> IdentityColumns,
+        IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> Indexes,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> NonNullableColumns,
+        IReadOnlySet<string> ProviderOwnedWriteBlockedTableKeys,
+        Dictionary<string, HashSet<string>> MemberNames);
 }

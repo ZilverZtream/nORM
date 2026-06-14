@@ -49,14 +49,17 @@ namespace nORM.Scaffolding
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var hasExactBridgePrimaryKey = ScaffoldJoinTableShape.HasExactBridgePrimaryKey(joinPrimaryKeyColumns, fkColumnNames);
             var databaseGeneratedColumns = ScaffoldJoinTableShape.GetColumnSet(databaseGeneratedColumnsByTable, joinTableKey);
+            var identityColumns = ScaffoldJoinTableShape.GetColumnSet(identityColumnsByTable, joinTableKey);
             var payloadColumns = joinColumns.Keys
-                .Where(column => !fkColumnNames.Contains(column) && !databaseGeneratedColumns.Contains(column))
+                .Where(column => !fkColumnNames.Contains(column)
+                                 && !databaseGeneratedColumns.Contains(column)
+                                 && !identityColumns.Contains(column))
                 .ToArray();
-            var hasGeneratedSurrogatePrimaryKey = payloadColumns.Length == 1
-                && joinPrimaryKeyColumns.Count == 1
-                && string.Equals(joinPrimaryKeyColumns[0], payloadColumns[0], StringComparison.OrdinalIgnoreCase)
-                && identityColumnsByTable.TryGetValue(joinTableKey, out var identityColumns)
-                && identityColumns.Contains(payloadColumns[0])
+            var hasGeneratedSurrogatePrimaryKey = ScaffoldJoinTableShape.HasGeneratedSurrogatePrimaryKey(
+                    joinPrimaryKeyColumns,
+                    fkColumnNames,
+                    databaseGeneratedColumns,
+                    identityColumns)
                 && ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, joinTableKey, fkColumnNames);
 
             if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)

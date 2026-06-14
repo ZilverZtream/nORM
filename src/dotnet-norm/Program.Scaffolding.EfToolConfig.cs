@@ -170,32 +170,4 @@ partial class Program
             ? path
             : Path.GetFullPath(Path.Combine(baseDirectory, path));
     }
-
-    sealed record EfToolConfig(
-        string? Project,
-        string? StartupProject,
-        string? OutputDir,
-        string? Namespace,
-        string? Context,
-        string? ContextDir,
-        string? ContextNamespace,
-        IReadOnlyList<string> Schemas,
-        IReadOnlyList<string> Tables,
-        string? Framework,
-        string? Configuration,
-        string? Runtime,
-        string? MsbuildProjectExtensionsPath,
-        bool? Verbose,
-        bool? NoColor,
-        bool? PrefixOutput,
-        bool? NoPluralize,
-        bool? UseDatabaseNames,
-        bool? Force,
-        bool? NoOverwrite,
-        bool? DryRun,
-        bool? FailOnWarnings,
-        bool? EmitRoutineStubs,
-        bool? EmitSequenceStubs,
-        bool? EmitViewEntities,
-        bool? EmitQueryArtifacts);
 }
