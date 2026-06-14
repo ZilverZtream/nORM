@@ -353,6 +353,13 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataReader.Parameters.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMetadataReader.Results.cs"));
 
+    private static string ReadSequenceStubWriterSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSequenceStubWriter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSequenceStubWriter.Names.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSequenceStubWriter.Sql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSequenceStubWriter.Types.cs"));
+
     private static string ReadContextWriterSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.cs"),

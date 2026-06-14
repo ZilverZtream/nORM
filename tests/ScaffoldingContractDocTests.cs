@@ -64,7 +64,7 @@ public partial class ScaffoldingContractDocTests
     {
         var doc = ReadDoc();
         var routineStubWriter = ReadRoutineStubWriterSource();
-        var sequenceStubWriter = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSequenceStubWriter.cs");
+        var sequenceStubWriter = ReadSequenceStubWriterSource();
 
         Assert.Contains("Schema-qualified table names are preserved for SQL Server, PostgreSQL, and", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL scaffolding uses the current database for", doc, StringComparison.Ordinal);
