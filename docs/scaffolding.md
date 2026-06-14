@@ -1307,7 +1307,8 @@ Each row also includes stable diagnostic metadata:
   database-generation, generated-model, generated-write, and provider-owned DDL
   flags, parsed identity `seed`/`increment`, and index-shape flags plus parsed
   `indexSql`/`keySql`/`expressionSql`/`filterSql`/`isUnique` and MySQL
-  prefix-column lengths when the provider exposes them. Provider-specific
+  prefix-column lengths plus declared-length coverage flags when the provider
+  exposes them. Provider-specific
   column rows include `providerType`, `readOnlyEntity`,
   `generatedWritesSupported`, and a machine-readable `reason`.
   Provider-specific

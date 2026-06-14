@@ -370,6 +370,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Equal("Code", prefixColumn["name"]);
         Assert.Equal(8, prefixColumn["prefixLength"]);
         Assert.Equal(80, prefixColumn["declaredLength"]);
+        Assert.Equal(true, prefixColumn["declaredLengthKnown"]);
+        Assert.Equal(false, prefixColumn["coversDeclaredLength"]);
+        Assert.Equal(false, prefixIndex["allPrefixColumnsCoverDeclaredLength"]);
         var sqlServerProviderIndex = Metadata("ProviderSpecificIndex", "IX_Orders_Search", "SQL Server provider-specific index; indexType=NONCLUSTERED COLUMNSTORE");
         Assert.Equal(true, sqlServerProviderIndex["providerSpecific"]);
         Assert.Equal("SQL Server", sqlServerProviderIndex["provider"]);

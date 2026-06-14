@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace nORM.Scaffolding
 {
-    internal static class ScaffoldIndexFeatureMetadataBuilder
+    internal static partial class ScaffoldIndexFeatureMetadataBuilder
     {
         public static void AddIndexFeatureMetadata(IDictionary<string, object?> metadata, string detail)
         {
@@ -27,7 +27,7 @@ namespace nORM.Scaffolding
             if (values.TryGetValue("prefixColumns", out var prefixColumns)
                 && !string.IsNullOrWhiteSpace(prefixColumns))
             {
-                metadata["prefixColumns"] = ParsePrefixIndexColumns(prefixColumns);
+                AddPrefixIndexMetadata(metadata, prefixColumns);
             }
 
             var indexSql = values.TryGetValue("indexSql", out var explicitIndexSql)
@@ -78,42 +78,6 @@ namespace nORM.Scaffolding
             metadata[key] = parsed;
         }
 
-        private static IReadOnlyList<IReadOnlyDictionary<string, object?>> ParsePrefixIndexColumns(string prefixColumns)
-        {
-            var result = new List<IReadOnlyDictionary<string, object?>>();
-            foreach (var rawPart in ScaffoldSqliteDdlParser.SplitTopLevelCommaSeparated(prefixColumns))
-            {
-                var part = rawPart.Trim();
-                if (part.Length == 0)
-                    continue;
-
-                var separator = part.LastIndexOf(':');
-                if (separator <= 0)
-                    continue;
-
-                var lengths = part[(separator + 1)..];
-                var slash = lengths.IndexOf('/');
-                var prefixLengthText = slash >= 0 ? lengths[..slash] : lengths;
-                var declaredLengthText = slash >= 0 ? lengths[(slash + 1)..] : string.Empty;
-                var column = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["name"] = part[..separator].Trim()
-                };
-
-                var prefixLength = ParseNullableInt(prefixLengthText);
-                if (prefixLength.HasValue)
-                    column["prefixLength"] = prefixLength.Value;
-
-                var declaredLength = ParseNullableInt(declaredLengthText);
-                if (declaredLength.HasValue)
-                    column["declaredLength"] = declaredLength.Value;
-
-                result.Add(column);
-            }
-
-            return result;
-        }
-
         private static string? ExtractCreateIndexStatement(string detail)
         {
             var createIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(detail, "CREATE", 0);
@@ -144,9 +108,6 @@ namespace nORM.Scaffolding
 
         private static string ParseSkippedObjectProvider(string detail)
             => ScaffoldSkippedObjectMetadataBuilder.ParseSkippedObjectProvider(detail);
-
-        private static int? ParseNullableInt(string? value)
-            => int.TryParse(value, out var parsed) ? parsed : null;
 
         private static string? NullIfWhiteSpace(string? value)
             => string.IsNullOrWhiteSpace(value) ? null : value;
