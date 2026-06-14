@@ -508,9 +508,10 @@ themselves. Routine wrappers preserve discovered input CLR types, output
 providers expose them; PostgreSQL set-returning functions scaffold as
 table-valued `SELECT * FROM function(...)` wrappers. Payload bridge tables scaffold as explicit join
 entities with payload columns and FK navigations.
-Owned-type inference, inheritance inference, view write semantics, and
-provider-specific schema semantics remain explicit modeling work after
-scaffolding. See [Scaffolding Contract](docs/scaffolding.md).
+Discriminator-looking columns and owned-type naming conventions scaffold as
+ordinary scalar columns; owned-type inference, inheritance inference, view
+write semantics, and provider-specific schema semantics remain explicit
+modeling work after scaffolding. See [Scaffolding Contract](docs/scaffolding.md).
 
 ### Modern SQL Features
 

@@ -215,6 +215,8 @@ public class DocumentationContractTests
 
         Assert.Contains("docs/scaffolding.md", readme, StringComparison.Ordinal);
         Assert.Contains("bounded v1", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Discriminator-looking columns and owned-type naming conventions", readme, StringComparison.Ordinal);
+        Assert.Contains("owned-type inference, inheritance inference", readme, StringComparison.Ordinal);
         Assert.Contains("SQL Server", contract, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL", contract, StringComparison.Ordinal);
         Assert.Contains("MySQL", contract, StringComparison.Ordinal);

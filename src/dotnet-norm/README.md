@@ -221,6 +221,8 @@ navigation generation beyond generated primary keys and exact ordered unfiltered
 unique indexes, owned-type inference, inheritance inference, and provider-specific
 schema semantics remain explicit post-processing. Use `--fail-on-warnings` in CI to
 reject lossy scaffolds after the warning report is written.
+Discriminator-looking columns and owned-type naming conventions remain ordinary
+scalar columns until the model author configures inheritance or ownership explicitly.
 Use `--dry-run` to validate scaffold output and print warning summaries without
 creating, deleting, or overwriting files in the requested output path.
 Tables and query artifacts without primary keys are generated with
