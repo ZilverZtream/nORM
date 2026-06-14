@@ -172,7 +172,9 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.MySql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Queries.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Sql.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Sql.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Sql.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Sql.MySql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexDiscovery.Helpers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexNameNormalizer.cs"));
