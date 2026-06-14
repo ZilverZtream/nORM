@@ -66,10 +66,11 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                                    item.GetProperty("name").GetString()!.EndsWith(overloadedName, StringComparison.Ordinal))
                     .ToArray();
                 Assert.Equal(2, overloads.Length);
-                Assert.Contains($"public sealed class {overloadedName}Parameters", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"public sealed class {overloadedName}Parameters2", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"Task<List<TResult>> {overloadedName}Async<TResult>", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"Task<List<TResult>> {overloadedName}Async2<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {overloadedName}IntegerParameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {overloadedName}TextParameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {overloadedName}IntegerAsync<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {overloadedName}TextAsync<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"{overloadedName}Async2", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public int? @value { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public string? @value { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("var casts = new[] { \"integer\" };", contextCode, StringComparison.Ordinal);

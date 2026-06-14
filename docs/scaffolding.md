@@ -627,10 +627,13 @@ must be reviewed and edited like handwritten model code.
   the generated wrapper XML summary and the provider-bound execution details
   remain in XML remarks. PostgreSQL overloaded routine names are left without
   generated comment summaries unless the catalog row can be matched
-  unambiguously. Routine stubs with the same name in different schemas use
-  schema-prefixed generated method and DTO names so diffs identify the provider
-  object being called. Routine bodies remain provider-owned and are not
-  translated across database engines.
+  unambiguously. Same-schema routine overloads use discovered input-type
+  suffixes in generated method and DTO names when those suffixes are distinct,
+  and fall back to deterministic numeric C# de-duplication only when the
+  signature cannot be named safely. Routine stubs with the same name in
+  different schemas use schema-prefixed generated method and DTO names so diffs
+  identify the provider object being called. Routine bodies remain
+  provider-owned and are not translated across database engines.
 - Optional provider-bound standalone sequence wrappers through
   `ScaffoldOptions.EmitSequenceStubs` and CLI `--emit-sequence-stubs`.
   SQL Server and PostgreSQL standalone sequences are discovered with scalar

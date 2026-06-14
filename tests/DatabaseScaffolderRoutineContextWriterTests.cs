@@ -129,7 +129,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public void ScaffoldContext_WithSameSchemaRoutineOverloads_KeepsBaseNameAndDeterministicSuffix()
+    public void ScaffoldContext_WithSameSchemaRoutineOverloads_UsesSignatureAwareNames()
     {
         var code = WriteScaffoldContext(
             "MyApp",
@@ -151,11 +151,12 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     null)
             });
 
-        Assert.Contains("public sealed class CalculateScoreParameters", code, StringComparison.Ordinal);
-        Assert.Contains("public sealed class CalculateScoreParameters2", code, StringComparison.Ordinal);
-        Assert.Contains("Task<List<TResult>> CalculateScoreAsync<TResult>", code, StringComparison.Ordinal);
-        Assert.Contains("Task<List<TResult>> CalculateScoreAsync2<TResult>", code, StringComparison.Ordinal);
+        Assert.Contains("public sealed class CalculateScoreIntegerParameters", code, StringComparison.Ordinal);
+        Assert.Contains("public sealed class CalculateScoreTextParameters", code, StringComparison.Ordinal);
+        Assert.Contains("Task<List<TResult>> CalculateScoreIntegerAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.Contains("Task<List<TResult>> CalculateScoreTextAsync<TResult>", code, StringComparison.Ordinal);
         Assert.DoesNotContain("PublicCalculateScore", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("CalculateScoreAsync2", code, StringComparison.Ordinal);
 
         var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_same_schema_overloaded_routines_" + Guid.NewGuid().ToString("N"));
         try

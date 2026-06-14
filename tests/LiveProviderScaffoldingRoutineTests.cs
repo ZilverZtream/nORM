@@ -295,10 +295,11 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     .ToArray();
 
                 Assert.Equal(2, routines.Length);
-                Assert.Contains($"public sealed class {PostgresOverloadedRoutineName}Parameters", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"public sealed class {PostgresOverloadedRoutineName}Parameters2", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}Async<TResult>", contextCode, StringComparison.Ordinal);
-                Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}Async2<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {PostgresOverloadedRoutineName}IntegerParameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {PostgresOverloadedRoutineName}TextParameters", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}IntegerAsync<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<TResult>> {PostgresOverloadedRoutineName}TextAsync<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"{PostgresOverloadedRoutineName}Async2", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public int? @value { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public string? @value { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("var casts = new[] { \"integer\" };", contextCode, StringComparison.Ordinal);

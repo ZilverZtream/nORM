@@ -73,9 +73,12 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("include the schema name", doc, StringComparison.Ordinal);
         Assert.Contains("Provider-bound routine and sequence stubs follow the same rule", doc, StringComparison.Ordinal);
         Assert.Contains("schema-prefixed generated method and DTO names", doc, StringComparison.Ordinal);
+        Assert.Contains("Same-schema routine overloads use discovered input-type", doc, StringComparison.Ordinal);
         Assert.Contains("schema-prefixed generated method", doc, StringComparison.Ordinal);
         Assert.Contains("avoid the enclosing entity type name", doc, StringComparison.Ordinal);
         Assert.Contains("GetSchemaAwareRoutineMemberName", routineStubWriter, StringComparison.Ordinal);
+        Assert.Contains("BuildSameSchemaOverloadSuffixes", routineStubWriter, StringComparison.Ordinal);
+        Assert.Contains("TryBuildRoutineSignatureNamePart", routineStubWriter, StringComparison.Ordinal);
         Assert.Contains("FindDuplicateNames", routineStubWriter, StringComparison.Ordinal);
         Assert.Contains("Default_\" + routine.Name", routineStubWriter, StringComparison.Ordinal);
         Assert.Contains("routine.Schema + \"_\" + routine.Name", routineStubWriter, StringComparison.Ordinal);
