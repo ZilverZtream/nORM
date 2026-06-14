@@ -280,6 +280,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.MySql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.Queries.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableDiscovery.Fallback.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Collisions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"));
 
     private static string ReadUnsupportedFeatureMetadataSource()
@@ -421,6 +422,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsRequest.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldObjectSelectionBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Collisions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.QueryArtifacts.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldEntityNameBuilder.cs"),
