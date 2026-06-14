@@ -47,6 +47,39 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task Dynamic_scaffolding_marks_keyless_tables_read_only_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupWarningDiagnosticsAsync(connection, provider, kind);
+            try
+            {
+                var keylessType = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, DefaultSchemaTableFilter(kind, KeylessTable));
+                var keyedType = await new DynamicEntityTypeGenerator()
+                    .GenerateEntityTypeAsync(connection, DefaultSchemaTableFilter(kind, WarningTable));
+
+                Assert.NotNull(keylessType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+                Assert.Null(keyedType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+                Assert.NotNull(keylessType.GetProperty("ExternalId"));
+                Assert.NotNull(keylessType.GetProperty("Payload"));
+            }
+            finally
+            {
+                await TeardownWarningDiagnosticsAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task Dynamic_scaffolding_marks_generated_columns_as_computed_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
