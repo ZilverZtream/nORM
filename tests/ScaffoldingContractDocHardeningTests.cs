@@ -13,7 +13,7 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Docs_and_gate_pin_recent_scaffold_hardening_scope()
     {
-        var doc = ReadDoc();
+        var doc = NormalizeDocWhitespace(ReadDoc());
         var rootReadme = ReadRepoFile("README.md");
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var releaseGates = ReadRepoFile("docs", "release-gates.md");
@@ -459,10 +459,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_reports_provider_specific_index_implementations_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("MySQL prefix-index diagnostics are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_reports_mysql_prefix_index_without_emitting_normal_index", liveScaffoldCliTests, StringComparison.Ordinal);
-        Assert.Contains("PostgreSQL NULLS FIRST/LAST and NULLS NOT DISTINCT index facets are verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL `NULLS FIRST/LAST` and `NULLS NOT DISTINCT` index facets are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_null_sort_order_index_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_nulls_not_distinct_unique_index_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
-        Assert.Contains("PostgreSQL expression-index INCLUDE and NULLS semantics are verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL expression-index `INCLUDE` and null-semantics facets are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_expression_index_include_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_expression_index_null_semantics", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL expression B-tree operator-class/key-option diagnostics are verified through the real CLI", doc, StringComparison.Ordinal);
@@ -686,4 +686,6 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ReadOnlyEntityAttribute", dynamicSource, StringComparison.Ordinal);
     }
 
+    private static string NormalizeDocWhitespace(string value)
+        => System.Text.RegularExpressions.Regex.Replace(value, @"\s+", " ").Trim();
 }

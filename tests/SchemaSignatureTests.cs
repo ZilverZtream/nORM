@@ -529,7 +529,7 @@ public class SchemaSignatureTests
         cmd.CommandText = """
             CREATE TABLE DynamicDefaultOwned (
                 Id INTEGER PRIMARY KEY,
-                Status TEXT NOT NULL DEFAULT (lower('NEW'))
+                Status TEXT NOT NULL DEFAULT (coalesce('NEW','OLD'))
             );
             """;
         cmd.ExecuteNonQuery();
