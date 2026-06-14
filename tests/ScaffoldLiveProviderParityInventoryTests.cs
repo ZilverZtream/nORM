@@ -28,6 +28,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL does not support executable SET DEFAULT foreign-key actions in the live schema setup.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldCliExpressionIndexTests.cs::Dotnet_norm_scaffold_emits_expression_index_metadata_on_live_provider"] =
                 Expect("SQL Server has no expression-index DDL equivalent; generated/computed columns plus ordinary indexes are the SQL Server path.", "Sqlite", "Postgres", "MySql"),
+            ["LiveProviderScaffoldCliProviderSpecificIndexTests.cs::Dotnet_norm_scaffold_reports_provider_specific_index_implementations_on_live_provider"] =
+                Expect("SQLite has no provider-specific index access-method catalog equivalent.", "SqlServer", "Postgres", "MySql"),
             ["LiveProviderScaffoldCliRoutineSequenceTests.cs::Dotnet_norm_scaffold_emits_routine_stubs_on_live_provider"] =
                 Expect("SQLite has no stored routine catalog to scaffold.", "SqlServer", "Postgres", "MySql"),
             ["LiveProviderScaffoldCliRoutineSequenceTests.cs::Dotnet_norm_scaffold_emits_advanced_routine_stubs_on_live_provider"] =

@@ -963,7 +963,9 @@ must be reviewed and edited like handwritten model code.
   real CLI where each provider exposes the feature. Provider-bound expression-index
   metadata is verified through the real CLI for SQLite, PostgreSQL, and MySQL;
   SQL Server expression-index equivalents require generated/computed columns plus
-  ordinary indexes. Multiple composite FKs to
+  ordinary indexes. Provider-specific index implementations are verified through
+  the real CLI for SQL Server, PostgreSQL, and MySQL as SCF119 diagnostics rather
+  than generated index metadata. Multiple composite FKs to
   the same principal are also verified through role-named navigations and
   payload-bridge diagnostics on the real CLI path. Direct composite alternate-key FKs are verified through the real CLI across all four providers.
   Multiple unique dependent
