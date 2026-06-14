@@ -68,7 +68,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Collisions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.QueryArtifacts.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.QueryArtifacts.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Validation.cs"));
         var contextWriterSource = ReadContextWriterSource();
         var cliReadme = ReadRepoFile("src", "dotnet-norm", "README.md");
         var rootReadme = ReadRepoFile("README.md");
@@ -195,7 +196,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Option<string?>(\"--startup-project\", \"-s\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--framework\", \"--target-framework\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string?>(\"--msbuildprojectextensionspath\")", cliSource, StringComparison.Ordinal);
-        Assert.Contains("MsbuildProjectExtensionsPathOption = scaffoldMsbuildProjectExtensionsPathOpt", cliSource, StringComparison.Ordinal);
+        Assert.Contains("MsbuildProjectExtensionsPathOption = symbols.MsbuildProjectExtensionsPathOption", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--no-build\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--json\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--verbose\", \"-v\")", cliSource, StringComparison.Ordinal);
@@ -256,8 +257,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Option<string?>(\"--schemas\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string[]>(\"--schema\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<string[]>(\"--table\", \"-t\")", cliSource, StringComparison.Ordinal);
-        Assert.Contains("schemaOpt.AllowMultipleArgumentsPerToken = true", cliSource, StringComparison.Ordinal);
-        Assert.Contains("tableOpt.AllowMultipleArgumentsPerToken = true", cliSource, StringComparison.Ordinal);
+        Assert.Contains("symbols.SchemaOption.AllowMultipleArgumentsPerToken = true", cliSource, StringComparison.Ordinal);
+        Assert.Contains("symbols.TableOption.AllowMultipleArgumentsPerToken = true", cliSource, StringComparison.Ordinal);
         Assert.Contains("Argument<string?>(\"connection\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Argument<string?>(\"provider\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("GetOptionalNonBlankScaffoldOption", cliSource, StringComparison.Ordinal);
