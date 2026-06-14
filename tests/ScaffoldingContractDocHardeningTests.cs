@@ -495,6 +495,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("X'DEADBEEF'", doc, StringComparison.Ordinal);
         Assert.Contains("LOWER('value')", doc, StringComparison.Ordinal);
         Assert.Contains("UPPER('value')", doc, StringComparison.Ordinal);
+        Assert.Contains("provider-normalized PostgreSQL casts or MySQL character-set literals", doc, StringComparison.Ordinal);
         Assert.Contains("now()::timestamp without time zone", doc, StringComparison.Ordinal);
         Assert.Contains("now() AT TIME ZONE 'utc'", doc, StringComparison.Ordinal);
         Assert.Contains("timezone('utc', now())", doc, StringComparison.Ordinal);

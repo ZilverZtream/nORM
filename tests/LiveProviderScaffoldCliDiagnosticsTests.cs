@@ -23,6 +23,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         var tableName = "CliLiveFeatureOwned" + suffix;
         var checkName = "CK_CliLiveFeatureOwned_Name_" + suffix;
         var defaultName = "DF_CliLiveFeatureOwned_Name_" + suffix;
+        var statusDefaultName = "DF_CliLiveFeatureOwned_Status_" + suffix;
         var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_feature_metadata_" + kind + "_" + suffix);
         string? sqliteFile = null;
 
@@ -35,7 +36,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         {
             using (connection)
             {
-                SetupFeatureOwnedMetadata(connection, provider, kind, tableName, checkName, defaultName);
+                SetupFeatureOwnedMetadata(connection, provider, kind, tableName, checkName, defaultName, statusDefaultName);
             }
 
             var scaffold = RunCli(
@@ -56,6 +57,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             var warningJsonPath = Path.Combine(output, "nORM.ScaffoldWarnings.json");
 
             Assert.Contains("public string Name { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+            Assert.Contains("public string Status { get; set; } = default!;", entityCode, StringComparison.Ordinal);
             Assert.Contains("public byte[] Payload { get; set; } = Array.Empty<byte>();", entityCode, StringComparison.Ordinal);
             Assert.Contains("[DatabaseGenerated(DatabaseGeneratedOption.Computed)]", entityCode, StringComparison.Ordinal);
             Assert.Contains("NameLength { get; set; }", entityCode, StringComparison.Ordinal);
@@ -64,6 +66,9 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 Assert.Contains($".Entity<{tableName}>().Property(e => e.Name).HasDefaultValueSql(\"'new'\", constraintName: \"{defaultName}\");", contextCode, StringComparison.Ordinal);
             else
                 Assert.Contains($".Entity<{tableName}>().Property(e => e.Name).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
+            Assert.Contains($".Entity<{tableName}>().Property(e => e.Status).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
+            if (kind == ProviderKind.SqlServer)
+                Assert.Contains($"constraintName: \"{statusDefaultName}\"", contextCode, StringComparison.Ordinal);
             Assert.Contains($".Entity<{tableName}>().Property(e => e.Payload).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
             if (kind == ProviderKind.Postgres)
                 Assert.Contains($".Entity<{tableName}>().Property(e => e.CreatedAt).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
