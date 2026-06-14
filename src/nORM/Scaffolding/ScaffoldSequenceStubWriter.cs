@@ -69,7 +69,10 @@ namespace nORM.Scaffolding
         private static HashSet<string> FindDuplicateNames(IReadOnlyList<ScaffoldContextSequenceInfo> sequenceStubs)
             => sequenceStubs
                 .GroupBy(sequence => sequence.Name, StringComparer.OrdinalIgnoreCase)
-                .Where(group => group.Count() > 1)
+                .Where(group => group
+                    .Select(sequence => string.IsNullOrWhiteSpace(sequence.Schema) ? string.Empty : sequence.Schema)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count() > 1)
                 .Select(group => group.Key)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

@@ -129,6 +129,49 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithSameSchemaRoutineOverloads_KeepsBaseNameAndDeterministicSuffix()
+    {
+        var code = WriteScaffoldContext(
+            "MyApp",
+            "AppDbContext",
+            new[] { "User" },
+            routineStubs: new[]
+            {
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "public",
+                    "CalculateScore",
+                    "Routine",
+                    "PostgreSQL function; parameters=1; parameterModes=value:IN:integer; callShape=scalar-function; dataType=integer",
+                    null),
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "public",
+                    "CalculateScore",
+                    "Routine",
+                    "PostgreSQL function; parameters=1; parameterModes=value:IN:text; callShape=scalar-function; dataType=integer",
+                    null)
+            });
+
+        Assert.Contains("public sealed class CalculateScoreParameters", code, StringComparison.Ordinal);
+        Assert.Contains("public sealed class CalculateScoreParameters2", code, StringComparison.Ordinal);
+        Assert.Contains("Task<List<TResult>> CalculateScoreAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.Contains("Task<List<TResult>> CalculateScoreAsync2<TResult>", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PublicCalculateScore", code, StringComparison.Ordinal);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_same_schema_overloaded_routines_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ScaffoldContext_WithUseDatabaseNames_RoutineStubPreservesLegalRoutineAndResultColumnNames()
     {
         var code = InvokeScaffoldContextWithRoutine(

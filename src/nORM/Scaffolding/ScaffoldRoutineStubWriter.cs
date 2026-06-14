@@ -129,7 +129,10 @@ namespace nORM.Scaffolding
         private static HashSet<string> FindDuplicateNames(IReadOnlyList<ScaffoldRoutineStubInfo> routineStubs)
             => routineStubs
                 .GroupBy(routine => routine.Name, StringComparer.OrdinalIgnoreCase)
-                .Where(group => group.Count() > 1)
+                .Where(group => group
+                    .Select(routine => string.IsNullOrWhiteSpace(routine.Schema) ? string.Empty : routine.Schema)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count() > 1)
                 .Select(group => group.Key)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
