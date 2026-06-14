@@ -349,6 +349,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldCliRoutineSequenceTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliSequenceTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliQueryArtifactTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerSynonymQueryArtifactTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliViewBoundaryTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliReferentialActionTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCompatibilityTests.cs"));
@@ -375,6 +376,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldingRoutineOutputTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderObjectTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingQueryArtifactTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingSqlServerSynonymQueryArtifactTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingDefaultQueryArtifactTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingViewBoundaryTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingDynamicTests.cs"),

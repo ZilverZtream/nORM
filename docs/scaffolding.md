@@ -754,7 +754,7 @@ must be reviewed and edited like handwritten model code.
   SQL Server geometry, PostgreSQL inet, MySQL point, and SQLite declared
   spatial provider-specific column diagnostics,
   PostgreSQL UUID/array column scaffolds,
-  MySQL JSON/YEAR column scaffolds, SQL Server local-table synonym query artifacts
+  MySQL JSON/YEAR column scaffolds, SQL Server local table/view synonym query artifacts
   plus dynamic read-only parity and procedure-synonym rejection,
   MySQL scheduled-event diagnostics, SQLite virtual-table query artifacts, and live
   generated-surrogate, composite generated-surrogate, shared-tenant,
@@ -918,7 +918,7 @@ must be reviewed and edited like handwritten model code.
   verifies ordinary views are emitted with discovered tables as read-only query
   artifacts across all four live providers. Provider query-artifact opt-in is
   also verified through the real CLI with `--emit-query-artifacts` for SQLite
-  virtual tables, SQL Server local table synonyms, PostgreSQL materialized
+  virtual tables, SQL Server local table/view synonyms, PostgreSQL materialized
   views, and MySQL views. The real CLI path also builds nullable and non-null alternate-key FK relationships from live provider metadata, including the
   unique index, navigation attributes, and generated fluent FK mapping, and
   preserves non-default FK delete/update referential actions, including

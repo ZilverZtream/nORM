@@ -392,7 +392,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("--emit-query-artifacts", doc, StringComparison.Ordinal);
         Assert.Contains("compatibility alias `--emit-view-entities`", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite virtual tables", doc, StringComparison.Ordinal);
-        Assert.Contains("SQL Server local table synonyms", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server local table/view synonyms", doc, StringComparison.Ordinal);
+        Assert.Contains("local_view_synonym", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("local_view_synonym", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL materialized", doc, StringComparison.Ordinal);
         Assert.Contains("nullable", doc, StringComparison.Ordinal);
         Assert.Contains("nullable and non-null alternate-key FK relationships", doc, StringComparison.Ordinal);
