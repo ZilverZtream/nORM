@@ -315,6 +315,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldCliParityTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCurrentDirectoryConfigurationTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliNamedConnectionConfigurationTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliNamedConnectionEnvironmentTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliEnvironmentConfigurationTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliStartupConfigurationTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliManyToManyTests.cs"),

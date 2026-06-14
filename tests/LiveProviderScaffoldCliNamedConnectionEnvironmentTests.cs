@@ -12,20 +12,23 @@ namespace nORM.Tests;
 
 public sealed partial class LiveProviderScaffoldCliParityTests
 {
+    // Live CLI named-connection environment override scaffold tests.
+
     [Theory]
     [InlineData(ProviderKind.Sqlite)]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
-    public void Dotnet_norm_scaffold_omitted_context_uses_named_connection_leaf_on_live_provider(ProviderKind kind)
+    public void Dotnet_norm_scaffold_named_connection_environment_overrides_project_appsettings_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();
         var suffix = IdentifierSuffix();
-        var tableName = "CliLiveNamedContext" + suffix;
-        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_live_cli_named_context_" + kind + "_" + suffix);
+        var tableName = "CliLiveNamedEnv" + suffix;
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_live_cli_named_env_" + kind + "_" + suffix);
         var projectDir = Path.Combine(tempRoot, "App");
-        var projectPath = Path.Combine(projectDir, "NamedContextLiveProject.csproj");
-        const string connectionName = "ReportingContext";
+        var projectPath = Path.Combine(projectDir, "NamedEnvLiveProject.csproj");
+        var connectionName = "LiveNamedEnv" + suffix;
+        var environmentKey = "ConnectionStrings__" + connectionName;
         string? sqliteFile = null;
 
         var live = OpenLive(kind, ref sqliteFile);
@@ -42,7 +45,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 $$"""
                 {
                   "ConnectionStrings": {
-                    "{{connectionName}}": {{JsonSerializer.Serialize(connectionString)}}
+                    "{{connectionName}}": "Not=ARealScaffoldConnectionString"
                   }
                 }
                 """,
@@ -53,12 +56,14 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 SetupProjectAwareScaffold(connection, provider, kind, tableName);
             }
 
+            Environment.SetEnvironmentVariable(environmentKey, connectionString);
             var scaffold = RunCli(
                 "scaffold " +
-                $"{Quote("Name=ConnectionStrings:" + connectionName)} " +
+                $"{Quote("Name=" + connectionName)} " +
                 $"{EfProviderPackageName(kind)} " +
                 $"--project {Quote(projectPath)} " +
                 "--output-dir Models " +
+                "--context CliLiveNamedEnvCtx " +
                 $"--table {Quote(tableName)}",
                 root);
 
@@ -67,15 +72,14 @@ public sealed partial class LiveProviderScaffoldCliParityTests
 
             var output = Path.Combine(projectDir, "Models");
             var entityPath = Path.Combine(output, tableName + ".cs");
-            var contextPath = Path.Combine(output, "ReportingContext.cs");
+            var contextPath = Path.Combine(output, "CliLiveNamedEnvCtx.cs");
             Assert.True(File.Exists(entityPath));
             Assert.True(File.Exists(contextPath));
 
             var contextCode = File.ReadAllText(contextPath);
             Assert.Contains("namespace Live.Project.Namespace.Models;", contextCode, StringComparison.Ordinal);
-            Assert.Contains("public partial class ReportingContext", contextCode, StringComparison.Ordinal);
             Assert.Contains($"IQueryable<{tableName}> {tableName}s", contextCode, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("ReportingContextContext", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("Not=ARealScaffoldConnectionString", contextCode, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
@@ -83,6 +87,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         }
         finally
         {
+            Environment.SetEnvironmentVariable(environmentKey, null);
             try
             {
                 using var cleanup = Reopen(kind, connectionString);
@@ -106,16 +111,17 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
-    public void Dotnet_norm_scaffold_named_connection_user_secrets_override_project_appsettings_on_live_provider(ProviderKind kind)
+    public void Dotnet_norm_scaffold_named_connection_environment_overrides_project_user_secrets_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();
         var suffix = IdentifierSuffix();
-        var tableName = "CliLiveUserSecrets" + suffix;
-        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_live_cli_user_secrets_" + kind + "_" + suffix);
+        var tableName = "CliLiveEnvSecret" + suffix;
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_live_cli_env_secret_" + kind + "_" + suffix);
         var projectDir = Path.Combine(tempRoot, "App");
-        var projectPath = Path.Combine(projectDir, "UserSecretsLiveProject.csproj");
-        var connectionName = "LiveUserSecrets" + suffix;
-        var userSecretsId = "norm-live-" + Guid.NewGuid().ToString("N");
+        var projectPath = Path.Combine(projectDir, "EnvSecretLiveProject.csproj");
+        var connectionName = "LiveEnvSecret" + suffix;
+        var environmentKey = "ConnectionStrings__" + connectionName;
+        var userSecretsId = "norm-live-env-secret-" + Guid.NewGuid().ToString("N");
         var userSecretsFile = GetUserSecretsFilePathForLiveTest(userSecretsId);
         string? sqliteFile = null;
 
@@ -144,7 +150,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 $$"""
                 {
                   "ConnectionStrings": {
-                    "{{connectionName}}": {{JsonSerializer.Serialize(connectionString)}}
+                    "{{connectionName}}": "Not=ProjectUserSecretConnectionString"
                   }
                 }
                 """,
@@ -157,20 +163,24 @@ public sealed partial class LiveProviderScaffoldCliParityTests
 
             var scaffold = RunCli(
                 "scaffold " +
-                $"{Quote("Name=ConnectionStrings:" + connectionName)} " +
+                $"{Quote("Name=" + connectionName)} " +
                 $"{EfProviderPackageName(kind)} " +
                 $"--project {Quote(projectPath)} " +
                 "--output-dir Models " +
-                "--context CliLiveUserSecretsCtx " +
+                "--context CliLiveEnvSecretCtx " +
                 $"--table {Quote(tableName)}",
-                root);
+                root,
+                new Dictionary<string, string?>
+                {
+                    [environmentKey] = connectionString
+                });
 
             Assert.True(scaffold.ExitCode == 0,
                 $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
 
             var output = Path.Combine(projectDir, "Models");
             var entityPath = Path.Combine(output, tableName + ".cs");
-            var contextPath = Path.Combine(output, "CliLiveUserSecretsCtx.cs");
+            var contextPath = Path.Combine(output, "CliLiveEnvSecretCtx.cs");
             Assert.True(File.Exists(entityPath));
             Assert.True(File.Exists(contextPath));
 
@@ -178,6 +188,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.Contains("namespace Live.Project.Namespace.Models;", contextCode, StringComparison.Ordinal);
             Assert.Contains($"IQueryable<{tableName}> {tableName}s", contextCode, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("Not=ProjectAppsettingsConnectionString", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("Not=ProjectUserSecretConnectionString", contextCode, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
@@ -209,15 +220,22 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
-    public void Dotnet_norm_scaffold_named_connection_shorthand_reads_project_appsettings_on_live_provider(ProviderKind kind)
+    public void Dotnet_norm_scaffold_named_connection_environment_overrides_startup_and_target_user_secrets_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();
         var suffix = IdentifierSuffix();
-        var tableName = "CliLiveNamedShort" + suffix;
-        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_live_cli_named_short_" + kind + "_" + suffix);
-        var projectDir = Path.Combine(tempRoot, "App");
-        var projectPath = Path.Combine(projectDir, "NamedShortLiveProject.csproj");
-        var connectionName = "LiveNamedShort" + suffix;
+        var tableName = "CliLiveStartupEnvSecret" + suffix;
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_live_cli_startup_env_secret_" + kind + "_" + suffix);
+        var modelProjectDir = Path.Combine(tempRoot, "Model");
+        var startupProjectDir = Path.Combine(tempRoot, "Startup");
+        var modelProjectPath = Path.Combine(modelProjectDir, "ModelApp.csproj");
+        var startupProjectPath = Path.Combine(startupProjectDir, "StartupEnvSecretApp.csproj");
+        var connectionName = "LiveStartupEnvSecret" + suffix;
+        var environmentKey = "ConnectionStrings__" + connectionName;
+        var targetUserSecretsId = "norm-live-target-env-secret-" + Guid.NewGuid().ToString("N");
+        var startupUserSecretsId = "norm-live-startup-env-secret-" + Guid.NewGuid().ToString("N");
+        var targetUserSecretsFile = GetUserSecretsFilePathForLiveTest(targetUserSecretsId);
+        var startupUserSecretsFile = GetUserSecretsFilePathForLiveTest(startupUserSecretsId);
         string? sqliteFile = null;
 
         var live = OpenLive(kind, ref sqliteFile);
@@ -227,14 +245,48 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         var (connection, provider, connectionString, _) = live.Value;
         try
         {
-            Directory.CreateDirectory(projectDir);
-            WriteLiveScaffoldProject(root, projectPath);
+            Directory.CreateDirectory(modelProjectDir);
+            Directory.CreateDirectory(startupProjectDir);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetUserSecretsFile)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(startupUserSecretsFile)!);
+            WriteLiveScaffoldProject(root, modelProjectPath, targetUserSecretsId);
+            WriteLiveScaffoldProject(root, startupProjectPath, startupUserSecretsId);
             File.WriteAllText(
-                Path.Combine(projectDir, "appsettings.json"),
+                Path.Combine(modelProjectDir, "appsettings.json"),
                 $$"""
                 {
                   "ConnectionStrings": {
-                    "{{connectionName}}": {{JsonSerializer.Serialize(connectionString)}}
+                    "{{connectionName}}": "Not=TargetProjectAppsettingsConnectionString"
+                  }
+                }
+                """,
+                Encoding.UTF8);
+            File.WriteAllText(
+                Path.Combine(startupProjectDir, "appsettings.json"),
+                $$"""
+                {
+                  "ConnectionStrings": {
+                    "{{connectionName}}": "Not=StartupProjectAppsettingsConnectionString"
+                  }
+                }
+                """,
+                Encoding.UTF8);
+            File.WriteAllText(
+                targetUserSecretsFile,
+                $$"""
+                {
+                  "ConnectionStrings": {
+                    "{{connectionName}}": "Not=TargetProjectUserSecretConnectionString"
+                  }
+                }
+                """,
+                Encoding.UTF8);
+            File.WriteAllText(
+                startupUserSecretsFile,
+                $$"""
+                {
+                  "ConnectionStrings": {
+                    "{{connectionName}}": "Not=StartupProjectUserSecretConnectionString"
                   }
                 }
                 """,
@@ -247,30 +299,39 @@ public sealed partial class LiveProviderScaffoldCliParityTests
 
             var scaffold = RunCli(
                 "scaffold " +
-                $"{Quote("name=" + connectionName)} " +
+                $"{Quote("Name=" + connectionName)} " +
                 $"{EfProviderPackageName(kind)} " +
-                $"--project {Quote(projectPath)} " +
+                $"--project {Quote(modelProjectPath)} " +
+                $"--startup-project {Quote(startupProjectPath)} " +
                 "--output-dir Models " +
-                "--context CliLiveNamedShortCtx " +
+                "--context CliLiveStartupEnvSecretCtx " +
                 $"--table {Quote(tableName)}",
-                root);
+                root,
+                new Dictionary<string, string?>
+                {
+                    [environmentKey] = connectionString
+                });
 
             Assert.True(scaffold.ExitCode == 0,
                 $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
 
-            var output = Path.Combine(projectDir, "Models");
+            var output = Path.Combine(modelProjectDir, "Models");
             var entityPath = Path.Combine(output, tableName + ".cs");
-            var contextPath = Path.Combine(output, "CliLiveNamedShortCtx.cs");
+            var contextPath = Path.Combine(output, "CliLiveStartupEnvSecretCtx.cs");
             Assert.True(File.Exists(entityPath));
             Assert.True(File.Exists(contextPath));
 
             var contextCode = File.ReadAllText(contextPath);
             Assert.Contains("namespace Live.Project.Namespace.Models;", contextCode, StringComparison.Ordinal);
             Assert.Contains($"IQueryable<{tableName}> {tableName}s", contextCode, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Not=TargetProjectAppsettingsConnectionString", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("Not=StartupProjectAppsettingsConnectionString", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("Not=TargetProjectUserSecretConnectionString", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("Not=StartupProjectUserSecretConnectionString", contextCode, StringComparison.Ordinal);
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
-            RunDotNet("build -c Release --nologo", projectDir);
+            RunDotNet("build -c Release --nologo", modelProjectDir);
         }
         finally
         {
@@ -285,6 +346,8 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             }
 
             TryDeleteDirectory(tempRoot);
+            TryDeleteDirectory(Path.GetDirectoryName(targetUserSecretsFile)!);
+            TryDeleteDirectory(Path.GetDirectoryName(startupUserSecretsFile)!);
             if (sqliteFile is not null)
             {
                 try { File.Delete(sqliteFile); } catch { }
