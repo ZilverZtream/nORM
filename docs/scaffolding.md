@@ -1013,7 +1013,8 @@ must be reviewed and edited like handwritten model code.
   scaffolds.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, one-to-one reference navigation generation for required and
-  optional single-column, required and optional composite, shared-primary-key, and role-named multiple unique dependent FKs, composite-FK relationship generation when the FK targets the
+  optional single-column, required and optional composite, shared-primary-key,
+  self-referencing unique dependent, and role-named multiple unique dependent FKs, composite-FK relationship generation when the FK targets the
   generated primary key, composite-FK diagnostics for unsupported relationship
   shapes, single-column nullable and non-null alternate-key FK generation,
   dynamic scaffolding of computed/generated columns, identity columns,
