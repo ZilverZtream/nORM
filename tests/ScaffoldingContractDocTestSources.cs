@@ -62,6 +62,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableMetadataBuilder.ForeignKeys.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableMetadataBuilder.Indexes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableReasonBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableReasonBuilder.Shape.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldJoinTableReasonBuilder.Principals.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldCompositeForeignKeyMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"),
