@@ -18,6 +18,41 @@ public v1.0 package is cut.
   prepared/compiled, join, count, insert, and bulk insert scenarios.
 - `dotnet pack` succeeds for `nORM` and `dotnet-norm`, including symbols.
 
+## Latest RC Evidence
+
+- Command: `.\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 3 -StressIterations 20`
+- Completed: 2026-06-14 16:37:58 UTC.
+- Commit: `890fb097d4e5a89daa5e0f4449e16667a9138bc5`.
+- Working tree: clean; mode: `rc`; benchmark skipped: `False`.
+- Build: Release build succeeded with 0 warnings.
+- Public API snapshot: 2/2 passed.
+- Package consumer smoke: 6/6 passed.
+- CLI smoke: 89/89 passed.
+- Live provider gate: 2,117/2,117 passed; second pass also 2,117/2,117 passed.
+- Full suite: 11,931/11,931 passed; second pass also 11,931/11,931 passed.
+- Provider/source-generator parity: 97/97 passed.
+- Bulk/provider parity: 424/424 passed.
+- Migration provider gate: 219/219 passed.
+- Cache memory bounds: 16/16 passed.
+- Concurrency/adversarial gate: 794/794 passed.
+- Fast complex benchmark: `Query_Complex_NoResults` 6.277 us / 3.37 KB,
+  `Query_Complex_Compiled` 14.750 us / 2.48 KB, `Query_Complex` 22.592 us /
+  7.47 KB.
+- Provider matrix: SQLite, SQL Server, PostgreSQL, and MySQL completed with raw
+  BenchmarkDotNet reports and split CSVs under
+  `BenchmarkDotNet.Artifacts/provider-slices/20260614-145753`.
+- Benchmark threshold gate: passed; summary in
+  `BenchmarkDotNet.Artifacts/v1-evidence/benchmark-thresholds.md`.
+- Packages:
+  - `src/bin/Release/nORM.1.0.0-rc.3.nupkg`
+    SHA-256 `a6528d263dfdd039a236785b9a675bd56971255e962f1345100893f509eecb9c`
+  - `src/bin/Release/nORM.1.0.0-rc.3.snupkg`
+    SHA-256 `0841e23d2ef6a669d15cea5734239f2c0913d774f295c62f3222cabe25970d7a`
+  - `src/dotnet-norm/bin/Release/dotnet-norm.1.0.0-rc.3.nupkg`
+    SHA-256 `57475a40241860c614662e92401be5c83bebc5677b56f01f7765d706a65f94a1`
+  - `src/dotnet-norm/bin/Release/dotnet-norm.1.0.0-rc.3.snupkg`
+    SHA-256 `d3256f95a2ac4b45e02ede529f1339819673d8abd7c95de257a2fd596a1e230e`
+
 ## Recommended RC Command
 
 Configure live providers:
