@@ -273,6 +273,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("efToolConfig?.EmitSequenceStubs", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.EmitViewEntities", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.EmitQueryArtifacts", cliSource, StringComparison.Ordinal);
+        Assert.Contains("Compatibility alias for --emit-query-artifacts", cliSource, StringComparison.Ordinal);
+        Assert.Contains("Generate bounded read-oriented query artifacts", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.MsbuildProjectExtensionsPath", cliSource, StringComparison.Ordinal);
         Assert.Contains("UsePluralizer = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames)", cliSource, StringComparison.Ordinal);

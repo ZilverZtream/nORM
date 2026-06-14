@@ -604,8 +604,7 @@ must be reviewed and edited like handwritten model code.
   while provider-bound sequence semantics stay in XML remarks.
 - Optional provider query-artifact entities through
   `ScaffoldOptions.EmitQueryArtifacts` (or the compatibility alias
-  `EmitViewEntities`) and CLI `--emit-query-artifacts` or
-  `--emit-view-entities`. Ordinary views and PostgreSQL materialized views are
+  `EmitViewEntities`) and CLI `--emit-query-artifacts` (or the compatibility alias `--emit-view-entities`). Ordinary views and PostgreSQL materialized views are
   scaffolded by default as read-oriented query artifacts. Explicit table filters
   (`--table`/`ScaffoldOptions.Tables`) and schema filters
   (`--schema`/`ScaffoldOptions.Schemas`) also include matching supported query

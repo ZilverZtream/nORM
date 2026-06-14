@@ -47,7 +47,9 @@ public partial class CliIntegrationTests
         Assert.Contains("EF Core provider package name", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-routine-stubs", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-view-entities", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("Compatibility alias for --emit-query-artifacts", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--emit-query-artifacts", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("Generate bounded read-oriented query artifacts", result.Stdout, StringComparison.Ordinal);
 
         var rootHelp = RunCli("--help", root);
         Assert.Equal(0, rootHelp.ExitCode);

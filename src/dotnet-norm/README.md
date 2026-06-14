@@ -190,7 +190,7 @@ Unfiltered ordinary views and PostgreSQL materialized views are scaffolded by
 default as read-oriented generated types; explicit `--table`/`--schema` filters
 also include matching supported query artifacts. SQLite virtual tables and
 SQL Server local table/view synonyms remain opt-in through explicit filters or
-`--emit-query-artifacts`/`--emit-view-entities`.
+`--emit-query-artifacts` (or the compatibility alias `--emit-view-entities`).
 `--data-annotations` is a no-op because nORM already emits supported annotation
 metadata, and `--force` opts into overwriting existing generated files.
 Use `--context-dir` to place the generated DbContext in a relative child

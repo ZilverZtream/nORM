@@ -487,7 +487,7 @@ Unfiltered ordinary views and PostgreSQL materialized views are scaffolded by
 default as read-oriented generated types; explicit `--table`/`--schema` filters
 also include matching supported query artifacts. SQLite virtual tables and
 SQL Server local table/view synonyms remain opt-in through explicit filters or
-`--emit-query-artifacts`/`--emit-view-entities`.
+`--emit-query-artifacts` (or the compatibility alias `--emit-view-entities`).
 `--context-dir` can place the generated context outside the entity output
 directory using EF-style project-relative paths; the CLI rejects absolute
 context paths. API callers can use
@@ -498,7 +498,7 @@ namespace while generated context code imports the entity namespace.
 Opt-in scaffold switches can emit provider-bound routine wrappers
 (`--emit-routine-stubs`), provider-bound sequence wrappers
 (`--emit-sequence-stubs`), and optional provider query artifacts
-(`--emit-query-artifacts` / `--emit-view-entities`, used for SQLite virtual-table and SQL Server synonym query artifacts);
+(`--emit-query-artifacts`, or the compatibility alias `--emit-view-entities`, used for SQLite virtual-table and SQL Server synonym query artifacts);
 both remain explicitly bounded and are not provider mobility proof by
 themselves. Routine wrappers preserve discovered input CLR types, output
 `DbType` values, INOUT direction, and string/binary output sizes where

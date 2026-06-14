@@ -369,6 +369,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ordinary views are emitted with discovered tables", doc, StringComparison.Ordinal);
         Assert.Contains("Provider query-artifact opt-in is", doc, StringComparison.Ordinal);
         Assert.Contains("--emit-query-artifacts", doc, StringComparison.Ordinal);
+        Assert.Contains("compatibility alias `--emit-view-entities`", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite virtual tables", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server local table synonyms", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL materialized", doc, StringComparison.Ordinal);
