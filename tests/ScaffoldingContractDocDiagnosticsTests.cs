@@ -107,6 +107,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("hasExactBridgePrimaryKey", joinDiagnosticBuilderSource, StringComparison.Ordinal);
         Assert.Contains("hasGeneratedSurrogatePrimaryKey", joinDiagnosticBuilderSource, StringComparison.Ordinal);
         Assert.Contains("hasExactForeignKeyUniqueIndex", joinDiagnosticBuilderSource, StringComparison.Ordinal);
+        Assert.Contains("foreignKeyUniqueIndexCandidates", joinDiagnosticBuilderSource, StringComparison.Ordinal);
         Assert.Contains("totalWarnings =", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("sectionCounts = new", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("EnsureNoStaleScaffoldWarningReports", source, StringComparison.Ordinal);

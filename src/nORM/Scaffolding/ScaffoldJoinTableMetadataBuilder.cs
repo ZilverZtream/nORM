@@ -42,6 +42,7 @@ namespace nORM.Scaffolding
                 ["hasExactBridgePrimaryKey"] = ScaffoldJoinTableShape.HasExactBridgePrimaryKey(primaryKeyColumns, foreignKeyColumnSet),
                 ["hasGeneratedSurrogatePrimaryKey"] = ScaffoldJoinTableShape.HasGeneratedSurrogatePrimaryKey(primaryKeyColumns, foreignKeyColumnSet, databaseGeneratedColumnSet, identityColumnSet),
                 ["hasExactForeignKeyUniqueIndex"] = ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, tableKey, foreignKeyColumnSet),
+                ["foreignKeyUniqueIndexCandidates"] = BuildForeignKeyUniqueIndexCandidateMetadata(indexes, tableKey, foreignKeyColumnSet),
                 ["foreignKeys"] = BuildForeignKeyConstraintMetadata(foreignKeys)
             };
         }
@@ -115,6 +116,50 @@ namespace nORM.Scaffolding
                         ["onUpdate"] = ScaffoldForeignKeyShape.NormalizeReferentialAction(first.OnUpdate),
                         ["referentialActionScaffoldable"] = ScaffoldForeignKeyShape.HasOnlyScaffoldableReferentialActions(rows)
                     };
+                })
+                .ToArray();
+
+        private static IReadOnlyDictionary<string, object?>[] BuildForeignKeyUniqueIndexCandidateMetadata(
+            IReadOnlyList<ScaffoldIndexInfo> indexes,
+            string tableKey,
+            IReadOnlySet<string> foreignKeyColumns)
+            => indexes
+                .Where(index => index.IsUnique
+                                && string.Equals(index.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(static index => index.IndexName, StringComparer.OrdinalIgnoreCase)
+                .Select(group =>
+                {
+                    var rows = group.ToArray();
+                    var keyRows = rows
+                        .Where(static index => !index.IsIncluded)
+                        .OrderBy(static index => index.Ordinal)
+                        .ToArray();
+                    var keyColumns = keyRows
+                        .Select(static index => index.ColumnName)
+                        .ToArray();
+                    var isExactForeignKeyColumnSet = keyColumns.Length == foreignKeyColumns.Count
+                                                     && keyRows.All(index => index.ColumnCount == foreignKeyColumns.Count)
+                                                     && keyColumns.All(foreignKeyColumns.Contains);
+                    var filterSql = rows
+                        .Select(static index => index.FilterSql)
+                        .FirstOrDefault(static filter => !string.IsNullOrWhiteSpace(filter));
+                    return new
+                    {
+                        Rows = rows,
+                        KeyColumns = keyColumns,
+                        IsExactForeignKeyColumnSet = isExactForeignKeyColumnSet,
+                        FilterSql = filterSql
+                    };
+                })
+                .Where(static candidate => candidate.IsExactForeignKeyColumnSet)
+                .OrderBy(static candidate => candidate.Rows[0].IndexName, StringComparer.Ordinal)
+                .Select(static candidate => new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["indexName"] = candidate.Rows[0].IndexName,
+                    ["columns"] = candidate.KeyColumns,
+                    ["isFiltered"] = !string.IsNullOrWhiteSpace(candidate.FilterSql),
+                    ["filterSql"] = candidate.FilterSql,
+                    ["isUnfilteredExactForeignKeyUniqueIndex"] = string.IsNullOrWhiteSpace(candidate.FilterSql)
                 })
                 .ToArray();
 

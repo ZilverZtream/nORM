@@ -110,6 +110,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
             var join = Assert.Single(joinTables);
             Assert.Equal("StudentCourse", join.GetProperty("table").GetString());
             Assert.Contains("missing-exact-unique-index", join.GetProperty("reasons").EnumerateArray().Select(reason => reason.GetString()));
+            var metadata = join.GetProperty("metadata");
+            Assert.False(metadata.GetProperty("hasExactForeignKeyUniqueIndex").GetBoolean());
+            var candidate = Assert.Single(metadata.GetProperty("foreignKeyUniqueIndexCandidates").EnumerateArray());
+            Assert.Equal("UX_StudentCourse_Filtered", candidate.GetProperty("indexName").GetString());
+            Assert.Equal(new[] { "StudentId", "CourseId" }, candidate.GetProperty("columns").EnumerateArray().Select(column => column.GetString()).ToArray());
+            Assert.True(candidate.GetProperty("isFiltered").GetBoolean());
+            Assert.Equal("StudentId > 0", candidate.GetProperty("filterSql").GetString());
+            Assert.False(candidate.GetProperty("isUnfilteredExactForeignKeyUniqueIndex").GetBoolean());
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
