@@ -336,6 +336,7 @@ public partial class ScaffoldingContractDocTests
     private static string ReadLiveProviderScaffoldingParitySource()
         => string.Concat(
             ReadRepoFile("tests", "LiveProviderScaffoldingParityTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingSqlHelpers.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyCompositeTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyAlternateTests.cs"),
@@ -348,6 +349,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeMySqlTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeSqlServerTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingIndexTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingIndexProviderSpecificTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingRoutineTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingRoutineOutputTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderObjectTests.cs"),

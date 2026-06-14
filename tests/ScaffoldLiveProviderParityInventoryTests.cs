@@ -38,7 +38,7 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("This test covers writable provider-specific type systems that SQLite does not expose beyond its declared-type path.", "SqlServer", "Postgres", "MySql"),
             ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_provider_specific_index_diagnostics_on_live_provider"] =
                 Expect("MySQL provider-specific access-method diagnostics are covered by the dedicated MySQL access-method test.", "Sqlite", "SqlServer", "Postgres"),
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_provider_specific_index_access_methods_as_provider_owned"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_reports_provider_specific_index_access_methods_as_provider_owned"] =
                 Expect("SQLite has no provider-specific index access-method catalog equivalent.", "SqlServer", "Postgres", "MySql"),
             ["LiveProviderScaffoldingReferentialActionTests.cs::ScaffoldAsync_preserves_restrict_fk_referential_actions_on_live_provider"] =
                 Expect("SQL Server does not accept RESTRICT as a foreign-key referential action.", "Sqlite", "Postgres", "MySql"),
@@ -63,17 +63,17 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
     private static readonly IReadOnlyDictionary<string, PartialCoverageExpectation> ProviderSpecificFactCoverage =
         new Dictionary<string, PartialCoverageExpectation>(StringComparer.Ordinal)
         {
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_mysql_prefix_index_without_emitting_normal_index"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_reports_mysql_prefix_index_without_emitting_normal_index"] =
                 Expect("MySQL prefix indexes are a MySQL-only index metadata shape.", "MySql"),
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_supported_mysql_expression_index_metadata"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_supported_mysql_expression_index_metadata"] =
                 Expect("MySQL expression index catalog metadata is exposed through MySQL-specific DDL and emitted as provider-bound expression-index metadata when representable.", "MySql"),
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_postgres_expression_index_with_include_metadata"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_expression_index_with_include_metadata"] =
                 Expect("PostgreSQL expression INCLUDE metadata is PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_postgres_null_sort_order_index_metadata"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_null_sort_order_index_metadata"] =
                 Expect("PostgreSQL NULLS FIRST/LAST index metadata is PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_reports_postgres_expression_btree_key_options_as_provider_owned"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_reports_postgres_expression_btree_key_options_as_provider_owned"] =
                 Expect("PostgreSQL expression B-tree operator-class/key options are PostgreSQL-specific.", "Postgres"),
-            ["LiveProviderScaffoldingIndexTests.cs::ScaffoldAsync_emits_postgres_nulls_not_distinct_unique_index_metadata"] =
+            ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_nulls_not_distinct_unique_index_metadata"] =
                 Expect("PostgreSQL NULLS NOT DISTINCT unique index metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_sqlserver_native_temporal_tables_and_marks_them_read_only"] =
                 Expect("SQL Server system-versioned temporal tables are SQL Server-specific.", "SqlServer"),
