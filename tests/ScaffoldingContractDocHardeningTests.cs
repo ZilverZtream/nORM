@@ -198,6 +198,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dynamic_scaffolding_marks_view_query_artifacts_read_only_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dynamic_scaffolding_marks_keyless_tables_read_only_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dynamic_scaffolding_marks_unmodeled_defaults_read_only_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("GenerateEntityTypeAsync(connection, \"public.\" + PostgresMaterializedView)", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("GenerateEntityTypeAsync(connection, SqliteVirtualTable)", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_non_nullable_alternate_key_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_nullable_alternate_key_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_synthetic_fk_constraint_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);

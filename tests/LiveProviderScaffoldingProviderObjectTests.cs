@@ -231,6 +231,9 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
                     item.GetProperty("code").GetString() == "SCF207" &&
                     item.GetProperty("name").GetString()!.StartsWith(SqliteVirtualTable + "_", StringComparison.Ordinal));
+                var dynamicVirtualType = await new DynamicEntityTypeGenerator().GenerateEntityTypeAsync(connection, SqliteVirtualTable);
+                Assert.NotNull(dynamicVirtualType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+                Assert.NotNull(dynamicVirtualType.GetProperty("Content"));
                 AssertScaffoldOutputBuilds(dir);
             }
             finally

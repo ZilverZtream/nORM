@@ -146,6 +146,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
                     item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
                     item.GetProperty("table").GetString() == "public." + PostgresMaterializedView);
+                var dynamicViewType = await new DynamicEntityTypeGenerator().GenerateEntityTypeAsync(connection, "public." + PostgresMaterializedView);
+                Assert.NotNull(dynamicViewType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
                 AssertScaffoldOutputBuilds(dir);
             }
             finally
