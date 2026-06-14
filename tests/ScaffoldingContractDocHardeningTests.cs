@@ -189,6 +189,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_table_filter_emits_view_query_artifact_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_provider_query_artifacts_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_default_discovery_emits_table_and_view_query_artifacts_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_default_discovery_emits_table_and_view_query_artifacts_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_non_nullable_alternate_key_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_nullable_alternate_key_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_synthetic_fk_constraint_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
