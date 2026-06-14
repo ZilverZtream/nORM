@@ -354,8 +354,10 @@ PostgreSQL domains over safe scalar/array/enum base types remain diagnostics for
 provider-mobility review, but generated writes stay enabled because nORM binds
 the safe base CLR type, preserves bounded string/numeric facets where provider
 metadata exposes them, and the database enforces the domain constraint.
-Safe SQL defaults, including vetted hex/binary literals and PostgreSQL
-typed-cast defaults, are emitted as `HasDefaultValueSql(...)`; SQL Server
+Safe SQL defaults, including vetted hex/binary literals, literal-only
+`LOWER`/`UPPER` string normalization defaults with provider-normalized
+PostgreSQL casts or MySQL character-set literals, and PostgreSQL typed-cast
+defaults, are emitted as `HasDefaultValueSql(...)`; SQL Server
 explicit non-system default-constraint names are preserved with
 `HasDefaultValueSql(..., constraintName: ...)`. Only unmodeled
 complex/provider-specific defaults make the generated entity read-only.

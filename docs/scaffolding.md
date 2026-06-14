@@ -118,7 +118,9 @@ must be reviewed and edited like handwritten model code.
   Simple SQL defaults that pass nORM's migration default allowlist (numeric,
   boolean, `NULL`, single-quoted ANSI/Unicode string literals, safe hex/binary
   literals such as `0xDEADBEEF` and `X'DEADBEEF'`, literal-only
-  `LOWER('value')`/`UPPER('value')` string normalization defaults, and known
+  `LOWER('value')`/`UPPER('value')` string normalization defaults, including
+  provider-normalized PostgreSQL literal casts such as `LOWER('value'::text)`
+  and MySQL character-set literals such as `LOWER(_utf8mb4'value')`, and known
   no-argument date/time/UUID functions, including no-argument `CURRENT_TIMESTAMP()`/
   `CURRENT_DATE()`/`CURRENT_TIME()` spellings, precision-limited MySQL
   temporal forms such as `CURRENT_TIMESTAMP(6)`/`UTC_TIMESTAMP(6)`, and safe
@@ -131,7 +133,8 @@ must be reviewed and edited like handwritten model code.
   non-system default-constraint names are preserved through the generated
   `HasDefaultValueSql(..., constraintName: ...)` overload; system-generated
   names still use nORM's stable fallback names. MySQL `information_schema`
-  string/date/time literal defaults are normalized back to SQL literal text
+  string/date/time literal defaults and catalog-escaped string-expression
+  defaults are normalized back to SQL literal text
   before that allowlist is applied. This is DDL metadata only:
   it does not mark the column as database-generated and does not cause nORM to
   omit the property from runtime inserts.
@@ -1052,8 +1055,9 @@ must be reviewed and edited like handwritten model code.
 - Provider-specific complex default constraints, column types, triggers,
   temporal tables, and keyless tables.
   Simple safe default literals/functions, including safe hex/binary literals,
-  literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults,
-  and safe PostgreSQL typed-cast defaults, are emitted as migration metadata with
+  literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults
+  with provider-normalized PostgreSQL casts or MySQL character-set literals, and
+  safe PostgreSQL typed-cast defaults, are emitted as migration metadata with
   `HasDefaultValueSql`; SQL Server explicit non-system default-constraint
   names are preserved with `HasDefaultValueSql(..., constraintName: ...)`;
   unmodeled complex/provider-specific defaults remain diagnostics;

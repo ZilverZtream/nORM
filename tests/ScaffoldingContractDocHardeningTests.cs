@@ -54,8 +54,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("one-to-one reference navigations when the dependent FK columns are exact unique", cliReadme, StringComparison.Ordinal);
         Assert.Contains("complex/provider-specific defaults", rootReadme, StringComparison.Ordinal);
         Assert.Contains("unmodeled complex/provider-specific defaults", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("Safe SQL defaults, including vetted hex/binary literals and PostgreSQL", rootReadme, StringComparison.Ordinal);
-        Assert.Contains("Safe SQL defaults, including vetted hex/binary literals and PostgreSQL", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("Safe SQL defaults, including vetted hex/binary literals, literal-only", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("Safe SQL defaults, including vetted hex/binary literals, literal-only", cliReadme, StringComparison.Ordinal);
         Assert.Contains("explicit non-system default-constraint names are preserved", rootReadme, StringComparison.Ordinal);
         Assert.Contains("explicit non-system default-constraint names are preserved", cliReadme, StringComparison.Ordinal);
         Assert.Contains("HasDefaultValueSql(..., constraintName: ...)", rootReadme, StringComparison.Ordinal);
@@ -477,6 +477,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("selectedTableKeys", source, StringComparison.Ordinal);
         Assert.Contains("provider-specific-default", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("QUOTE(column_default)", mySqlUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("REPLACE(column_default, CHAR(92, 39), CHAR(39))", mySqlUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("providerSpecificIdentityStrategyTableKeys.Contains(tableKey)", source, StringComparison.Ordinal);
         Assert.Contains("provider-specific-identity-strategy", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("referential-action-not-scaffoldable", unsupportedMetadataSource, StringComparison.Ordinal);
@@ -562,6 +563,7 @@ public partial class ScaffoldingContractDocTests
         Assert.DoesNotContain("DefaultValueValidator.Validate(candidate)", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("AND is_identity <> 'YES'", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("QUOTE(column_default)", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("REPLACE(column_default, CHAR(92, 39), CHAR(39))", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("HasWriteBlockingProviderSpecificColumns", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("ty.name IN ('geography', 'geometry', 'hierarchyid', 'sql_variant')", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("c.udt_name IN ('inet', 'cidr', 'macaddr', 'macaddr8', 'tsvector', 'tsquery')", dynamicSource, StringComparison.Ordinal);

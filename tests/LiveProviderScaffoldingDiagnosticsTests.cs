@@ -172,11 +172,15 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
 
                 Assert.Contains("public string Name { get; set; } = default!;", entityCode, StringComparison.Ordinal);
+                Assert.Contains("public string Status { get; set; } = default!;", entityCode, StringComparison.Ordinal);
                 Assert.Contains("NameLength { get; set; }", entityCode, StringComparison.Ordinal);
                 Assert.Contains(".HasCheckConstraint(", contextCode, StringComparison.Ordinal);
                 Assert.Contains(FeatureOwnedCheckName, contextCode, StringComparison.Ordinal);
                 Assert.Contains("HasComputedColumnSql(", contextCode, StringComparison.Ordinal);
                 Assert.Contains("HasCollation(", contextCode, StringComparison.Ordinal);
+                Assert.Contains(".Property(e => e.Status).HasDefaultValueSql(", contextCode, StringComparison.Ordinal);
+                if (kind == ProviderKind.SqlServer)
+                    Assert.Contains($"constraintName: \"{FeatureOwnedDefaultName}\"", contextCode, StringComparison.Ordinal);
                 var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(connection, FeatureOwnedTable);
                 Assert.Null(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
 
@@ -190,7 +194,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
 
                     Assert.DoesNotContain(providerOwned, item =>
                         LastTableNameEquals(item.GetProperty("table").GetString(), FeatureOwnedTable) &&
-                        item.GetProperty("kind").GetString() is "CheckConstraint" or "Computed" or "Collation");
+                        item.GetProperty("kind").GetString() is "CheckConstraint" or "Computed" or "Collation" or "Default");
                 }
 
                 AssertScaffoldOutputBuilds(dir);

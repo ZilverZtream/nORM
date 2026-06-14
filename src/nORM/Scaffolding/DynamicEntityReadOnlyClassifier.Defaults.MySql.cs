@@ -9,6 +9,9 @@ namespace nORM.Scaffolding
             => QueryHasUnmodeledDefault(connection, """
                 SELECT CASE
                            WHEN data_type IN ('char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', 'enum', 'set')
+                                AND (LOWER(column_default) LIKE 'lower(%' OR LOWER(column_default) LIKE 'upper(%')
+                           THEN REPLACE(column_default, CHAR(92, 39), CHAR(39))
+                           WHEN data_type IN ('char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', 'enum', 'set')
                            THEN QUOTE(column_default)
                            WHEN data_type IN ('date', 'datetime', 'timestamp', 'time')
                                 AND LOWER(column_default) NOT LIKE 'current_timestamp%'

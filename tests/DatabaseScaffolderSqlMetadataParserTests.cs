@@ -216,6 +216,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("lower('NEW')")]
     [InlineData("UPPER(N'pending')")]
     [InlineData("lower('can''t ship')")]
+    [InlineData("lower('NEW'::text)")]
+    [InlineData("UPPER('pending'::character varying)")]
+    [InlineData("lower(_utf8mb4'NEW')")]
     public void NormalizeDefaultSql_StaticAndDynamic_AcceptSafePostgresCasts(string raw)
     {
         var staticResult = InvokeTryNormalizeScaffoldDefaultSql(raw);
@@ -242,7 +245,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("'active'::\"quoted\"")]
     [InlineData("lower(Status)")]
     [InlineData("upper(current_user)")]
+    [InlineData("lower('active'::\"quoted\")")]
     [InlineData("lower('active'); DROP TABLE Users")]
+    [InlineData("lower('active'::text); DROP TABLE Users")]
+    [InlineData("lower(_utf8mb4 Status)")]
     [InlineData("replace('NEW','N','n')")]
     public void NormalizeDefaultSql_StaticAndDynamic_RejectUnsafePostgresCasts(string raw)
     {

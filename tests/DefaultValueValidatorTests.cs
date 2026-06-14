@@ -112,6 +112,10 @@ public class DefaultValueValidatorTests
         new object[] { "0::integer /* comment */" },
         new object[] { "now()::timestamp without time zone; DELETE FROM Users" },
         new object[] { "'active'::\"quoted\"" },
+        new object[] { "lower(Status)" },
+        new object[] { "lower('active'::\"quoted\")" },
+        new object[] { "lower('active'::text); DROP TABLE Users" },
+        new object[] { "lower(_utf8mb4 Status)" },
     };
 
     [Theory]
@@ -197,6 +201,12 @@ public class DefaultValueValidatorTests
         new object[] { "true::boolean" },
         new object[] { "now()::timestamp without time zone" },
         new object[] { "CURRENT_TIMESTAMP::timestamp with time zone" },
+        new object[] { "_utf8mb4'active'" },
+        new object[] { "lower('NEW')" },
+        new object[] { "UPPER(N'pending')" },
+        new object[] { "lower('NEW'::text)" },
+        new object[] { "upper('pending'::character varying)" },
+        new object[] { "lower(_utf8mb4'NEW')" },
     };
 
     [Theory]

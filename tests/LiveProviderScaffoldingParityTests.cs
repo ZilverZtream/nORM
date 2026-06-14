@@ -152,6 +152,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string WarningView = "ScaffoldLiveWarningView";
     private const string FeatureOwnedTable = "ScaffoldLiveFeatureOwned";
     private const string FeatureOwnedCheckName = "CK_ScaffoldLiveFeatureOwned_Name";
+    private const string FeatureOwnedDefaultName = "DF_ScaffoldLiveFeatureOwned_Status";
     private const string SqlServerWarningSynonym = "ScaffoldLiveWarningSynonym";
     private const string SqlServerProcedureSynonym = "ScaffoldLiveProcedureSynonym";
     private const string SqlServerSynonymProcedure = "ScaffoldLiveSynonymProcedure";
