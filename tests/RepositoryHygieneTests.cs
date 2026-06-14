@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -11,6 +12,7 @@ public sealed class RepositoryHygieneTests
 {
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
     private const int MaxProductionScaffoldingFileLines = 200;
+    private const int MaxScaffoldingMethodLines = 90;
     private const int MaxDatabaseScaffolderAggregateLines = 500;
     private const int MaxCliScaffoldingFileLines = 200;
     private const int MaxCliDesignTimeFileLines = 200;
@@ -171,6 +173,27 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split production scaffolding code before it becomes a god object: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Scaffolding_methods_stay_below_god_function_budget()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Scaffolding methods stay below 90 lines", ownership, StringComparison.Ordinal);
+
+        var scaffoldingFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Scaffolding"), "*.cs", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "dotnet-norm"), "Program.Scaffolding*.cs"))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        var oversizedMethods = scaffoldingFiles
+            .SelectMany(FindMethodLineSpans)
+            .Where(method => method.LineCount > MaxScaffoldingMethodLines)
+            .OrderByDescending(method => method.LineCount)
+            .Select(method => $"{method.Path}:{method.StartLine} ({method.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedMethods.Length == 0,
+            "Split scaffolding methods before they become god functions: " + string.Join(", ", oversizedMethods));
     }
 
     [Fact]
@@ -691,4 +714,63 @@ public sealed class RepositoryHygieneTests
         Assert.True(process.ExitCode == 0, error);
         return output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
     }
+
+    private static IEnumerable<(string Path, int StartLine, int LineCount)> FindMethodLineSpans(string path)
+    {
+        var lines = File.ReadAllLines(path);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].Trim();
+            if (!LooksLikeMethodSignature(trimmed))
+                continue;
+
+            if (trimmed.Contains("=>", StringComparison.Ordinal))
+            {
+                yield return (RelativeRepoPath(path), i + 1, 1);
+                continue;
+            }
+
+            var braceDepth = 0;
+            var sawOpenBrace = false;
+            for (var j = i; j < lines.Length; j++)
+            {
+                var openBraceCount = Count(lines[j], '{');
+                var closeBraceCount = Count(lines[j], '}');
+                braceDepth += openBraceCount;
+                sawOpenBrace |= openBraceCount > 0;
+                braceDepth -= closeBraceCount;
+                if (sawOpenBrace && braceDepth <= 0)
+                {
+                    yield return (RelativeRepoPath(path), i + 1, j - i + 1);
+                    break;
+                }
+            }
+        }
+    }
+
+    private static bool LooksLikeMethodSignature(string trimmed)
+    {
+        if (!trimmed.Contains('('))
+            return false;
+        if (!StartsWithMethodAccessModifier(trimmed))
+            return false;
+        if (trimmed.Contains(" class ", StringComparison.Ordinal) ||
+            trimmed.Contains(" record ", StringComparison.Ordinal) ||
+            trimmed.Contains(" interface ", StringComparison.Ordinal))
+            return false;
+
+        return true;
+    }
+
+    private static bool StartsWithMethodAccessModifier(string value)
+        => value.StartsWith("public ", StringComparison.Ordinal) ||
+           value.StartsWith("private ", StringComparison.Ordinal) ||
+           value.StartsWith("internal ", StringComparison.Ordinal) ||
+           value.StartsWith("protected ", StringComparison.Ordinal);
+
+    private static int Count(string value, char match)
+        => value.Count(ch => ch == match);
+
+    private static string RelativeRepoPath(string path)
+        => Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/');
 }

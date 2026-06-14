@@ -101,6 +101,9 @@ remains split by provider, model phase, or generated-code responsibility.
 `RepositoryHygieneTests` enforces this boundary for `src/nORM/Scaffolding`.
 When a scaffolding change needs more room, split the responsibility into a new
 focused helper instead of growing an existing file.
+Scaffolding methods stay below 90 lines across production scaffolding and CLI
+scaffold command files so large catalog probes, option binders, and generation
+steps get split before they become god functions.
 The public `DatabaseScaffolder` facade also stays below 500 aggregate lines
 across its partial files; new behavior belongs in focused collaborators and
 adapters, with the facade kept as orchestration and compatibility glue only.

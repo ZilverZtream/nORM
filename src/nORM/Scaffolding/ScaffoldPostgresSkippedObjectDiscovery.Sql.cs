@@ -1,0 +1,90 @@
+#nullable enable
+
+namespace nORM.Scaffolding
+{
+    internal static partial class ScaffoldPostgresSkippedObjectDiscovery
+    {
+        private const string SkippedObjectSql = """
+            SELECT table_schema AS ObjectSchema, table_name AS ObjectName, 'View' AS Kind, 'PostgreSQL view' AS Detail
+            FROM information_schema.views
+            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+            UNION ALL
+            SELECT sequence_schema, sequence_name, 'Sequence', 'PostgreSQL sequence; dataType=' || data_type
+            FROM information_schema.sequences seq
+            WHERE sequence_schema NOT IN ('pg_catalog', 'information_schema')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM pg_class sequence_class
+                  INNER JOIN pg_namespace sequence_schema_ns ON sequence_schema_ns.oid = sequence_class.relnamespace
+                  INNER JOIN pg_depend dependency ON dependency.objid = sequence_class.oid
+                  WHERE sequence_class.relkind = 'S'
+                    AND sequence_schema_ns.nspname = seq.sequence_schema
+                    AND sequence_class.relname = seq.sequence_name
+                    AND dependency.deptype IN ('a', 'i')
+              )
+            UNION ALL
+            SELECT schemaname, matviewname, 'MaterializedView', 'PostgreSQL materialized view'
+            FROM pg_matviews
+            WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+            UNION ALL
+            SELECT r.routine_schema, r.routine_name, 'Routine',
+                   'PostgreSQL ' || LOWER(r.routine_type) || '; parameters=' ||
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM information_schema.parameters p
+                       WHERE p.specific_schema = r.specific_schema
+                         AND p.specific_name = r.specific_name
+                         AND p.parameter_mode IS NOT NULL
+                   ), 0)::text ||
+                   '; outputParameters=' ||
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM information_schema.parameters p
+                       WHERE p.specific_schema = r.specific_schema
+                         AND p.specific_name = r.specific_name
+                         AND p.parameter_mode IN ('OUT', 'INOUT')
+                   ), 0)::text ||
+                   '; parameterModes=' ||
+                   COALESCE((
+                       SELECT string_agg(
+                           COALESCE(p.parameter_name, 'return') || ':' || COALESCE(p.parameter_mode, 'RETURN') || ':' ||
+                           CASE
+                               WHEN p.data_type IN ('ARRAY', 'USER-DEFINED')
+                                    AND p.udt_name IS NOT NULL
+                                    AND p.udt_name <> ''
+                               THEN p.data_type || ' (' || p.udt_name || ')'
+                               ELSE COALESCE(p.data_type, '')
+                           END ||
+                           CASE
+                               WHEN p.character_maximum_length IS NOT NULL THEN '(' || p.character_maximum_length::text || ')'
+                               WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NULL THEN '(' || p.numeric_precision::text || ')'
+                               WHEN p.numeric_precision IS NOT NULL AND p.numeric_scale IS NOT NULL THEN '(' || p.numeric_precision::text || ',' || p.numeric_scale::text || ')'
+                               ELSE ''
+                           END,
+                           ',' ORDER BY p.ordinal_position)
+                       FROM information_schema.parameters p
+                       WHERE p.specific_schema = r.specific_schema
+                         AND p.specific_name = r.specific_name
+                         AND p.parameter_mode IS NOT NULL
+                   ), '') ||
+                   '; callShape=' ||
+                   CASE
+                       WHEN UPPER(r.routine_type) = 'FUNCTION' AND EXISTS (
+                           SELECT 1
+                           FROM pg_proc routine_proc
+                           INNER JOIN pg_namespace routine_ns ON routine_ns.oid = routine_proc.pronamespace
+                           WHERE routine_ns.nspname = r.specific_schema
+                             AND routine_proc.proname = r.routine_name
+                             AND routine_proc.proretset
+                       ) THEN 'table-valued-function'
+                       WHEN UPPER(r.routine_type) = 'FUNCTION' AND LOWER(COALESCE(r.data_type, '')) IN ('record', 'table') THEN 'table-valued-function'
+                       WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
+                       ELSE ''
+                   END ||
+                   '; dataType=' || COALESCE(r.data_type, '')
+            FROM information_schema.routines r
+            WHERE r.routine_schema NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY ObjectSchema, ObjectName
+            """;
+    }
+}
