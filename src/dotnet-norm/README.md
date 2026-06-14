@@ -97,6 +97,9 @@ unqualified `[Table]` metadata. MySQL remains scoped to the current database
 without emitting that database name as a model schema; the current catalog can
 still be used in table/query-artifact filters for EF-style command
 compatibility.
+When `--emit-routine-stubs` or `--emit-sequence-stubs` is enabled, table filters
+can also select matching provider routines or sequences without generating every
+discovered provider object.
 By default, nORM's scaffold pluralizer singularizes plural database object
 names for entity classes and emits collection-style generated `IQueryable<T>`
 context property names, with deterministic cleanup for descriptor-like entity

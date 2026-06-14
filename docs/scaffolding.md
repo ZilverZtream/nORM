@@ -383,6 +383,10 @@ must be reviewed and edited like handwritten model code.
   Relationship and index metadata is scoped to selected tables; FKs whose
   dependent or principal table is intentionally filtered out are not emitted as
   navigations and do not create unrelated scaffold warnings.
+  When `--emit-routine-stubs` or `--emit-sequence-stubs` is enabled, explicit
+  table filters can also select matching routine or sequence stubs without
+  broadening the run to every discovered provider object; without the matching
+  opt-in those filters still fail as non-entity database objects.
 - When no table/schema filter is supplied, ordinary views and PostgreSQL
   materialized views are scaffolded by default as read-only query artifacts,
   matching EF's database-first view coverage without inferring provider-neutral

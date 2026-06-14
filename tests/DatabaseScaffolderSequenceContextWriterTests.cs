@@ -39,6 +39,17 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldContext_WithSequenceStubOnly_EmitsWrapperWithoutEntitySets()
+    {
+        var code = InvokeScaffoldContextWithSequenceOnly();
+
+        Assert.Contains("public partial class AppDbContext", code, StringComparison.Ordinal);
+        Assert.Contains("private sealed class OrderNoSequenceValue", code, StringComparison.Ordinal);
+        Assert.Contains("public async Task<long> NextOrderNoValueAsync", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("IQueryable<User>", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithSqlServerTinyIntSequence_EmitsByteWrapper()
     {
         var code = InvokeScaffoldContextWithSequence(

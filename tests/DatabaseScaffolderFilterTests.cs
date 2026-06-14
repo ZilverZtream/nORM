@@ -442,4 +442,71 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Empty(selection.SkippedObjects);
     }
 
+    [Fact]
+    public void BuildSelection_WithTableFilterAndRoutineStubOptIn_SelectsMatchingRoutine()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo(null, "TargetRoutine", "Routine", "SQL Server stored procedure; parameters=0", null),
+            new ScaffoldSkippedObjectInfo(null, "OtherRoutine", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            Array.Empty<ScaffoldTableInfo>(),
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "TargetRoutine" }, EmitRoutineStubs = true },
+            new SqliteProvider(),
+            null);
+
+        Assert.Empty(selection.Tables);
+        Assert.Empty(selection.QueryArtifactTableKeys);
+        var routine = Assert.Single(selection.SkippedObjects);
+        Assert.Equal("Routine", routine.Kind);
+        Assert.Equal("TargetRoutine", routine.Name);
+    }
+
+    [Fact]
+    public void BuildSelection_WithTableFilterAndSequenceStubOptIn_SelectsMatchingSequence()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "TargetSequence", "Sequence", "SQL Server sequence; dataType=bigint", null),
+            new ScaffoldSkippedObjectInfo("dbo", "OtherSequence", "Sequence", "SQL Server sequence; dataType=bigint", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            Array.Empty<ScaffoldTableInfo>(),
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "dbo.TargetSequence" }, EmitSequenceStubs = true },
+            new SqliteProvider(),
+            null);
+
+        Assert.Empty(selection.Tables);
+        Assert.Empty(selection.QueryArtifactTableKeys);
+        var sequence = Assert.Single(selection.SkippedObjects);
+        Assert.Equal("Sequence", sequence.Kind);
+        Assert.Equal("dbo", sequence.Schema);
+        Assert.Equal("TargetSequence", sequence.Name);
+    }
+
+    [Fact]
+    public void BuildSelection_WithTableFilterMatchingRoutineWithoutStubOptIn_StillThrows()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo(null, "TargetRoutine", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ScaffoldObjectSelectionBuilder.BuildSelection(
+                Array.Empty<ScaffoldTableInfo>(),
+                skippedObjects,
+                new ScaffoldOptions { Tables = new[] { "TargetRoutine" } },
+                new SqliteProvider(),
+                null));
+
+        Assert.Contains("does not emit as entity classes", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Routine TargetRoutine", ex.Message, StringComparison.Ordinal);
+    }
+
 }

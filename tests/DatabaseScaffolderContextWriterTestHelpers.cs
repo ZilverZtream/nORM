@@ -69,6 +69,21 @@ public partial class DatabaseScaffolderPrivateMethodTests
     private static string InvokeScaffoldContextWithRoutineStub()
         => InvokeScaffoldContextWithRoutine("dbo", "GetRevenue", "SQL Server stored procedure; parameters=3; outputParameters=2; parameterModes=@tenantId:IN:int,@total:OUT:decimal(18,2),@message:INOUT:nvarchar(32); resultColumns=Id:int:0|Name:nvarchar(40):0");
 
+    private static string InvokeScaffoldContextWithRoutineStubOnly()
+        => WriteScaffoldContext(
+            "MyApp",
+            "AppDbContext",
+            Array.Empty<string>(),
+            routineStubs: new[]
+            {
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "dbo",
+                    "GetRevenue",
+                    "Routine",
+                    "SQL Server stored procedure; parameters=1; parameterModes=@tenantId:IN:int",
+                    null)
+            });
+
     private static string InvokeScaffoldContextWithRoutineReturnStub()
         => InvokeScaffoldContextWithRoutine("dbo", "ApplyDiscount", "SQL Server stored procedure; parameters=2; outputParameters=1; parameterModes=@orderId:IN:int,return:RETURN:int");
 
@@ -103,6 +118,21 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     null)
             },
             useDatabaseNames: useDatabaseNames);
+
+    private static string InvokeScaffoldContextWithSequenceOnly()
+        => WriteScaffoldContext(
+            "MyApp",
+            "AppDbContext",
+            Array.Empty<string>(),
+            sequenceStubs: new[]
+            {
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "dbo",
+                    "OrderNo",
+                    "Sequence",
+                    "SQL Server sequence; dataType=bigint",
+                    null)
+            });
 
     private static string InvokeScaffoldContextWithIdentityOptions()
         => WriteScaffoldContext(

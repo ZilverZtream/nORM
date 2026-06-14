@@ -51,7 +51,9 @@ namespace nORM.Scaffolding
                 .ToArray();
 
             var missing = requested
-                .Where(request => !tables.Any(table => MatchesTableFilter(provider, table, request, filterCatalog)))
+                .Where(request =>
+                    !tables.Any(table => MatchesTableFilter(provider, table, request, filterCatalog))
+                    && !MatchesSelectableSkippedObjectFilter(skippedObjects, options, provider, request, filterCatalog))
                 .ToArray();
 
             if (missing.Length > 0)
@@ -115,6 +117,20 @@ namespace nORM.Scaffolding
                 string.Join("; ", collisions.Select(c => $"{c.DisplayKey} matched {string.Join(", ", c.Matches)}")) +
                 ". Rename one table or scaffold a provider-specific model manually; v1 table filters cannot disambiguate literal dotted table names from schema-qualified table names.");
         }
+
+        private static bool MatchesSelectableSkippedObjectFilter(
+            IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,
+            ScaffoldOptions options,
+            DatabaseProvider provider,
+            string requested,
+            string? filterCatalog)
+            => skippedObjects.Any(obj =>
+                MatchesSkippedObjectFilter(provider, obj, requested, filterCatalog)
+                && IsSelectableProviderStubObject(obj, options));
+
+        private static bool IsSelectableProviderStubObject(ScaffoldSkippedObjectInfo obj, ScaffoldOptions options)
+            => (string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase) && options.EmitRoutineStubs)
+               || (string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase) && options.EmitSequenceStubs);
 
         public static IReadOnlyList<ScaffoldSkippedObjectInfo> FilterSkippedObjects(
             IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,

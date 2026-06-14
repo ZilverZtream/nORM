@@ -59,6 +59,28 @@ public partial class DatabaseScaffolderPrivateMethodTests
         }
     }
 
+    [Fact]
+    public void ScaffoldContext_WithRoutineStubOnly_EmitsWrapperWithoutEntitySets()
+    {
+        var code = InvokeScaffoldContextWithRoutineStubOnly();
+
+        Assert.Contains("public partial class AppDbContext", code, StringComparison.Ordinal);
+        Assert.Contains("public sealed class GetRevenueParameters", code, StringComparison.Ordinal);
+        Assert.Contains("Task<List<TResult>> GetRevenueAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("IQueryable<User>", code, StringComparison.Ordinal);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_routine_only_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
 
     [Fact]
     public void ScaffoldContext_WithUseDatabaseNames_RoutineStubPreservesLegalRoutineAndResultColumnNames()
