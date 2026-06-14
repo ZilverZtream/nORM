@@ -37,6 +37,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Bindings.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Execution.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Handler.cs"),
+            ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Options.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Request.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.Command.Request.Helpers.cs"),
             ReadRepoFile("src", "dotnet-norm", "Program.Scaffolding.cs"),

@@ -752,7 +752,7 @@ public sealed class RepositoryHygieneTests
     {
         if (!trimmed.Contains('('))
             return false;
-        if (!StartsWithMethodAccessModifier(trimmed))
+        if (!StartsWithMethodAccessModifier(trimmed) && !trimmed.StartsWith("static ", StringComparison.Ordinal))
             return false;
         if (trimmed.Contains(" class ", StringComparison.Ordinal) ||
             trimmed.Contains(" record ", StringComparison.Ordinal) ||
