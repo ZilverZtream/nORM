@@ -459,6 +459,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL expression-index INCLUDE and NULLS semantics are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_expression_index_include_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_expression_index_null_semantics", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL expression B-tree operator-class/key-option diagnostics are verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_reports_postgres_expression_btree_key_options_as_provider_owned", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("included-column index metadata", doc, StringComparison.Ordinal);
         Assert.Contains("real CLI where each provider exposes the feature", doc, StringComparison.Ordinal);
         Assert.Contains("Multiple composite FKs to", doc, StringComparison.Ordinal);

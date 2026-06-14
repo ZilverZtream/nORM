@@ -981,7 +981,10 @@ must be reviewed and edited like handwritten model code.
   facets are verified through the real CLI as generated `[Index]` metadata
   without provider-owned warnings. PostgreSQL expression-index `INCLUDE` and
   null-semantics facets are verified through the real CLI as generated
-  `HasExpressionIndex` metadata without provider-owned warnings. Multiple composite FKs to
+  `HasExpressionIndex` metadata without provider-owned warnings. PostgreSQL
+  expression B-tree operator-class/key-option diagnostics are verified through
+  the real CLI as SCF119 provider-owned metadata instead of generated
+  `HasExpressionIndex` calls. Multiple composite FKs to
   the same principal are also verified through role-named navigations and
   payload-bridge diagnostics on the real CLI path. Direct composite alternate-key FKs are verified through the real CLI across all four providers.
   Multiple unique dependent
