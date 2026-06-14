@@ -490,6 +490,78 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildSelection_WithSchemaQualifiedRoutineStubFilter_SelectsOnlyMatchingSchema()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("billing", "CalculateTotal", "Routine", "SQL Server stored procedure; parameters=0", null),
+            new ScaffoldSkippedObjectInfo("audit", "CalculateTotal", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            Array.Empty<ScaffoldTableInfo>(),
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "billing.CalculateTotal" }, EmitRoutineStubs = true },
+            new SqliteProvider(),
+            null);
+
+        Assert.Empty(selection.Tables);
+        var routine = Assert.Single(selection.SkippedObjects);
+        Assert.Equal("Routine", routine.Kind);
+        Assert.Equal("billing", routine.Schema);
+        Assert.Equal("CalculateTotal", routine.Name);
+    }
+
+    [Fact]
+    public void BuildSelection_WithBareRoutineStubFilterAcrossSchemas_ThrowsAmbiguous()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("billing", "CalculateTotal", "Routine", "SQL Server stored procedure; parameters=0", null),
+            new ScaffoldSkippedObjectInfo("audit", "CalculateTotal", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ScaffoldObjectSelectionBuilder.BuildSelection(
+                Array.Empty<ScaffoldTableInfo>(),
+                skippedObjects,
+                new ScaffoldOptions { Tables = new[] { "CalculateTotal" }, EmitRoutineStubs = true },
+                new SqliteProvider(),
+                null));
+
+        Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Routine audit.CalculateTotal", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Routine billing.CalculateTotal", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("schema-qualified", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildSelection_WithTableAndRoutineStubFilterNameCollision_ThrowsAmbiguous()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("RebuildCache", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "RebuildCache", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ScaffoldObjectSelectionBuilder.BuildSelection(
+                tables,
+                skippedObjects,
+                new ScaffoldOptions { Tables = new[] { "dbo.RebuildCache" }, EmitRoutineStubs = true },
+                new SqliteProvider(),
+                null));
+
+        Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Table dbo.RebuildCache", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Routine dbo.RebuildCache", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("same-schema object-kind collisions", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BuildSelection_WithTableFilterMatchingRoutineWithoutStubOptIn_StillThrows()
     {
         var skippedObjects = new[]

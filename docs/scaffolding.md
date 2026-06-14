@@ -387,6 +387,11 @@ must be reviewed and edited like handwritten model code.
   table filters can also select matching routine or sequence stubs without
   broadening the run to every discovered provider object; without the matching
   opt-in those filters still fail as non-entity database objects.
+  Because table filters are not object-kind selectors, an explicit filter that
+  matches more than one selectable table, query artifact, routine, or sequence
+  fails deterministically; schema-qualified filters disambiguate cross-schema
+  matches, while same-schema object-kind collisions must be scaffolded in
+  separate runs.
 - When no table/schema filter is supplied, ordinary views and PostgreSQL
   materialized views are scaffolded by default as read-only query artifacts,
   matching EF's database-first view coverage without inferring provider-neutral

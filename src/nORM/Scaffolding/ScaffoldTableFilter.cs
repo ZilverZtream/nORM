@@ -25,12 +25,7 @@ namespace nORM.Scaffolding
                 .Select(request => new
                 {
                     Request = request,
-                    Matches = tables
-                        .Where(table => MatchesTableFilter(provider, table, request, filterCatalog))
-                        .GroupBy(table => (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
-                        .Select(group => DisplayTableMatch(group.First()))
-                        .OrderBy(value => value, StringComparer.Ordinal)
-                        .ToArray()
+                    Matches = GetSelectableTableFilterMatches(tables, skippedObjects, options, provider, request, filterCatalog)
                 })
                 .Where(match => match.Matches.Length > 1)
                 .ToArray();
@@ -38,9 +33,9 @@ namespace nORM.Scaffolding
             if (ambiguousRequests.Length > 0)
             {
                 throw new NormConfigurationException(
-                    "Scaffolding table filter is ambiguous because it matches multiple discovered tables: " +
+                    "Scaffolding table filter is ambiguous because it matches multiple selectable database objects: " +
                     string.Join("; ", ambiguousRequests.Select(match => $"{match.Request} matched {string.Join(", ", match.Matches)}")) +
-                    ". Use schema-qualified table filters when the ambiguity is across schemas; literal dotted table names that collide with schema-qualified names must be scaffolded without a table filter.");
+                    ". Use schema-qualified table filters when the ambiguity is across schemas; literal dotted table names that collide with schema-qualified names must be scaffolded without a table filter; same-schema object-kind collisions must be scaffolded in separate runs.");
             }
 
             var selected = tables
@@ -131,6 +126,33 @@ namespace nORM.Scaffolding
         private static bool IsSelectableProviderStubObject(ScaffoldSkippedObjectInfo obj, ScaffoldOptions options)
             => (string.Equals(obj.Kind, "Routine", StringComparison.OrdinalIgnoreCase) && options.EmitRoutineStubs)
                || (string.Equals(obj.Kind, "Sequence", StringComparison.OrdinalIgnoreCase) && options.EmitSequenceStubs);
+
+        private static string[] GetSelectableTableFilterMatches(
+            IReadOnlyList<ScaffoldTableInfo> tables,
+            IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,
+            ScaffoldOptions options,
+            DatabaseProvider provider,
+            string requested,
+            string? filterCatalog)
+        {
+            var matches = tables
+                .Where(table => MatchesTableFilter(provider, table, requested, filterCatalog))
+                .GroupBy(table => "Table\u001f" + (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => "Table " + DisplayTableMatch(group.First()))
+                .Concat(skippedObjects
+                    .Where(obj =>
+                        MatchesSkippedObjectFilter(provider, obj, requested, filterCatalog)
+                        && IsSelectableProviderStubObject(obj, options))
+                    .GroupBy(obj => obj.Kind + "\u001f" + (obj.Schema ?? string.Empty) + "\u001f" + obj.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => DisplaySkippedObjectMatch(group.First())))
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+
+            return matches;
+        }
+
+        private static string DisplaySkippedObjectMatch(ScaffoldSkippedObjectInfo obj)
+            => $"{obj.Kind} {TableKey(obj.Schema, obj.Name)}";
 
         public static IReadOnlyList<ScaffoldSkippedObjectInfo> FilterSkippedObjects(
             IReadOnlyList<ScaffoldSkippedObjectInfo> skippedObjects,
