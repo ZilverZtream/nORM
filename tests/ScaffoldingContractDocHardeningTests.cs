@@ -428,6 +428,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL UUID/array columns, and MySQL JSON/YEAR/enum/set", doc, StringComparison.Ordinal);
         Assert.Contains("Writable provider-specific diagnostics are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server alias types, PostgreSQL domains over safe base types, and MySQL", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server rowversion concurrency metadata is verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_marks_sqlserver_rowversion_as_timestamp_and_database_generated", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("SCF104 remains in", doc, StringComparison.Ordinal);
         Assert.Contains("SCF104", doc, StringComparison.Ordinal);
         Assert.Contains("Decimal precision plus", doc, StringComparison.Ordinal);

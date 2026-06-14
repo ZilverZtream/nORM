@@ -105,6 +105,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL serial columns and owned sequences are PostgreSQL-specific catalog behavior.", "Postgres"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
                 Expect("SQL Server rowversion/timestamp concurrency metadata is SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldCliSqlServerRowVersionTests.cs::Dotnet_norm_scaffold_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
+                Expect("SQL Server rowversion/timestamp concurrency metadata is SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldingProviderTypePostgresTests.cs::ScaffoldAsync_emits_postgres_uuid_and_array_columns_on_live_provider"] =
                 Expect("PostgreSQL UUID and native array column DDL is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingProviderTypePostgresTests.cs::Dynamic_scaffolding_handles_postgres_uuid_and_array_columns_on_live_provider"] =
