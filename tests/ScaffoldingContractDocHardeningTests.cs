@@ -423,6 +423,12 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_reports_postgres_deferrable_fk_semantics_as_relationship_diagnostic", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("con.condeferrable", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
         Assert.Contains("con.confmatchtype", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
+        Assert.Contains("SQL Server disabled/untrusted/not-for-replication FK state is verified as relationship", doc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_reports_sqlserver_disabled_fk_state_as_relationship_diagnostic", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_reports_sqlserver_disabled_fk_state_as_relationship_diagnostic", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("fk.is_not_trusted", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
+        Assert.Contains("fk.is_disabled", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
+        Assert.Contains("fk.is_not_for_replication", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
         Assert.Contains("SQLite FK `MATCH FULL` / `DEFERRABLE`", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_WithSqliteMatchFullForeignKey_ReportsRelationshipDiagnostic", sqliteFkSemanticsTests, StringComparison.Ordinal);
         Assert.Contains("ExtractForeignKeyProviderSemanticsByColumns", foreignKeyDiscoverySource, StringComparison.Ordinal);
@@ -586,6 +592,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Unsupported/provider-specific FK referential action or FK timing/match semantic discovered", doc, StringComparison.Ordinal);
         Assert.Contains("FK timing/match semantic", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL `DEFERRABLE`", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server `NOT TRUSTED`", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite `MATCH FULL`", doc, StringComparison.Ordinal);
         Assert.Contains("Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted", doc, StringComparison.Ordinal);
         Assert.Contains("'draft'::text", doc, StringComparison.Ordinal);

@@ -16,7 +16,10 @@ namespace nORM.Scaffolding
                 fk.is_system_named AS IsSyntheticConstraintName,
                 COUNT(*) OVER (PARTITION BY fk.object_id) AS ColumnCount,
                 fk.delete_referential_action_desc AS OnDelete,
-                fk.update_referential_action_desc AS OnUpdate
+                fk.update_referential_action_desc +
+                CASE WHEN fk.is_not_trusted = 1 THEN ' NOT TRUSTED' ELSE '' END +
+                CASE WHEN fk.is_disabled = 1 THEN ' DISABLED' ELSE '' END +
+                CASE WHEN fk.is_not_for_replication = 1 THEN ' NOT FOR REPLICATION' ELSE '' END AS OnUpdate
             FROM sys.foreign_keys fk
             INNER JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
             INNER JOIN sys.tables dep ON dep.object_id = fk.parent_object_id

@@ -117,6 +117,10 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL deferrable foreign-key timing semantics are PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldCliPostgresFkSemanticsTests.cs::Dotnet_norm_scaffold_reports_postgres_deferrable_fk_semantics_as_relationship_diagnostic"] =
                 Expect("PostgreSQL deferrable foreign-key timing semantics are PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldingReferentialActionTests.cs::ScaffoldAsync_reports_sqlserver_disabled_fk_state_as_relationship_diagnostic"] =
+                Expect("SQL Server disabled, untrusted, and not-for-replication foreign-key state is SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldCliSqlServerFkSemanticsTests.cs::Dotnet_norm_scaffold_reports_sqlserver_disabled_fk_state_as_relationship_diagnostic"] =
+                Expect("SQL Server disabled, untrusted, and not-for-replication foreign-key state is SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
                 Expect("SQL Server rowversion/timestamp concurrency metadata is SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldCliSqlServerRowVersionTests.cs::Dotnet_norm_scaffold_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =

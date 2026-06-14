@@ -199,4 +199,103 @@ public sealed partial class LiveProviderScaffoldingParityTests
             }
         }
     }
+
+    [Fact]
+    public async Task ScaffoldAsync_reports_sqlserver_disabled_fk_state_as_relationship_diagnostic()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.SqlServer);
+        if (Skip.If(live is null, "Live provider SQL Server not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var parentTable = "ScaffoldLiveSqlServerFkParent" + suffix;
+        var childTable = "ScaffoldLiveSqlServerFkChild" + suffix;
+        var fkName = "FK_ScaffoldLiveSqlServerFkState_" + suffix;
+        var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_sqlserver_fk_state_" + suffix);
+
+        await using (connection)
+        {
+            try
+            {
+                await SetupSqlServerForeignKeyStateAsync(connection, provider, parentTable, childTable, fkName);
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSqlServerFkStateContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { "dbo." + parentTable, "dbo." + childTable },
+                        OverwriteFiles = false
+                    });
+
+                var childCode = await File.ReadAllTextAsync(Path.Combine(dir, childTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSqlServerFkStateContext.cs"));
+                var warningJsonPath = Path.Combine(dir, "nORM.ScaffoldWarnings.json");
+
+                Assert.Contains("public int ParentId { get; set; }", childCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"public {parentTable}", childCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(".HasForeignKey(", contextCode, StringComparison.Ordinal);
+                Assert.True(File.Exists(warningJsonPath));
+
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(warningJsonPath));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+                var diagnostic = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "ReferentialAction" &&
+                    item.GetProperty("name").GetString() == fkName);
+                Assert.Equal("SCF106", diagnostic.GetProperty("code").GetString());
+                Assert.Contains("NOT TRUSTED", diagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("DISABLED", diagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("NOT FOR REPLICATION", diagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+
+                var metadata = diagnostic.GetProperty("metadata");
+                Assert.True(metadata.GetProperty("navigationSuppressed").GetBoolean());
+                Assert.False(metadata.GetProperty("generatedNavigationSupported").GetBoolean());
+                Assert.Equal("referential-action-not-scaffoldable", metadata.GetProperty("reason").GetString());
+                Assert.Contains("NOT TRUSTED", metadata.GetProperty("onUpdate").GetString(), StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("DISABLED", metadata.GetProperty("onUpdate").GetString(), StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("NOT FOR REPLICATION", metadata.GetProperty("onUpdate").GetString(), StringComparison.OrdinalIgnoreCase);
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await CleanupSqlServerForeignKeyStateAsync(connection, provider, parentTable, childTable);
+            }
+        }
+    }
+
+    private static async Task SetupSqlServerForeignKeyStateAsync(
+        System.Data.Common.DbConnection connection,
+        nORM.Providers.DatabaseProvider provider,
+        string parentTable,
+        string childTable,
+        string fkName)
+    {
+        await CleanupSqlServerForeignKeyStateAsync(connection, provider, parentTable, childTable);
+
+        var parent = Qualified(provider, "dbo", parentTable);
+        var child = Qualified(provider, "dbo", childTable);
+        var id = provider.Escape("Id");
+        var parentId = provider.Escape("ParentId");
+        await ExecuteAsync(connection, $"CREATE TABLE {parent} ({id} int NOT NULL PRIMARY KEY)");
+        await ExecuteAsync(connection, $"CREATE TABLE {child} ({id} int NOT NULL PRIMARY KEY, {parentId} int NOT NULL)");
+        await ExecuteAsync(connection,
+            $"ALTER TABLE {child} WITH NOCHECK ADD CONSTRAINT {provider.Escape(fkName)} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}) NOT FOR REPLICATION");
+        await ExecuteAsync(connection, $"ALTER TABLE {child} NOCHECK CONSTRAINT {provider.Escape(fkName)}");
+    }
+
+    private static async Task CleanupSqlServerForeignKeyStateAsync(
+        System.Data.Common.DbConnection connection,
+        nORM.Providers.DatabaseProvider provider,
+        string parentTable,
+        string childTable)
+    {
+        await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, "dbo." + childTable, Qualified(provider, "dbo", childTable)));
+        await ExecuteAsync(connection, DropTable(ProviderKind.SqlServer, "dbo." + parentTable, Qualified(provider, "dbo", parentTable)));
+    }
 }

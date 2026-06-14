@@ -373,6 +373,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldCliViewBoundaryTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliReferentialActionTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliPostgresFkSemanticsTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliSqlServerFkSemanticsTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCompatibilityTests.cs"));
 
     private static string ReadLiveProviderScaffoldingParitySource()
