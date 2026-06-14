@@ -105,6 +105,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL scheduled events are a MySQL-only routine/object catalog shape.", "MySql"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_mysql_on_update_timestamp_default_as_read_only"] =
                 Expect("MySQL ON UPDATE timestamp defaults are MySQL-specific provider-managed update behavior.", "MySql"),
+            ["LiveProviderScaffoldCliMySqlEventDiagnosticsTests.cs::Dotnet_norm_scaffold_reports_mysql_on_update_timestamp_default_as_read_only"] =
+                Expect("MySQL ON UPDATE timestamp defaults are MySQL-specific provider-managed update behavior.", "MySql"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact"] =
                 Expect("SQLite virtual tables and shadow-table diagnostics are SQLite-specific.", "Sqlite"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =

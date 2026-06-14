@@ -407,6 +407,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_rejects_sqlserver_procedure_synonym_as_entity_filter", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("MySQL scheduled-event diagnostics are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_reports_mysql_event_diagnostics_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_reports_mysql_on_update_timestamp_default_as_read_only", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL serial primary-key scaffolding is verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL materialized", doc, StringComparison.Ordinal);
