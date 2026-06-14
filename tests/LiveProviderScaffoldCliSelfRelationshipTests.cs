@@ -88,6 +88,82 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_generates_self_referencing_one_to_many_on_live_provider(ProviderKind kind)
+    {
+        var root = FindRepositoryRoot();
+        var suffix = IdentifierSuffix();
+        var nodeTable = "CliSelfManyNode" + suffix;
+        var fkName = "FK_CliSelfManyNode_Manager_" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_self_one_to_many_" + kind + "_" + suffix);
+        string? sqliteFile = null;
+
+        var live = OpenLive(kind, ref sqliteFile);
+        if (live is null)
+            return;
+
+        var (connection, provider, connectionString, cliProvider) = live.Value;
+        try
+        {
+            using (connection)
+            {
+                SetupSelfReferencingOneToManyForeignKey(connection, provider, kind, nodeTable, fkName);
+            }
+
+            var scaffold = RunCli(
+                "scaffold " +
+                $"--provider {cliProvider} " +
+                $"--connection {Quote(connectionString)} " +
+                $"--output {Quote(output)} " +
+                "--namespace CliLiveScaffolded " +
+                "--context CliLiveSelfOneToManyCtx " +
+                $"--table {Quote(nodeTable)}",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            var nodeCode = File.ReadAllText(Path.Combine(output, nodeTable + ".cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveSelfOneToManyCtx.cs"));
+
+            Assert.Contains("[ForeignKey(nameof(ManagerId))]", nodeCode, StringComparison.Ordinal);
+            Assert.Matches(@"public (int|long)\? ManagerId \{ get; set; \}", nodeCode);
+            Assert.Contains($"public {nodeTable}? Manager {{ get; set; }}", nodeCode, StringComparison.Ordinal);
+            Assert.Contains($"public List<{nodeTable}> {nodeTable}sByManagerId {{ get; set; }} = new();", nodeCode, StringComparison.Ordinal);
+            Assert.DoesNotContain($"public {nodeTable}? {nodeTable} {{ get; set; }}", nodeCode, StringComparison.Ordinal);
+            Assert.Contains($".HasMany(p => p.{nodeTable}sByManagerId)", contextCode, StringComparison.Ordinal);
+            Assert.Contains(".WithOne(d => d.Manager)", contextCode, StringComparison.Ordinal);
+            Assert.Contains(ExpectedCascadeForeignKey(kind, "d => d.ManagerId", "p => p.Id", fkName), contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+
+            WriteConsumerProject(root, output);
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try
+            {
+                using var cleanup = Reopen(kind, connectionString);
+                CleanupSelfReferencingOneToManyForeignKey(cleanup, provider, nodeTable);
+            }
+            catch
+            {
+                // Best-effort cleanup; failed cleanup should not hide the original assertion.
+            }
+
+            TryDeleteDirectory(output);
+            if (sqliteFile is not null)
+            {
+                try { File.Delete(sqliteFile); } catch { }
+            }
+        }
+    }
+
     private static void SetupSelfReferencingOneToOneForeignKey(
         DbConnection connection,
         DatabaseProvider provider,
@@ -121,4 +197,36 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         DatabaseProvider provider,
         string personTable)
         => Execute(connection, $"DROP TABLE IF EXISTS {provider.Escape(personTable)}");
+
+    private static void SetupSelfReferencingOneToManyForeignKey(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind,
+        string nodeTable,
+        string fkName)
+    {
+        CleanupSelfReferencingOneToManyForeignKey(connection, provider, nodeTable);
+
+        var node = provider.Escape(nodeTable);
+        var id = provider.Escape("Id");
+        var managerId = provider.Escape("ManagerId");
+        var name = provider.Escape("Name");
+        var idType = kind == ProviderKind.Sqlite ? "INTEGER" : "int";
+        var text = kind switch
+        {
+            ProviderKind.SqlServer => "nvarchar(80)",
+            ProviderKind.MySql => "varchar(80)",
+            _ => "text"
+        };
+
+        Execute(connection,
+            $"CREATE TABLE {node} ({id} {idType} NOT NULL PRIMARY KEY, {managerId} {idType} NULL, {name} {text} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(fkName)} FOREIGN KEY ({managerId}) REFERENCES {node} ({id}))");
+    }
+
+    private static void CleanupSelfReferencingOneToManyForeignKey(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string nodeTable)
+        => Execute(connection, $"DROP TABLE IF EXISTS {provider.Escape(nodeTable)}");
 }

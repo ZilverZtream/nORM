@@ -15,6 +15,8 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string SelfOnePersonTable = "ScaffoldLiveSelfOnePerson";
     private const string SelfOnePersonFkName = "FK_ScaffoldLiveSelfOnePerson_Spouse";
     private const string SelfOnePersonIndexName = "UX_ScaffoldLiveSelfOnePerson_Spouse";
+    private const string SelfManyNodeTable = "ScaffoldLiveSelfManyNode";
+    private const string SelfManyNodeFkName = "FK_ScaffoldLiveSelfManyNode_Manager";
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
@@ -66,6 +68,55 @@ public sealed partial class LiveProviderScaffoldingParityTests
         }
     }
 
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_generates_self_referencing_one_to_many_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupSelfReferencingOneToManyForeignKeyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_self_one_to_many_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldSelfOneToManyContext",
+                    new ScaffoldOptions { Tables = new[] { SelfManyNodeTable }, OverwriteFiles = false });
+
+                var nodeCode = await File.ReadAllTextAsync(Path.Combine(dir, SelfManyNodeTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldSelfOneToManyContext.cs"));
+
+                Assert.Contains("[ForeignKey(nameof(ManagerId))]", nodeCode, StringComparison.Ordinal);
+                Assert.Matches(@"public (int|long)\? ManagerId \{ get; set; \}", nodeCode);
+                Assert.Contains($"public {SelfManyNodeTable}? Manager {{ get; set; }}", nodeCode, StringComparison.Ordinal);
+                Assert.Contains($"public List<{SelfManyNodeTable}> {SelfManyNodeTable}sByManagerId {{ get; set; }} = new();", nodeCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"public {SelfManyNodeTable}? {SelfManyNodeTable} {{ get; set; }}", nodeCode, StringComparison.Ordinal);
+                Assert.Contains($".HasMany(p => p.{SelfManyNodeTable}sByManagerId)", contextCode, StringComparison.Ordinal);
+                Assert.Contains(".WithOne(d => d.Manager)", contextCode, StringComparison.Ordinal);
+                Assert.Contains(ExpectedCascadeForeignKey(kind, "d => d.ManagerId", "p => p.Id", SelfManyNodeFkName), contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownSelfReferencingOneToManyForeignKeyAsync(connection, provider, kind);
+            }
+        }
+    }
+
     private static async Task SetupSelfReferencingUniqueDependentForeignKeyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await TeardownSelfReferencingUniqueDependentForeignKeyAsync(connection, provider, kind);
@@ -87,6 +138,32 @@ public sealed partial class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(kind, SelfOnePersonTable, provider.Escape(SelfOnePersonTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task SetupSelfReferencingOneToManyForeignKeyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownSelfReferencingOneToManyForeignKeyAsync(connection, provider, kind);
+
+        var node = provider.Escape(SelfManyNodeTable);
+        var id = provider.Escape("Id");
+        var managerId = provider.Escape("ManagerId");
+        var name = provider.Escape("Name");
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {node} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {managerId} {IntType(kind)} NULL, {name} {TextType(kind, 80)} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(SelfManyNodeFkName)} FOREIGN KEY ({managerId}) REFERENCES {node} ({id}))");
+    }
+
+    private static async Task TeardownSelfReferencingOneToManyForeignKeyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, SelfManyNodeTable, provider.Escape(SelfManyNodeTable)));
         }
         catch
         {

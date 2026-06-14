@@ -693,7 +693,7 @@ must be reviewed and edited like handwritten model code.
   FK cascade/non-cascade preservation, computed/generated column write
   exclusion, relationship suppression when the principal key cannot be
   generated safely, schema-qualified many-to-many join table preservation,
-  self-referencing FK role-based navigation naming,
+  self-referencing one-to-many and one-to-one FK role-based navigation naming,
   self-referencing pure many-to-many join scaffolding,
   composite-key pure many-to-many join scaffolding,
   provider-specific partial/expression/included-column index diagnostics,
@@ -965,7 +965,8 @@ must be reviewed and edited like handwritten model code.
   combined real CLI scaffold. Composite unique-dependent FKs are
   verified as required one-to-one relationships through the real CLI, and
   nullable composite unique-dependent FKs are also verified as optional one-to-one relationships
-  through the same command path. Self-referencing unique dependent FKs are verified
+  through the same command path. Self-referencing FKs are verified as role-named
+  one-to-many relationships through the real CLI path. Self-referencing unique dependent FKs are verified
   as role-named one-to-one relationships through the real CLI path. Shared primary-key FK shapes are verified as
   one-to-one relationships through the real CLI as well. Keyless dependent FK shapes are verified
   through the real CLI to remain read-only, navigation-free, and reported as
@@ -1014,7 +1015,8 @@ must be reviewed and edited like handwritten model code.
 - `LiveProviderScaffoldingParityTests` covers single-column FK relationship
   scaffolding, one-to-one reference navigation generation for required and
   optional single-column, required and optional composite, shared-primary-key,
-  self-referencing unique dependent, and role-named multiple unique dependent FKs, composite-FK relationship generation when the FK targets the
+  self-referencing one-to-many, self-referencing unique dependent,
+  and role-named multiple unique dependent FKs, composite-FK relationship generation when the FK targets the
   generated primary key, composite-FK diagnostics for unsupported relationship
   shapes, single-column nullable and non-null alternate-key FK generation,
   dynamic scaffolding of computed/generated columns, identity columns,
