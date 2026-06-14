@@ -11,7 +11,7 @@ namespace nORM.Scaffolding
     {
         public static async Task<IReadOnlyList<ScaffoldSkippedObjectInfo>> GetSkippedObjectsAsync(DbConnection connection, DatabaseProvider provider)
         {
-            var objects = await QuerySkippedObjectsAsync(connection, SkippedObjectSql).ConfigureAwait(false);
+            var objects = await QuerySkippedObjectsAsync(connection, GetSkippedObjectSql()).ConfigureAwait(false);
             return await AttachSkippedObjectCommentsAsync(connection, provider, objects).ConfigureAwait(false);
         }
     }
