@@ -77,9 +77,13 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL expression INCLUDE metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_null_sort_order_index_metadata"] =
                 Expect("PostgreSQL NULLS FIRST/LAST index metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldCliPostgresIndexFacetTests.cs::Dotnet_norm_scaffold_emits_postgres_null_sort_order_index_metadata"] =
+                Expect("PostgreSQL NULLS FIRST/LAST index metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_reports_postgres_expression_btree_key_options_as_provider_owned"] =
                 Expect("PostgreSQL expression B-tree operator-class/key options are PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_nulls_not_distinct_unique_index_metadata"] =
+                Expect("PostgreSQL NULLS NOT DISTINCT unique index metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldCliPostgresIndexFacetTests.cs::Dotnet_norm_scaffold_emits_postgres_nulls_not_distinct_unique_index_metadata"] =
                 Expect("PostgreSQL NULLS NOT DISTINCT unique index metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_sqlserver_native_temporal_tables_and_marks_them_read_only"] =
                 Expect("SQL Server system-versioned temporal tables are SQL Server-specific.", "SqlServer"),
