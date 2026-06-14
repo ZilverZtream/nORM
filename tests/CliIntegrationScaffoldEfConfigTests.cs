@@ -402,6 +402,52 @@ public partial class CliIntegrationTests
         }
     }
 
+    [Theory]
+    [InlineData("scaffold", "Scaffold requires a database connection string.")]
+    [InlineData("scaffold \"Data Source=:memory:\"", "Scaffold requires a database provider.")]
+    [InlineData("scaffold \"Data Source=:memory:\" sqlite --bad", "Unrecognized scaffold argument(s): --bad")]
+    public void Scaffold_dotnet_ef_config_json_default_applies_to_early_command_errors(string arguments, string expectedError)
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_json_early_error_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+        var configuredOutput = "ConfiguredJsonErrors";
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                $$"""
+                {
+                  "json": true,
+                  "outputDir": "{{configuredOutput}}",
+                  "dryRun": true
+                }
+                """,
+                Encoding.UTF8);
+
+            var result = RunCli(arguments, workDir);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.True(string.IsNullOrWhiteSpace(result.Stderr), result.Stderr);
+
+            using var document = JsonDocument.Parse(result.Stdout);
+            var json = document.RootElement;
+            Assert.Equal("failed", json.GetProperty("status").GetString());
+            Assert.True(json.GetProperty("dryRun").GetBoolean());
+            Assert.Equal(Path.GetFullPath(Path.Combine(workDir, configuredOutput)), json.GetProperty("outputDirectory").GetString());
+            Assert.Contains(expectedError, json.GetProperty("error").GetString(), StringComparison.Ordinal);
+            Assert.False(json.GetProperty("warnings").GetProperty("hasDiagnostics").GetBoolean());
+            Assert.False(Directory.Exists(Path.Combine(workDir, configuredOutput)));
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
     [Fact]
     public void Scaffold_dotnet_ef_config_json_validation_failure_uses_effective_output_and_dry_run()
     {
