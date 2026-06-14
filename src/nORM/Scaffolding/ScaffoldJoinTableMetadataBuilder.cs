@@ -106,6 +106,9 @@ namespace nORM.Scaffolding
                     {
                         ["constraint"] = first.ConstraintName,
                         ["principalTable"] = ScaffoldForeignKeyShape.TableKey(first.PrincipalSchema, first.PrincipalTable),
+                        ["declaredColumnCount"] = first.ColumnCount,
+                        ["metadataRowCount"] = rows.Length,
+                        ["metadataComplete"] = IsForeignKeyMetadataComplete(rows),
                         ["dependentColumns"] = rows.Select(static row => row.DependentColumn).ToArray(),
                         ["principalColumns"] = rows.Select(static row => row.PrincipalColumn).ToArray(),
                         ["onDelete"] = ScaffoldForeignKeyShape.NormalizeReferentialAction(first.OnDelete),
@@ -114,5 +117,10 @@ namespace nORM.Scaffolding
                     };
                 })
                 .ToArray();
+
+        private static bool IsForeignKeyMetadataComplete(IReadOnlyList<ScaffoldForeignKeyInfo> rows)
+            => rows.Count > 0
+               && rows[0].ColumnCount == rows.Count
+               && rows.All(row => row.ColumnCount == rows.Count);
     }
 }

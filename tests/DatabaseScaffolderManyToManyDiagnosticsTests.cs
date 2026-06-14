@@ -372,6 +372,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.False(metadata.GetProperty("hasExactForeignKeyUniqueIndex").GetBoolean());
             Assert.Contains(metadata.GetProperty("foreignKeys").EnumerateArray(), item =>
                 item.GetProperty("principalTable").GetString() == "Author" &&
+                item.GetProperty("declaredColumnCount").GetInt32() == 1 &&
+                item.GetProperty("metadataRowCount").GetInt32() == 1 &&
+                item.GetProperty("metadataComplete").GetBoolean() &&
                 string.Join(",", item.GetProperty("dependentColumns").EnumerateArray().Select(column => column.GetString())) == "AuthorId" &&
                 string.Join(",", item.GetProperty("principalColumns").EnumerateArray().Select(column => column.GetString())) == "Id");
         }

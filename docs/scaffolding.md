@@ -1293,7 +1293,8 @@ Each row also includes stable diagnostic metadata:
   For `SCF002` possible many-to-many rows this includes bridge evidence such
   as `foreignKeyColumns`, `primaryKeyColumns`, `payloadColumns`,
   `databaseGeneratedColumns`, `identityColumns`, `nullableForeignKeyColumns`,
-  bridge-key booleans, and per-constraint principal/dependent column maps.
+  bridge-key booleans, and per-constraint principal/dependent column maps plus
+  declared/observed FK metadata row counts.
   For `providerOwnedSchemaFeatures` rows this includes stable kind-specific
   facts where nORM can derive them, such as keyless-table
   `readOnlyEntity`/`generatedWritesSupported`, `table`, ordered `columns`,
