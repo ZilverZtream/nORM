@@ -98,6 +98,55 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_json_dry_run_fail_on_warnings_reports_diagnostics_without_writing_output_files()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_json_dry_warn_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_json_dry_warn_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    CREATE TABLE WarningRow (
+                        Status TEXT NOT NULL
+                    );
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --dry-run --fail-on-warnings --json",
+                root);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.True(string.IsNullOrWhiteSpace(result.Stderr), result.Stderr);
+            Assert.False(Directory.Exists(output));
+
+            using var document = JsonDocument.Parse(result.Stdout);
+            var json = document.RootElement;
+            var warnings = json.GetProperty("warnings");
+            Assert.Equal("failed", json.GetProperty("status").GetString());
+            Assert.True(json.GetProperty("dryRun").GetBoolean());
+            Assert.Equal(Path.GetFullPath(output), json.GetProperty("outputDirectory").GetString());
+            Assert.Contains("Scaffolding produced warnings", json.GetProperty("error").GetString(), StringComparison.Ordinal);
+            Assert.True(warnings.GetProperty("hasDiagnostics").GetBoolean());
+            Assert.False(warnings.GetProperty("reportsWritten").GetBoolean());
+            Assert.Equal(1, warnings.GetProperty("totalWarnings").GetInt32());
+            Assert.Equal(1, warnings.GetProperty("codes").GetProperty("SCF116").GetInt32());
+            Assert.Equal(1, warnings.GetProperty("categories").GetProperty("table-shape").GetInt32());
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
     public void Scaffold_with_warnings_returns_zero_and_prints_warning_paths()
     {
         var root = FindRepositoryRoot();

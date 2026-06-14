@@ -307,6 +307,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("environment-specific appsettings lookup builds", doc, StringComparison.Ordinal);
         Assert.Contains("Output-safety semantics", doc, StringComparison.Ordinal);
         Assert.Contains("successful `--dry-run --json`", doc, StringComparison.Ordinal);
+        Assert.Contains("With `--dry-run", doc, StringComparison.Ordinal);
+        Assert.Contains("`warnings.reportsWritten` is `false`", doc, StringComparison.Ordinal);
         Assert.Contains("`--no-overwrite`", doc, StringComparison.Ordinal);
         Assert.Contains("`--force --json` removes stale", doc, StringComparison.Ordinal);
         Assert.Contains("CSV `--tables` filters", doc, StringComparison.Ordinal);

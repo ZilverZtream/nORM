@@ -517,9 +517,12 @@ must be reviewed and edited like handwritten model code.
   without creating the output directory, deleting stale warning reports, or
   writing generated files. The CLI dry run uses an isolated temporary output
   directory so it can print the same warning summary as a real run while
-  leaving the requested output path untouched.
+  leaving the requested output path untouched. With `--dry-run
+  --fail-on-warnings --json`, diagnostics still produce a failed
+  machine-readable result, but `warnings.reportsWritten` is `false` and the
+  requested output directory is not created.
 - Optional warning enforcement through `ScaffoldOptions.FailOnWarnings` and CLI
-  `--fail-on-warnings`, which fails the scaffold run after writing
+  `--fail-on-warnings`, which fails real scaffold runs after writing
   `nORM.ScaffoldWarnings.md` and `nORM.ScaffoldWarnings.json`.
 - Optional provider-bound routine wrappers through
   `ScaffoldOptions.EmitRoutineStubs` and CLI `--emit-routine-stubs`.
