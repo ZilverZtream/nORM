@@ -557,6 +557,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("provider-specific-default", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("QUOTE(column_default)", mySqlUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("REPLACE(column_default, CHAR(92, 39), CHAR(39))", mySqlUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("LOWER(COALESCE(extra, '')) LIKE '%on update%'", mySqlUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("LOWER(COALESCE(extra, '')) LIKE '%on update%'", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("providerSpecificIdentityStrategyTableKeys.Contains(tableKey)", source, StringComparison.Ordinal);
         Assert.Contains("provider-specific-identity-strategy", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("referential-action-not-scaffoldable", unsupportedMetadataSource, StringComparison.Ordinal);
@@ -567,6 +569,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("scaffoldable citext/JSON/XML/UUID scalar storage", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("CURRENT_TIMESTAMP()", doc, StringComparison.Ordinal);
         Assert.Contains("CURRENT_TIMESTAMP(6)", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL `ON UPDATE` timestamp defaults remain provider-specific diagnostics", doc, StringComparison.Ordinal);
         Assert.Contains("Unsupported/provider-specific FK referential action discovered", doc, StringComparison.Ordinal);
         Assert.Contains("Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted", doc, StringComparison.Ordinal);
         Assert.Contains("'draft'::text", doc, StringComparison.Ordinal);

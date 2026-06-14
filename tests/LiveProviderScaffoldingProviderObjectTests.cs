@@ -181,6 +181,65 @@ public sealed partial class LiveProviderScaffoldingParityTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_reports_mysql_on_update_timestamp_default_as_read_only()
+    {
+        var live = LiveProviderFactory.OpenLive(ProviderKind.MySql);
+        if (Skip.If(live is null, "Live provider MySQL not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            var table = provider.Escape(MySqlOnUpdateTimestampTable);
+            var id = provider.Escape("Id");
+            var updatedAt = provider.Escape("UpdatedAt");
+            await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlOnUpdateTimestampTable, table));
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_mysql_on_update_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await ExecuteAsync(connection,
+                    $"CREATE TABLE {table} ({id} INT NOT NULL PRIMARY KEY, {updatedAt} TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)");
+
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldMySqlOnUpdateTimestampContext",
+                    new ScaffoldOptions { Tables = new[] { MySqlOnUpdateTimestampTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(Path.Combine(dir, MySqlOnUpdateTimestampTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldMySqlOnUpdateTimestampContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(".Property(e => e.UpdatedAt).HasDefaultValueSql", contextCode, StringComparison.Ordinal);
+                var defaultDiagnostic = Assert.Single(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "Default" &&
+                    item.GetProperty("name").GetString() == "UpdatedAt");
+                Assert.Equal("SCF100", defaultDiagnostic.GetProperty("code").GetString());
+                Assert.Contains("on update", defaultDiagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
+                var metadata = defaultDiagnostic.GetProperty("metadata");
+                Assert.Contains("on update", metadata.GetProperty("defaultSql").GetString(), StringComparison.OrdinalIgnoreCase);
+                Assert.True(metadata.GetProperty("readOnlyEntity").GetBoolean());
+                Assert.False(metadata.GetProperty("generatedWritesSupported").GetBoolean());
+                Assert.Equal("provider-specific-default", metadata.GetProperty("reason").GetString());
+
+                var dynamicType = await new DynamicEntityTypeGenerator().GenerateEntityTypeAsync(connection, MySqlOnUpdateTimestampTable);
+                Assert.NotNull(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await ExecuteAsync(connection, DropTable(ProviderKind.MySql, MySqlOnUpdateTimestampTable, table));
+            }
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact()
     {
         var live = LiveProviderFactory.OpenLive(ProviderKind.Sqlite);

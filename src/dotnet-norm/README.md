@@ -252,7 +252,9 @@ PostgreSQL casts or MySQL character-set literals, and PostgreSQL typed-cast
 defaults, are emitted as `HasDefaultValueSql(...)`; SQL Server
 explicit non-system default-constraint names are preserved with
 `HasDefaultValueSql(..., constraintName: ...)`. Only unmodeled
-complex/provider-specific defaults make the generated entity read-only.
+complex/provider-specific defaults make the generated entity read-only. MySQL
+`ON UPDATE` timestamp defaults remain provider-specific diagnostics rather than
+plain default metadata because the database mutates them during updates.
 Foreign keys from keyless dependent tables are reported as relationship
 diagnostics instead of generating unsafe navigations.
 Foreign keys with unknown provider-specific referential actions also suppress

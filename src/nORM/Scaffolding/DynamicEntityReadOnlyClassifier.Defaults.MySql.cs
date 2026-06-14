@@ -8,6 +8,8 @@ namespace nORM.Scaffolding
         private static bool HasMySqlUnmodeledDefaults(DbConnection connection, string? schemaName, string tableName)
             => QueryHasUnmodeledDefault(connection, """
                 SELECT CASE
+                           WHEN LOWER(COALESCE(extra, '')) LIKE '%on update%'
+                           THEN TRIM(CONCAT(COALESCE(column_default, ''), ' ', extra))
                            WHEN data_type IN ('char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', 'enum', 'set')
                                 AND (LOWER(column_default) LIKE 'lower(%' OR LOWER(column_default) LIKE 'upper(%')
                            THEN REPLACE(column_default, CHAR(92, 39), CHAR(39))
@@ -29,7 +31,10 @@ namespace nORM.Scaffolding
                 FROM information_schema.columns
                 WHERE table_schema = COALESCE(@schemaName, DATABASE())
                   AND table_name = @tableName
-                  AND column_default IS NOT NULL
+                  AND (
+                      column_default IS NOT NULL
+                      OR LOWER(COALESCE(extra, '')) LIKE '%on update%'
+                  )
                 """, schemaName, tableName);
     }
 }

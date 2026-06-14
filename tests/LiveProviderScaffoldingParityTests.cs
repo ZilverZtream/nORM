@@ -195,6 +195,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string SqlServerTemporalBaseTable = "ScaffoldLiveTemporalOrder";
     private const string SqlServerTemporalHistoryTable = "ScaffoldLiveTemporalOrderHistory";
     private const string PostgresSerialTable = "ScaffoldLivePostgresSerial";
+    private const string MySqlOnUpdateTimestampTable = "ScaffoldLiveOnUpdateTimestamp";
     private const string DynamicComputedTable = "ScaffoldLiveDynamicComputed";
     private const string DynamicIdentityTable = "ScaffoldLiveDynamicIdentity";
     private const string DynamicCompositeKeyTable = "ScaffoldLiveDynamicCompositeKey";

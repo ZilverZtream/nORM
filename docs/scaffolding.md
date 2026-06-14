@@ -138,6 +138,10 @@ must be reviewed and edited like handwritten model code.
   before that allowlist is applied. This is DDL metadata only:
   it does not mark the column as database-generated and does not cause nORM to
   omit the property from runtime inserts.
+  MySQL `ON UPDATE` timestamp defaults are not promoted as plain default
+  metadata because the database mutates the column during updates; they remain
+  provider-specific default diagnostics and make the generated entity read-only
+  until the update semantics are modeled explicitly.
   Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
@@ -1133,6 +1137,10 @@ must be reviewed and edited like handwritten model code.
   `<table>_<columns>_check` names, and MySQL default `<table>_chk_<n>` names
   are replaced with stable generated `CK_<Entity>_<hash>` names so scaffold
   output preserves the predicate without carrying generated catalog artifacts.
+  MySQL `ON UPDATE` timestamp defaults remain provider-specific default
+  diagnostics rather than being flattened into plain `HasDefaultValueSql`
+  metadata, because generated writes cannot infer the provider-managed update
+  behavior safely.
   Computed/generated column expressions are emitted as provider-bound migration metadata with
   `HasComputedColumnSql`; column collations are emitted as provider-bound
   migration metadata with `HasCollation`; complex/provider-specific defaults
@@ -1339,7 +1347,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | --- | --- | --- |
 | `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact ordered unfiltered unique index. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
-| `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary literals, literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults with provider-normalized PostgreSQL casts or MySQL character-set literals, and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; SQL Server explicit non-system default-constraint names are preserved with the optional `constraintName` argument. Unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
+| `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary literals, literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults with provider-normalized PostgreSQL casts or MySQL character-set literals, and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; SQL Server explicit non-system default-constraint names are preserved with the optional `constraintName` argument. MySQL `ON UPDATE` timestamp defaults remain provider-specific diagnostics because they mutate values during updates. Unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`; SQL Server, PostgreSQL, and MySQL provider-default names are replaced with stable generated names. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |

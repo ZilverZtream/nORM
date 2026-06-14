@@ -99,6 +99,43 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("[Amount]>(0)", check.Sql);
     }
 
+    [Fact]
+    public void BuildFeatureConfigurations_KeepsMySqlOnUpdateTimestampAsProviderOwnedDefault()
+    {
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Orders"] = "Order"
+        };
+        var propertiesByTable = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Orders"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["UpdatedAt"] = "UpdatedAt"
+            }
+        };
+        var features = new[]
+        {
+            new ScaffoldFeatureInput(
+                0,
+                new ScaffoldUnsupportedFeatureInfo(
+                    "Orders",
+                    "Default",
+                    "UpdatedAt",
+                    "CURRENT_TIMESTAMP DEFAULT_GENERATED on update CURRENT_TIMESTAMP"))
+        };
+
+        var configurations = ScaffoldFeatureConfigurationBuilder.BuildFeatureConfigurations(
+            features,
+            entityByTable,
+            propertiesByTable,
+            new Dictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Empty(configurations.DefaultValuesByTable);
+        Assert.Contains("Orders", configurations.ProviderSpecificDefaultTableKeys);
+        Assert.Contains("Orders", configurations.ProviderOwnedWriteBlockedTableKeys);
+        Assert.Empty(configurations.GeneratedFeatureIndexes);
+    }
+
     [Theory]
     [InlineData("character varying(320)", "character varying(320)")]
     [InlineData("varchar(64)", "character varying(64)")]

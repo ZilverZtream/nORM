@@ -249,6 +249,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("lower('active'); DROP TABLE Users")]
     [InlineData("lower('active'::text); DROP TABLE Users")]
     [InlineData("lower(_utf8mb4 Status)")]
+    [InlineData("CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP")]
+    [InlineData("CURRENT_TIMESTAMP DEFAULT_GENERATED on update CURRENT_TIMESTAMP")]
     [InlineData("replace('NEW','N','n')")]
     public void NormalizeDefaultSql_StaticAndDynamic_RejectUnsafePostgresCasts(string raw)
     {

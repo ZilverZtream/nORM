@@ -5,6 +5,8 @@ namespace nORM.Scaffolding
         private const string MySqlUnsupportedFeatureSql = """
             SELECT NULL AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind,
                 CASE
+                    WHEN LOWER(COALESCE(extra, '')) LIKE '%on update%'
+                    THEN TRIM(CONCAT(COALESCE(column_default, ''), ' ', extra))
                     WHEN data_type IN ('char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', 'enum', 'set')
                          AND (LOWER(column_default) LIKE 'lower(%' OR LOWER(column_default) LIKE 'upper(%')
                     THEN REPLACE(column_default, CHAR(92, 39), CHAR(39))
@@ -24,7 +26,11 @@ namespace nORM.Scaffolding
                     ELSE column_default
                 END AS Detail
             FROM information_schema.columns
-            WHERE table_schema = DATABASE() AND column_default IS NOT NULL
+            WHERE table_schema = DATABASE()
+              AND (
+                  column_default IS NOT NULL
+                  OR LOWER(COALESCE(extra, '')) LIKE '%on update%'
+              )
             UNION ALL
             SELECT NULL, table_name, column_name, 'Computed',
                 CONCAT(
