@@ -29,7 +29,12 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Postgres.Arrays.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Postgres.Domains.cs"));
         var foreignKeyDiscoverySource = ReadForeignKeyDiscoverySource();
-        var featureMapBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.cs");
+        var featureMapBuilderSource = string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.Details.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.Names.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.Precision.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.WriteBlocking.cs"));
         var columnDiscoverySource = ReadColumnDiscoverySource();
         var contextWriterSource = ReadContextWriterSource();
         var diagnosticsWriterSource = ReadDiagnosticsWriterSource();
