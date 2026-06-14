@@ -492,11 +492,15 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("'draft'::text", doc, StringComparison.Ordinal);
         Assert.Contains("0xDEADBEEF", doc, StringComparison.Ordinal);
         Assert.Contains("X'DEADBEEF'", doc, StringComparison.Ordinal);
+        Assert.Contains("LOWER('value')", doc, StringComparison.Ordinal);
+        Assert.Contains("UPPER('value')", doc, StringComparison.Ordinal);
         Assert.Contains("now()::timestamp without time zone", doc, StringComparison.Ordinal);
         Assert.Contains("now() AT TIME ZONE 'utc'", doc, StringComparison.Ordinal);
         Assert.Contains("timezone('utc', now())", doc, StringComparison.Ordinal);
         Assert.Contains("Safe PostgreSQL cast suffixes", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("Hex/binary literals", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("Literal-only string normalization defaults", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("(?:lower|upper)", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("0x[0-9a-f]+", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("x'(?:[0-9a-f]{2})*'", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("Strict PostgreSQL UTC timestamp defaults", defaultValidator, StringComparison.Ordinal);

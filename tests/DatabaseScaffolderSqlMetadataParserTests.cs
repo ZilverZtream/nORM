@@ -213,6 +213,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("now() AT TIME ZONE 'utc'")]
     [InlineData("CURRENT_TIMESTAMP(6) AT TIME ZONE 'utc'::text")]
     [InlineData("timezone('utc'::text, now())")]
+    [InlineData("lower('NEW')")]
+    [InlineData("UPPER(N'pending')")]
+    [InlineData("lower('can''t ship')")]
     public void NormalizeDefaultSql_StaticAndDynamic_AcceptSafePostgresCasts(string raw)
     {
         var staticResult = InvokeTryNormalizeScaffoldDefaultSql(raw);
@@ -237,6 +240,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [InlineData("timezone('utc', unsafe())")]
     [InlineData("timezone('utc', now()); DROP TABLE Users")]
     [InlineData("'active'::\"quoted\"")]
+    [InlineData("lower(Status)")]
+    [InlineData("upper(current_user)")]
+    [InlineData("lower('active'); DROP TABLE Users")]
+    [InlineData("replace('NEW','N','n')")]
     public void NormalizeDefaultSql_StaticAndDynamic_RejectUnsafePostgresCasts(string raw)
     {
         Assert.False(InvokeTryNormalizeScaffoldDefaultSql(raw).Normalized);

@@ -300,7 +300,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithUnmodeledDefault_MarksTypeReadOnly()
+    public async Task ScaffoldAsync_WithLiteralStringNormalizationDefault_PromotesDefaultAndKeepsTypeWritable()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -309,6 +309,41 @@ public partial class DatabaseScaffolderPrivateMethodTests
             CREATE TABLE DefaultOwned (
                 Id INTEGER PRIMARY KEY,
                 Status TEXT NOT NULL DEFAULT (lower('NEW'))
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "DefaultOwnedCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "DefaultOwned.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "DefaultOwnedCtx.cs"));
+
+            Assert.DoesNotContain("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
+            Assert.Contains("mb.Entity<DefaultOwned>().Property(e => e.Status).HasDefaultValueSql(\"lower('NEW')\");", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            var dynamicType = new DynamicEntityTypeGenerator().GenerateEntityType(cn, "DefaultOwned");
+            Assert.Null(dynamicType.GetCustomAttributes(typeof(nORM.Configuration.ReadOnlyEntityAttribute), inherit: true).SingleOrDefault());
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ScaffoldAsync_WithUnmodeledDefault_MarksTypeReadOnly()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE DefaultOwned (
+                Id INTEGER PRIMARY KEY,
+                Status TEXT NOT NULL DEFAULT (coalesce('NEW','OLD'))
             );
             """;
         cmd.ExecuteNonQuery();
@@ -330,7 +365,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                         item.GetProperty("name").GetString() == "Status");
             Assert.Equal("SCF100", defaultDiagnostic.GetProperty("code").GetString());
             var metadata = defaultDiagnostic.GetProperty("metadata");
-            Assert.Contains("lower('NEW')", metadata.GetProperty("defaultSql").GetString(), StringComparison.Ordinal);
+            Assert.Contains("coalesce('NEW','OLD')", metadata.GetProperty("defaultSql").GetString(), StringComparison.Ordinal);
             Assert.True(metadata.GetProperty("readOnlyEntity").GetBoolean());
             Assert.False(metadata.GetProperty("generatedWritesSupported").GetBoolean());
             Assert.Equal("provider-specific-default", metadata.GetProperty("reason").GetString());

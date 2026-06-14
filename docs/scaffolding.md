@@ -117,8 +117,9 @@ must be reviewed and edited like handwritten model code.
   identity metadata, not as separate provider-owned warning rows.
   Simple SQL defaults that pass nORM's migration default allowlist (numeric,
   boolean, `NULL`, single-quoted ANSI/Unicode string literals, safe hex/binary
-  literals such as `0xDEADBEEF` and `X'DEADBEEF'`, and known no-argument
-  date/time/UUID functions, including no-argument `CURRENT_TIMESTAMP()`/
+  literals such as `0xDEADBEEF` and `X'DEADBEEF'`, literal-only
+  `LOWER('value')`/`UPPER('value')` string normalization defaults, and known
+  no-argument date/time/UUID functions, including no-argument `CURRENT_TIMESTAMP()`/
   `CURRENT_DATE()`/`CURRENT_TIME()` spellings, precision-limited MySQL
   temporal forms such as `CURRENT_TIMESTAMP(6)`/`UTC_TIMESTAMP(6)`, and safe
   PostgreSQL cast suffixes such as `'draft'::text` and
@@ -1050,7 +1051,8 @@ must be reviewed and edited like handwritten model code.
   read-only join entities instead of generating writable skip navigations.
 - Provider-specific complex default constraints, column types, triggers,
   temporal tables, and keyless tables.
-  Simple safe default literals/functions, including safe hex/binary literals
+  Simple safe default literals/functions, including safe hex/binary literals,
+  literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults,
   and safe PostgreSQL typed-cast defaults, are emitted as migration metadata with
   `HasDefaultValueSql`; SQL Server explicit non-system default-constraint
   names are preserved with `HasDefaultValueSql(..., constraintName: ...)`;
@@ -1267,7 +1269,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | --- | --- | --- |
 | `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact ordered unfiltered unique index. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
-| `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary literals and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; SQL Server explicit non-system default-constraint names are preserved with the optional `constraintName` argument. Unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
+| `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary literals, literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults, and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; SQL Server explicit non-system default-constraint names are preserved with the optional `constraintName` argument. Unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`; SQL Server, PostgreSQL, and MySQL provider-default names are replaced with stable generated names. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
