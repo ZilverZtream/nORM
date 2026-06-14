@@ -368,6 +368,32 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildSelection_WithUnfilteredTableAndQueryArtifactKeyCollision_ThrowsBeforeAmbiguousGeneration()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("Report", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "Report", "View", "SQL Server view", null)
+        };
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ScaffoldObjectSelectionBuilder.BuildSelection(
+                tables,
+                skippedObjects,
+                new ScaffoldOptions(),
+                new SqliteProvider(),
+                null));
+
+        Assert.Contains("display names collide", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Table dbo.Report", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("View dbo.Report", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("same-schema object-kind collisions", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithMissingTableFilter_ThrowsNormConfigurationException()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
