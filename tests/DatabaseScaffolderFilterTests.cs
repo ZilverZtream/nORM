@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -536,6 +537,53 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("Routine", routine.Kind);
         Assert.Equal("billing", routine.Schema);
         Assert.Equal("CalculateTotal", routine.Name);
+    }
+
+    [Fact]
+    public void BuildSelection_WithSchemaFilterAndRoutineStubOptIn_SelectsRoutinesInSchema()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("billing", "CalculateTotal", "Routine", "SQL Server stored procedure; parameters=0", null),
+            new ScaffoldSkippedObjectInfo("audit", "CalculateTotal", "Routine", "SQL Server stored procedure; parameters=0", null),
+            new ScaffoldSkippedObjectInfo("billing", "NightlyEvent", "Event", "MySQL event", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            Array.Empty<ScaffoldTableInfo>(),
+            skippedObjects,
+            new ScaffoldOptions { Schemas = new[] { "billing" }, EmitRoutineStubs = true },
+            new SqliteProvider(),
+            null);
+
+        Assert.Empty(selection.Tables);
+        var routine = Assert.Single(selection.SkippedObjects.Where(obj => obj.Kind == "Routine"));
+        Assert.Equal("billing", routine.Schema);
+        Assert.Equal("CalculateTotal", routine.Name);
+        Assert.Contains(selection.SkippedObjects, obj => obj.Kind == "Event" && obj.Name == "NightlyEvent");
+    }
+
+    [Fact]
+    public void BuildSelection_WithSchemaFilterAndSequenceStubOptIn_SelectsSequencesInSchema()
+    {
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("billing", "InvoiceNumber", "Sequence", "SQL Server sequence; dataType=bigint", null),
+            new ScaffoldSkippedObjectInfo("audit", "InvoiceNumber", "Sequence", "SQL Server sequence; dataType=bigint", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            Array.Empty<ScaffoldTableInfo>(),
+            skippedObjects,
+            new ScaffoldOptions { Schemas = new[] { "billing" }, EmitSequenceStubs = true },
+            new SqliteProvider(),
+            null);
+
+        Assert.Empty(selection.Tables);
+        var sequence = Assert.Single(selection.SkippedObjects);
+        Assert.Equal("Sequence", sequence.Kind);
+        Assert.Equal("billing", sequence.Schema);
+        Assert.Equal("InvoiceNumber", sequence.Name);
     }
 
     [Fact]
