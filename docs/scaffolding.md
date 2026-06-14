@@ -240,9 +240,10 @@ must be reviewed and edited like handwritten model code.
   cascade behavior; valid database referential actions (`NO ACTION`,
   `CASCADE`, `SET NULL`, `RESTRICT`, `SET DEFAULT`) are emitted into generated
   fluent configuration, including `ON UPDATE` actions. Provider-owned FK
-  timing/match semantics such as PostgreSQL `DEFERRABLE` and `MATCH FULL`
-  remain relationship diagnostics instead of being flattened into ordinary
-  generated navigations. Relationships are emitted when the FK targets the
+  timing/match semantics such as PostgreSQL `DEFERRABLE` / `MATCH FULL` and
+  SQLite `MATCH FULL` / `DEFERRABLE INITIALLY DEFERRED` remain relationship
+  diagnostics instead of being flattened into ordinary generated navigations.
+  Relationships are emitted when the FK targets the
   generated principal primary key or an exact ordered unfiltered unique index exposed by provider
   metadata. Composite relationships are emitted when the ordered FK columns
   reference the exact generated composite primary key or an exact ordered unfiltered unique index.
@@ -939,7 +940,10 @@ must be reviewed and edited like handwritten model code.
   RESTRICT and SET DEFAULT referential actions where providers expose them.
   PostgreSQL deferrable FK timing semantics are verified as relationship
   diagnostics through the real CLI so they are not silently normalized into
-  ordinary generated navigations. It also
+  ordinary generated navigations. SQLite FK `MATCH FULL` / `DEFERRABLE`
+  semantics are parsed from `CREATE TABLE` SQL and verified as relationship
+  diagnostics because `PRAGMA foreign_key_list` does not preserve enough of
+  that provider-owned clause text. It also
   proves safe string/binary defaults, table CHECK constraints, computed/generated columns,
   column collations, provider-native table/column comments,
   explicit SQL Server/PostgreSQL primary-key constraint names,
@@ -1113,8 +1117,9 @@ must be reviewed and edited like handwritten model code.
   `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` are emitted
   into generated fluent configuration for delete/update actions. Unknown
   provider-specific action tokens and FK timing/match semantics such as
-  PostgreSQL `DEFERRABLE`, `INITIALLY DEFERRED`, and `MATCH FULL` are
-  discovered and reported in scaffold diagnostics, and generated
+  PostgreSQL `DEFERRABLE`, `INITIALLY DEFERRED`, and `MATCH FULL`, plus
+  SQLite `MATCH FULL` and `DEFERRABLE INITIALLY DEFERRED`, are discovered from
+  provider metadata or parsed DDL and reported in scaffold diagnostics, and generated
   navigations/fluent relationships for those FKs are suppressed so unknown
   provider behavior is not silently normalized to `NO ACTION`.
 - Owned types and inheritance inference.
@@ -1360,7 +1365,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
 | `SCF104` | `schema-feature` | Provider-specific column type discovered. SQLite declared `UUID`, `JSON`, and `XML`, SQL Server `xml`, PostgreSQL `citext`/`json`/`jsonb`/`xml`/`uuid` plus safe scalar arrays/simple enums, and MySQL `json`/`year`/simple `enum(...)` plus bounded simple `set(...)` are scaffolded as supported storage; MySQL unsigned integer and decimal/numeric columns, SQL Server alias types over scaffoldable scalar/binary bases, and PostgreSQL domains over safe scalar/array/enum base types preserve generated writes and bounded facets where provider metadata exposes them while remaining diagnostics because the DDL is provider-specific. Unsafe provider-specific declarations such as SQL Server/SQLite/MySQL spatial types like `GEOMETRY`/`POINT`, PostgreSQL network/search types such as `inet`, and larger or ambiguous MySQL `set(...)` declarations remain diagnostics and make the generated entity `[ReadOnlyEntity]` so generated writes fail closed. |
 | `SCF105` | `schema-feature` | Decimal precision/scale metadata discovered but not emitted. Parsed precision and precision/scale facets are emitted as `HasPrecision`; remaining rows indicate provider numeric facet text that needs explicit model configuration or provider migration DDL. |
-| `SCF106` | `relationship` | Unsupported/provider-specific FK referential action or FK timing/match semantic discovered. Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted in generated fluent configuration; PostgreSQL `DEFERRABLE`, `INITIALLY DEFERRED`, and `MATCH FULL` remain diagnostics so generated navigations are suppressed. |
+| `SCF106` | `relationship` | Unsupported/provider-specific FK referential action or FK timing/match semantic discovered. Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted in generated fluent configuration; PostgreSQL `DEFERRABLE`, `INITIALLY DEFERRED`, and `MATCH FULL`, plus SQLite `MATCH FULL` / `DEFERRABLE INITIALLY DEFERRED`, remain diagnostics so generated navigations are suppressed. |
 | `SCF107` | `relationship` | FK targets principal columns that are neither the generated primary key nor an exact ordered unfiltered unique index. |
 | `SCF108` | `schema-feature` | Provider rowversion/timestamp column discovered. Static and dynamic scaffolding emit `[Timestamp]` plus computed database-generation metadata so generated writes and concurrency checks can use the column; exact provider rowversion/timestamp DDL remains provider-owned. |
 | `SCF109` | `schema-feature` | Provider-specific identity strategy discovered. SQL Server `IDENTITY(seed, increment)` is emitted as `HasIdentityOptions`; unparsed strategies remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |

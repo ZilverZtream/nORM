@@ -21,6 +21,7 @@ public partial class ScaffoldingContractDocTests
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var foreignKeyDiscoverySqlSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sql.cs");
+        var foreignKeyDiscoverySource = ReadForeignKeyDiscoverySource();
         var featureMapBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.cs");
         var columnDiscoverySource = ReadColumnDiscoverySource();
         var contextWriterSource = ReadContextWriterSource();
@@ -31,6 +32,7 @@ public partial class ScaffoldingContractDocTests
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var sqliteUnsupportedSource = ReadSqliteUnsupportedFeatureSource();
         var sqliteDdlParserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.DeclaredTypes.cs");
+        var sqliteFkSemanticsTests = ReadRepoFile("tests", "DatabaseScaffolderSqliteFkSemanticsTests.cs");
         var dynamicSource = ReadDynamicEntitySource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
@@ -421,6 +423,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_reports_postgres_deferrable_fk_semantics_as_relationship_diagnostic", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("con.condeferrable", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
         Assert.Contains("con.confmatchtype", foreignKeyDiscoverySqlSource, StringComparison.Ordinal);
+        Assert.Contains("SQLite FK `MATCH FULL` / `DEFERRABLE`", doc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_WithSqliteMatchFullForeignKey_ReportsRelationshipDiagnostic", sqliteFkSemanticsTests, StringComparison.Ordinal);
+        Assert.Contains("ExtractForeignKeyProviderSemanticsByColumns", foreignKeyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("DEFERRABLE INITIALLY DEFERRED", sqliteFkSemanticsTests, StringComparison.Ordinal);
         Assert.Contains("safe string/binary defaults, table CHECK constraints", doc, StringComparison.Ordinal);
         Assert.Contains("computed/generated columns", doc, StringComparison.Ordinal);
         Assert.Contains("provider-native table/column comments", doc, StringComparison.Ordinal);
@@ -580,6 +586,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Unsupported/provider-specific FK referential action or FK timing/match semantic discovered", doc, StringComparison.Ordinal);
         Assert.Contains("FK timing/match semantic", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL `DEFERRABLE`", doc, StringComparison.Ordinal);
+        Assert.Contains("SQLite `MATCH FULL`", doc, StringComparison.Ordinal);
         Assert.Contains("Valid `NO ACTION`, `CASCADE`, `SET NULL`, `RESTRICT`, and `SET DEFAULT` actions are emitted", doc, StringComparison.Ordinal);
         Assert.Contains("'draft'::text", doc, StringComparison.Ordinal);
         Assert.Contains("0xDEADBEEF", doc, StringComparison.Ordinal);
