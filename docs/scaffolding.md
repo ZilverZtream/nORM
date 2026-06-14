@@ -955,7 +955,9 @@ must be reviewed and edited like handwritten model code.
   the warning report for provider-mobility review, and `[ReadOnlyEntity]` is
   not emitted. SQL Server rowversion concurrency metadata is verified through
   the real CLI as `[Timestamp]` plus computed database-generation metadata while
-  the provider-owned DDL remains visible as SCF108.
+  the provider-owned DDL remains visible as SCF108. SQL Server provider-native
+  temporal table diagnostics are verified through the real CLI as read-only
+  base/history entities with SCF115 metadata.
   Decimal precision plus
   bounded string/binary length, Unicode, and fixed-length facets are also
   verified through real CLI scaffolds on the providers whose catalogs expose

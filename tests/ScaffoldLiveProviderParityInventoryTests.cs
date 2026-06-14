@@ -91,6 +91,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL NULLS NOT DISTINCT unique index metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_sqlserver_native_temporal_tables_and_marks_them_read_only"] =
                 Expect("SQL Server system-versioned temporal tables are SQL Server-specific.", "SqlServer"),
+            ["LiveProviderScaffoldCliSqlServerTemporalTests.cs::Dotnet_norm_scaffold_reports_sqlserver_native_temporal_tables_and_marks_them_read_only"] =
+                Expect("SQL Server system-versioned temporal tables are SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_rejects_sqlserver_procedure_synonym_as_entity_filter"] =
                 Expect("SQL Server procedure synonyms are SQL Server-specific provider objects.", "SqlServer"),
             ["LiveProviderScaffoldCliSqlServerProcedureSynonymTests.cs::Dotnet_norm_scaffold_rejects_sqlserver_procedure_synonym_as_entity_filter"] =
