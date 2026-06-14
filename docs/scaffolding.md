@@ -990,6 +990,9 @@ must be reviewed and edited like handwritten model code.
   explicit join entities with payload-column diagnostics without composite-FK rejection.
   Filtered unique surrogate join tables are verified through the real CLI where
   providers expose filtered or partial indexes. They remain explicit entities instead of unsafe skip navigations.
+  Nullable-FK surrogate join tables are verified through the real CLI across all four
+  live providers; they remain explicit entities with `nullable-foreign-key`
+  diagnostics instead of unsafe skip navigations.
   Schema-qualified many-to-many join tables are verified through the real CLI
   with schema-aware `UsingTable` mapping.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
@@ -1022,6 +1025,7 @@ must be reviewed and edited like handwritten model code.
   dynamic scaffolding of computed/generated columns, identity columns,
   database-name preservation with role-named FK navigations,
   and composite primary-key ordinal order across live providers,
+  nullable-FK many-to-many bridge rejection,
   provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.

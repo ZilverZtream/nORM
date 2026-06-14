@@ -284,6 +284,29 @@ public sealed partial class LiveProviderScaffoldingParityTests
             $"CREATE UNIQUE INDEX {provider.Escape(FilteredStudentCourseUniqueIndex)} ON {join} ({studentId}, {courseId}) WHERE {activePredicate}");
     }
 
+    private static async Task SetupNullableBridgeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownNullableBridgeManyToManyAsync(connection, provider, kind);
+
+        var student = provider.Escape(NullableBridgeStudentTable);
+        var course = provider.Escape(NullableBridgeCourseTable);
+        var join = provider.Escape(NullableBridgeStudentCourseTable);
+        var id = provider.Escape("Id");
+        var studentId = provider.Escape("StudentId");
+        var courseId = provider.Escape("CourseId");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+
+        await ExecuteAsync(connection, $"CREATE TABLE {student} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE TABLE {course} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {title} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({IdentityPrimaryKeyColumn(kind, id)}, {studentId} {IntType(kind)} NULL, {courseId} {IntType(kind)} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(NullableBridgeStudentCourseStudentFkName)} FOREIGN KEY ({studentId}) REFERENCES {student} ({id}), " +
+            $"CONSTRAINT {provider.Escape(NullableBridgeStudentCourseCourseFkName)} FOREIGN KEY ({courseId}) REFERENCES {course} ({id}))");
+        await ExecuteAsync(connection,
+            $"CREATE UNIQUE INDEX {provider.Escape(NullableBridgeStudentCourseUniqueIndexName)} ON {join} ({studentId}, {courseId})");
+    }
+
     private static async Task SetupSchemaQualifiedManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await TeardownSchemaQualifiedManyToManyAsync(connection, provider, kind);

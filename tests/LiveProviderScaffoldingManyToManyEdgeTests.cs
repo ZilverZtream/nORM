@@ -114,4 +114,54 @@ public sealed partial class LiveProviderScaffoldingParityTests
             }
         }
     }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_rejects_nullable_fk_bridge_join_table_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupNullableBridgeManyToManyAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_nullable_bridge_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldNullableBridgeContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { NullableBridgeStudentTable, NullableBridgeCourseTable, NullableBridgeStudentCourseTable },
+                        OverwriteFiles = false
+                    });
+
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldNullableBridgeContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables").EnumerateArray().ToArray();
+
+                Assert.True(File.Exists(Path.Combine(dir, NullableBridgeStudentCourseTable + ".cs")));
+                Assert.DoesNotContain($".UsingTable(\"{NullableBridgeStudentCourseTable}\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains(joinTables, item =>
+                    LastTableNameEquals(item.GetProperty("table").GetString(), NullableBridgeStudentCourseTable) &&
+                    item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "nullable-foreign-key") &&
+                    item.GetProperty("metadata").GetProperty("nullableForeignKeyColumns").EnumerateArray().Any(column => column.GetString() == "StudentId"));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownNullableBridgeManyToManyAsync(connection, provider, kind);
+            }
+        }
+    }
 }

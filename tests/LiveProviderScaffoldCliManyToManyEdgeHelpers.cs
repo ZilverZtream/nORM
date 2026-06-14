@@ -277,6 +277,57 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             $"DROP TABLE IF EXISTS {provider.Escape(studentTable)}");
     }
 
+    private static void SetupNullableBridgeManyToMany(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind,
+        string studentTable,
+        string courseTable,
+        string studentCourseTable,
+        string studentFkName,
+        string courseFkName,
+        string uniqueIndexName)
+    {
+        CleanupNullableBridgeManyToMany(connection, provider, studentTable, courseTable, studentCourseTable);
+
+        var student = provider.Escape(studentTable);
+        var course = provider.Escape(courseTable);
+        var studentCourse = provider.Escape(studentCourseTable);
+        var id = provider.Escape("Id");
+        var studentId = provider.Escape("StudentId");
+        var courseId = provider.Escape("CourseId");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+        var idType = kind == ProviderKind.Sqlite ? "INTEGER" : "int";
+        var text = kind switch
+        {
+            ProviderKind.SqlServer => "nvarchar(80)",
+            ProviderKind.MySql => "varchar(80)",
+            _ => "text"
+        };
+
+        Execute(connection,
+            $"CREATE TABLE {student} ({id} {idType} NOT NULL PRIMARY KEY, {name} {text} NOT NULL)",
+            $"CREATE TABLE {course} ({id} {idType} NOT NULL PRIMARY KEY, {title} {text} NOT NULL)",
+            $"CREATE TABLE {studentCourse} ({IdentityPrimaryKeyColumn(kind, id)}, {studentId} {idType} NULL, {courseId} {idType} NOT NULL, " +
+            $"CONSTRAINT {provider.Escape(studentFkName)} FOREIGN KEY ({studentId}) REFERENCES {student} ({id}), " +
+            $"CONSTRAINT {provider.Escape(courseFkName)} FOREIGN KEY ({courseId}) REFERENCES {course} ({id}))",
+            $"CREATE UNIQUE INDEX {provider.Escape(uniqueIndexName)} ON {studentCourse} ({studentId}, {courseId})");
+    }
+
+    private static void CleanupNullableBridgeManyToMany(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string studentTable,
+        string courseTable,
+        string studentCourseTable)
+    {
+        Execute(connection,
+            $"DROP TABLE IF EXISTS {provider.Escape(studentCourseTable)}",
+            $"DROP TABLE IF EXISTS {provider.Escape(courseTable)}",
+            $"DROP TABLE IF EXISTS {provider.Escape(studentTable)}");
+    }
+
     private static void SetupSchemaQualifiedManyToMany(
         DbConnection connection,
         DatabaseProvider provider,

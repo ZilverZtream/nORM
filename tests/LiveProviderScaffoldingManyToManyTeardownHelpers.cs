@@ -147,6 +147,20 @@ public sealed partial class LiveProviderScaffoldingParityTests
         }
     }
 
+    private static async Task TeardownNullableBridgeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, NullableBridgeStudentCourseTable, provider.Escape(NullableBridgeStudentCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, NullableBridgeCourseTable, provider.Escape(NullableBridgeCourseTable)));
+            await ExecuteAsync(connection, DropTable(kind, NullableBridgeStudentTable, provider.Escape(NullableBridgeStudentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
     private static async Task TeardownSchemaQualifiedManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         try

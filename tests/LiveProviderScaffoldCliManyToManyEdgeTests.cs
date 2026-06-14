@@ -91,6 +91,82 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.Sqlite)]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_rejects_nullable_fk_bridge_join_table_on_live_provider(ProviderKind kind)
+    {
+        var root = FindRepositoryRoot();
+        var suffix = IdentifierSuffix();
+        var studentTable = "CliNullStudent" + suffix;
+        var courseTable = "CliNullCourse" + suffix;
+        var studentCourseTable = "CliNullStudentCourse" + suffix;
+        var studentFkName = "FK_CliNullBridge_Student_" + suffix;
+        var courseFkName = "FK_CliNullBridge_Course_" + suffix;
+        var uniqueIndexName = "UX_CliNullBridge_Pair_" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_nullable_bridge_" + kind + "_" + suffix);
+        string? sqliteFile = null;
+
+        var live = OpenLive(kind, ref sqliteFile);
+        if (live is null)
+            return;
+
+        var (connection, provider, connectionString, cliProvider) = live.Value;
+        try
+        {
+            using (connection)
+            {
+                SetupNullableBridgeManyToMany(connection, provider, kind, studentTable, courseTable, studentCourseTable, studentFkName, courseFkName, uniqueIndexName);
+            }
+
+            var scaffold = RunCli(
+                "scaffold " +
+                $"--provider {cliProvider} " +
+                $"--connection {Quote(connectionString)} " +
+                $"--output {Quote(output)} " +
+                "--namespace CliLiveScaffolded " +
+                "--context CliLiveNullableBridgeCtx " +
+                $"--table {Quote(studentTable)} " +
+                $"--table {Quote(courseTable)} " +
+                $"--table {Quote(studentCourseTable)}",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            Assert.True(File.Exists(Path.Combine(output, studentCourseTable + ".cs")), "Nullable FK bridge must remain explicit.");
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveNullableBridgeCtx.cs"));
+            Assert.DoesNotContain($".UsingTable(\"{studentCourseTable}\"", contextCode, StringComparison.Ordinal);
+            AssertPossibleManyToManyDiagnosticReason(
+                Path.Combine(output, "nORM.ScaffoldWarnings.json"),
+                studentCourseTable,
+                "nullable-foreign-key");
+
+            WriteConsumerProject(root, output);
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try
+            {
+                using var cleanup = Reopen(kind, connectionString);
+                CleanupNullableBridgeManyToMany(cleanup, provider, studentTable, courseTable, studentCourseTable);
+            }
+            catch
+            {
+                // Best-effort cleanup; failed cleanup should not hide the original assertion.
+            }
+
+            TryDeleteDirectory(output);
+            if (sqliteFile is not null)
+            {
+                try { File.Delete(sqliteFile); } catch { }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
     public void Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();

@@ -96,6 +96,12 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string SchemaAuthorBookTable = "ScaffoldLiveSchemaAuthorBook";
     private const string SchemaAuthorBookAuthorFkName = "FK_ScaffoldLiveSchemaAuthorBook_Author";
     private const string SchemaAuthorBookBookFkName = "FK_ScaffoldLiveSchemaAuthorBook_Book";
+    private const string NullableBridgeStudentTable = "ScaffoldLiveNullableBridgeStudent";
+    private const string NullableBridgeCourseTable = "ScaffoldLiveNullableBridgeCourse";
+    private const string NullableBridgeStudentCourseTable = "ScaffoldLiveNullableBridgeStudentCourse";
+    private const string NullableBridgeStudentCourseStudentFkName = "FK_ScaffoldLiveNullableBridge_Student";
+    private const string NullableBridgeStudentCourseCourseFkName = "FK_ScaffoldLiveNullableBridge_Course";
+    private const string NullableBridgeStudentCourseUniqueIndexName = "UX_ScaffoldLiveNullableBridge_Pair";
     private const string UniqueParentTable = "ScaffoldLiveUniqueParent";
     private const string UniqueChildTable = "ScaffoldLiveUniqueChild";
     private const string UniqueFkName = "FK_ScaffoldLiveUniqueChild_Parent";
