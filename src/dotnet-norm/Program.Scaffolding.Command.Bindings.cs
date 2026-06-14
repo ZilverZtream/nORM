@@ -18,6 +18,7 @@ partial class Program
         public required Option<string?> ConfigurationOption { get; init; }
         public required Option<string?> RuntimeOption { get; init; }
         public required Option<string?> MsbuildProjectExtensionsPathOption { get; init; }
+        public required Option<bool> NoBuildOption { get; init; }
         public required Option<bool> JsonOption { get; init; }
         public required Option<bool> VerboseOption { get; init; }
         public required Option<bool> NoColorOption { get; init; }
@@ -30,6 +31,8 @@ partial class Program
         public required Option<string[]> TableOption { get; init; }
         public required Option<bool> NoPluralizeOption { get; init; }
         public required Option<bool> UseDatabaseNamesOption { get; init; }
+        public required Option<bool> NoOnConfiguringOption { get; init; }
+        public required Option<bool> DataAnnotationsOption { get; init; }
         public required Option<bool> ForceOption { get; init; }
         public required Option<bool> NoOverwriteOption { get; init; }
         public required Option<bool> DryRunOption { get; init; }

@@ -477,8 +477,9 @@ must be reviewed and edited like handwritten model code.
   `startupProject`, `outputDir`/`output`, `namespace`, `context`,
   `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
   `framework`/`targetFramework`, `configuration`, `runtime`,
-  `msbuildProjectExtensionsPath`,
+  `msbuildProjectExtensionsPath`, `noBuild`,
   `verbose`, `noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`,
+  `noOnConfiguring`, `dataAnnotations`,
   `force`, `noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
   `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`. Relative project paths are
   resolved relative to the parent directory of `.config`, comma-separated or

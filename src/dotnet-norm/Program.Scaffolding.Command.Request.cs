@@ -36,9 +36,12 @@ partial class Program
         _ = FirstNonBlank(configurationOption, efToolConfig?.Configuration);
         _ = FirstNonBlank(runtimeOption, efToolConfig?.Runtime);
         _ = FirstNonBlank(msbuildProjectExtensionsPathOption, efToolConfig?.MsbuildProjectExtensionsPath);
+        _ = GetScaffoldBoolOptionOrConfig(result, bindings.NoBuildOption, efToolConfig?.NoBuild);
         _ = result.GetValue(bindings.VerboseOption) || efToolConfig?.Verbose == true;
         _ = result.GetValue(bindings.NoColorOption) || efToolConfig?.NoColor == true;
         _ = result.GetValue(bindings.PrefixOutputOption) || efToolConfig?.PrefixOutput == true;
+        _ = GetScaffoldBoolOptionOrConfig(result, bindings.NoOnConfiguringOption, efToolConfig?.NoOnConfiguring);
+        _ = GetScaffoldBoolOptionOrConfig(result, bindings.DataAnnotationsOption, efToolConfig?.DataAnnotations);
 
         var projectInfo = ResolveScaffoldProject(FirstNonBlank(projectOption, efToolConfig?.Project), inferCurrentDirectory: true);
         var startupProjectInfo = IsNamedConnectionReference(connectionReference)

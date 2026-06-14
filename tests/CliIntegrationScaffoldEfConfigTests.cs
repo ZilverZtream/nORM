@@ -34,9 +34,12 @@ public partial class CliIntegrationTests
                   "configuration": "Release",
                   "runtime": "win-x64",
                   "msbuildProjectExtensionsPath": "obj/custom",
+                  "noBuild": true,
                   "verbose": true,
                   "noColor": true,
-                  "prefixOutput": false
+                  "prefixOutput": false,
+                  "noOnConfiguring": true,
+                  "dataAnnotations": true
                 }
                 """,
                 Encoding.UTF8);
@@ -600,33 +603,36 @@ public partial class CliIntegrationTests
     [Fact]
     public void Scaffold_dotnet_ef_config_rejects_non_boolean_common_flags()
     {
-        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_bool_" + Guid.NewGuid().ToString("N"));
-        var configDir = Path.Combine(tempRoot, ".config");
-        var workDir = Path.Combine(tempRoot, "Work");
-
-        try
+        foreach (var propertyName in new[] { "verbose", "noBuild", "noOnConfiguring", "dataAnnotations" })
         {
-            Directory.CreateDirectory(configDir);
-            Directory.CreateDirectory(workDir);
-            File.WriteAllText(
-                Path.Combine(configDir, "dotnet-ef.json"),
-                """
-                {
-                  "verbose": "true"
-                }
-                """,
-                Encoding.UTF8);
+            var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_bool_" + Guid.NewGuid().ToString("N"));
+            var configDir = Path.Combine(tempRoot, ".config");
+            var workDir = Path.Combine(tempRoot, "Work");
 
-            var result = RunCli(
-                $"scaffold {Quote("Data Source=:memory:")} sqlite --output-dir Models",
-                workDir);
+            try
+            {
+                Directory.CreateDirectory(configDir);
+                Directory.CreateDirectory(workDir);
+                File.WriteAllText(
+                    Path.Combine(configDir, "dotnet-ef.json"),
+                    $$"""
+                    {
+                      "{{propertyName}}": "true"
+                    }
+                    """,
+                    Encoding.UTF8);
 
-            Assert.NotEqual(0, result.ExitCode);
-            Assert.Contains("EF tool configuration property 'verbose' must be a boolean", result.Stderr, StringComparison.Ordinal);
-        }
-        finally
-        {
-            TryDeleteDirectory(tempRoot);
+                var result = RunCli(
+                    $"scaffold {Quote("Data Source=:memory:")} sqlite --output-dir Models",
+                    workDir);
+
+                Assert.NotEqual(0, result.ExitCode);
+                Assert.Contains($"EF tool configuration property '{propertyName}' must be a boolean", result.Stderr, StringComparison.Ordinal);
+            }
+            finally
+            {
+                TryDeleteDirectory(tempRoot);
+            }
         }
     }
 
