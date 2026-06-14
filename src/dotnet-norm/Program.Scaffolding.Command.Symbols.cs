@@ -1,50 +1,8 @@
 using System.CommandLine;
-using nORM.Scaffolding;
 
 partial class Program
 {
-    private static ScaffoldCommandBindings CreateScaffoldCommandBindings(ScaffoldCommandSymbols symbols)
-        => new()
-        {
-            ConnectionArgument = symbols.ConnectionArgument,
-            ProviderArgument = symbols.ProviderArgument,
-            ConnectionOption = symbols.ConnectionOption,
-            ProviderOption = symbols.ProviderOption,
-            OutputOption = symbols.OutputOption,
-            NamespaceOption = symbols.NamespaceOption,
-            ContextOption = symbols.ContextOption,
-            ProjectOption = symbols.ProjectOption,
-            StartupProjectOption = symbols.StartupProjectOption,
-            FrameworkOption = symbols.FrameworkOption,
-            ConfigurationOption = symbols.ConfigurationOption,
-            RuntimeOption = symbols.RuntimeOption,
-            MsbuildProjectExtensionsPathOption = symbols.MsbuildProjectExtensionsPathOption,
-            NoBuildOption = symbols.NoBuildOption,
-            JsonOption = symbols.JsonOption,
-            VerboseOption = symbols.VerboseOption,
-            NoColorOption = symbols.NoColorOption,
-            PrefixOutputOption = symbols.PrefixOutputOption,
-            ContextDirectoryOption = symbols.ContextDirectoryOption,
-            ContextNamespaceOption = symbols.ContextNamespaceOption,
-            SchemasOption = symbols.SchemasOption,
-            SchemaOption = symbols.SchemaOption,
-            TablesOption = symbols.TablesOption,
-            TableOption = symbols.TableOption,
-            NoPluralizeOption = symbols.NoPluralizeOption,
-            UseDatabaseNamesOption = symbols.UseDatabaseNamesOption,
-            NoOnConfiguringOption = symbols.NoOnConfiguringOption,
-            DataAnnotationsOption = symbols.DataAnnotationsOption,
-            ForceOption = symbols.ForceOption,
-            NoOverwriteOption = symbols.NoOverwriteOption,
-            DryRunOption = symbols.DryRunOption,
-            FailOnWarningsOption = symbols.FailOnWarningsOption,
-            EmitRoutineStubsOption = symbols.EmitRoutineStubsOption,
-            EmitSequenceStubsOption = symbols.EmitSequenceStubsOption,
-            EmitViewEntitiesOption = symbols.EmitViewEntitiesOption,
-            EmitQueryArtifactsOption = symbols.EmitQueryArtifactsOption
-        };
-
-    private sealed class ScaffoldCommandBindings
+    private sealed class ScaffoldCommandSymbols
     {
         public required Argument<string?> ConnectionArgument { get; init; }
         public required Argument<string?> ProviderArgument { get; init; }
@@ -83,12 +41,4 @@ partial class Program
         public required Option<bool> EmitViewEntitiesOption { get; init; }
         public required Option<bool> EmitQueryArtifactsOption { get; init; }
     }
-
-    private sealed record ScaffoldCommandRequest(
-        string ProviderName,
-        string ConnectionString,
-        string Output,
-        string Namespace,
-        string ContextName,
-        ScaffoldOptions Options);
 }
