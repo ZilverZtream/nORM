@@ -44,9 +44,9 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQL Server does not accept RESTRICT as a foreign-key referential action.", "Sqlite", "Postgres", "MySql"),
             ["LiveProviderScaffoldingReferentialActionTests.cs::ScaffoldAsync_preserves_set_default_fk_referential_actions_on_live_provider"] =
                 Expect("MySQL does not support executable SET DEFAULT foreign-key actions in the live schema setup.", "Sqlite", "SqlServer", "Postgres"),
-            ["LiveProviderScaffoldingManyToManyTests.cs::ScaffoldAsync_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
+            ["LiveProviderScaffoldingManyToManyEdgeTests.cs::ScaffoldAsync_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
                 Expect("MySQL does not expose filtered unique indexes; this diagnostic is for providers with partial-index metadata.", "Sqlite", "SqlServer", "Postgres"),
-            ["LiveProviderScaffoldingManyToManyTests.cs::ScaffoldAsync_preserves_schema_qualified_many_to_many_on_live_provider"] =
+            ["LiveProviderScaffoldingManyToManyEdgeTests.cs::ScaffoldAsync_preserves_schema_qualified_many_to_many_on_live_provider"] =
                 Expect("MySQL has database/catalog names rather than schema-qualified table namespaces in this scaffold shape.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_routine_output_factories_on_live_provider"] =
                 Expect("PostgreSQL and SQLite do not expose this stored-procedure output factory shape.", "SqlServer", "MySql"),
