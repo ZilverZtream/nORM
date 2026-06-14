@@ -11,6 +11,23 @@ namespace nORM.Tests;
 public partial class ScaffoldingContractDocTests
 {
     [Fact]
+    public void Public_api_policy_lists_every_scaffold_options_member()
+    {
+        var shippedApi = ReadRepoFile("tests", "PublicApi.Shipped.txt");
+        var publicApiPolicy = ReadRepoFile("docs", "public-api-policy.md");
+        var scaffoldOptionMembers = shippedApi
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(static line => line.StartsWith("P:nORM.Scaffolding.ScaffoldOptions.", StringComparison.Ordinal))
+            .Select(static line => line[2..].Split(':')[0])
+            .OrderBy(static member => member, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(scaffoldOptionMembers);
+        foreach (var member in scaffoldOptionMembers)
+            Assert.Contains(member, publicApiPolicy, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doc_and_cli_pin_repeatable_table_filter_for_literal_commas()
     {
         var doc = ReadDoc();
