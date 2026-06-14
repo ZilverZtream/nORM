@@ -44,6 +44,7 @@ namespace nORM.Scaffolding
                         .Select(static index => index.ColumnName)
                         .ToArray();
                     return keyColumns.Length == columnNames.Count
+                           && group.All(col => col.ColumnCount == columnNames.Count)
                            && keyColumns.All(columnNames.Contains);
                 });
 

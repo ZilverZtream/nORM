@@ -444,7 +444,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
         IReadOnlyList<string> joinColumnNames,
         IReadOnlyList<string> databaseGeneratedColumns,
         IReadOnlyList<string> identityColumns,
-        bool includeUniqueForeignKeyIndex)
+        bool includeUniqueForeignKeyIndex,
+        int uniqueForeignKeyIndexColumnCount = 2)
     {
         var tables = new[]
         {
@@ -520,7 +521,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     "AuthorId",
                     "UX_AuthorBook_AuthorId_BookId",
                     true,
-                    2,
+                    uniqueForeignKeyIndexColumnCount,
                     0,
                     false,
                     false,
@@ -532,7 +533,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     "BookId",
                     "UX_AuthorBook_AuthorId_BookId",
                     true,
-                    2,
+                    uniqueForeignKeyIndexColumnCount,
                     1,
                     false,
                     false,
