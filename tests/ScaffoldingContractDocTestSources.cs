@@ -339,6 +339,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldingManyToManyTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingReferentialActionTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingRelationshipTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingOneToOneTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypePostgresTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderTypeMySqlTests.cs"),
