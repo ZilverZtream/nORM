@@ -330,6 +330,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldCliSchemaFilterTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliEfSwitchTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliDiagnosticsTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliCommentFacetTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldCliIndexDiagnosticsTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliWarningDiagnosticsTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCoreShapeTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldCliCoreManyToManyTests.cs"),
