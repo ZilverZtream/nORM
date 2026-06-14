@@ -118,6 +118,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldAsync_generates_one_to_one_for_shared_primary_key_fk_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_one_to_one_for_composite_unique_dependent_fk_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_optional_one_to_one_for_nullable_composite_unique_dependent_fk_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_generates_self_referencing_one_to_one_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_role_named_navigations_for_multiple_composite_fks_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_preserves_database_names_and_role_navigations_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_fk_to_nullable_unique_index_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
@@ -142,6 +143,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_generates_shared_primary_key_one_to_one_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_composite_unique_dependent_one_to_one_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_optional_composite_unique_dependent_one_to_one_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_generates_self_referencing_one_to_one_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_keyless_dependent_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_json_fail_on_warnings_reports_live_provider_diagnostics", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_provider_option_accepts_ef_provider_package_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -430,6 +432,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("required one-to-one relationships", doc, StringComparison.Ordinal);
         Assert.Contains("nullable composite unique-dependent FKs", doc, StringComparison.Ordinal);
         Assert.Contains("optional one-to-one relationships", doc, StringComparison.Ordinal);
+        Assert.Contains("Self-referencing unique dependent FKs", doc, StringComparison.Ordinal);
+        Assert.Contains("role-named one-to-one relationships through the real CLI path", doc, StringComparison.Ordinal);
         Assert.Contains("Shared primary-key FK shapes", doc, StringComparison.Ordinal);
         Assert.Contains("one-to-one relationships through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Keyless dependent FK shapes", doc, StringComparison.Ordinal);

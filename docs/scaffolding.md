@@ -244,7 +244,8 @@ must be reviewed and edited like handwritten model code.
   with a nullable reference navigation
   on the principal instead of flattening the model into a collection. This
   applies to required and optional single-column FK column sets, required and
-  optional composite FK column sets, and shared primary-key one-to-one
+  optional composite FK column sets, self-referencing unique dependent FKs,
+  and shared primary-key one-to-one
   relationships where the dependent PK is also the FK. Optional nullable unique
   dependent FKs keep nullable scalar FK columns and the dependent reference
   navigation nullable.
@@ -964,7 +965,8 @@ must be reviewed and edited like handwritten model code.
   combined real CLI scaffold. Composite unique-dependent FKs are
   verified as required one-to-one relationships through the real CLI, and
   nullable composite unique-dependent FKs are also verified as optional one-to-one relationships
-  through the same command path. Shared primary-key FK shapes are verified as
+  through the same command path. Self-referencing unique dependent FKs are verified
+  as role-named one-to-one relationships through the real CLI path. Shared primary-key FK shapes are verified as
   one-to-one relationships through the real CLI as well. Keyless dependent FK shapes are verified
   through the real CLI to remain read-only, navigation-free, and reported as
   `RelationshipDependentKey` diagnostics.
