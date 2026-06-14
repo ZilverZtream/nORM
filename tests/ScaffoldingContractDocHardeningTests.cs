@@ -437,6 +437,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ordered unique composite indexes", doc, StringComparison.Ordinal);
         Assert.Contains("generated `[Index]` attributes", doc, StringComparison.Ordinal);
         Assert.Contains("Provider-bound filtered/partial predicates", doc, StringComparison.Ordinal);
+        Assert.Contains("Provider-bound expression-index metadata is verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_emits_expression_index_metadata_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("included-column index metadata", doc, StringComparison.Ordinal);
         Assert.Contains("real CLI where each provider exposes the feature", doc, StringComparison.Ordinal);
         Assert.Contains("Multiple composite FKs to", doc, StringComparison.Ordinal);

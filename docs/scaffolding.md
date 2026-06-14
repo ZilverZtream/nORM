@@ -960,7 +960,10 @@ must be reviewed and edited like handwritten model code.
   verified through generated `[Index]` attributes and consumer builds on all
   four live providers. Provider-bound filtered/partial predicates, descending
   key order, and included-column index metadata are also verified through the
-  real CLI where each provider exposes the feature. Multiple composite FKs to
+  real CLI where each provider exposes the feature. Provider-bound expression-index
+  metadata is verified through the real CLI for SQLite, PostgreSQL, and MySQL;
+  SQL Server expression-index equivalents require generated/computed columns plus
+  ordinary indexes. Multiple composite FKs to
   the same principal are also verified through role-named navigations and
   payload-bridge diagnostics on the real CLI path. Direct composite alternate-key FKs are verified through the real CLI across all four providers.
   Multiple unique dependent
