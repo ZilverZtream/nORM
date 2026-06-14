@@ -359,6 +359,50 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_dotnet_ef_config_json_validation_failure_uses_effective_output_and_dry_run()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_json_failure_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+        var output = Path.Combine(tempRoot, "ConfiguredFailure").Replace('\\', '/');
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                $$"""
+                {
+                  "outputDir": "{{output}}",
+                  "namespace": "Bad-Name",
+                  "dryRun": true
+                }
+                """,
+                Encoding.UTF8);
+
+            var result = RunCli(
+                $"scaffold {Quote("Data Source=:memory:")} Microsoft.EntityFrameworkCore.Sqlite --json",
+                workDir);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.True(string.IsNullOrWhiteSpace(result.Stderr), result.Stderr);
+
+            using var document = JsonDocument.Parse(result.Stdout);
+            var json = document.RootElement;
+            Assert.Equal("failed", json.GetProperty("status").GetString());
+            Assert.True(json.GetProperty("dryRun").GetBoolean());
+            Assert.Equal(Path.GetFullPath(output), json.GetProperty("outputDirectory").GetString());
+            Assert.Contains("Scaffold --namespace 'Bad-Name' is not a valid C# namespace", json.GetProperty("error").GetString(), StringComparison.Ordinal);
+            Assert.False(Directory.Exists(output));
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void Scaffold_dotnet_ef_config_emit_query_artifacts_emits_sqlite_virtual_table()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_query_artifact_" + Guid.NewGuid().ToString("N"));
