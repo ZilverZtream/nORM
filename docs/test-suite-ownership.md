@@ -96,12 +96,12 @@ class-named files with the original test class names.
 
 ## Scaffolding Source Size
 
-Production scaffolding files stay below 250 lines so reverse-engineering logic
+Production scaffolding files stay below 200 lines so reverse-engineering logic
 remains split by provider, model phase, or generated-code responsibility.
 `RepositoryHygieneTests` enforces this boundary for `src/nORM/Scaffolding`.
 When a scaffolding change needs more room, split the responsibility into a new
 focused helper instead of growing an existing file.
-The public `DatabaseScaffolder` facade also stays below 1600 aggregate lines
+The public `DatabaseScaffolder` facade also stays below 500 aggregate lines
 across its partial files; new behavior belongs in focused collaborators and
 adapters, with the facade kept as orchestration and compatibility glue only.
 

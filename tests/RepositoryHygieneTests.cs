@@ -10,8 +10,8 @@ namespace nORM.Tests;
 public sealed class RepositoryHygieneTests
 {
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-    private const int MaxProductionScaffoldingFileLines = 250;
-    private const int MaxDatabaseScaffolderAggregateLines = 1600;
+    private const int MaxProductionScaffoldingFileLines = 200;
+    private const int MaxDatabaseScaffolderAggregateLines = 500;
     private const int MaxCliScaffoldingFileLines = 200;
     private const int MaxCliDesignTimeFileLines = 200;
     private const int MaxProviderMobilityCertificationFileLines = 200;
@@ -154,7 +154,7 @@ public sealed class RepositoryHygieneTests
     public void Production_scaffolding_files_stay_split_by_responsibility()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("Production scaffolding files stay below 250 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("Production scaffolding files stay below 200 lines", ownership, StringComparison.Ordinal);
 
         var scaffoldingDirectory = Path.Combine(RepoRoot, "src", "nORM", "Scaffolding");
         var oversizedFiles = Directory.EnumerateFiles(scaffoldingDirectory, "*.cs", SearchOption.AllDirectories)
@@ -177,7 +177,7 @@ public sealed class RepositoryHygieneTests
     public void DatabaseScaffolder_facade_stays_below_aggregate_line_budget()
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
-        Assert.Contains("DatabaseScaffolder` facade also stays below 1600 aggregate lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("DatabaseScaffolder` facade also stays below 500 aggregate lines", ownership, StringComparison.Ordinal);
 
         var scaffoldingDirectory = Path.Combine(RepoRoot, "src", "nORM", "Scaffolding");
         var facadeFiles = Directory.EnumerateFiles(scaffoldingDirectory, "DatabaseScaffolder*.cs")
