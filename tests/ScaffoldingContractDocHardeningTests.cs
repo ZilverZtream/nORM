@@ -116,6 +116,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("provider-owned many-to-many bridge rejection", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL catalog-qualified many-to-many filter parity", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables", doc, StringComparison.Ordinal);
+        Assert.Contains("Inference-boundary scaffolds", doc, StringComparison.Ordinal);
+        Assert.Contains("because nORM does not infer", doc, StringComparison.Ordinal);
+        Assert.Contains("owned types or inheritance from database naming patterns", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_one_to_one_for_unique_dependent_fk_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_optional_one_to_one_for_nullable_unique_dependent_fk_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_generates_role_named_one_to_one_for_multiple_unique_dependent_fks_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
@@ -130,6 +133,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldAsync_rejects_nullable_fk_bridge_join_table_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_rejects_provider_owned_bridge_join_table_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_does_not_infer_owned_types_or_inheritance_from_column_conventions_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_database_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_builds_mixed_single_fk_and_many_to_many_shape_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_builds_composite_primary_key_fk_model_shape_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -146,6 +150,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_rejects_nullable_fk_bridge_join_table_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_rejects_provider_owned_bridge_join_table_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_does_not_infer_owned_types_or_inheritance_from_column_conventions_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_composite_fk_to_unique_index_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_role_named_composite_fks_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);

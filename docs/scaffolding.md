@@ -1001,6 +1001,10 @@ must be reviewed and edited like handwritten model code.
   MySQL current-catalog-qualified many-to-many table filters are verified through
   direct and real CLI scaffolds; the catalog qualifies selection only and is not
   emitted as a nORM schema in generated entity or `UsingTable` mappings.
+  Inference-boundary scaffolds are verified through direct and real CLI runs
+  across all four live providers: discriminator-looking columns and owned-type
+  naming conventions remain ordinary scalar columns, because nORM does not infer
+  owned types or inheritance from database naming patterns.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
   duplicate generated property handling, quoted and dotted literal identifier
   preservation, SQLite `UUID` declared-type parity, keyless dynamic
@@ -1034,6 +1038,7 @@ must be reviewed and edited like handwritten model code.
   nullable-FK many-to-many bridge rejection,
   provider-owned many-to-many bridge rejection,
   MySQL catalog-qualified many-to-many filter parity,
+  inference-boundary non-inference for owned types and inheritance,
   provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.
