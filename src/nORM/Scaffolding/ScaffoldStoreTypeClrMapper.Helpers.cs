@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Text;
 
 namespace nORM.Scaffolding
 {
@@ -22,10 +23,33 @@ namespace nORM.Scaffolding
         }
 
         private static string Normalize(string storeType)
-            => StripFacets(storeType.Trim().ToLowerInvariant())
-                .Replace('_', ' ')
-                .Replace("  ", " ", StringComparison.Ordinal)
-                .Trim();
+            => CollapseWhitespace(
+                StripFacets(storeType.Trim().ToLowerInvariant())
+                    .Replace('_', ' '));
+
+        private static string CollapseWhitespace(string value)
+        {
+            var result = new StringBuilder(value.Length);
+            var previousWasWhitespace = false;
+            foreach (var ch in value)
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    if (!previousWasWhitespace && result.Length > 0)
+                    {
+                        result.Append(' ');
+                        previousWasWhitespace = true;
+                    }
+
+                    continue;
+                }
+
+                result.Append(ch);
+                previousWasWhitespace = false;
+            }
+
+            return result.ToString().Trim();
+        }
 
         private static string StripFacets(string storeType)
         {
