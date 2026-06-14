@@ -32,5 +32,23 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyDictionary<string, string> GetSqlServerAliasColumnBaseTypes(DbConnection connection, string? schemaName, string tableName)
             => DynamicEntitySchemaMetadataReader.GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName);
+
+        private static DynamicColumnMetadata ReadColumnMetadata(
+            DbConnection connection,
+            string? schemaName,
+            string tableName,
+            IReadOnlyDictionary<string, string> postgresDomainColumnCastTypes)
+            => new(
+                postgresDomainColumnCastTypes,
+                GetComputedColumns(connection, schemaName, tableName),
+                GetIdentityColumns(connection, schemaName, tableName),
+                GetRowVersionColumns(connection, schemaName, tableName),
+                GetSqliteDeclaredColumnTypes(connection, schemaName, tableName),
+                GetColumnStoreTypes(connection, schemaName, tableName),
+                GetSqlServerAliasColumnBaseTypes(connection, schemaName, tableName),
+                GetMySqlUnsignedColumnTypes(connection, schemaName, tableName),
+                GetDecimalPrecisions(connection, schemaName, tableName),
+                GetStringBinaryFacets(connection, schemaName, tableName),
+                GetPrimaryKeyOrdinals(connection, schemaName, tableName));
     }
 }
