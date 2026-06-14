@@ -75,6 +75,10 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL expression index catalog metadata is exposed through MySQL-specific DDL and emitted as provider-bound expression-index metadata when representable.", "MySql"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_expression_index_with_include_metadata"] =
                 Expect("PostgreSQL expression INCLUDE metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldCliPostgresExpressionIndexFacetTests.cs::Dotnet_norm_scaffold_emits_postgres_expression_index_include_metadata"] =
+                Expect("PostgreSQL expression INCLUDE metadata is PostgreSQL-specific.", "Postgres"),
+            ["LiveProviderScaffoldCliPostgresExpressionIndexFacetTests.cs::Dotnet_norm_scaffold_emits_postgres_expression_index_null_semantics"] =
+                Expect("PostgreSQL expression index NULLS FIRST/LAST and NULLS NOT DISTINCT metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_null_sort_order_index_metadata"] =
                 Expect("PostgreSQL NULLS FIRST/LAST index metadata is PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldCliPostgresIndexFacetTests.cs::Dotnet_norm_scaffold_emits_postgres_null_sort_order_index_metadata"] =

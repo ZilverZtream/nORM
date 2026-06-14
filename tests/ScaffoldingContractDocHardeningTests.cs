@@ -446,6 +446,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL NULLS FIRST/LAST and NULLS NOT DISTINCT index facets are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_null_sort_order_index_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_nulls_not_distinct_unique_index_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL expression-index INCLUDE and NULLS semantics are verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_emits_postgres_expression_index_include_metadata", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_emits_postgres_expression_index_null_semantics", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("included-column index metadata", doc, StringComparison.Ordinal);
         Assert.Contains("real CLI where each provider exposes the feature", doc, StringComparison.Ordinal);
         Assert.Contains("Multiple composite FKs to", doc, StringComparison.Ordinal);

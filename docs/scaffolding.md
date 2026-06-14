@@ -969,7 +969,9 @@ must be reviewed and edited like handwritten model code.
   through the real CLI as SCF117 while full-length prefixes remain ordinary
   index metadata. PostgreSQL `NULLS FIRST/LAST` and `NULLS NOT DISTINCT` index
   facets are verified through the real CLI as generated `[Index]` metadata
-  without provider-owned warnings. Multiple composite FKs to
+  without provider-owned warnings. PostgreSQL expression-index `INCLUDE` and
+  null-semantics facets are verified through the real CLI as generated
+  `HasExpressionIndex` metadata without provider-owned warnings. Multiple composite FKs to
   the same principal are also verified through role-named navigations and
   payload-bridge diagnostics on the real CLI path. Direct composite alternate-key FKs are verified through the real CLI across all four providers.
   Multiple unique dependent
