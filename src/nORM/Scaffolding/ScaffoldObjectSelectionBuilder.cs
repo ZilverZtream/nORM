@@ -19,7 +19,7 @@ namespace nORM.Scaffolding
                 .Where(obj => ScaffoldTableFilter.ShouldEmitQueryArtifactObject(obj, options, provider, filterCatalog))
                 .ToArray();
             var discoveredTablesAndViews = discoveredTables
-                .Concat(candidateQueryArtifacts.Select(obj => new ScaffoldTableInfo(obj.Name, obj.Schema)))
+                .Concat(candidateQueryArtifacts.Select(obj => new ScaffoldTableInfo(obj.Name, obj.Schema, obj.Kind)))
                 .ToArray();
             var tables = ScaffoldTableFilter.FilterTables(
                 discoveredTablesAndViews,

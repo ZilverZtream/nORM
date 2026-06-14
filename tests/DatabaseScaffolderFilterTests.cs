@@ -562,6 +562,32 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildSelection_WithTableAndQueryArtifactFilterNameCollision_ReportsArtifactKind()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("Report", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "Report", "View", "SQL Server view", null)
+        };
+
+        var ex = Assert.Throws<NormConfigurationException>(() =>
+            ScaffoldObjectSelectionBuilder.BuildSelection(
+                tables,
+                skippedObjects,
+                new ScaffoldOptions { Tables = new[] { "dbo.Report" }, EmitQueryArtifacts = true },
+                new SqliteProvider(),
+                null));
+
+        Assert.Contains("ambiguous", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Table dbo.Report", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("View dbo.Report", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Table dbo.Report, Table dbo.Report", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildSelection_WithTableFilterMatchingRoutineWithoutStubOptIn_StillThrows()
     {
         var skippedObjects = new[]

@@ -137,8 +137,8 @@ namespace nORM.Scaffolding
         {
             var matches = tables
                 .Where(table => MatchesTableFilter(provider, table, requested, filterCatalog))
-                .GroupBy(table => "Table\u001f" + (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(group => "Table " + DisplayTableMatch(group.First()))
+                .GroupBy(table => table.Kind + "\u001f" + (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => DisplaySelectableTableMatch(group.First()))
                 .Concat(skippedObjects
                     .Where(obj =>
                         MatchesSkippedObjectFilter(provider, obj, requested, filterCatalog)
@@ -150,6 +150,9 @@ namespace nORM.Scaffolding
 
             return matches;
         }
+
+        private static string DisplaySelectableTableMatch(ScaffoldTableInfo table)
+            => $"{table.Kind} {DisplayTableMatch(table)}";
 
         private static string DisplaySkippedObjectMatch(ScaffoldSkippedObjectInfo obj)
             => $"{obj.Kind} {TableKey(obj.Schema, obj.Name)}";

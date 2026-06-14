@@ -57,23 +57,23 @@ namespace nORM.Scaffolding
             if (!string.IsNullOrWhiteSpace(requestedSchema)
                 && string.Equals(requestedSchema, table.Schema, StringComparison.OrdinalIgnoreCase))
             {
-                return new ScaffoldTableInfo(GetUnqualifiedName(request), requestedSchema);
+                return new ScaffoldTableInfo(GetUnqualifiedName(request), requestedSchema, table.Kind);
             }
 
             if (!string.IsNullOrWhiteSpace(requestedSchema)
                 && IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, request))
             {
-                return new ScaffoldTableInfo(GetUnqualifiedName(request), table.Schema);
+                return new ScaffoldTableInfo(GetUnqualifiedName(request), table.Schema, table.Kind);
             }
 
             if (!string.IsNullOrWhiteSpace(requestedSchema)
                 && IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, request, filterCatalog))
             {
-                return new ScaffoldTableInfo(GetUnqualifiedName(request), table.Schema);
+                return new ScaffoldTableInfo(GetUnqualifiedName(request), table.Schema, table.Kind);
             }
 
             if (requestedSchema is null && string.Equals(request, table.Name, StringComparison.OrdinalIgnoreCase))
-                return new ScaffoldTableInfo(request, table.Schema);
+                return new ScaffoldTableInfo(request, table.Schema, table.Kind);
 
             return table;
         }
