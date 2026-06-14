@@ -9,32 +9,10 @@ namespace nORM.Scaffolding
     internal static class ScaffoldUnsupportedDiagnosticAdapter
     {
         public static string NormalizeReferentialAction(string? action)
-            => ScaffoldForeignKeyShape.NormalizeReferentialAction(action);
+            => ScaffoldReferentialAction.Normalize(action);
 
         public static bool TryParseReferentialAction(string? action, out ReferentialAction referentialAction)
-        {
-            switch (NormalizeReferentialAction(action))
-            {
-                case "CASCADE":
-                    referentialAction = ReferentialAction.Cascade;
-                    return true;
-                case "SET NULL":
-                    referentialAction = ReferentialAction.SetNull;
-                    return true;
-                case "RESTRICT":
-                    referentialAction = ReferentialAction.Restrict;
-                    return true;
-                case "SET DEFAULT":
-                    referentialAction = ReferentialAction.SetDefault;
-                    return true;
-                case "NO ACTION":
-                    referentialAction = ReferentialAction.NoAction;
-                    return true;
-                default:
-                    referentialAction = ReferentialAction.NoAction;
-                    return false;
-            }
-        }
+            => ScaffoldReferentialAction.TryParse(action, out referentialAction);
 
         public static void AddMissingPrimaryKeyDiagnostics(
             List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,

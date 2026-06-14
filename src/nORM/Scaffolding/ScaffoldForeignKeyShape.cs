@@ -129,12 +129,7 @@ namespace nORM.Scaffolding
         }
 
         public static string NormalizeReferentialAction(string? action)
-        {
-            if (string.IsNullOrWhiteSpace(action))
-                return "NO ACTION";
-
-            return action.Replace('_', ' ').Trim().ToUpperInvariant();
-        }
+            => ScaffoldReferentialAction.Normalize(action);
 
         public static string TableKey(string? schema, string table)
             => string.IsNullOrWhiteSpace(schema) ? table : schema + "." + table;
@@ -145,6 +140,6 @@ namespace nORM.Scaffolding
                && string.IsNullOrWhiteSpace(index.FilterSql);
 
         private static bool IsScaffoldableReferentialAction(string? action)
-            => NormalizeReferentialAction(action) is "CASCADE" or "SET NULL" or "SET DEFAULT" or "RESTRICT" or "NO ACTION";
+            => ScaffoldReferentialAction.IsScaffoldable(action);
     }
 }

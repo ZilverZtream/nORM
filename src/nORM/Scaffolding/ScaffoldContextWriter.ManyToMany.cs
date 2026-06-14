@@ -80,10 +80,10 @@ namespace nORM.Scaffolding
             string leftKey,
             string rightKey)
         {
-            var leftOnDelete = FormatReferentialAction(join.LeftOnDelete);
-            var leftOnUpdate = FormatReferentialAction(join.LeftOnUpdate);
-            var rightOnDelete = FormatReferentialAction(join.RightOnDelete);
-            var rightOnUpdate = FormatReferentialAction(join.RightOnUpdate);
+            var leftOnDelete = ScaffoldReferentialAction.FormatModelBuilderLiteral(join.LeftOnDelete);
+            var leftOnUpdate = ScaffoldReferentialAction.FormatModelBuilderLiteral(join.LeftOnUpdate);
+            var rightOnDelete = ScaffoldReferentialAction.FormatModelBuilderLiteral(join.RightOnDelete);
+            var rightOnUpdate = ScaffoldReferentialAction.FormatModelBuilderLiteral(join.RightOnUpdate);
             return join.UsesPrimaryKeys
                 ? $".UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)}, {leftOnDelete}, {leftOnUpdate}, {rightOnDelete}, {rightOnUpdate}{schemaArgument});"
                 : $".UsingTable(\"{joinTable}\", {FormatStringArrayLiteral(join.LeftForeignKeyColumns)}, {FormatStringArrayLiteral(join.RightForeignKeyColumns)}, {leftKey}, {rightKey}, {leftOnDelete}, {leftOnUpdate}, {rightOnDelete}, {rightOnUpdate}{schemaArgument});";
@@ -96,6 +96,6 @@ namespace nORM.Scaffolding
                || !IsDefaultReferentialAction(join.RightOnUpdate);
 
         private static bool IsDefaultReferentialAction(string action)
-            => string.Equals(NormalizeReferentialAction(action), "NO ACTION", StringComparison.OrdinalIgnoreCase);
+            => ScaffoldReferentialAction.IsDefault(action);
     }
 }

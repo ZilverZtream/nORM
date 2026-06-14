@@ -38,7 +38,7 @@ namespace nORM.Scaffolding
                     var constraintNameSuffix = string.IsNullOrWhiteSpace(relationship.ConstraintName)
                         ? string.Empty
                         : $", \"{EscapeStringLiteral(relationship.ConstraintName)}\"";
-                    sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}, {FormatReferentialAction(relationship.OnDelete)}, {FormatReferentialAction(relationship.OnUpdate)}{constraintNameSuffix});");
+                    sb.AppendLine($"                .HasForeignKey({foreignKey}, {principalKey}, {ScaffoldReferentialAction.FormatModelBuilderLiteral(relationship.OnDelete)}, {ScaffoldReferentialAction.FormatModelBuilderLiteral(relationship.OnUpdate)}{constraintNameSuffix});");
                 }
             }
         }
@@ -61,21 +61,6 @@ namespace nORM.Scaffolding
             => (string.Equals(relationship.OnDelete, "CASCADE", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(relationship.OnDelete, "NO ACTION", StringComparison.OrdinalIgnoreCase))
                && string.Equals(relationship.OnUpdate, "NO ACTION", StringComparison.OrdinalIgnoreCase);
-
-        private static string FormatReferentialAction(string action)
-            => NormalizeReferentialAction(action) switch
-            {
-                "CASCADE" => "ReferentialAction.Cascade",
-                "SET NULL" => "ReferentialAction.SetNull",
-                "RESTRICT" => "ReferentialAction.Restrict",
-                "SET DEFAULT" => "ReferentialAction.SetDefault",
-                _ => "ReferentialAction.NoAction"
-            };
-
-        private static string NormalizeReferentialAction(string? action)
-            => string.IsNullOrWhiteSpace(action)
-                ? "NO ACTION"
-                : action.Replace('_', ' ').Trim().ToUpperInvariant();
 
         private static string FormatScaffoldKeySelector(string parameterName, IReadOnlyList<string> propertyNames)
         {

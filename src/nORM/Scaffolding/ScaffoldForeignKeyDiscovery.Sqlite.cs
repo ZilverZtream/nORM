@@ -66,8 +66,8 @@ namespace nORM.Scaffolding
                     PrincipalColumn: row.PrincipalColumn,
                     ConstraintName: "sqlite_fk_" + row.Id,
                     ColumnCount: rows.Count,
-                    OnDelete: NormalizeReferentialAction(row.OnDelete),
-                    OnUpdate: NormalizeReferentialAction(row.OnUpdate),
+                    OnDelete: ScaffoldReferentialAction.Normalize(row.OnDelete),
+                    OnUpdate: ScaffoldReferentialAction.Normalize(row.OnUpdate),
                     IsSyntheticConstraintName: true));
             }
         }

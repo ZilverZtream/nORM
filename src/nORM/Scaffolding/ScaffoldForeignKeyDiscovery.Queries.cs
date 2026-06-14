@@ -38,21 +38,13 @@ namespace nORM.Scaffolding
                     principalColumn,
                     Convert.ToString(reader["ConstraintName"]) ?? string.Empty,
                     Convert.ToInt32(reader["ColumnCount"], CultureInfo.InvariantCulture),
-                    ReaderHasColumn(reader, "OnDelete") ? NormalizeReferentialAction(Convert.ToString(reader["OnDelete"])) : "NO ACTION",
-                    ReaderHasColumn(reader, "OnUpdate") ? NormalizeReferentialAction(Convert.ToString(reader["OnUpdate"])) : "NO ACTION",
+                    ReaderHasColumn(reader, "OnDelete") ? ScaffoldReferentialAction.Normalize(Convert.ToString(reader["OnDelete"])) : "NO ACTION",
+                    ReaderHasColumn(reader, "OnUpdate") ? ScaffoldReferentialAction.Normalize(Convert.ToString(reader["OnUpdate"])) : "NO ACTION",
                     ReaderHasColumn(reader, "IsSyntheticConstraintName")
                         && Convert.ToBoolean(reader["IsSyntheticConstraintName"], CultureInfo.InvariantCulture)));
             }
 
             return foreignKeys;
-        }
-
-        private static string NormalizeReferentialAction(string? action)
-        {
-            if (string.IsNullOrWhiteSpace(action))
-                return "NO ACTION";
-
-            return action.Replace('_', ' ').Trim().ToUpperInvariant();
         }
     }
 }
