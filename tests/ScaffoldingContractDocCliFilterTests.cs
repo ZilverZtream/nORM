@@ -74,6 +74,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("multi-value `--schema Accounting Sales`", doc, StringComparison.Ordinal);
         Assert.Contains("`schema.table`", doc, StringComparison.Ordinal);
         Assert.Contains("`schema.view`", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL catalog-qualified", doc, StringComparison.Ordinal);
+        Assert.Contains("table and query-artifact filters", doc, StringComparison.Ordinal);
+        Assert.Contains("current catalog can still be used in table/query-artifact filters", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.Schemas", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UsePluralizer", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseDatabaseNames", doc, StringComparison.Ordinal);
@@ -157,6 +160,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("explicitly selected by table/schema filters", doc, StringComparison.Ordinal);
         Assert.Contains("ShouldEmitQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("IsDefaultQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("IsDefaultMySqlCatalogQualifiedFilter", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("MatchesTableFilter(provider, table, request, filterCatalog)", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("MatchesSkippedObjectFilter(provider, obj, request, filterCatalog)", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("unioned with explicit table filters", doc, StringComparison.Ordinal);
         Assert.Contains("database object names are singularized for entity classes", doc, StringComparison.Ordinal);
         Assert.Contains("output-relative API placement", doc, StringComparison.Ordinal);
@@ -293,12 +299,16 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Use repeatable `--table`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("routine result-column names", cliReadme, StringComparison.Ordinal);
         Assert.Contains("Blank CLI table/schema filters are rejected", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("MySQL catalog-qualified", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("table and query-artifact filters", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`schema.view` filters", cliReadme, StringComparison.Ordinal);
         Assert.Contains("repeatable `--schema`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("multi-value `--table First Second`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("multi-value", rootReadme, StringComparison.Ordinal);
         Assert.Contains("routine result-column names", rootReadme, StringComparison.Ordinal);
         Assert.Contains("Blank CLI table/schema filters are rejected", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("catalog-qualified table and query-artifact filters", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("table and query-artifact filters", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`--project`/`-p`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("plus sanitized output directory", cliReadme, StringComparison.Ordinal);
         Assert.Contains("nullable-reference output", cliReadme, StringComparison.Ordinal);

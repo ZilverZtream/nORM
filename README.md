@@ -385,7 +385,10 @@ caller-supplied `DbContextOptions.OnModelCreating` and
 `OnModelCreatingPartial(ModelBuilder)` customization hooks. Table filters
 (`--tables`/`--table`) and schema filters (`--schemas`/`--schema`) can be combined; EF-style
 multi-value `--table First Second` and `--schema Accounting Sales` tokens are
-accepted, and table filters can use `schema.table` or `schema.view`.
+accepted, and table filters can use `schema.table` or `schema.view`. MySQL
+catalog-qualified table and query-artifact filters are accepted when the
+catalog matches the current database, while generated model metadata remains
+unqualified because MySQL catalogs are not emitted as nORM schemas.
 Blank CLI table/schema filters are rejected so an empty option cannot broaden
 the run to every table.
 Schema filters select all discovered user tables and supported query

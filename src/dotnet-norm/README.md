@@ -76,8 +76,11 @@ reports when overwrite is explicitly allowed, so old warnings do not leak into
 CI logs.
 
 `--tables` accepts comma-separated bare table names plus `schema.table` and
-`schema.view` filters. Use repeatable `--table` for literal table names that
-contain commas and must not be split; EF-style multi-value `--table First Second`
+`schema.view` filters. MySQL catalog-qualified table and query-artifact filters
+are accepted when the catalog matches the current database, but generated model
+metadata remains unqualified because MySQL catalogs are not emitted as nORM
+schemas. Use repeatable `--table` for literal table names that contain commas
+and must not be split; EF-style multi-value `--table First Second`
 tokens are also accepted. Literal dotted table names are supported, but if a literal dotted
 table name collides with the same text as a schema-qualified table, scaffolding
 fails with an actionable error because the v1 filter syntax cannot disambiguate
@@ -91,7 +94,9 @@ filters. Schema filters apply where nORM preserves schema identity
 (SQL Server, PostgreSQL, and SQLite attached databases including `main`);
 SQLite `main` matches the unqualified default database and still emits
 unqualified `[Table]` metadata. MySQL remains scoped to the current database
-without emitting that database name as a model schema.
+without emitting that database name as a model schema; the current catalog can
+still be used in table/query-artifact filters for EF-style command
+compatibility.
 By default, nORM's scaffold pluralizer singularizes plural database object
 names for entity classes and emits collection-style generated `IQueryable<T>`
 context property names, with deterministic cleanup for descriptor-like entity

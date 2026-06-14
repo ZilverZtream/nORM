@@ -26,7 +26,7 @@ namespace nORM.Scaffolding
                 {
                     Request = request,
                     Matches = tables
-                        .Where(table => MatchesTableFilter(provider, table, request))
+                        .Where(table => MatchesTableFilter(provider, table, request, filterCatalog))
                         .GroupBy(table => (table.Schema ?? string.Empty) + "\u001f" + table.Name, StringComparer.OrdinalIgnoreCase)
                         .Select(group => DisplayTableMatch(group.First()))
                         .OrderBy(value => value, StringComparer.Ordinal)
@@ -45,19 +45,19 @@ namespace nORM.Scaffolding
 
             var selected = tables
                 .Where(table =>
-                    requested.Any(request => MatchesTableFilter(provider, table, request))
+                    requested.Any(request => MatchesTableFilter(provider, table, request, filterCatalog))
                     || requestedSchemas.Any(schema => MatchesSchemaFilter(provider, table.Schema, schema, filterCatalog)))
-                .Select(table => ApplyRequestedTableCasing(provider, table, requested))
+                .Select(table => ApplyRequestedTableCasing(provider, table, requested, filterCatalog))
                 .ToArray();
 
             var missing = requested
-                .Where(request => !tables.Any(table => MatchesTableFilter(provider, table, request)))
+                .Where(request => !tables.Any(table => MatchesTableFilter(provider, table, request, filterCatalog)))
                 .ToArray();
 
             if (missing.Length > 0)
             {
                 var skippedMatches = skippedObjects
-                    .Where(obj => missing.Any(request => MatchesSkippedObjectFilter(provider, obj, request)))
+                    .Where(obj => missing.Any(request => MatchesSkippedObjectFilter(provider, obj, request, filterCatalog)))
                     .Select(obj => $"{obj.Kind} {TableKey(obj.Schema, obj.Name)}")
                     .OrderBy(value => value, StringComparer.Ordinal)
                     .ToArray();
@@ -133,7 +133,7 @@ namespace nORM.Scaffolding
                 .ToArray();
 
             return skippedObjects
-                .Where(obj => requested.Any(request => MatchesSkippedObjectFilter(provider, obj, request))
+                .Where(obj => requested.Any(request => MatchesSkippedObjectFilter(provider, obj, request, filterCatalog))
                               || requestedSchemas.Any(schema => MatchesSchemaFilter(provider, obj.Schema, schema, filterCatalog))
                               || IsShadowOfEmittedVirtualTable(obj, emittedVirtualTables))
                 .ToArray();

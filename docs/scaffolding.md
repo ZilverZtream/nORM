@@ -359,8 +359,11 @@ must be reviewed and edited like handwritten model code.
 - Optional table filtering through `ScaffoldOptions.Tables`, CLI
   comma-separated `--tables`, repeatable CLI `--table` entries, and EF-style
   multi-value `--table First Second` tokens. Filters may use `schema.table`
-  or `schema.view` for schema-qualified tables and views. Use repeatable
-  `--table` for literal table names that contain commas and must not be split.
+  or `schema.view` for schema-qualified tables and views. MySQL catalog-qualified
+  table and query-artifact filters are accepted when the catalog matches the
+  current database, but generated model metadata remains unqualified because
+  MySQL catalogs are not emitted as nORM schemas. Use repeatable `--table` for
+  literal table names that contain commas and must not be split.
   Null or blank API filters are treated as empty rather than producing raw
   runtime exceptions; blank CLI filters are rejected so an empty command-line
   option cannot broaden the run to all tables. Bare table-name filters fail with an
@@ -384,7 +387,9 @@ must be reviewed and edited like handwritten model code.
   and SQLite attached databases including `main`; SQLite `main` matches the
   unqualified default database and still emits unqualified `[Table]` metadata.
   MySQL scaffolding still uses the current database as an unqualified model
-  because nORM does not emit the MySQL catalog/database name as a schema.
+  because nORM does not emit the MySQL catalog/database name as a schema; the
+  current catalog can still be used in table/query-artifact filters for EF-style
+  command compatibility.
 - Optional generated-name pluralizer control through
   `ScaffoldOptions.UsePluralizer` and CLI `--no-pluralize`. By default plural
   database object names are singularized for entity classes, and generated

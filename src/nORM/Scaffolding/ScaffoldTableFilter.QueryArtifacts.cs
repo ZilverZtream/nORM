@@ -31,7 +31,7 @@ namespace nORM.Scaffolding
             if (requested.Length == 0 && requestedSchemas.Length == 0)
                 return IsDefaultQueryArtifactObject(obj);
 
-            return requested.Any(request => MatchesSkippedObjectFilter(provider, obj, request))
+            return requested.Any(request => MatchesSkippedObjectFilter(provider, obj, request, filterCatalog))
                    || requestedSchemas.Any(schema => MatchesSchemaFilter(provider, obj.Schema, schema, filterCatalog));
         }
 

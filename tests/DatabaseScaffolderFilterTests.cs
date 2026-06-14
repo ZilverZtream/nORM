@@ -395,4 +395,51 @@ public partial class DatabaseScaffolderPrivateMethodTests
         }
     }
 
+    [Fact]
+    public void BuildSelection_WithMySqlCatalogQualifiedTableFilter_SelectsCurrentCatalogTable()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("Customer", null),
+            new ScaffoldTableInfo("Ignored", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            tables,
+            Array.Empty<ScaffoldSkippedObjectInfo>(),
+            new ScaffoldOptions { Tables = new[] { "tenant_db.Customer" } },
+            provider,
+            "tenant_db");
+
+        var table = Assert.Single(selection.Tables);
+        Assert.Equal("Customer", table.Name);
+        Assert.Null(table.Schema);
+        Assert.Empty(selection.SkippedObjects);
+    }
+
+    [Fact]
+    public void BuildSelection_WithMySqlCatalogQualifiedQueryArtifactFilter_EmitsMatchingArtifactOnly()
+    {
+        var provider = new MySqlProvider(new SqliteParameterFactory());
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo(null, "CustomerView", "View", "MySQL view", null),
+            new ScaffoldSkippedObjectInfo(null, "IgnoredView", "View", "MySQL view", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            Array.Empty<ScaffoldTableInfo>(),
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "tenant_db.CustomerView" } },
+            provider,
+            "tenant_db");
+
+        var table = Assert.Single(selection.Tables);
+        Assert.Equal("CustomerView", table.Name);
+        Assert.Null(table.Schema);
+        Assert.Contains("CustomerView", selection.QueryArtifactTableKeys);
+        Assert.Empty(selection.SkippedObjects);
+    }
+
 }
