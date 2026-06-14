@@ -19,7 +19,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxProviderMobilitySchemaInspectorFileLines = 200;
     private const int MaxProviderMobilityTranslationFileLines = 250;
     private const int MaxLiveProviderScaffoldingFileLines = 450;
-    private const int MaxLiveProviderScaffoldCliFileLines = 700;
+    private const int MaxLiveProviderScaffoldCliFileLines = 650;
     private const int MaxCliIntegrationFileLines = 1000;
     private const int MaxCoreQueryTranslatorFileLines = 1000;
     private const int MaxQueryTranslatorPartialFileLines = 1000;
@@ -110,7 +110,7 @@ public sealed class RepositoryHygieneTests
     {
         var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
         Assert.Contains("Live-provider runtime scaffolder test files stay below 450 lines", ownership, StringComparison.Ordinal);
-        Assert.Contains("Live-provider CLI scaffold test files stay below 700 lines", ownership, StringComparison.Ordinal);
+        Assert.Contains("Live-provider CLI scaffold test files stay below 650 lines", ownership, StringComparison.Ordinal);
 
         var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "tests"), "LiveProviderScaffold*.cs")
             .Select(path =>
