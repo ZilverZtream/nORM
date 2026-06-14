@@ -306,6 +306,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.Indexes.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.ProviderObjects.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.Relationships.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedFeatureMetadataBuilder.Relationships.Parsing.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexFeatureMetadataBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexFeatureMetadataBuilder.Prefix.cs"));
 
