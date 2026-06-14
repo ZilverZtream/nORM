@@ -69,6 +69,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Helpers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.ForeignKeys.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.ForeignKeys.Clauses.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.ForeignKeys.Semantics.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"));
 
     private static string ReadManyToManyDiscoverySource()
