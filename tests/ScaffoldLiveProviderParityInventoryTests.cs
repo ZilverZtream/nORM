@@ -159,6 +159,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("PostgreSQL array and UUID routine parameters are PostgreSQL-specific.", "Postgres"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_overloaded_function_wrappers_without_collisions"] =
                 Expect("PostgreSQL overloaded functions are PostgreSQL-specific routine metadata.", "Postgres"),
+            ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_postgres_scalar_set_returning_function_wrapper_on_live_provider"] =
+                Expect("This is a PostgreSQL-specific set-returning-function scaffold shape.", "Postgres"),
             ["LiveProviderScaffoldingRoutineTests.cs::ScaffoldAsync_emits_postgres_quoted_parameter_function_as_positional_arguments"] =
                 Expect("PostgreSQL quoted routine parameter names require PostgreSQL-specific invocation handling.", "Postgres"),
             ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_postgres_overloaded_and_quoted_parameter_function_wrappers_on_live_provider"] =

@@ -944,7 +944,9 @@ must be reviewed and edited like handwritten model code.
   functions, PostgreSQL array/UUID routine parameters, and MySQL unsigned
   routine parameters. SQL Server table-valued parameters and PostgreSQL
   overloaded and quoted-parameter function wrappers are also verified through
-  the real CLI with consumer builds. SQL Server and MySQL output-parameter routine factories,
+  the real CLI with consumer builds. PostgreSQL scalar set-returning functions
+  are verified through the real CLI as `Value` result DTO wrappers instead of
+  `SELECT * FROM` calls. SQL Server and MySQL output-parameter routine factories,
   plus SQL Server no-result stored procedure non-query wrappers, are also
   verified through the real CLI. Trigger-owned tables are
   also scaffolded as read-only entities while the JSON warning report preserves

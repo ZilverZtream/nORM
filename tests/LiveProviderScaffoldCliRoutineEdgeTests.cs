@@ -91,6 +91,41 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             });
     }
 
+    [Fact]
+    public void Dotnet_norm_scaffold_emits_postgres_scalar_set_returning_function_wrapper_on_live_provider()
+    {
+        var suffix = IdentifierSuffix();
+        var routineName = "CliPostgresSetofRoutine" + suffix;
+
+        RunRoutineEdgeCliTest(
+            ProviderKind.Postgres,
+            "norm_live_cli_postgres_setof_routine_",
+            "CliLivePostgresSetofRoutineCtx",
+            (connection, provider) => SetupPostgresScalarSetReturningRoutine(connection, provider, routineName),
+            (connection, provider) => CleanupPostgresScalarSetReturningRoutine(connection, provider, routineName),
+            (contextCode, routines) =>
+            {
+                Assert.Contains(routines, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString()!.EndsWith(routineName, StringComparison.Ordinal));
+                Assert.Contains($"Task<List<TResult>> {routineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"public sealed class {routineName}Result", contextCode, StringComparison.Ordinal);
+                Assert.Contains("public int Value { get; set; }", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"Task<List<{routineName}Result>> {routineName}Async", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<TResult> Stream{routineName}Async<TResult>", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"IAsyncEnumerable<{routineName}Result> Stream{routineName}Async", contextCode, StringComparison.Ordinal);
+                Assert.Contains("return QueryUnchangedAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"return QueryUnchangedAsync<{routineName}Result>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains("QueryUnchangedStreamAsync<TResult>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                Assert.Contains($"QueryUnchangedStreamAsync<{routineName}Result>(\"SELECT \" + invocation + \" AS \" + Provider.Escape(\"Value\")", contextCode, StringComparison.Ordinal);
+                var methodStart = contextCode.IndexOf($"Task<List<TResult>> {routineName}Async<TResult>", StringComparison.Ordinal);
+                Assert.True(methodStart >= 0);
+                var nextMethod = contextCode.IndexOf("/// <summary>", methodStart + 1, StringComparison.Ordinal);
+                var methodBlock = nextMethod > methodStart ? contextCode[methodStart..nextMethod] : contextCode[methodStart..];
+                Assert.DoesNotContain("SELECT * FROM \" + invocation", methodBlock, StringComparison.Ordinal);
+            });
+    }
+
     private static void RunRoutineEdgeCliTest(
         ProviderKind kind,
         string outputPrefix,
@@ -210,5 +245,24 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(quotedName)}(integer, text)",
             $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(overloadedName)}(integer)",
             $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(overloadedName)}(text)");
+    }
+
+    private static void SetupPostgresScalarSetReturningRoutine(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string routineName)
+    {
+        CleanupPostgresScalarSetReturningRoutine(connection, provider, routineName);
+
+        Execute(connection,
+            $"CREATE FUNCTION {provider.Escape("public")}.{provider.Escape(routineName)}(tenantId integer) RETURNS SETOF integer LANGUAGE SQL AS $$ SELECT tenantId $$");
+    }
+
+    private static void CleanupPostgresScalarSetReturningRoutine(
+        DbConnection connection,
+        DatabaseProvider provider,
+        string routineName)
+    {
+        Execute(connection, $"DROP FUNCTION IF EXISTS {provider.Escape("public")}.{provider.Escape(routineName)}(integer)");
     }
 }
