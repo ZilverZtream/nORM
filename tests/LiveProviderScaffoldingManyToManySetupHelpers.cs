@@ -307,6 +307,80 @@ public sealed partial class LiveProviderScaffoldingParityTests
             $"CREATE UNIQUE INDEX {provider.Escape(NullableBridgeStudentCourseUniqueIndexName)} ON {join} ({studentId}, {courseId})");
     }
 
+    private static async Task SetupProviderOwnedBridgeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownProviderOwnedBridgeManyToManyAsync(connection, provider, kind);
+
+        var author = kind == ProviderKind.SqlServer
+            ? SqlServerQualified(provider, ProviderOwnedBridgeAuthorTable)
+            : kind == ProviderKind.Postgres
+                ? Qualified(provider, "public", ProviderOwnedBridgeAuthorTable)
+                : provider.Escape(ProviderOwnedBridgeAuthorTable);
+        var book = kind == ProviderKind.SqlServer
+            ? SqlServerQualified(provider, ProviderOwnedBridgeBookTable)
+            : kind == ProviderKind.Postgres
+                ? Qualified(provider, "public", ProviderOwnedBridgeBookTable)
+                : provider.Escape(ProviderOwnedBridgeBookTable);
+        var join = kind == ProviderKind.SqlServer
+            ? SqlServerQualified(provider, ProviderOwnedBridgeAuthorBookTable)
+            : kind == ProviderKind.Postgres
+                ? Qualified(provider, "public", ProviderOwnedBridgeAuthorBookTable)
+                : provider.Escape(ProviderOwnedBridgeAuthorBookTable);
+        var id = provider.Escape("Id");
+        var authorId = provider.Escape("AuthorId");
+        var bookId = provider.Escape("BookId");
+        var name = provider.Escape("Name");
+        var title = provider.Escape("Title");
+
+        await ExecuteAsync(connection, $"CREATE TABLE {author} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {name} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection, $"CREATE TABLE {book} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {title} {TextType(kind, 80)} NOT NULL)");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {join} ({authorId} {IntType(kind)} NOT NULL, {bookId} {IntType(kind)} NOT NULL, PRIMARY KEY ({authorId}, {bookId}), " +
+            $"CONSTRAINT {provider.Escape(ProviderOwnedBridgeAuthorBookAuthorFkName)} FOREIGN KEY ({authorId}) REFERENCES {author} ({id}), " +
+            $"CONSTRAINT {provider.Escape(ProviderOwnedBridgeAuthorBookBookFkName)} FOREIGN KEY ({bookId}) REFERENCES {book} ({id}))");
+
+        switch (kind)
+        {
+            case ProviderKind.SqlServer:
+                await ExecuteAsync(connection, $$"""
+                    CREATE TRIGGER {{SqlServerQualified(provider, ProviderOwnedBridgeTrigger)}} ON {{join}}
+                    AFTER INSERT AS
+                    BEGIN
+                        SET NOCOUNT ON;
+                    END
+                    """);
+                break;
+            case ProviderKind.Postgres:
+                var function = Qualified(provider, "public", ProviderOwnedBridgePostgresFunction);
+                await ExecuteAsync(connection, $$"""
+                    CREATE FUNCTION {{function}}() RETURNS trigger
+                    LANGUAGE plpgsql
+                    AS $$
+                    BEGIN
+                        RETURN NEW;
+                    END
+                    $$
+                    """);
+                await ExecuteAsync(connection,
+                    $"CREATE TRIGGER {provider.Escape(ProviderOwnedBridgeTrigger)} BEFORE INSERT ON {join} FOR EACH ROW EXECUTE FUNCTION {function}()");
+                break;
+            case ProviderKind.MySql:
+                await ExecuteAsync(connection,
+                    $"CREATE TRIGGER {provider.Escape(ProviderOwnedBridgeTrigger)} BEFORE INSERT ON {join} FOR EACH ROW SET @norm_provider_owned_bridge = 1");
+                break;
+            case ProviderKind.Sqlite:
+                await ExecuteAsync(connection, $$"""
+                    CREATE TRIGGER {{provider.Escape(ProviderOwnedBridgeTrigger)}} AFTER INSERT ON {{join}}
+                    BEGIN
+                        SELECT 1;
+                    END
+                    """);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.");
+        }
+    }
+
     private static async Task SetupSchemaQualifiedManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await TeardownSchemaQualifiedManyToManyAsync(connection, provider, kind);

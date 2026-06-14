@@ -167,6 +167,101 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.Sqlite)]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_rejects_provider_owned_bridge_join_table_on_live_provider(ProviderKind kind)
+    {
+        var root = FindRepositoryRoot();
+        var suffix = IdentifierSuffix();
+        var authorTable = "CliOwnedAuthor" + suffix;
+        var bookTable = "CliOwnedBook" + suffix;
+        var authorBookTable = "CliOwnedAuthorBook" + suffix;
+        var authorFkName = "FK_CliOwnedBridge_Author_" + suffix;
+        var bookFkName = "FK_CliOwnedBridge_Book_" + suffix;
+        var triggerName = "TR_CliOwnedBridge_Audit_" + suffix;
+        var functionName = "fn_CliOwnedBridgeAudit_" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_owned_bridge_" + kind + "_" + suffix);
+        var scratchDatabase = kind == ProviderKind.MySql
+            ? "norm_cli_owned_bridge_" + suffix.ToLowerInvariant()
+            : null;
+        string? sqliteFile = null;
+
+        var live = OpenLive(kind, ref sqliteFile);
+        if (live is null)
+            return;
+
+        var (connection, provider, connectionString, cliProvider) = live.Value;
+        var scaffoldConnectionString = scratchDatabase is null
+            ? connectionString
+            : ConnectionStringWithDatabase(connectionString, scratchDatabase);
+        try
+        {
+            using (connection)
+            {
+                if (scratchDatabase is not null)
+                {
+                    Execute(connection,
+                        $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}",
+                        $"CREATE DATABASE {provider.Escape(scratchDatabase)}");
+                    connection.ChangeDatabase(scratchDatabase);
+                }
+
+                SetupProviderOwnedBridgeManyToMany(connection, provider, kind, authorTable, bookTable, authorBookTable, authorFkName, bookFkName, triggerName, functionName);
+            }
+
+            var scaffold = RunCli(
+                "scaffold " +
+                $"--provider {cliProvider} " +
+                $"--connection {Quote(scaffoldConnectionString)} " +
+                $"--output {Quote(output)} " +
+                "--namespace CliLiveScaffolded " +
+                "--context CliLiveProviderOwnedBridgeCtx " +
+                $"--table {Quote(authorTable)} " +
+                $"--table {Quote(bookTable)} " +
+                $"--table {Quote(authorBookTable)}",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            var joinCode = File.ReadAllText(Path.Combine(output, authorBookTable + ".cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveProviderOwnedBridgeCtx.cs"));
+            var warningJsonPath = Path.Combine(output, "nORM.ScaffoldWarnings.json");
+
+            Assert.Contains("[ReadOnlyEntity]", joinCode, StringComparison.Ordinal);
+            Assert.DoesNotContain($".UsingTable(\"{authorBookTable}\"", contextCode, StringComparison.Ordinal);
+            AssertTriggerDiagnostic(warningJsonPath, authorBookTable, triggerName, kind);
+            AssertPossibleManyToManyDiagnosticReason(warningJsonPath, authorBookTable, "provider-owned-write-blocking-schema");
+
+            WriteConsumerProject(root, output);
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try
+            {
+                using var cleanup = Reopen(kind, connectionString);
+                if (scratchDatabase is null)
+                    CleanupProviderOwnedBridgeManyToMany(cleanup, provider, kind, authorTable, bookTable, authorBookTable, triggerName, functionName);
+                else
+                    Execute(cleanup, $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}");
+            }
+            catch
+            {
+                // Best-effort cleanup; failed cleanup should not hide the original assertion.
+            }
+
+            TryDeleteDirectory(output);
+            if (sqliteFile is not null)
+            {
+                try { File.Delete(sqliteFile); } catch { }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
     public void Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();

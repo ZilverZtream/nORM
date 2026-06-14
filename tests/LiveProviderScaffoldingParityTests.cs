@@ -102,6 +102,13 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string NullableBridgeStudentCourseStudentFkName = "FK_ScaffoldLiveNullableBridge_Student";
     private const string NullableBridgeStudentCourseCourseFkName = "FK_ScaffoldLiveNullableBridge_Course";
     private const string NullableBridgeStudentCourseUniqueIndexName = "UX_ScaffoldLiveNullableBridge_Pair";
+    private const string ProviderOwnedBridgeAuthorTable = "ScaffoldLiveOwnedBridgeAuthor";
+    private const string ProviderOwnedBridgeBookTable = "ScaffoldLiveOwnedBridgeBook";
+    private const string ProviderOwnedBridgeAuthorBookTable = "ScaffoldLiveOwnedBridgeAuthorBook";
+    private const string ProviderOwnedBridgeAuthorBookAuthorFkName = "FK_ScaffoldLiveOwnedBridge_Author";
+    private const string ProviderOwnedBridgeAuthorBookBookFkName = "FK_ScaffoldLiveOwnedBridge_Book";
+    private const string ProviderOwnedBridgeTrigger = "TR_ScaffoldLiveOwnedBridge_Audit";
+    private const string ProviderOwnedBridgePostgresFunction = "fn_scaffold_live_owned_bridge_audit";
     private const string UniqueParentTable = "ScaffoldLiveUniqueParent";
     private const string UniqueChildTable = "ScaffoldLiveUniqueChild";
     private const string UniqueFkName = "FK_ScaffoldLiveUniqueChild_Parent";

@@ -993,6 +993,9 @@ must be reviewed and edited like handwritten model code.
   Nullable-FK surrogate join tables are verified through the real CLI across all four
   live providers; they remain explicit entities with `nullable-foreign-key`
   diagnostics instead of unsafe skip navigations.
+  Provider-owned trigger bridge tables are verified through the real CLI across all four
+  live providers; they remain explicit `[ReadOnlyEntity]` join entities with
+  `provider-owned-write-blocking-schema` diagnostics instead of unsafe skip navigations.
   Schema-qualified many-to-many join tables are verified through the real CLI
   with schema-aware `UsingTable` mapping.
 - `SchemaSignatureTests` covers dynamic scaffolding schema signatures,
@@ -1026,6 +1029,7 @@ must be reviewed and edited like handwritten model code.
   database-name preservation with role-named FK navigations,
   and composite primary-key ordinal order across live providers,
   nullable-FK many-to-many bridge rejection,
+  provider-owned many-to-many bridge rejection,
   provider-owned/default-promotion and
   keyless-table diagnostics, and skipped-view table-filter failures against
   SQLite and any configured SQL Server, PostgreSQL, and MySQL live providers.

@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using System.Data.Common;
 using System.Threading.Tasks;
 using nORM.Providers;
@@ -154,6 +155,44 @@ public sealed partial class LiveProviderScaffoldingParityTests
             await ExecuteAsync(connection, DropTable(kind, NullableBridgeStudentCourseTable, provider.Escape(NullableBridgeStudentCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, NullableBridgeCourseTable, provider.Escape(NullableBridgeCourseTable)));
             await ExecuteAsync(connection, DropTable(kind, NullableBridgeStudentTable, provider.Escape(NullableBridgeStudentTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task TeardownProviderOwnedBridgeManyToManyAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        try
+        {
+            switch (kind)
+            {
+                case ProviderKind.SqlServer:
+                    await ExecuteAsync(connection,
+                        $"IF OBJECT_ID(N'dbo.{ProviderOwnedBridgeTrigger}', N'TR') IS NOT NULL DROP TRIGGER {SqlServerQualified(provider, ProviderOwnedBridgeTrigger)}");
+                    await ExecuteAsync(connection, DropTable(kind, "dbo." + ProviderOwnedBridgeAuthorBookTable, SqlServerQualified(provider, ProviderOwnedBridgeAuthorBookTable)));
+                    await ExecuteAsync(connection, DropTable(kind, "dbo." + ProviderOwnedBridgeBookTable, SqlServerQualified(provider, ProviderOwnedBridgeBookTable)));
+                    await ExecuteAsync(connection, DropTable(kind, "dbo." + ProviderOwnedBridgeAuthorTable, SqlServerQualified(provider, ProviderOwnedBridgeAuthorTable)));
+                    break;
+                case ProviderKind.Postgres:
+                    var join = Qualified(provider, "public", ProviderOwnedBridgeAuthorBookTable);
+                    await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(ProviderOwnedBridgeTrigger)} ON {join}");
+                    await ExecuteAsync(connection, $"DROP FUNCTION IF EXISTS {Qualified(provider, "public", ProviderOwnedBridgePostgresFunction)}()");
+                    await ExecuteAsync(connection, DropTable(kind, ProviderOwnedBridgeAuthorBookTable, join));
+                    await ExecuteAsync(connection, DropTable(kind, ProviderOwnedBridgeBookTable, Qualified(provider, "public", ProviderOwnedBridgeBookTable)));
+                    await ExecuteAsync(connection, DropTable(kind, ProviderOwnedBridgeAuthorTable, Qualified(provider, "public", ProviderOwnedBridgeAuthorTable)));
+                    break;
+                case ProviderKind.MySql:
+                case ProviderKind.Sqlite:
+                    await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(ProviderOwnedBridgeTrigger)}");
+                    await ExecuteAsync(connection, DropTable(kind, ProviderOwnedBridgeAuthorBookTable, provider.Escape(ProviderOwnedBridgeAuthorBookTable)));
+                    await ExecuteAsync(connection, DropTable(kind, ProviderOwnedBridgeBookTable, provider.Escape(ProviderOwnedBridgeBookTable)));
+                    await ExecuteAsync(connection, DropTable(kind, ProviderOwnedBridgeAuthorTable, provider.Escape(ProviderOwnedBridgeAuthorTable)));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported live provider kind.");
+            }
         }
         catch
         {

@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -161,6 +162,71 @@ public sealed partial class LiveProviderScaffoldingParityTests
                 if (Directory.Exists(dir))
                     Directory.Delete(dir, recursive: true);
                 await TeardownNullableBridgeManyToManyAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_rejects_provider_owned_bridge_join_table_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            try
+            {
+                await SetupProviderOwnedBridgeManyToManyAsync(connection, provider, kind);
+            }
+            catch (DbException ex)
+            {
+                await TeardownProviderOwnedBridgeManyToManyAsync(connection, provider, kind);
+                if (Skip.If(true, $"{kind} provider-owned bridge setup is not available on this server: {ex.Message}")) return;
+            }
+
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_owned_bridge_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldProviderOwnedBridgeContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { ProviderOwnedBridgeAuthorTable, ProviderOwnedBridgeBookTable, ProviderOwnedBridgeAuthorBookTable },
+                        OverwriteFiles = false
+                    });
+
+                var joinCode = await File.ReadAllTextAsync(Path.Combine(dir, ProviderOwnedBridgeAuthorBookTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldProviderOwnedBridgeContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+                var joinTables = warningJson.RootElement.GetProperty("possibleManyToManyJoinTables").EnumerateArray().ToArray();
+
+                Assert.Contains("[ReadOnlyEntity]", joinCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($".UsingTable(\"{ProviderOwnedBridgeAuthorBookTable}\"", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                    item.GetProperty("kind").GetString() == "Trigger" &&
+                    LastTableNameEquals(item.GetProperty("table").GetString(), ProviderOwnedBridgeAuthorBookTable) &&
+                    item.GetProperty("name").GetString() == ProviderOwnedBridgeTrigger);
+                Assert.Contains(joinTables, item =>
+                    LastTableNameEquals(item.GetProperty("table").GetString(), ProviderOwnedBridgeAuthorBookTable) &&
+                    item.GetProperty("reasons").EnumerateArray().Any(reason => reason.GetString() == "provider-owned-write-blocking-schema") &&
+                    item.GetProperty("metadata").GetProperty("providerOwnedWriteBlockingSchema").GetBoolean());
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownProviderOwnedBridgeManyToManyAsync(connection, provider, kind);
             }
         }
     }
