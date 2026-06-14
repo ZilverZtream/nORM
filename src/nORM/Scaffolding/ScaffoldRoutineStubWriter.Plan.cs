@@ -9,6 +9,7 @@ namespace nORM.Scaffolding
     {
         private static RoutineStubPlan BuildRoutineStubPlan(
             ScaffoldRoutineStubInfo routine,
+            string routineMemberName,
             HashSet<string> memberNames,
             bool useNullableReferenceTypes,
             bool useDatabaseNames,
@@ -25,7 +26,6 @@ namespace nORM.Scaffolding
             var inputParameterDataTypes = GetRoutineInputParameterDataTypes(metadata);
             var outputParameters = GetRoutineOutputParameters(metadata);
             var discoveredInputParameterCount = GetRoutineInputParameterCount(metadata);
-            var routineMemberName = ScaffoldNameHelper.ToScaffoldClrNamePart(routine.Name, useDatabaseNames);
             var methodBase = ScaffoldNameHelper.MakeUnique(routineMemberName + "Async", memberNames);
             var parameterType = inputParameters.Count > 0
                 ? ScaffoldNameHelper.MakeUnique(routineMemberName + "Parameters", memberNames)

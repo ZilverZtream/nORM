@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Text;
+using nORM.Scaffolding;
 using Xunit;
 
 namespace nORM.Tests;
@@ -74,6 +75,51 @@ public partial class DatabaseScaffolderPrivateMethodTests
         {
             Directory.CreateDirectory(dir);
             File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithDuplicateRoutineNamesAcrossSchemas_UsesSchemaQualifiedMemberNames()
+    {
+        var code = WriteScaffoldContext(
+            "MyApp",
+            "AppDbContext",
+            new[] { "User" },
+            routineStubs: new[]
+            {
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "billing",
+                    "SyncLedger",
+                    "Routine",
+                    "SQL Server stored procedure; parameters=0",
+                    null),
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "audit",
+                    "SyncLedger",
+                    "Routine",
+                    "SQL Server stored procedure; parameters=0",
+                    null)
+            });
+
+        Assert.Contains("Task<List<TResult>> AuditSyncLedgerAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.Contains("Task<List<TResult>> BillingSyncLedgerAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.Contains("StreamAuditSyncLedgerAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.Contains("StreamBillingSyncLedgerAsync<TResult>", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("SyncLedgerAsync2", code, StringComparison.Ordinal);
+        Assert.Contains("Provider.Escape(\"audit\") + \".\" + Provider.Escape(\"SyncLedger\")", code, StringComparison.Ordinal);
+        Assert.Contains("Provider.Escape(\"billing\") + \".\" + Provider.Escape(\"SyncLedger\")", code, StringComparison.Ordinal);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_duplicate_routines_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

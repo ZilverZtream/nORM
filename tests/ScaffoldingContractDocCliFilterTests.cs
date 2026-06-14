@@ -86,6 +86,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames", publicApiPolicy, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_database_names_on_live_provider", publicApiPolicy, StringComparison.Ordinal);
         Assert.Contains("routine result-column names", doc, StringComparison.Ordinal);
+        Assert.Contains("Provider-bound routine and sequence stubs follow the same rule", doc, StringComparison.Ordinal);
         Assert.Contains("Synthetic navigation", doc, StringComparison.Ordinal);
         Assert.Contains("EF-style CLI aliases", doc, StringComparison.Ordinal);
         Assert.Contains("`--data-annotations`/`-d`", doc, StringComparison.Ordinal);
@@ -313,6 +314,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`schema.view` filters", cliReadme, StringComparison.Ordinal);
         Assert.Contains("select matching provider routines or sequences", cliReadme, StringComparison.Ordinal);
         Assert.Contains("Ambiguous explicit filters", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("schema-prefixed generated", cliReadme, StringComparison.Ordinal);
         Assert.Contains("repeatable `--schema`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("multi-value `--table First Second`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("multi-value", rootReadme, StringComparison.Ordinal);
@@ -322,6 +324,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("table and query-artifact filters", rootReadme, StringComparison.Ordinal);
         Assert.Contains("select matching provider routines or sequences", rootReadme, StringComparison.Ordinal);
         Assert.Contains("Ambiguous explicit filters", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("schema-prefixed generated", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`--project`/`-p`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("plus sanitized output directory", cliReadme, StringComparison.Ordinal);
         Assert.Contains("nullable-reference output", cliReadme, StringComparison.Ordinal);

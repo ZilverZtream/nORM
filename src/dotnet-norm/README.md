@@ -112,6 +112,8 @@ and routine result-column names should be preserved as generated CLR names
 instead of normalized to PascalCase. Invalid C# identifiers and C# keywords are
 still escaped or normalized so generated code compiles; synthetic navigation
 members remain C#-style names derived from FK roles.
+Duplicate routine or sequence names across schemas use schema-prefixed generated
+member names instead of opaque numeric suffixes.
 `--no-onconfiguring` is accepted for EF Core scaffold command compatibility; it
 is a no-op because nORM generated contexts never emit `OnConfiguring` or a
 hard-coded connection string.

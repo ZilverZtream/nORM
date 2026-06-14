@@ -63,12 +63,25 @@ public partial class ScaffoldingContractDocTests
     public void Doc_bounds_schema_preservation_by_provider()
     {
         var doc = ReadDoc();
+        var routineStubWriter = ReadRoutineStubWriterSource();
+        var sequenceStubWriter = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSequenceStubWriter.cs");
+
         Assert.Contains("Schema-qualified table names are preserved for SQL Server, PostgreSQL, and", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL scaffolding uses the current database for", doc, StringComparison.Ordinal);
         Assert.Contains("does not emit the database/catalog name as a model schema", doc, StringComparison.Ordinal);
         Assert.Contains("same table name appears in multiple schemas", doc, StringComparison.Ordinal);
         Assert.Contains("include the schema name", doc, StringComparison.Ordinal);
+        Assert.Contains("Provider-bound routine and sequence stubs follow the same rule", doc, StringComparison.Ordinal);
+        Assert.Contains("schema-prefixed generated method and DTO names", doc, StringComparison.Ordinal);
+        Assert.Contains("schema-prefixed generated method", doc, StringComparison.Ordinal);
         Assert.Contains("avoid the enclosing entity type name", doc, StringComparison.Ordinal);
+        Assert.Contains("GetSchemaAwareRoutineMemberName", routineStubWriter, StringComparison.Ordinal);
+        Assert.Contains("FindDuplicateNames", routineStubWriter, StringComparison.Ordinal);
+        Assert.Contains("Default_\" + routine.Name", routineStubWriter, StringComparison.Ordinal);
+        Assert.Contains("routine.Schema + \"_\" + routine.Name", routineStubWriter, StringComparison.Ordinal);
+        Assert.Contains("GetSchemaAwareSequenceMemberName", sequenceStubWriter, StringComparison.Ordinal);
+        Assert.Contains("Default_\" + sequence.Name", sequenceStubWriter, StringComparison.Ordinal);
+        Assert.Contains("sequence.Schema + \"_\" + sequence.Name", sequenceStubWriter, StringComparison.Ordinal);
     }
 
     [Fact]

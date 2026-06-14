@@ -20,12 +20,14 @@ namespace nORM.Scaffolding
         {
             var nullableReferenceSuffix = useNullableReferenceTypes ? "?" : string.Empty;
             var nullableObjectType = "object" + nullableReferenceSuffix;
+            var duplicateRoutineNames = FindDuplicateNames(routineStubs);
             foreach (var routine in routineStubs
                 .OrderBy(r => r.Schema ?? string.Empty, StringComparer.Ordinal)
                 .ThenBy(r => r.Name, StringComparer.Ordinal)
                 .ThenBy(r => r.Detail, StringComparer.Ordinal))
             {
-                AppendRoutineStub(sb, routine, memberNames, useNullableReferenceTypes, useDatabaseNames, nullableReferenceSuffix, nullableObjectType);
+                var routineMemberName = GetSchemaAwareRoutineMemberName(routine, duplicateRoutineNames, useDatabaseNames);
+                AppendRoutineStub(sb, routine, routineMemberName, memberNames, useNullableReferenceTypes, useDatabaseNames, nullableReferenceSuffix, nullableObjectType);
             }
 
             AppendRoutineParameterGuard(sb, nullableObjectType);
@@ -34,6 +36,7 @@ namespace nORM.Scaffolding
         private static void AppendRoutineStub(
             StringBuilder sb,
             ScaffoldRoutineStubInfo routine,
+            string routineMemberName,
             HashSet<string> memberNames,
             bool useNullableReferenceTypes,
             bool useDatabaseNames,
@@ -42,6 +45,7 @@ namespace nORM.Scaffolding
         {
             var plan = BuildRoutineStubPlan(
                 routine,
+                routineMemberName,
                 memberNames,
                 useNullableReferenceTypes,
                 useDatabaseNames,
@@ -120,6 +124,27 @@ namespace nORM.Scaffolding
                     plan.OutputFactory,
                     plan.OutputParameters);
             }
+        }
+
+        private static HashSet<string> FindDuplicateNames(IReadOnlyList<ScaffoldRoutineStubInfo> routineStubs)
+            => routineStubs
+                .GroupBy(routine => routine.Name, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        private static string GetSchemaAwareRoutineMemberName(
+            ScaffoldRoutineStubInfo routine,
+            IReadOnlySet<string> duplicateRoutineNames,
+            bool useDatabaseNames)
+        {
+            var sourceName = duplicateRoutineNames.Contains(routine.Name)
+                ? string.IsNullOrWhiteSpace(routine.Schema)
+                    ? "Default_" + routine.Name
+                    : routine.Schema + "_" + routine.Name
+                : routine.Name;
+
+            return ScaffoldNameHelper.ToScaffoldClrNamePart(sourceName, useDatabaseNames);
         }
     }
 }

@@ -216,6 +216,10 @@ must be reviewed and edited like handwritten model code.
   `GetType`.
 - When the same table name appears in multiple schemas, generated entity names
   include the schema name instead of relying on opaque numeric suffixes.
+  Provider-bound routine and sequence stubs follow the same rule: when selected
+  stubs share a database object name across schemas, generated method, DTO, and
+  helper type names include the schema-derived prefix instead of opaque numeric
+  suffixes.
 - The requested namespace is validated before files are written, and the
   generated context file name follows the escaped context class name rather
   than the raw CLI/API input. If that context name collides with an entity
@@ -623,8 +627,10 @@ must be reviewed and edited like handwritten model code.
   the generated wrapper XML summary and the provider-bound execution details
   remain in XML remarks. PostgreSQL overloaded routine names are left without
   generated comment summaries unless the catalog row can be matched
-  unambiguously. Routine bodies remain provider-owned and are not translated
-  across database engines.
+  unambiguously. Routine stubs with the same name in different schemas use
+  schema-prefixed generated method and DTO names so diffs identify the provider
+  object being called. Routine bodies remain provider-owned and are not
+  translated across database engines.
 - Optional provider-bound standalone sequence wrappers through
   `ScaffoldOptions.EmitSequenceStubs` and CLI `--emit-sequence-stubs`.
   SQL Server and PostgreSQL standalone sequences are discovered with scalar
@@ -635,7 +641,9 @@ must be reviewed and edited like handwritten model code.
   records the provider, discovered data type, generated CLR value type, and
   whether nORM can emit an opt-in next-value stub for that provider. SQL Server
   and PostgreSQL native sequence comments are emitted as wrapper XML summaries
-  while provider-bound sequence semantics stay in XML remarks.
+  while provider-bound sequence semantics stay in XML remarks. Sequence stubs
+  with the same name in different schemas use schema-prefixed generated method
+  and result type names instead of opaque numeric suffixes.
 - Optional provider query-artifact entities through
   `ScaffoldOptions.EmitQueryArtifacts` (or the compatibility alias
   `EmitViewEntities`) and CLI `--emit-query-artifacts` (or the compatibility alias `--emit-view-entities`). Ordinary views and PostgreSQL materialized views are

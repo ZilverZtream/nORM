@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Text;
+using nORM.Scaffolding;
 using Xunit;
 
 namespace nORM.Tests;
@@ -77,6 +78,52 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("SELECT nextval('", code);
         Assert.Contains("::regclass) AS ", code);
         Assert.Contains("(Provider.Escape(\"public\") + \".\" + Provider.Escape(\"invoice_no\")).Replace(\"'\", \"''\")", code);
+    }
+
+    [Fact]
+    public void ScaffoldContext_WithDuplicateSequenceNamesAcrossSchemas_UsesSchemaQualifiedMemberNames()
+    {
+        var code = WriteScaffoldContext(
+            "MyApp",
+            "AppDbContext",
+            new[] { "User" },
+            sequenceStubs: new[]
+            {
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "billing",
+                    "OrderNo",
+                    "Sequence",
+                    "SQL Server sequence; dataType=bigint",
+                    null),
+                new DatabaseScaffolder.ScaffoldSkippedObject(
+                    "audit",
+                    "OrderNo",
+                    "Sequence",
+                    "SQL Server sequence; dataType=bigint",
+                    null)
+            });
+
+        Assert.Contains("private sealed class AuditOrderNoSequenceValue", code, StringComparison.Ordinal);
+        Assert.Contains("private sealed class BillingOrderNoSequenceValue", code, StringComparison.Ordinal);
+        Assert.Contains("public async Task<long> NextAuditOrderNoValueAsync", code, StringComparison.Ordinal);
+        Assert.Contains("public async Task<long> NextBillingOrderNoValueAsync", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("OrderNoSequenceValue2", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("NextOrderNoValueAsync2", code, StringComparison.Ordinal);
+        Assert.Contains("Provider.Escape(\"audit\") + \".\" + Provider.Escape(\"OrderNo\")", code, StringComparison.Ordinal);
+        Assert.Contains("Provider.Escape(\"billing\") + \".\" + Provider.Escape(\"OrderNo\")", code, StringComparison.Ordinal);
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_duplicate_sequences_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "AppDbContext.cs"), code, Encoding.UTF8);
+            File.WriteAllText(Path.Combine(dir, "User.cs"), "namespace MyApp; public class User { public int Id { get; set; } }", Encoding.UTF8);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]

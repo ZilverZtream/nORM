@@ -304,6 +304,8 @@ explicit-output overload for reviewed signature changes, including INOUT and
 return-value directions where provider metadata exposes them.
 Opt-in sequence stubs generate provider-bound next-value wrappers for SQL Server
 and PostgreSQL standalone sequences.
+Duplicate routine or sequence names across schemas use schema-prefixed generated
+member names instead of opaque numeric suffixes.
 SQL Server
 and PostgreSQL schemas are preserved, SQLite attached database schemas are
 preserved, and MySQL discovery does not bake the current database/catalog name

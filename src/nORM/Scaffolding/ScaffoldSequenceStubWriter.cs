@@ -16,6 +16,7 @@ namespace nORM.Scaffolding
             HashSet<string> memberNames,
             bool useDatabaseNames)
         {
+            var duplicateSequenceNames = FindDuplicateNames(sequenceStubs);
             foreach (var sequence in sequenceStubs
                 .OrderBy(s => s.Schema ?? string.Empty, StringComparer.Ordinal)
                 .ThenBy(s => s.Name, StringComparer.Ordinal))
@@ -25,7 +26,7 @@ namespace nORM.Scaffolding
                     continue;
 
                 var valueTypeName = MapSequenceValueTypeName(sequence.Detail);
-                var sequenceMemberName = ScaffoldNameHelper.ToScaffoldClrNamePart(sequence.Name, useDatabaseNames);
+                var sequenceMemberName = GetSchemaAwareSequenceMemberName(sequence, duplicateSequenceNames, useDatabaseNames);
                 var methodBase = ScaffoldNameHelper.MakeUnique("Next" + sequenceMemberName + "ValueAsync", memberNames);
                 var resultType = ScaffoldNameHelper.MakeUnique(sequenceMemberName + "SequenceValue", memberNames);
 
@@ -63,6 +64,27 @@ namespace nORM.Scaffolding
             if (detail.StartsWith("PostgreSQL", StringComparison.OrdinalIgnoreCase))
                 return "postgres";
             return string.Empty;
+        }
+
+        private static HashSet<string> FindDuplicateNames(IReadOnlyList<ScaffoldContextSequenceInfo> sequenceStubs)
+            => sequenceStubs
+                .GroupBy(sequence => sequence.Name, StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        private static string GetSchemaAwareSequenceMemberName(
+            ScaffoldContextSequenceInfo sequence,
+            IReadOnlySet<string> duplicateSequenceNames,
+            bool useDatabaseNames)
+        {
+            var sourceName = duplicateSequenceNames.Contains(sequence.Name)
+                ? string.IsNullOrWhiteSpace(sequence.Schema)
+                    ? "Default_" + sequence.Name
+                    : sequence.Schema + "_" + sequence.Name
+                : sequence.Name;
+
+            return ScaffoldNameHelper.ToScaffoldClrNamePart(sourceName, useDatabaseNames);
         }
 
         private static string MapSequenceValueTypeName(string detail)
