@@ -105,6 +105,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQLite virtual tables and shadow-table diagnostics are SQLite-specific.", "Sqlite"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =
                 Expect("PostgreSQL serial columns and owned sequences are PostgreSQL-specific catalog behavior.", "Postgres"),
+            ["LiveProviderScaffoldCliPostgresSerialTests.cs::Dotnet_norm_scaffold_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =
+                Expect("PostgreSQL serial columns and owned sequences are PostgreSQL-specific catalog behavior.", "Postgres"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
                 Expect("SQL Server rowversion/timestamp concurrency metadata is SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldCliSqlServerRowVersionTests.cs::Dotnet_norm_scaffold_marks_sqlserver_rowversion_as_timestamp_and_database_generated"] =
