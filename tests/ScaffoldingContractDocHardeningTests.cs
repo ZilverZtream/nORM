@@ -441,6 +441,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_emits_expression_index_metadata_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Provider-specific index implementations are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_reports_provider_specific_index_implementations_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("MySQL prefix-index diagnostics are verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_reports_mysql_prefix_index_without_emitting_normal_index", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("included-column index metadata", doc, StringComparison.Ordinal);
         Assert.Contains("real CLI where each provider exposes the feature", doc, StringComparison.Ordinal);
         Assert.Contains("Multiple composite FKs to", doc, StringComparison.Ordinal);

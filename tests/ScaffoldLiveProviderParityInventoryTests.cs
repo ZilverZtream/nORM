@@ -69,6 +69,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
         {
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_reports_mysql_prefix_index_without_emitting_normal_index"] =
                 Expect("MySQL prefix indexes are a MySQL-only index metadata shape.", "MySql"),
+            ["LiveProviderScaffoldCliMySqlPrefixIndexTests.cs::Dotnet_norm_scaffold_reports_mysql_prefix_index_without_emitting_normal_index"] =
+                Expect("MySQL prefix indexes are a MySQL-only index metadata shape.", "MySql"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_supported_mysql_expression_index_metadata"] =
                 Expect("MySQL expression index catalog metadata is exposed through MySQL-specific DDL and emitted as provider-bound expression-index metadata when representable.", "MySql"),
             ["LiveProviderScaffoldingIndexProviderSpecificTests.cs::ScaffoldAsync_emits_postgres_expression_index_with_include_metadata"] =

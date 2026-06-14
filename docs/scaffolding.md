@@ -965,7 +965,9 @@ must be reviewed and edited like handwritten model code.
   SQL Server expression-index equivalents require generated/computed columns plus
   ordinary indexes. Provider-specific index implementations are verified through
   the real CLI for SQL Server, PostgreSQL, and MySQL as SCF119 diagnostics rather
-  than generated index metadata. Multiple composite FKs to
+  than generated index metadata. MySQL prefix-index diagnostics are verified
+  through the real CLI as SCF117 while full-length prefixes remain ordinary
+  index metadata. Multiple composite FKs to
   the same principal are also verified through role-named navigations and
   payload-bridge diagnostics on the real CLI path. Direct composite alternate-key FKs are verified through the real CLI across all four providers.
   Multiple unique dependent
