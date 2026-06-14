@@ -167,7 +167,7 @@ explicit decisions rather than accidental gaps. Provider-specific live-provider
 cannot bypass the all-four matrix by avoiding provider `InlineData`.
 Live-provider runtime scaffolder test files stay below 450 lines so direct
 runtime parity, helpers, setup, and teardown remain split by scenario group.
-Live-provider CLI scaffold test files stay below 500 lines while the CLI suite
+Live-provider CLI scaffold test files stay below 465 lines while the CLI suite
 is split down to the same tighter boundary. `RepositoryHygieneTests` enforces
 these boundaries for `tests/LiveProviderScaffold*.cs`.
 
