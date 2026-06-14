@@ -919,7 +919,9 @@ must be reviewed and edited like handwritten model code.
   artifacts across all four live providers. Provider query-artifact opt-in is
   also verified through the real CLI with `--emit-query-artifacts` for SQLite
   virtual tables, SQL Server local table/view synonyms, PostgreSQL materialized
-  views, and MySQL views. The real CLI path also builds nullable and non-null alternate-key FK relationships from live provider metadata, including the
+  views, and MySQL views. SQL Server procedure-synonym rejection is verified
+  through the real CLI so non-query synonyms do not scaffold as entity classes.
+  The real CLI path also builds nullable and non-null alternate-key FK relationships from live provider metadata, including the
   unique index, navigation attributes, and generated fluent FK mapping, and
   preserves non-default FK delete/update referential actions, including
   RESTRICT and SET DEFAULT referential actions where providers expose them. It also

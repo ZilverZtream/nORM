@@ -395,6 +395,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("SQL Server local table/view synonyms", doc, StringComparison.Ordinal);
         Assert.Contains("local_view_synonym", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("local_view_synonym", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("SQL Server procedure-synonym rejection is verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_rejects_sqlserver_procedure_synonym_as_entity_filter", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL materialized", doc, StringComparison.Ordinal);
         Assert.Contains("nullable", doc, StringComparison.Ordinal);
         Assert.Contains("nullable and non-null alternate-key FK relationships", doc, StringComparison.Ordinal);

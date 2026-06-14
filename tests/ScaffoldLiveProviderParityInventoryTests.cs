@@ -93,6 +93,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQL Server system-versioned temporal tables are SQL Server-specific.", "SqlServer"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_rejects_sqlserver_procedure_synonym_as_entity_filter"] =
                 Expect("SQL Server procedure synonyms are SQL Server-specific provider objects.", "SqlServer"),
+            ["LiveProviderScaffoldCliSqlServerProcedureSynonymTests.cs::Dotnet_norm_scaffold_rejects_sqlserver_procedure_synonym_as_entity_filter"] =
+                Expect("SQL Server procedure synonyms are SQL Server-specific provider objects.", "SqlServer"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_reports_mysql_event_diagnostics_on_live_provider"] =
                 Expect("MySQL scheduled events are a MySQL-only routine/object catalog shape.", "MySql"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact"] =
