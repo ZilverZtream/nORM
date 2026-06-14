@@ -403,8 +403,9 @@ must be reviewed and edited like handwritten model code.
 - Optional schema filtering through `ScaffoldOptions.Schemas`, CLI
   comma-separated `--schemas`, repeatable CLI `--schema` entries, and EF-style
   multi-value `--schema Accounting Sales` tokens. Schema filters include all
-  discovered user tables and supported query artifacts in the selected schemas
-  and are unioned with explicit table filters. They apply to
+  discovered user tables, supported query artifacts, and opt-in routine or
+  sequence stubs in the selected schemas and are unioned with explicit table
+  filters. They apply to
   providers whose discovery preserves schema identity: SQL Server, PostgreSQL,
   and SQLite attached databases including `main`; SQLite `main` matches the
   unqualified default database and still emits unqualified `[Table]` metadata.

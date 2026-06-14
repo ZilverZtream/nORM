@@ -163,6 +163,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("matching supported query", doc, StringComparison.Ordinal);
         Assert.Contains("scaffolded by default as read-only query artifacts", doc, StringComparison.Ordinal);
         Assert.Contains("explicitly selected by table/schema filters", doc, StringComparison.Ordinal);
+        Assert.Contains("opt-in routine or", doc, StringComparison.Ordinal);
+        Assert.Contains("sequence stubs in the selected schemas", doc, StringComparison.Ordinal);
         Assert.Contains("ShouldEmitQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("IsDefaultQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("IsDefaultMySqlCatalogQualifiedFilter", tableFilterSource, StringComparison.Ordinal);
