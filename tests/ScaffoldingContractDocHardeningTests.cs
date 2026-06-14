@@ -199,6 +199,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldAsync_suppresses_synthetic_check_constraint_names_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_synthetic_unique_constraint_index_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_suppresses_synthetic_unique_constraint_index_names_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_unions_schema_and_table_filters_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_reports_missing_schema_filter_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_reports_trigger_diagnostics_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_reports_provider_specific_column_diagnostics_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_safe_provider_specific_columns_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
