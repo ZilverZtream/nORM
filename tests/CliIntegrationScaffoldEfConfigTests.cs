@@ -278,6 +278,7 @@ public partial class CliIntegrationTests
                   "project": "src/App",
                   "outputDir": "DryRunModels",
                   "tables": [ "Customer" ],
+                  "json": true,
                   "dryRun": true,
                   "failOnWarnings": true,
                   "emitRoutineStubs": true,
@@ -289,7 +290,7 @@ public partial class CliIntegrationTests
                 Encoding.UTF8);
 
             var dryRun = RunCli(
-                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite --json",
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite",
                 workDir);
 
             Assert.True(dryRun.ExitCode == 0,
@@ -603,7 +604,7 @@ public partial class CliIntegrationTests
     [Fact]
     public void Scaffold_dotnet_ef_config_rejects_non_boolean_common_flags()
     {
-        foreach (var propertyName in new[] { "verbose", "noBuild", "noOnConfiguring", "dataAnnotations" })
+        foreach (var propertyName in new[] { "verbose", "json", "noBuild", "noOnConfiguring", "dataAnnotations" })
         {
             var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_bool_" + Guid.NewGuid().ToString("N"));
             var configDir = Path.Combine(tempRoot, ".config");

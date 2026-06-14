@@ -18,6 +18,10 @@ partial class Program
 
         try
         {
+            var efToolConfig = LoadEfToolConfig();
+            if (!IsScaffoldOptionExplicit(result, bindings.JsonOption))
+                jsonOutput = efToolConfig?.Json ?? false;
+
             var request = ResolveScaffoldCommandRequest(result, bindings);
             outputForJson = request.Output;
             dryRunForJson = request.Options.DryRun;

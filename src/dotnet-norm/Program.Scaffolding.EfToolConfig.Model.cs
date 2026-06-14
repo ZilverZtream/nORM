@@ -17,6 +17,7 @@ partial class Program
         string? Runtime,
         string? MsbuildProjectExtensionsPath,
         bool? NoBuild,
+        bool? Json,
         bool? Verbose,
         bool? NoColor,
         bool? PrefixOutput,

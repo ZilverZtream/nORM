@@ -281,7 +281,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("config-supplied `project`, `startupProject`, and `context`", doc, StringComparison.Ordinal);
         Assert.Contains("Expanded config-supplied output directory, namespace", doc, StringComparison.Ordinal);
         Assert.Contains("context directory, context namespace, table filters", doc, StringComparison.Ordinal);
-        Assert.Contains("`msbuildProjectExtensionsPath`, `noBuild`", doc, StringComparison.Ordinal);
+        Assert.Contains("`msbuildProjectExtensionsPath`, `noBuild`, `json`", doc, StringComparison.Ordinal);
         Assert.Contains("`noOnConfiguring`, `dataAnnotations`", doc, StringComparison.Ordinal);
         Assert.Contains("overwrite", doc, StringComparison.Ordinal);
         Assert.Contains("defaults are likewise verified through real CLI scaffolds", doc, StringComparison.Ordinal);

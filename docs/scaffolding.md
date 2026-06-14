@@ -477,7 +477,7 @@ must be reviewed and edited like handwritten model code.
   `startupProject`, `outputDir`/`output`, `namespace`, `context`,
   `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
   `framework`/`targetFramework`, `configuration`, `runtime`,
-  `msbuildProjectExtensionsPath`, `noBuild`,
+  `msbuildProjectExtensionsPath`, `noBuild`, `json`,
   `verbose`, `noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`,
   `noOnConfiguring`, `dataAnnotations`,
   `force`, `noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,

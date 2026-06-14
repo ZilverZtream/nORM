@@ -36,6 +36,7 @@ partial class Program
                 ReadEfToolConfigString(document.RootElement, "runtime"),
                 ReadEfToolConfigString(document.RootElement, "msbuildProjectExtensionsPath"),
                 ReadEfToolConfigBool(document.RootElement, "noBuild"),
+                ReadEfToolConfigBool(document.RootElement, "json"),
                 ReadEfToolConfigBool(document.RootElement, "verbose"),
                 ReadEfToolConfigBool(document.RootElement, "noColor"),
                 ReadEfToolConfigBool(document.RootElement, "prefixOutput"),
