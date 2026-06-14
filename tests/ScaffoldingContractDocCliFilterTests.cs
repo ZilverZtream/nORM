@@ -150,7 +150,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("override the opposite config default", doc, StringComparison.Ordinal);
         Assert.Contains("take precedence over configuration file", doc, StringComparison.Ordinal);
         Assert.Contains("EF common output switches", doc, StringComparison.Ordinal);
-        Assert.Contains("`--json` emits a machine-readable", doc, StringComparison.Ordinal);
+        Assert.Contains("`--json` or config `json` emits a machine-readable", doc, StringComparison.Ordinal);
         Assert.Contains("`--no-onconfiguring` is accepted", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.ContextDirectory", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.ContextNamespace", doc, StringComparison.Ordinal);
@@ -341,7 +341,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("cannot expand the explicit", cliReadme, StringComparison.Ordinal);
         Assert.Contains("opposite config default", cliReadme, StringComparison.Ordinal);
         Assert.Contains("matching supported query artifacts", cliReadme, StringComparison.Ordinal);
-        Assert.Contains("`--json` emits a machine-readable", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`--json` or config `json` emits a machine-readable", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--verbose`/`-v`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--no-pluralize`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--use-database-names`", cliReadme, StringComparison.Ordinal);

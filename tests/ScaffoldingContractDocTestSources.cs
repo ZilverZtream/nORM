@@ -56,6 +56,7 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipNavigationNameBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRelationshipNavigationNameBuilder.Roles.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyShape.cs"));
 
     private static string ReadForeignKeyDiscoverySource()
@@ -406,7 +407,8 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"));
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Models.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.RelationalModels.cs"));
 
     private static string ReadStaticEntityScaffoldSource()
         => string.Concat(
