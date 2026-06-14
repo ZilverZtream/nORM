@@ -205,6 +205,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_suppresses_synthetic_fk_constraint_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_suppresses_synthetic_fk_constraint_names_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_preserves_database_comments_as_xml_docs_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("Dotnet_norm_scaffold_preserves_database_comments_as_xml_docs_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_promotes_safe_feature_metadata_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_synthetic_check_constraint_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_suppresses_synthetic_check_constraint_names_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
