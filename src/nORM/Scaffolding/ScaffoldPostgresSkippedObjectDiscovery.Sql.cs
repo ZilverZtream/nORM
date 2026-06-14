@@ -109,21 +109,27 @@ namespace nORM.Scaffolding
                    ), '') ||
                    '; callShape=' ||
                    CASE
-                       WHEN UPPER(r.routine_type) = 'FUNCTION' AND EXISTS (
-                           SELECT 1
-                           FROM pg_proc routine_proc
-                           INNER JOIN pg_namespace routine_ns ON routine_ns.oid = routine_proc.pronamespace
-                           WHERE routine_ns.nspname = r.specific_schema
-                             AND routine_proc.proname = r.routine_name
-                             AND routine_proc.proretset
-                       ) THEN 'table-valued-function'
+                       WHEN UPPER(r.routine_type) = 'FUNCTION' AND routine_proc.proretset THEN 'table-valued-function'
                        WHEN UPPER(r.routine_type) = 'FUNCTION' AND LOWER(COALESCE(r.data_type, '')) IN ('record', 'table') THEN 'table-valued-function'
                        WHEN UPPER(r.routine_type) = 'FUNCTION' THEN 'scalar-function'
                        ELSE ''
                    END ||
                    '; dataType=' || COALESCE(r.data_type, '')
             FROM information_schema.routines r
+            INNER JOIN pg_namespace routine_ns ON routine_ns.nspname = r.specific_schema
+            INNER JOIN pg_proc routine_proc ON routine_proc.pronamespace = routine_ns.oid
+              AND routine_proc.proname = r.routine_name
+              AND RIGHT(r.specific_name, LENGTH(routine_proc.oid::text) + 1) = '_' || routine_proc.oid::text
             WHERE r.routine_schema NOT IN ('pg_catalog', 'information_schema')
+              AND routine_proc.prokind IN ('f', 'p')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM pg_depend extension_dependency
+                  WHERE extension_dependency.classid = 'pg_catalog.pg_proc'::regclass
+                    AND extension_dependency.objid = routine_proc.oid
+                    AND extension_dependency.refclassid = 'pg_catalog.pg_extension'::regclass
+                    AND extension_dependency.deptype = 'e'
+              )
             ORDER BY ObjectSchema, ObjectName
             """;
     }

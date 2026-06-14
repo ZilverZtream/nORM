@@ -80,7 +80,9 @@ table/column comment preservation as generated XML docs across the all-four
 provider command path, SQL Server/PostgreSQL/MySQL routine comments,
 SQL Server/PostgreSQL sequence comments, and SQL Server/PostgreSQL
 view/materialized-view query-artifact comments plus SQL Server local-synonym
-comments in the same all-four view/provider-artifact gates. The CLI scaffold
+comments in the same all-four view/provider-artifact gates. PostgreSQL routine
+coverage also proves extension-owned functions are suppressed from generated
+application routine wrappers. The CLI scaffold
 gate also verifies explicit SQL Server/PostgreSQL primary-key constraint-name
 preservation while MySQL's fixed `PRIMARY` metadata and SQLite's PRAGMA-only
 key shape remain unnamed generated `HasKey(...)` configuration. The same live scaffold parity tests are also included in

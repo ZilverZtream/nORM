@@ -128,6 +128,15 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                     item.GetProperty("name").GetString()!.EndsWith(routineName, StringComparison.Ordinal));
                 var parameters = routine.GetProperty("metadata").GetProperty("parameters").EnumerateArray().ToArray();
 
+                Assert.DoesNotContain("ArmorAsync", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("CryptAsync", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("UuidGenerateV4Async", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(routines, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString() is string name &&
+                    (string.Equals(name, "public.armor", StringComparison.Ordinal) ||
+                     string.Equals(name, "public.crypt", StringComparison.Ordinal) ||
+                     name.StartsWith("public.uuid_generate_", StringComparison.Ordinal)));
                 Assert.Contains($"public sealed class {routineName}Parameters", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public string? email { get; init; }", contextCode, StringComparison.Ordinal);
                 Assert.Contains("public decimal[]? ratings { get; init; }", contextCode, StringComparison.Ordinal);

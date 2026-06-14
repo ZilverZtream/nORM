@@ -426,6 +426,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("tests", "LiveProviderScaffoldingIndexProviderSpecificTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingRoutineTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingRoutineOutputTests.cs"),
+            ReadRepoFile("tests", "LiveProviderScaffoldingRoutineDomainTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingProviderObjectTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingQueryArtifactTests.cs"),
             ReadRepoFile("tests", "LiveProviderScaffoldingSqlServerSynonymQueryArtifactTests.cs"),

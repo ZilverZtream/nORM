@@ -295,7 +295,9 @@ MySQL expression indexes exposed by `SHOW INDEX` are emitted with
 on the safer generated-column path.
 Opt-in routine stubs include SQL Server scalar/table-valued functions plus
 PostgreSQL and MySQL functions as provider-bound `SELECT` wrappers instead of
-stored-procedure calls. Stored-procedure stubs include buffered and streaming
+stored-procedure calls. PostgreSQL extension-owned routines are suppressed so
+installed helper extensions do not generate application routine wrappers.
+Stored-procedure stubs include buffered and streaming
 result wrappers; stubs with discovered output metadata include a convenience
 overload that uses the scaffolded `OutputParameter` definitions plus an
 explicit-output overload for reviewed signature changes, including INOUT and

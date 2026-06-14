@@ -380,8 +380,14 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Advanced routine wrappers", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server scalar/table-valued", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL array/domain/UUID routine parameters", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL extension-owned routines", doc, StringComparison.Ordinal);
         Assert.Contains("domain_type.typtype = 'd'", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("pg_catalog.format_type(domain_type.typbasetype, domain_type.typtypmod)", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("RIGHT(r.specific_name, LENGTH(routine_proc.oid::text) + 1)", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("routine_proc.prokind IN ('f', 'p')", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("routine_proc.proretset", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("extension_dependency.refclassid = 'pg_catalog.pg_extension'::regclass", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("extension_dependency.deptype = 'e'", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("TryMapPostgresDomainFunctionArgumentCastType", postgresRoutineTypeMapperSource, StringComparison.Ordinal);
         Assert.Contains("MySQL unsigned", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server table-valued parameters", doc, StringComparison.Ordinal);
@@ -389,6 +395,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("PostgreSQL scalar set-returning functions", doc, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_domain_routine_parameters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("Assert.DoesNotContain(\"ArmorAsync\"", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("Assert.DoesNotContain(\"ArmorAsync\"", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_overloaded_and_quoted_parameter_function_wrappers_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_postgres_scalar_set_returning_function_wrapper_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("output-parameter routine factories", doc, StringComparison.Ordinal);

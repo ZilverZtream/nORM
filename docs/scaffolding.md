@@ -547,7 +547,10 @@ must be reviewed and edited like handwritten model code.
   functions, PostgreSQL functions, and MySQL functions are discovered as
   routines and emitted as provider-bound `SELECT` wrappers (`SELECT
   function(...) AS Value` for scalar functions and `SELECT * FROM
-  function(...)` for table-valued functions with row metadata). PostgreSQL set-returning functions
+  function(...)` for table-valued functions with row metadata). PostgreSQL extension-owned routines
+  are excluded from routine discovery so installed helper functions such as
+  `uuid-ossp` or `pgcrypto` entry points do not flood generated application
+  contexts. PostgreSQL set-returning functions
   that return scalars use `SELECT function(...) AS Value` and get a generated
   `Value` result DTO so `RETURNS SETOF
   integer/text/...` has a typed buffered and streaming path instead of forcing a
@@ -961,7 +964,8 @@ must be reviewed and edited like handwritten model code.
   are not downgraded to provider-owned diagnostics.
   Advanced routine wrappers
   are verified through the real CLI for SQL Server scalar/table-valued
-  functions, PostgreSQL array/domain/UUID routine parameters, and MySQL unsigned
+  functions, PostgreSQL array/domain/UUID routine parameters, PostgreSQL
+  extension-owned routines, and MySQL unsigned
   routine parameters. SQL Server table-valued parameters and PostgreSQL
   overloaded and quoted-parameter function wrappers are also verified through
   the real CLI with consumer builds. PostgreSQL scalar set-returning functions

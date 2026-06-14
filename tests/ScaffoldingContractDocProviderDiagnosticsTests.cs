@@ -134,6 +134,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("TryParseRoutineResultColumnParts", skippedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("information_schema.parameters", skippedDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("specific_name", skippedDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("RIGHT(r.specific_name, LENGTH(routine_proc.oid::text) + 1)", skippedDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("routine_proc.prokind IN ('f', 'p')", skippedDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("extension_dependency.refclassid = 'pg_catalog.pg_extension'::regclass", skippedDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("extension_dependency.deptype = 'e'", skippedDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("'Sequence'", skippedDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("'VirtualTable'", skippedDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("'VirtualTableShadow'", skippedDiscoverySource, StringComparison.Ordinal);

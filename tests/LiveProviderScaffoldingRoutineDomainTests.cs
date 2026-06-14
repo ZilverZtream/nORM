@@ -34,8 +34,20 @@ public sealed partial class LiveProviderScaffoldingParityTests
 
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldPostgresDomainRoutineContext.cs"));
                 using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var skippedObjects = warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray().ToArray();
+
+                Assert.DoesNotContain("ArmorAsync", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("CryptAsync", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("UuidGenerateV4Async", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(skippedObjects, item =>
+                    item.GetProperty("kind").GetString() == "Routine" &&
+                    item.GetProperty("name").GetString() is string name &&
+                    (string.Equals(name, "public.armor", StringComparison.Ordinal) ||
+                     string.Equals(name, "public.crypt", StringComparison.Ordinal) ||
+                     name.StartsWith("public.uuid_generate_", StringComparison.Ordinal)));
+
                 var routine = Assert.Single(
-                    warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(),
+                    skippedObjects,
                     item => item.GetProperty("kind").GetString() == "Routine" &&
                             item.GetProperty("name").GetString()!.EndsWith(PostgresDomainRoutineName, StringComparison.Ordinal));
                 var parameters = routine.GetProperty("metadata").GetProperty("parameters").EnumerateArray().ToArray();
