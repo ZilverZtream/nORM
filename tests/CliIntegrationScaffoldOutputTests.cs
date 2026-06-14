@@ -377,6 +377,34 @@ public partial class CliIntegrationTests
             (
                 Arguments: $"--output {Quote(" ")} --namespace CliScaffolded --context CliCtx",
                 Message: "Scaffold --output must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_project_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --project {Quote(" ")}",
+                Message: "Scaffold --project must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_startup_project_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --startup-project {Quote(" ")}",
+                Message: "Scaffold --startup-project must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_framework_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --framework {Quote(" ")}",
+                Message: "Scaffold --framework must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_target_framework_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --target-framework {Quote(" ")}",
+                Message: "Scaffold --framework must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_configuration_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --configuration {Quote(" ")}",
+                Message: "Scaffold --configuration must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_runtime_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --runtime {Quote(" ")}",
+                Message: "Scaffold --runtime must not be blank."
+            ),
+            (
+                Arguments: $"--output {Quote(Path.Combine(Path.GetTempPath(), "norm_scaffold_blank_msbuild_ext_" + Guid.NewGuid().ToString("N")))} --namespace CliScaffolded --context CliCtx --msbuildprojectextensionspath {Quote(" ")}",
+                Message: "Scaffold --msbuildprojectextensionspath must not be blank."
             )
         };
 

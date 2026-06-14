@@ -11,6 +11,12 @@ partial class Program
         ValidateScaffoldUnmatchedTokens(result);
         var connectionOption = GetOptionalNonBlankScaffoldOption(result, bindings.ConnectionOption, "--connection");
         var providerOption = GetOptionalNonBlankScaffoldOption(result, bindings.ProviderOption, "--provider");
+        var projectOption = GetOptionalNonBlankScaffoldOption(result, bindings.ProjectOption, "--project");
+        var startupProjectOption = GetOptionalNonBlankScaffoldOption(result, bindings.StartupProjectOption, "--startup-project");
+        var frameworkOption = GetOptionalNonBlankScaffoldOption(result, bindings.FrameworkOption, "--framework");
+        var configurationOption = GetOptionalNonBlankScaffoldOption(result, bindings.ConfigurationOption, "--configuration");
+        var runtimeOption = GetOptionalNonBlankScaffoldOption(result, bindings.RuntimeOption, "--runtime");
+        var msbuildProjectExtensionsPathOption = GetOptionalNonBlankScaffoldOption(result, bindings.MsbuildProjectExtensionsPathOption, "--msbuildprojectextensionspath");
         var connectionPosition = NullIfWhiteSpace(result.GetValue(bindings.ConnectionArgument));
         var providerPosition = NullIfWhiteSpace(result.GetValue(bindings.ProviderArgument));
         if (connectionOption is not null && providerOption is null && providerPosition is null && connectionPosition is not null)
@@ -26,17 +32,17 @@ partial class Program
         providerName = NormalizeProviderName(providerName);
 
         var efToolConfig = LoadEfToolConfig();
-        _ = FirstNonBlank(result.GetValue(bindings.FrameworkOption), efToolConfig?.Framework);
-        _ = FirstNonBlank(result.GetValue(bindings.ConfigurationOption), efToolConfig?.Configuration);
-        _ = FirstNonBlank(result.GetValue(bindings.RuntimeOption), efToolConfig?.Runtime);
-        _ = FirstNonBlank(result.GetValue(bindings.MsbuildProjectExtensionsPathOption), efToolConfig?.MsbuildProjectExtensionsPath);
+        _ = FirstNonBlank(frameworkOption, efToolConfig?.Framework);
+        _ = FirstNonBlank(configurationOption, efToolConfig?.Configuration);
+        _ = FirstNonBlank(runtimeOption, efToolConfig?.Runtime);
+        _ = FirstNonBlank(msbuildProjectExtensionsPathOption, efToolConfig?.MsbuildProjectExtensionsPath);
         _ = result.GetValue(bindings.VerboseOption) || efToolConfig?.Verbose == true;
         _ = result.GetValue(bindings.NoColorOption) || efToolConfig?.NoColor == true;
         _ = result.GetValue(bindings.PrefixOutputOption) || efToolConfig?.PrefixOutput == true;
 
-        var projectInfo = ResolveScaffoldProject(FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, bindings.ProjectOption, "--project"), efToolConfig?.Project), inferCurrentDirectory: true);
+        var projectInfo = ResolveScaffoldProject(FirstNonBlank(projectOption, efToolConfig?.Project), inferCurrentDirectory: true);
         var startupProjectInfo = IsNamedConnectionReference(connectionReference)
-            ? ResolveScaffoldProject(FirstNonBlank(GetOptionalNonBlankScaffoldOption(result, bindings.StartupProjectOption, "--startup-project"), efToolConfig?.StartupProject))
+            ? ResolveScaffoldProject(FirstNonBlank(startupProjectOption, efToolConfig?.StartupProject))
             : null;
         var scaffoldEnvironment = GetScaffoldPassThroughEnvironment();
         var connectionString = ResolveScaffoldConnectionString(connectionReference, projectInfo, startupProjectInfo, scaffoldEnvironment);
