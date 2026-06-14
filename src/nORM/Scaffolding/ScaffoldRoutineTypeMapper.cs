@@ -8,6 +8,9 @@ namespace nORM.Scaffolding
         private static string NormalizeRoutineDataType(string dataType)
         {
             var normalized = dataType.Trim().ToLowerInvariant();
+            if (TryNormalizeRoutineDomainDataType(dataType, out var domainDataType))
+                return domainDataType;
+
             if (ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(normalized, out var postgresArrayCastType))
                 return postgresArrayCastType;
 
@@ -41,6 +44,28 @@ namespace nORM.Scaffolding
                 : baseType;
 
             return NormalizeProviderAlias(normalized);
+        }
+
+        private static bool TryNormalizeRoutineDomainDataType(string dataType, out string normalized)
+        {
+            normalized = string.Empty;
+            if (!ScaffoldProviderSpecificTypeClassifier.TryGetPostgresDomainBaseTypeText(dataType, out var typeText)
+                || !ScaffoldProviderSpecificTypeClassifier.TryNormalizeSafePostgresDomainProbeCastType(typeText, out var castType))
+            {
+                return false;
+            }
+
+            var castTypeNormalized = castType.Trim().ToLowerInvariant();
+            if (ScaffoldProviderSpecificTypeClassifier.TryMapPostgresArrayProbeCastType(castTypeNormalized, out var arrayCastType))
+            {
+                normalized = arrayCastType;
+                return true;
+            }
+
+            var paren = castTypeNormalized.IndexOf('(');
+            var baseType = paren >= 0 ? castTypeNormalized[..paren].Trim() : castTypeNormalized;
+            normalized = NormalizeProviderAlias(baseType);
+            return normalized.Length > 0;
         }
 
         private static string NormalizeProviderAlias(string normalized)

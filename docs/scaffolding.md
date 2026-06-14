@@ -563,8 +563,11 @@ must be reviewed and edited like handwritten model code.
   `DateOnly?`, `TimeOnly?`, `TimeSpan?`, `Guid?`, `string?`, `byte[]?`,
   etc.) and falls back to `object?` only for unmapped provider types. PostgreSQL
   routine parameters preserve common array metadata (`int[]?`, `string[]?`,
-  `Guid[]?`, temporal arrays, etc.) and known safe PostgreSQL user-defined
-  scalar types such as `citext` and `uuid`. SQL Server scalar alias types are mapped through their base
+  `Guid[]?`, temporal arrays, etc.), known safe PostgreSQL user-defined
+  scalar types such as `citext` and `uuid`, and PostgreSQL domain parameters
+  over safe scalar/array/enum bases. Simple domain identifiers are emitted as
+  function argument casts so domain-typed overloads stay provider-faithful.
+  SQL Server scalar alias types are mapped through their base
   system type; SQL Server table-valued parameters scaffold as `DbParameter?`
   so callers pass reviewed provider-specific structured parameters. MySQL
   unsigned routine parameters use unsigned CLR types (`uint?`, `ulong?`,
@@ -753,7 +756,7 @@ must be reviewed and edited like handwritten model code.
   provider-native temporal base/history read-only scaffolds, SQL Server
   rowversion concurrency-token scaffolds, SQL Server scalar/table-valued
   function wrappers, SQL Server no-result procedure non-query wrappers,
-  table-valued-parameter routine result wrappers, PostgreSQL array/UUID and MySQL
+  table-valued-parameter routine result wrappers, PostgreSQL array/domain/UUID and MySQL
   scalar-function wrappers with unsigned routine parameter stubs, env-gated
   execution of scaffold-style escaped routine output invocation names,
   PostgreSQL
@@ -958,7 +961,7 @@ must be reviewed and edited like handwritten model code.
   are not downgraded to provider-owned diagnostics.
   Advanced routine wrappers
   are verified through the real CLI for SQL Server scalar/table-valued
-  functions, PostgreSQL array/UUID routine parameters, and MySQL unsigned
+  functions, PostgreSQL array/domain/UUID routine parameters, and MySQL unsigned
   routine parameters. SQL Server table-valued parameters and PostgreSQL
   overloaded and quoted-parameter function wrappers are also verified through
   the real CLI with consumer builds. PostgreSQL scalar set-returning functions

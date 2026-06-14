@@ -21,6 +21,8 @@ public partial class ScaffoldingContractDocTests
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
         var foreignKeyDiscoverySqlSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sql.cs");
+        var postgresSkippedObjectDiscoverySource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.Sql.cs");
+        var postgresRoutineTypeMapperSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineTypeMapper.Postgres.cs");
         var foreignKeyDiscoverySource = ReadForeignKeyDiscoverySource();
         var featureMapBuilderSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureMapBuilder.cs");
         var columnDiscoverySource = ReadColumnDiscoverySource();
@@ -377,7 +379,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("SQL Server/PostgreSQL/MySQL routine comments", doc, StringComparison.Ordinal);
         Assert.Contains("Advanced routine wrappers", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server scalar/table-valued", doc, StringComparison.Ordinal);
-        Assert.Contains("PostgreSQL array/UUID routine parameters", doc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL array/domain/UUID routine parameters", doc, StringComparison.Ordinal);
+        Assert.Contains("domain_type.typtype = 'd'", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("pg_catalog.format_type(domain_type.typbasetype, domain_type.typtypmod)", postgresSkippedObjectDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("TryMapPostgresDomainFunctionArgumentCastType", postgresRoutineTypeMapperSource, StringComparison.Ordinal);
         Assert.Contains("MySQL unsigned", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server table-valued parameters", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL overloaded and quoted-parameter function wrappers", doc, StringComparison.Ordinal);
