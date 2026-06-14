@@ -314,6 +314,9 @@ public partial class ScaffoldingContractDocTests
     private static string ReadFeatureConfigurationBuilderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.Maps.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.Relational.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.Scalar.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.Checks.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldFeatureConfigurationBuilder.GeneratedDiagnostics.GeneratedColumns.cs"),
