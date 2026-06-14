@@ -359,6 +359,74 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_dotnet_ef_config_emit_query_artifacts_emits_sqlite_virtual_table()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_query_artifact_" + Guid.NewGuid().ToString("N"));
+        var configDir = Path.Combine(tempRoot, ".config");
+        var workDir = Path.Combine(tempRoot, "Work");
+        var output = Path.Combine(tempRoot, "Generated");
+        var dbFile = Path.Combine(tempRoot, "query-artifacts.db");
+
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            Directory.CreateDirectory(workDir);
+
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = "CREATE VIRTUAL TABLE SearchDocs USING fts5(Body);";
+                try
+                {
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Microsoft.Data.Sqlite.SqliteException ex)
+                {
+                    if (Skip.If(true, $"SQLite FTS5 virtual tables are not available in this build: {ex.Message}")) return;
+                }
+            }
+
+            File.WriteAllText(
+                Path.Combine(configDir, "dotnet-ef.json"),
+                $$"""
+                {
+                  "outputDir": {{JsonSerializer.Serialize(output)}},
+                  "namespace": "CliScaffolded",
+                  "context": "QueryArtifactConfigCtx",
+                  "emitQueryArtifacts": true
+                }
+                """,
+                Encoding.UTF8);
+
+            var result = RunCli(
+                $"scaffold {Quote($"Data Source={dbFile}")} Microsoft.EntityFrameworkCore.Sqlite",
+                workDir);
+
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+
+            var entityCode = File.ReadAllText(Path.Combine(output, "SearchDoc.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "QueryArtifactConfigCtx.cs"));
+            using var warningJson = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+
+            Assert.Contains("[ReadOnlyEntity]", entityCode, StringComparison.Ordinal);
+            Assert.Contains("[Table(\"SearchDocs\")]", entityCode, StringComparison.Ordinal);
+            Assert.Contains("IQueryable<SearchDoc> SearchDocs", contextCode, StringComparison.Ordinal);
+            Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "MissingPrimaryKey" &&
+                item.GetProperty("table").GetString() == "SearchDocs");
+            Assert.Contains(warningJson.RootElement.GetProperty("skippedDatabaseObjects").EnumerateArray(), item =>
+                item.GetProperty("kind").GetString() == "VirtualTableShadow" &&
+                item.GetProperty("metadata").GetProperty("shadowOf").GetString() == "SearchDocs");
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public void Scaffold_dotnet_ef_config_startup_project_resolves_named_connection()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_startup_" + Guid.NewGuid().ToString("N"));
