@@ -4,32 +4,6 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldForeignKeyDiscovery
     {
-        private const string SqlServerForeignKeySql = """
-            SELECT
-                SCHEMA_NAME(dep.schema_id) AS DependentSchema,
-                dep.name AS DependentTable,
-                dep_col.name AS DependentColumn,
-                SCHEMA_NAME(principal.schema_id) AS PrincipalSchema,
-                principal.name AS PrincipalTable,
-                principal_col.name AS PrincipalColumn,
-                fk.name AS ConstraintName,
-                fk.is_system_named AS IsSyntheticConstraintName,
-                COUNT(*) OVER (PARTITION BY fk.object_id) AS ColumnCount,
-                fk.delete_referential_action_desc AS OnDelete,
-                fk.update_referential_action_desc +
-                CASE WHEN fk.is_not_trusted = 1 THEN ' NOT TRUSTED' ELSE '' END +
-                CASE WHEN fk.is_disabled = 1 THEN ' DISABLED' ELSE '' END +
-                CASE WHEN fk.is_not_for_replication = 1 THEN ' NOT FOR REPLICATION' ELSE '' END AS OnUpdate
-            FROM sys.foreign_keys fk
-            INNER JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
-            INNER JOIN sys.tables dep ON dep.object_id = fk.parent_object_id
-            INNER JOIN sys.columns dep_col ON dep_col.object_id = dep.object_id AND dep_col.column_id = fkc.parent_column_id
-            INNER JOIN sys.tables principal ON principal.object_id = fk.referenced_object_id
-            INNER JOIN sys.columns principal_col ON principal_col.object_id = principal.object_id AND principal_col.column_id = fkc.referenced_column_id
-            WHERE dep.is_ms_shipped = 0 AND principal.is_ms_shipped = 0
-            ORDER BY SCHEMA_NAME(dep.schema_id), dep.name, fk.name, fkc.constraint_column_id
-            """;
-
         private const string PostgresForeignKeySql = """
             SELECT
                 dep_ns.nspname AS DependentSchema,
@@ -88,33 +62,6 @@ namespace nORM.Scaffolding
             WHERE con.contype = 'f'
               AND dep_ns.nspname NOT IN ('pg_catalog', 'information_schema')
             ORDER BY dep_ns.nspname, dep.relname, con.conname, key_pair.ord
-            """;
-
-        private const string MySqlForeignKeySql = """
-            SELECT
-                NULL AS DependentSchema,
-                kcu.table_name AS DependentTable,
-                kcu.column_name AS DependentColumn,
-                NULL AS PrincipalSchema,
-                kcu.referenced_table_name AS PrincipalTable,
-                kcu.referenced_column_name AS PrincipalColumn,
-                kcu.constraint_name AS ConstraintName,
-                CASE
-                    WHEN LOWER(LEFT(kcu.constraint_name, CHAR_LENGTH(kcu.table_name) + 6)) = LOWER(CONCAT(kcu.table_name, '_ibfk_'))
-                     AND SUBSTRING(kcu.constraint_name, CHAR_LENGTH(kcu.table_name) + 7) REGEXP '^[0-9]+$'
-                    THEN 1 ELSE 0
-                END AS IsSyntheticConstraintName,
-                COUNT(*) OVER (PARTITION BY kcu.constraint_schema, kcu.table_name, kcu.constraint_name) AS ColumnCount,
-                rc.delete_rule AS OnDelete,
-                rc.update_rule AS OnUpdate
-            FROM information_schema.key_column_usage kcu
-            INNER JOIN information_schema.referential_constraints rc
-                ON rc.constraint_schema = kcu.constraint_schema
-               AND rc.constraint_name = kcu.constraint_name
-               AND rc.table_name = kcu.table_name
-            WHERE kcu.table_schema = DATABASE()
-              AND kcu.referenced_table_name IS NOT NULL
-            ORDER BY kcu.table_schema, kcu.table_name, kcu.constraint_name, kcu.ordinal_position
             """;
     }
 }

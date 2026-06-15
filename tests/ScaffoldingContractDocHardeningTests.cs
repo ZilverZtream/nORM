@@ -20,7 +20,10 @@ public partial class ScaffoldingContractDocTests
         var source = ReadStaticEntityScaffoldSource();
         var joinDiagnosticBuilderSource = ReadJoinTableDiagnosticSource();
         var relationshipDiscoverySource = ReadRelationshipDiscoverySource();
-        var foreignKeyDiscoverySqlSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sql.cs");
+        var foreignKeyDiscoverySqlSource = string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.SqlServer.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Postgres.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.MySql.cs"));
         var postgresSkippedObjectDiscoverySource = string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.Sql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldPostgresSkippedObjectDiscovery.Sql.Routines.cs"),
