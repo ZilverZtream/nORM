@@ -139,7 +139,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("nullable and non-null alternate-key FK generation", doc, StringComparison.Ordinal);
         Assert.Contains("nullable-FK many-to-many bridge rejection", doc, StringComparison.Ordinal);
         Assert.Contains("provider-owned many-to-many bridge rejection", doc, StringComparison.Ordinal);
-        Assert.Contains("MySQL catalog-qualified many-to-many filter parity", doc, StringComparison.Ordinal);
+        Assert.Contains("schema/catalog-qualified many-to-many filter parity", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables", doc, StringComparison.Ordinal);
         Assert.Contains("Inference-boundary scaffolds", doc, StringComparison.Ordinal);
         Assert.Contains("because nORM does not infer", doc, StringComparison.Ordinal);
@@ -157,7 +157,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldAsync_generates_fk_to_nullable_unique_index_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_rejects_nullable_fk_bridge_join_table_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_rejects_provider_owned_bridge_join_table_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
-        Assert.Contains("ScaffoldAsync_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_preserves_schema_qualified_many_to_many_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_does_not_infer_owned_types_or_inheritance_from_column_conventions_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_database_names_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_builds_mixed_single_fk_and_many_to_many_shape_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -174,7 +174,6 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_rejects_filtered_unique_surrogate_join_table_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_rejects_nullable_fk_bridge_join_table_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_rejects_provider_owned_bridge_join_table_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
-        Assert.Contains("Dotnet_norm_scaffold_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_does_not_infer_owned_types_or_inheritance_from_column_conventions_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_composite_fk_to_unique_index_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -566,8 +565,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("payload-column diagnostics without composite-FK rejection", doc, StringComparison.Ordinal);
         Assert.Contains("Filtered unique surrogate join tables are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("remain explicit entities instead of unsafe skip navigations", doc, StringComparison.Ordinal);
-        Assert.Contains("Schema-qualified many-to-many join tables are verified through the real CLI", doc, StringComparison.Ordinal);
+        Assert.Contains("Schema/catalog-qualified many-to-many join tables are verified through direct", doc, StringComparison.Ordinal);
+        Assert.Contains("real CLI scaffolds across all four providers", doc, StringComparison.Ordinal);
         Assert.Contains("schema-aware `UsingTable` mapping", doc, StringComparison.Ordinal);
+        Assert.Contains("MySQL current-catalog-qualified", doc, StringComparison.Ordinal);
 
         Assert.Contains("Scaffold_sqlite_output_builds_as_consumer_project", releaseGates, StringComparison.Ordinal);
         Assert.Contains("Scaffold_clean_run_removes_stale_warning_reports_without_printing_summary", releaseGates, StringComparison.Ordinal);

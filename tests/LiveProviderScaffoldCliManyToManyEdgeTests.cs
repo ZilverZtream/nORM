@@ -258,19 +258,23 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         }
     }
 
-    [Fact]
-    public void Dotnet_norm_scaffold_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider()
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
     {
-        const ProviderKind kind = ProviderKind.MySql;
         var root = FindRepositoryRoot();
         var suffix = IdentifierSuffix();
-        var scratchDatabase = "norm_cli_m2m_catalog_" + suffix.ToLowerInvariant();
-        var authorTable = "CliCatalogAuthor" + suffix;
-        var bookTable = "CliCatalogBook" + suffix;
-        var authorBookTable = "CliCatalogAuthorBook" + suffix;
-        var authorFkName = "FK_CliCatalogAuthorBook_Author_" + suffix;
-        var bookFkName = "FK_CliCatalogAuthorBook_Book_" + suffix;
-        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_mysql_catalog_m2m_" + suffix);
+        var schemaName = kind == ProviderKind.Sqlite ? "main" : "CliSchema" + suffix;
+        var scratchDatabase = kind == ProviderKind.MySql ? "norm_cli_m2m_catalog_" + suffix.ToLowerInvariant() : null;
+        var authorTable = "CliSchemaAuthor" + suffix;
+        var bookTable = "CliSchemaBook" + suffix;
+        var authorBookTable = "CliSchemaAuthorBook" + suffix;
+        var authorFkName = "FK_CliSchemaAuthorBook_Author_" + suffix;
+        var bookFkName = "FK_CliSchemaAuthorBook_Book_" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_schema_catalog_m2m_" + kind + "_" + suffix);
         string? sqliteFile = null;
 
         var live = OpenLive(kind, ref sqliteFile);
@@ -278,100 +282,38 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             return;
 
         var (connection, provider, connectionString, cliProvider) = live.Value;
-        var scaffoldConnectionString = ConnectionStringWithDatabase(connectionString, scratchDatabase);
+        var scaffoldConnectionString = scratchDatabase is null
+            ? connectionString
+            : ConnectionStringWithDatabase(connectionString, scratchDatabase);
         try
         {
             using (connection)
             {
-                Execute(connection,
-                    $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}",
-                    $"CREATE DATABASE {provider.Escape(scratchDatabase)}");
-                connection.ChangeDatabase(scratchDatabase);
-                SetupSurrogateKeyManyToMany(connection, provider, kind, authorTable, bookTable, authorBookTable, authorFkName, bookFkName);
+                if (scratchDatabase is null)
+                {
+                    SetupSchemaQualifiedManyToMany(connection, provider, kind, schemaName, authorTable, bookTable, authorBookTable, authorFkName, bookFkName);
+                }
+                else
+                {
+                    Execute(connection,
+                        $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}",
+                        $"CREATE DATABASE {provider.Escape(scratchDatabase)}");
+                    connection.ChangeDatabase(scratchDatabase);
+                    SetupSurrogateKeyManyToMany(connection, provider, kind, authorTable, bookTable, authorBookTable, authorFkName, bookFkName);
+                }
             }
 
+            var filterQualifier = scratchDatabase ?? schemaName;
             var scaffold = RunCli(
                 "scaffold " +
                 $"--provider {cliProvider} " +
                 $"--connection {Quote(scaffoldConnectionString)} " +
                 $"--output {Quote(output)} " +
                 "--namespace CliLiveScaffolded " +
-                "--context CliLiveMySqlCatalogManyToManyCtx " +
-                $"--table {Quote(scratchDatabase + "." + authorTable)} " +
-                $"--table {Quote(scratchDatabase + "." + bookTable)} " +
-                $"--table {Quote(scratchDatabase + "." + authorBookTable)}",
-                root);
-
-            Assert.True(scaffold.ExitCode == 0,
-                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
-
-            Assert.False(File.Exists(Path.Combine(output, authorBookTable + ".cs")), "MySQL catalog-qualified pure join table should scaffold as skip navigations.");
-            var authorCode = File.ReadAllText(Path.Combine(output, authorTable + ".cs"));
-            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveMySqlCatalogManyToManyCtx.cs"));
-
-            Assert.DoesNotContain("Schema =", authorCode, StringComparison.Ordinal);
-            Assert.Contains($".UsingTable(\"{authorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
-            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
-            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
-
-            WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
-        }
-        finally
-        {
-            try
-            {
-                using var cleanup = Reopen(kind, connectionString);
-                Execute(cleanup, $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}");
-            }
-            catch
-            {
-                // Best-effort cleanup; failed cleanup should not hide the original assertion.
-            }
-
-            TryDeleteDirectory(output);
-        }
-    }
-
-    [Theory]
-    [InlineData(ProviderKind.Sqlite)]
-    [InlineData(ProviderKind.SqlServer)]
-    [InlineData(ProviderKind.Postgres)]
-    public void Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider(ProviderKind kind)
-    {
-        var root = FindRepositoryRoot();
-        var suffix = IdentifierSuffix();
-        var schemaName = kind == ProviderKind.Sqlite ? "main" : "CliSchema" + suffix;
-        var authorTable = "CliSchemaAuthor" + suffix;
-        var bookTable = "CliSchemaBook" + suffix;
-        var authorBookTable = "CliSchemaAuthorBook" + suffix;
-        var authorFkName = "FK_CliSchemaAuthorBook_Author_" + suffix;
-        var bookFkName = "FK_CliSchemaAuthorBook_Book_" + suffix;
-        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_schema_m2m_" + kind + "_" + suffix);
-        string? sqliteFile = null;
-
-        var live = OpenLive(kind, ref sqliteFile);
-        if (live is null)
-            return;
-
-        var (connection, provider, connectionString, cliProvider) = live.Value;
-        try
-        {
-            using (connection)
-            {
-                SetupSchemaQualifiedManyToMany(connection, provider, kind, schemaName, authorTable, bookTable, authorBookTable, authorFkName, bookFkName);
-            }
-
-            var scaffold = RunCli(
-                "scaffold " +
-                $"--provider {cliProvider} " +
-                $"--connection {Quote(connectionString)} " +
-                $"--output {Quote(output)} " +
-                "--namespace CliLiveScaffolded " +
                 "--context CliLiveSchemaManyToManyCtx " +
-                $"--table {Quote(schemaName + "." + authorTable)} " +
-                $"--table {Quote(schemaName + "." + bookTable)} " +
-                $"--table {Quote(schemaName + "." + authorBookTable)}",
+                $"--table {Quote(filterQualifier + "." + authorTable)} " +
+                $"--table {Quote(filterQualifier + "." + bookTable)} " +
+                $"--table {Quote(filterQualifier + "." + authorBookTable)}",
                 root);
 
             Assert.True(scaffold.ExitCode == 0,
@@ -386,6 +328,11 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             {
                 Assert.Contains($"[Table(\"{authorTable}\")]", authorCode, StringComparison.Ordinal);
                 Assert.DoesNotContain("Schema = \"main\"", authorCode, StringComparison.Ordinal);
+                Assert.Contains($".UsingTable(\"{authorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
+            }
+            else if (kind == ProviderKind.MySql)
+            {
+                Assert.DoesNotContain("Schema =", authorCode, StringComparison.Ordinal);
                 Assert.Contains($".UsingTable(\"{authorBookTable}\", \"AuthorId\", \"BookId\");", contextCode, StringComparison.Ordinal);
             }
             else
@@ -407,7 +354,10 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             try
             {
                 using var cleanup = Reopen(kind, connectionString);
-                CleanupSchemaQualifiedManyToMany(cleanup, provider, kind, schemaName, authorTable, bookTable, authorBookTable);
+                if (scratchDatabase is null)
+                    CleanupSchemaQualifiedManyToMany(cleanup, provider, kind, schemaName, authorTable, bookTable, authorBookTable);
+                else
+                    Execute(cleanup, $"DROP DATABASE IF EXISTS {provider.Escape(scratchDatabase)}");
             }
             catch
             {

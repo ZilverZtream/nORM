@@ -1094,11 +1094,11 @@ must be reviewed and edited like handwritten model code.
   Provider-owned trigger bridge tables are verified through the real CLI across all four
   live providers; they remain explicit `[ReadOnlyEntity]` join entities with
   `provider-owned-write-blocking-schema` diagnostics instead of unsafe skip navigations.
-  Schema-qualified many-to-many join tables are verified through the real CLI
-  with schema-aware `UsingTable` mapping.
-  MySQL current-catalog-qualified many-to-many table filters are verified through
-  direct and real CLI scaffolds; the catalog qualifies selection only and is not
-  emitted as a nORM schema in generated entity or `UsingTable` mappings.
+  Schema/catalog-qualified many-to-many join tables are verified through direct
+  and real CLI scaffolds across all four providers: schema-aware providers keep
+  schema-aware `UsingTable` mapping, while MySQL current-catalog-qualified
+  filters qualify selection only and do not emit the catalog as a nORM schema in
+  generated entity or `UsingTable` mappings.
   Inference-boundary scaffolds are verified through direct and real CLI runs
   across all four live providers: discriminator-looking columns and owned-type
   naming conventions remain ordinary scalar columns, because nORM does not infer
@@ -1135,7 +1135,7 @@ must be reviewed and edited like handwritten model code.
   and composite primary-key ordinal order across live providers,
   nullable-FK many-to-many bridge rejection,
   provider-owned many-to-many bridge rejection,
-  MySQL catalog-qualified many-to-many filter parity,
+  schema/catalog-qualified many-to-many filter parity,
   inference-boundary non-inference for owned types and inheritance,
   key-looking view read-only boundary coverage,
   provider-owned/default-promotion and

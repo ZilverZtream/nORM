@@ -20,8 +20,6 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
         {
             ["LiveProviderScaffoldCliManyToManyEdgeTests.cs::Dotnet_norm_scaffold_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
                 Expect("MySQL does not expose filtered unique indexes; this diagnostic is for providers with partial-index metadata.", "Sqlite", "SqlServer", "Postgres"),
-            ["LiveProviderScaffoldCliManyToManyEdgeTests.cs::Dotnet_norm_scaffold_preserves_schema_qualified_many_to_many_on_live_provider"] =
-                Expect("MySQL has database/catalog names rather than schema-qualified table namespaces in this scaffold shape.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldCliReferentialActionTests.cs::Dotnet_norm_scaffold_preserves_restrict_fk_referential_actions_on_live_provider"] =
                 Expect("SQL Server does not accept RESTRICT as a foreign-key referential action.", "Sqlite", "Postgres", "MySql"),
             ["LiveProviderScaffoldCliReferentialActionTests.cs::Dotnet_norm_scaffold_preserves_set_default_fk_referential_actions_on_live_provider"] =
@@ -50,8 +48,6 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL does not support executable SET DEFAULT foreign-key actions in the live schema setup.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldingManyToManyEdgeTests.cs::ScaffoldAsync_rejects_filtered_unique_surrogate_join_table_on_live_provider"] =
                 Expect("MySQL does not expose filtered unique indexes; this diagnostic is for providers with partial-index metadata.", "Sqlite", "SqlServer", "Postgres"),
-            ["LiveProviderScaffoldingManyToManyEdgeTests.cs::ScaffoldAsync_preserves_schema_qualified_many_to_many_on_live_provider"] =
-                Expect("MySQL has database/catalog names rather than schema-qualified table namespaces in this scaffold shape.", "Sqlite", "SqlServer", "Postgres"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_routine_output_factories_on_live_provider"] =
                 Expect("PostgreSQL and SQLite do not expose this stored-procedure output factory shape.", "SqlServer", "MySql"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::Scaffolded_routine_output_invocation_name_executes_on_live_provider"] =
@@ -157,10 +153,6 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("SQL Server local view synonyms are SQL Server-specific query artifacts.", "SqlServer"),
             ["LiveProviderScaffoldCliSqlServerSynonymQueryArtifactTests.cs::Dotnet_norm_scaffold_emits_sqlserver_local_view_synonym_as_read_only_query_artifact"] =
                 Expect("SQL Server local view synonyms are SQL Server-specific query artifacts.", "SqlServer"),
-            ["LiveProviderScaffoldCliManyToManyEdgeTests.cs::Dotnet_norm_scaffold_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider"] =
-                Expect("MySQL catalog-qualified table filters are the MySQL counterpart to schema-qualified many-to-many filtering; MySQL catalogs are not emitted as nORM schemas.", "MySql"),
-            ["LiveProviderScaffoldingManyToManyEdgeTests.cs::ScaffoldAsync_accepts_mysql_catalog_qualified_many_to_many_filters_on_live_provider"] =
-                Expect("MySQL catalog-qualified table filters are the MySQL counterpart to schema-qualified many-to-many filtering; MySQL catalogs are not emitted as nORM schemas.", "MySql"),
             ["LiveProviderScaffoldingRoutineOutputTests.cs::ScaffoldAsync_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider"] =
                 Expect("SQL Server table-valued parameters are SQL Server-specific routine metadata.", "SqlServer"),
             ["LiveProviderScaffoldCliRoutineEdgeTests.cs::Dotnet_norm_scaffold_emits_sqlserver_table_valued_parameter_routine_stub_on_live_provider"] =
