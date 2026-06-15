@@ -32,59 +32,75 @@ namespace nORM.Scaffolding
             ScaffoldEntityFileSetRequest request,
             ScaffoldTable table)
         {
-            var tableName = table.Name;
-            var schemaName = table.Schema;
-            var tableKey = TableKey(schemaName, tableName);
+            var tableKey = TableKey(table.Schema, table.Name);
             if (request.Composition.ManyToManyJoinTableKeys.Contains(tableKey))
                 return null;
 
+            var tableContext = new EntityTableContext(
+                table.Name,
+                table.Schema,
+                tableKey,
+                request.Discovery.EntityByTable[tableKey]);
+            var entityCode = await ScaffoldEntityFileAdapter.ScaffoldEntityAsync(
+                BuildEntitySourceInfo(request, tableContext)).ConfigureAwait(false);
+
+            return new EntityFileResult(
+                tableContext.EntityName,
+                Path.Combine(request.OutputDirectory, tableContext.EntityName + ".cs"),
+                entityCode);
+        }
+
+        private static ScaffoldEntitySourceInfo BuildEntitySourceInfo(
+            ScaffoldEntityFileSetRequest request,
+            EntityTableContext table)
+        {
             var discovery = request.Discovery;
             var composition = request.Composition;
-            var entityName = discovery.EntityByTable[tableKey];
             var references = composition.Relationships
-                .Where(r => string.Equals(r.DependentTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                .Where(r => string.Equals(r.DependentTableKey, table.TableKey, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             var collections = composition.Relationships
-                .Where(r => string.Equals(r.PrincipalTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                .Where(r => string.Equals(r.PrincipalTableKey, table.TableKey, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
-            var manyToManyCollections = ScaffoldRelationshipAdapter.BuildManyToManyNavigations(composition.ManyToManyJoins, tableKey);
+            var manyToManyCollections = ScaffoldRelationshipAdapter.BuildManyToManyNavigations(composition.ManyToManyJoins, table.TableKey);
             var tableIndexes = discovery.Indexes
-                .Where(i => string.Equals(i.TableKey, tableKey, StringComparison.OrdinalIgnoreCase))
+                .Where(i => string.Equals(i.TableKey, table.TableKey, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
-            discovery.ColumnPropertiesByTable.TryGetValue(tableKey, out var columnPropertyNames);
-            discovery.FeatureConfigurations.ComputedColumnsByTable.TryGetValue(tableKey, out var computedColumns);
-            discovery.FeatureConfigurations.RowVersionColumnsByTable.TryGetValue(tableKey, out var rowVersionColumns);
-            discovery.IdentityColumnsByTable.TryGetValue(tableKey, out var identityColumns);
-            discovery.NonNullableColumnsByTable.TryGetValue(tableKey, out var nonNullableColumns);
-            discovery.FeatureConfigurations.DecimalPrecisionByTable.TryGetValue(tableKey, out var decimalPrecisions);
-            discovery.StringBinaryFacetsByTable.TryGetValue(tableKey, out var columnFacets);
-            discovery.ColumnStoreTypesByTable.TryGetValue(tableKey, out var columnStoreTypes);
-            discovery.CommentsByTable.TryGetValue(tableKey, out var comments);
-            discovery.SqliteDeclaredTypesByTable.TryGetValue(tableKey, out var sqliteDeclaredTypes);
-            discovery.FeatureConfigurations.ProviderSpecificColumnTypesByTable.TryGetValue(tableKey, out var providerSpecificColumnTypes);
+            discovery.ColumnPropertiesByTable.TryGetValue(table.TableKey, out var columnPropertyNames);
+            discovery.FeatureConfigurations.ComputedColumnsByTable.TryGetValue(table.TableKey, out var computedColumns);
+            discovery.FeatureConfigurations.RowVersionColumnsByTable.TryGetValue(table.TableKey, out var rowVersionColumns);
+            discovery.IdentityColumnsByTable.TryGetValue(table.TableKey, out var identityColumns);
+            discovery.NonNullableColumnsByTable.TryGetValue(table.TableKey, out var nonNullableColumns);
+            discovery.FeatureConfigurations.DecimalPrecisionByTable.TryGetValue(table.TableKey, out var decimalPrecisions);
+            discovery.StringBinaryFacetsByTable.TryGetValue(table.TableKey, out var columnFacets);
+            discovery.ColumnStoreTypesByTable.TryGetValue(table.TableKey, out var columnStoreTypes);
+            discovery.CommentsByTable.TryGetValue(table.TableKey, out var comments);
+            discovery.SqliteDeclaredTypesByTable.TryGetValue(table.TableKey, out var sqliteDeclaredTypes);
+            discovery.FeatureConfigurations.ProviderSpecificColumnTypesByTable.TryGetValue(table.TableKey, out var providerSpecificColumnTypes);
 
-            var isQueryArtifact = discovery.QueryArtifactTableKeys.Contains(tableKey);
+            var isQueryArtifact = discovery.QueryArtifactTableKeys.Contains(table.TableKey);
             var isReadOnlyEntity = ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
-                tableKey,
+                table.TableKey,
                 discovery.QueryArtifactTableKeys,
                 discovery.FeatureConfigurations.ProviderOwnedWriteBlockedTableKeys,
                 discovery.PrimaryKeyColumnsByTable);
-            var entityCode = await ScaffoldEntityFileAdapter.ScaffoldEntityAsync(
+
+            return new ScaffoldEntitySourceInfo(
                 request.Connection,
                 request.Provider,
-                schemaName,
-                tableName,
-                entityName,
+                table.SchemaName,
+                table.TableName,
+                table.EntityName,
                 request.NamespaceName,
                 columnPropertyNames,
-                tableIndexes,
-                references,
-                collections,
-                manyToManyCollections,
+                ScaffoldEntityFileAdapter.ConvertEntityIndexInfos(tableIndexes),
+                ScaffoldEntityFileAdapter.ConvertEntityReferenceInfos(references),
+                ScaffoldEntityFileAdapter.ConvertEntityCollectionInfos(collections),
+                ScaffoldEntityFileAdapter.ConvertEntityManyToManyNavigationInfos(manyToManyCollections),
                 computedColumns,
                 rowVersionColumns,
                 identityColumns,
-                decimalPrecisions,
+                ScaffoldEntityFileAdapter.ConvertEntityDecimalPrecisionInfos(decimalPrecisions),
                 columnFacets,
                 comments,
                 isReadOnlyEntity,
@@ -93,16 +109,17 @@ namespace nORM.Scaffolding
                 nonNullableColumns,
                 sqliteDeclaredTypes,
                 columnStoreTypes,
-                providerSpecificColumnTypes).ConfigureAwait(false);
-
-            return new EntityFileResult(
-                entityName,
-                Path.Combine(request.OutputDirectory, entityName + ".cs"),
-                entityCode);
+                providerSpecificColumnTypes);
         }
 
         private static string TableKey(string? schema, string table)
             => ScaffoldForeignKeyShape.TableKey(schema, table);
+
+        private readonly record struct EntityTableContext(
+            string TableName,
+            string? SchemaName,
+            string TableKey,
+            string EntityName);
 
         private readonly record struct EntityFileResult(string EntityName, string Path, string Content);
     }
