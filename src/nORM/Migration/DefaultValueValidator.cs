@@ -16,7 +16,7 @@ namespace nORM.Migration
     ///   <item>SQL NULL literal</item>
     ///   <item>Boolean keywords: TRUE, FALSE</item>
     ///   <item>Integer and decimal numeric literals (optional leading minus)</item>
-    ///   <item>Hex/binary literals: 0xDEADBEEF and X'DEADBEEF'</item>
+    ///   <item>Hex/binary/bit-string literals: 0xDEADBEEF, X'DEADBEEF', and B'1010'</item>
     ///   <item>Single-quoted ANSI/Unicode/MySQL-character-set string literals with SQL-escaped interior quotes</item>
     ///   <item>Literal-only string normalization defaults: LOWER('value') and UPPER('value'),
     ///         including provider-normalized literal casts such as LOWER('value'::text)
@@ -42,6 +42,7 @@ namespace nORM.Migration
     internal static class DefaultValueValidator
     {
         private const string QuotedStringLiteralPattern = @"(?:n|_[A-Za-z][A-Za-z0-9_]*)?'(?:[^']|'')*'";
+        private const string BitStringLiteralPattern = @"b'[01]+'";
         private const string SafePostgresCastTypePattern =
             @"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?(?:\s*\(\s*[0-9]+(?:\s*,\s*[0-9]+)?\s*\))?(?:\[\])?" +
             @"|character\s+varying(?:\s*\(\s*[0-9]+\s*\))?" +
@@ -59,7 +60,7 @@ namespace nORM.Migration
             @"null" +                                                   // SQL NULL
             @"|true|false" +                                            // boolean keywords
             @"|-?[0-9]+(?:\.[0-9]+)?" +                                 // numeric literal (int or decimal)
-            @"|0x[0-9a-f]+|x'(?:[0-9a-f]{2})*'" +                       // provider binary/hex literals
+            @"|0x[0-9a-f]+|x'(?:[0-9a-f]{2})*'|" + BitStringLiteralPattern + // provider binary/hex/bit literals
             @"|" + QuotedStringLiteralPattern +                          // single-quoted ANSI/Unicode/provider string literal
             @"|" + StringNormalizationLiteralPattern +                    // literal-only string normalization functions
             @"|current_timestamp(?:\([0-6]?\))?|current_date(?:\(\))?|current_time(?:\([0-6]?\))?" + // ANSI standard date/time functions
@@ -75,7 +76,7 @@ namespace nORM.Migration
             @"|clock_timestamp\(\)|transaction_timestamp\(\)" +          // H: PostgreSQL clock functions
             @"|(?:now\(\)|current_timestamp(?:\([0-6]?\))?)\s+at\s+time\s+zone\s+'utc'(?:\s*::\s*text)?" + // H: PostgreSQL UTC timestamp defaults
             @"|timezone\s*\(\s*'utc'(?:\s*::\s*text)?\s*,\s*(?:now\(\)|current_timestamp(?:\([0-6]?\))?)\s*\)" +
-            // H: PostgreSQL/MySQL NEXTVAL — allow only simple optional schema-qualified identifiers.
+            // H: PostgreSQL/MySQL NEXTVAL: allow only simple optional schema-qualified identifiers.
             @"|nextval\s*\(\s*'[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?'\s*(?:::regclass)?\s*\)" +
             @")" + SafePostgresCastSuffixPattern + @"\z",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -101,7 +102,7 @@ namespace nORM.Migration
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
                     "Only numeric literals, single-quoted ANSI/Unicode/provider strings, boolean literals (TRUE/FALSE), NULL, " +
-                    "safe hex/binary literals, literal-only LOWER/UPPER string normalization defaults over string literals, " +
+                    "safe hex/binary/bit-string literals, literal-only LOWER/UPPER string normalization defaults over string literals, " +
                     "standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), SYSUTCDATETIME(), NEWID(), UUID(), etc.), " +
                     "and safe PostgreSQL cast suffixes on those values are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");

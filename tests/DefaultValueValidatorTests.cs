@@ -103,6 +103,9 @@ public class DefaultValueValidatorTests
         new object[] { "X'DEADBEEF'; DROP TABLE Users" },
         new object[] { "X'DEADZ0'" },
         new object[] { "X'DEA'" },
+        new object[] { "B'102'" },
+        new object[] { "B''" },
+        new object[] { "B'1010'; DROP TABLE Users" },
         new object[] { "now() AT TIME ZONE 'utc'; DROP TABLE Users" },
         new object[] { "now() AT TIME ZONE current_user" },
         new object[] { "timezone('utc', unsafe())" },
@@ -142,6 +145,9 @@ public class DefaultValueValidatorTests
         new object[] { "0x0" },
         new object[] { "X'DEADBEEF'" },
         new object[] { "x''" },
+        new object[] { "B'0'" },
+        new object[] { "b'1010'" },
+        new object[] { "B'1010'::bit(4)" },
         new object[] { "NULL" },
         new object[] { "null" },
         new object[] { "TRUE" },
@@ -335,6 +341,7 @@ public class DefaultValueValidatorTests
     [InlineData("'default_val'")]
     [InlineData("NOW()")]
     [InlineData("'\\xDEADBEEF'::bytea")]
+    [InlineData("B'1010'::bit(4)")]
     public void PostgresGenerator_AddColumn_LegitimateDefault_SqlContainsValue(string defaultValue)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", defaultValue));
@@ -359,6 +366,7 @@ public class DefaultValueValidatorTests
     [InlineData("'default_val'")]
     [InlineData("NOW()")]
     [InlineData("0xDEADBEEF")]
+    [InlineData("b'1010'")]
     public void MySqlGenerator_AddColumn_LegitimateDefault_SqlContainsValue(string defaultValue)
     {
         var diff = AddColumnDiff("T", NotNullCol("NewCol", defaultValue));

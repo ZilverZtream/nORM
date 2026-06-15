@@ -118,8 +118,8 @@ must be reviewed and edited like handwritten model code.
   PostgreSQL serial column defaults and their owned sequences are treated as
   identity metadata, not as separate provider-owned warning rows.
   Simple SQL defaults that pass nORM's migration default allowlist (numeric,
-  boolean, `NULL`, single-quoted ANSI/Unicode string literals, safe hex/binary
-  literals such as `0xDEADBEEF` and `X'DEADBEEF'`, literal-only
+  boolean, `NULL`, single-quoted ANSI/Unicode string literals, safe hex/binary/bit-string
+  literals such as `0xDEADBEEF`, `X'DEADBEEF'`, and `B'1010'`, literal-only
   `LOWER('value')`/`UPPER('value')` string normalization defaults, including
   provider-normalized PostgreSQL literal casts such as `LOWER('value'::text)`
   and MySQL character-set literals such as `LOWER(_utf8mb4'value')`, and known
@@ -1174,7 +1174,7 @@ must be reviewed and edited like handwritten model code.
   read-only join entities instead of generating writable skip navigations.
 - Provider-specific complex default constraints, column types, triggers,
   temporal tables, and keyless tables.
-  Simple safe default literals/functions, including safe hex/binary literals,
+  Simple safe default literals/functions, including safe hex/binary/bit-string literals,
   literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults
   with provider-normalized PostgreSQL casts or MySQL character-set literals, and
   safe PostgreSQL typed-cast defaults, are emitted as migration metadata with
@@ -1400,7 +1400,7 @@ and scheduled-event ownership review. Do not parse `detail` or
 | --- | --- | --- |
 | `SCF001` | `relationship` | Unsupported composite foreign key discovered; scalar columns are generated, but no navigation is emitted because it does not target the generated principal primary key or an exact ordered unfiltered unique index. |
 | `SCF002` | `many-to-many` | Possible many-to-many table discovered. Pure single-column, composite-key, alternate-key, and generated-surrogate-key bridges can be generated as `UsingTable`; payload-capable, nullable, keyless, or non-unique bridges stay as join entities until explicitly modeled. |
-| `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary literals, literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults with provider-normalized PostgreSQL casts or MySQL character-set literals, and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; SQL Server explicit non-system default-constraint names are preserved with the optional `constraintName` argument. MySQL `ON UPDATE` timestamp defaults remain provider-specific diagnostics because they mutate values during updates. Unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
+| `SCF100` | `schema-feature` | Database default expression discovered. Simple safe defaults, including safe hex/binary/bit-string literals, literal-only `LOWER('value')`/`UPPER('value')` string normalization defaults with provider-normalized PostgreSQL casts or MySQL character-set literals, and safe PostgreSQL typed-cast defaults, are emitted as `HasDefaultValueSql`; SQL Server explicit non-system default-constraint names are preserved with the optional `constraintName` argument. MySQL `ON UPDATE` timestamp defaults remain provider-specific diagnostics because they mutate values during updates. Unmodeled complex/provider-specific defaults remain diagnostics and make the generated entity `[ReadOnlyEntity]`. |
 | `SCF101` | `schema-feature` | Computed/generated column expression discovered but not emitted. Ordinary generated-column expressions are emitted as `HasComputedColumnSql`. |
 | `SCF102` | `schema-feature` | Check constraint discovered but not emitted. Ordinary table CHECK constraints are emitted as `HasCheckConstraint`; SQL Server, PostgreSQL, and MySQL provider-default names are replaced with stable generated names. |
 | `SCF103` | `schema-feature` | Provider/database collation discovered but not emitted because no generated property could safely own it. Ordinary column collations are emitted as `HasCollation`. |
