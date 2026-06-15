@@ -630,4 +630,39 @@ public partial class DatabaseScaffolderPrivateMethodTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_WithSqliteCheckAfterNamedNonCheckConstraint_UsesCheckConstraintName()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE CheckAfterUnique (
+                Id INTEGER PRIMARY KEY,
+                Code TEXT NOT NULL CONSTRAINT UQ_CheckAfterUnique_Code UNIQUE CHECK (length(Code) > 0),
+                NamedCode TEXT NOT NULL CONSTRAINT UQ_CheckAfterUnique_NamedCode UNIQUE CONSTRAINT CK_CheckAfterUnique_NamedCode CHECK (length(NamedCode) > 0)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CheckAfterUniqueCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CheckAfterUniqueCtx.cs"));
+
+            Assert.Equal(2, contextCode.Split("HasCheckConstraint(", StringSplitOptions.None).Length - 1);
+            Assert.Contains(".Entity<CheckAfterUnique>().HasCheckConstraint(\"CK_CheckAfterUnique_", contextCode, StringComparison.Ordinal);
+            Assert.Contains("\"length(Code) > 0\"", contextCode, StringComparison.Ordinal);
+            Assert.Contains(".Entity<CheckAfterUnique>().HasCheckConstraint(\"CK_CheckAfterUnique_NamedCode\", \"length(NamedCode) > 0\");", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasCheckConstraint(\"UQ_CheckAfterUnique_Code\"", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasCheckConstraint(\"UQ_CheckAfterUnique_NamedCode\"", contextCode, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
 }

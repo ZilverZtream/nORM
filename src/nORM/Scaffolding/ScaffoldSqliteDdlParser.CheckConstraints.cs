@@ -41,7 +41,7 @@ namespace nORM.Scaffolding
                 if (closeIndex <= openIndex)
                     continue;
 
-                var name = TryReadCheckConstraintName(trimmed, checkIndex, out var constraintName)
+                var name = TryReadConstraintNameImmediatelyBefore(trimmed, checkIndex, out var constraintName)
                     ? constraintName
                     : $"CK_{ScaffoldNameHelper.ToPascalCase(tableName)}_{++ordinal}";
                 var sql = trimmed.Substring(openIndex + 1, closeIndex - openIndex - 1).Trim();
@@ -50,31 +50,6 @@ namespace nORM.Scaffolding
             }
 
             return result;
-        }
-
-        private static bool TryReadCheckConstraintName(string sql, int checkIndex, out string name)
-        {
-            name = string.Empty;
-            var searchIndex = 0;
-            var constraintIndex = -1;
-            while (searchIndex < checkIndex)
-            {
-                var next = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, "CONSTRAINT", searchIndex);
-                if (next < 0 || next >= checkIndex)
-                    break;
-
-                constraintIndex = next;
-                searchIndex = next + "CONSTRAINT".Length;
-            }
-
-            if (constraintIndex < 0)
-                return false;
-
-            var identifierIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(sql, constraintIndex + "CONSTRAINT".Length);
-            return identifierIndex >= 0
-                   && identifierIndex < checkIndex
-                   && TryReadSqlIdentifier(sql, identifierIndex, out name, out var nextIndex)
-                   && nextIndex <= checkIndex;
         }
     }
 }

@@ -146,6 +146,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 "Commented" INTEGER /* CHECK (ignored block comment) */,
                 CONSTRAINT "CK_Orders_Amount" CHECK ("Amount" > 0 /* ) ignored comment */),
                 "Status" TEXT CONSTRAINT [CK_Orders_Status] CHECK ("Status" IN ('new', 'done')),
+                "Code" TEXT CONSTRAINT [UQ_Orders_Code] UNIQUE CHECK (length("Code") > 0),
+                "NamedCode" TEXT CONSTRAINT [UQ_Orders_NamedCode] UNIQUE CONSTRAINT [CK_Orders_NamedCode] CHECK (length("NamedCode") > 0),
                 -- CHECK (ignored line comment)
                 "Flag" INTEGER CHECK /* CHECK (ignored trivia comment) */ ("Flag" IN (0, 1))
             );
@@ -153,10 +155,12 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
         var checks = ScaffoldSqliteDdlParser.ExtractCheckConstraints("Orders", sql);
 
-        Assert.Equal(3, checks.Count);
+        Assert.Equal(5, checks.Count);
         Assert.Equal(("CK_Orders_Amount", "\"Amount\" > 0 /* ) ignored comment */"), checks[0]);
         Assert.Equal(("CK_Orders_Status", "\"Status\" IN ('new', 'done')"), checks[1]);
-        Assert.Equal(("CK_Orders_1", "\"Flag\" IN (0, 1)"), checks[2]);
+        Assert.Equal(("CK_Orders_1", "length(\"Code\") > 0"), checks[2]);
+        Assert.Equal(("CK_Orders_NamedCode", "length(\"NamedCode\") > 0"), checks[3]);
+        Assert.Equal(("CK_Orders_2", "\"Flag\" IN (0, 1)"), checks[4]);
     }
 
     [Fact]
