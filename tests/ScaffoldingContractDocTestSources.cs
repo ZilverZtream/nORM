@@ -388,7 +388,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Functions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Guards.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Metadata.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Names.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineMemberNameBuilder.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Plan.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Plan.Metadata.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldRoutineStubWriter.Plan.Signature.cs"),

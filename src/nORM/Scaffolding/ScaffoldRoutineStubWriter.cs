@@ -25,7 +25,7 @@ namespace nORM.Scaffolding
                 .ThenBy(r => r.Name, StringComparer.Ordinal)
                 .ThenBy(r => r.Detail, StringComparer.Ordinal)
                 .ToArray();
-            var routineMemberNames = BuildRoutineMemberNames(orderedRoutineStubs, useDatabaseNames);
+            var routineMemberNames = ScaffoldRoutineMemberNameBuilder.BuildRoutineMemberNames(orderedRoutineStubs, useDatabaseNames);
             for (var i = 0; i < orderedRoutineStubs.Length; i++)
             {
                 AppendRoutineStub(sb, orderedRoutineStubs[i], routineMemberNames[i], memberNames, useNullableReferenceTypes, useDatabaseNames, nullableReferenceSuffix, nullableObjectType);

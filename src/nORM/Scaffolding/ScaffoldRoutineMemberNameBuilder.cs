@@ -6,9 +6,9 @@ using System.Text;
 
 namespace nORM.Scaffolding
 {
-    internal static partial class ScaffoldRoutineStubWriter
+    internal static class ScaffoldRoutineMemberNameBuilder
     {
-        private static string[] BuildRoutineMemberNames(
+        public static string[] BuildRoutineMemberNames(
             IReadOnlyList<ScaffoldRoutineStubInfo> routineStubs,
             bool useDatabaseNames)
         {
@@ -68,7 +68,7 @@ namespace nORM.Scaffolding
         private static bool TryBuildRoutineSignatureNamePart(ScaffoldRoutineStubInfo routine, out string suffix)
         {
             suffix = string.Empty;
-            var dataTypes = GetRoutineInputParameterDataTypes(routine.Metadata);
+            var dataTypes = ScaffoldRoutineMetadataReader.GetRoutineInputParameterDataTypes(routine.Metadata);
             if (dataTypes.Count == 0)
                 return false;
 
