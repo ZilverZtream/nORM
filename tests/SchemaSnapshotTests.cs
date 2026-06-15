@@ -63,6 +63,16 @@ public class SchemaSnapshotTests
         public string DisplayName { get; set; } = string.Empty;
     }
 
+    [Table("SnapshotUniqueIncludedIndexedEntity")]
+    private class SnapshotUniqueIncludedIndexedEntity
+    {
+        [Key] public int Id { get; set; }
+        [Index("UX_SnapshotUniqueIncludedIndexedEntity_Code", IsUnique = true)]
+        public string Code { get; set; } = string.Empty;
+        [Index("UX_SnapshotUniqueIncludedIndexedEntity_Code", IsIncluded = true)]
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
     [Table("SnapshotNullsNotDistinctIndexedEntity")]
     private class SnapshotNullsNotDistinctIndexedEntity
     {
@@ -1020,6 +1030,46 @@ public class SchemaSnapshotTests
 
         Assert.False(Assert.Single(code.Indexes).IsIncluded);
         Assert.True(Assert.Single(displayName.Indexes).IsIncluded);
+    }
+
+    [Fact]
+    public void SchemaSnapshotBuilder_DoesNotCountIncludedColumnsAsUniqueIndexKeys()
+    {
+        var snapshot = SchemaSnapshotBuilder.Build(typeof(SnapshotUniqueIncludedIndexedEntity).Assembly);
+        var table = snapshot.Tables.Single(t => t.Name == "SnapshotUniqueIncludedIndexedEntity");
+        var code = table.Columns.Single(c => c.Name == "Code");
+        var displayName = table.Columns.Single(c => c.Name == "DisplayName");
+
+        Assert.True(code.IsUnique);
+        Assert.False(displayName.IsUnique);
+        Assert.Contains(code.Indexes, index =>
+            index.Name == "UX_SnapshotUniqueIncludedIndexedEntity_Code" &&
+            index.IsUnique &&
+            !index.IsIncluded);
+        Assert.Contains(displayName.Indexes, index =>
+            index.Name == "UX_SnapshotUniqueIncludedIndexedEntity_Code" &&
+            index.IsIncluded);
+
+        var oldSnapshot = new SchemaSnapshot
+        {
+            Tables =
+            {
+                new TableSchema
+                {
+                    Name = table.Name,
+                    Columns =
+                    {
+                        new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsNullable = false, IsPrimaryKey = true, IsUnique = true, IndexName = "PK_" + table.Name },
+                        new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, IsNullable = false },
+                        new ColumnSchema { Name = "DisplayName", ClrType = typeof(string).FullName!, IsNullable = false }
+                    }
+                }
+            }
+        };
+        var diff = SchemaDiffer.Diff(oldSnapshot, snapshot);
+        var addedIndex = Assert.Single(diff.AddedIndexes, index => index.IndexName == "UX_SnapshotUniqueIncludedIndexedEntity_Code");
+        Assert.True(addedIndex.IsUnique);
+        Assert.Equal(new[] { "Code" }, addedIndex.ColumnNames);
     }
 
     [Fact]

@@ -133,7 +133,9 @@ namespace nORM.Migration
 
         private static Dictionary<string, int> BuildIndexColumnCounts(IReadOnlyDictionary<PropertyInfo, IndexAttribute[]> indexAttributesByProperty)
             => indexAttributesByProperty.Values
-                .SelectMany(static attrs => attrs.Select(static attr => attr.Name))
+                .SelectMany(static attrs => attrs
+                    .Where(static attr => !attr.IsIncluded)
+                    .Select(static attr => attr.Name))
                 .GroupBy(static name => name, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.OrdinalIgnoreCase);
 
