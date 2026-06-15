@@ -951,7 +951,7 @@ must be reviewed and edited like handwritten model code.
   SQLite's unnamed PRAGMA-only key shape stays as unnamed `HasKey(...)`
   configuration.
   Table-filtered direct API and CLI
-  scaffolds both prove relationships to unselected principal tables are
+  scaffolds both prove relationships to unselected principal or dependent tables are
   suppressed rather than emitted as broken navigations, and selected ordinary
   views are emitted as read-only query artifacts without requiring
   `--emit-query-artifacts`. Key-looking view columns are verified through the

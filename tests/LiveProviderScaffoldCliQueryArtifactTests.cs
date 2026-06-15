@@ -91,6 +91,80 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_table_filter_suppresses_unselected_dependent_relationship_on_live_provider(ProviderKind kind)
+    {
+        var root = FindRepositoryRoot();
+        var suffix = IdentifierSuffix();
+        var principalTable = "CliLiveFilterParent" + suffix;
+        var dependentTable = "CliLiveFilterChild" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_principal_filter_" + kind + "_" + suffix);
+        string? sqliteFile = null;
+
+        var live = OpenLive(kind, ref sqliteFile);
+        if (live is null)
+            return;
+
+        var (connection, provider, connectionString, cliProvider) = live.Value;
+        try
+        {
+            using (connection)
+            {
+                SetupFilteredRelationship(connection, provider, kind, principalTable, dependentTable);
+            }
+
+            var scaffold = RunCli(
+                "scaffold " +
+                $"--provider {cliProvider} " +
+                $"--connection {Quote(connectionString)} " +
+                $"--output {Quote(output)} " +
+                "--namespace CliLiveScaffolded " +
+                "--context CliLiveFilteredPrincipalCtx " +
+                $"--table {Quote(principalTable)}",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            Assert.True(File.Exists(Path.Combine(output, principalTable + ".cs")));
+            Assert.False(File.Exists(Path.Combine(output, dependentTable + ".cs")));
+            var principalCode = File.ReadAllText(Path.Combine(output, principalTable + ".cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveFilteredPrincipalCtx.cs"));
+
+            Assert.Contains($"IQueryable<{principalTable}>", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(dependentTable, principalCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(dependentTable, contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+
+            WriteConsumerProject(root, output);
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try
+            {
+                using var cleanup = Reopen(kind, connectionString);
+                CleanupFilteredRelationship(cleanup, provider, principalTable, dependentTable);
+            }
+            catch
+            {
+                // Best-effort cleanup; failed cleanup should not hide the original assertion.
+            }
+
+            TryDeleteDirectory(output);
+            if (sqliteFile is not null)
+            {
+                try { File.Delete(sqliteFile); } catch { }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
     public void Dotnet_norm_scaffold_table_filter_emits_view_query_artifact_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();
