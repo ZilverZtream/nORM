@@ -665,4 +665,36 @@ public partial class DatabaseScaffolderPrivateMethodTests
         }
     }
 
+    [Fact]
+    public async Task ScaffoldAsync_WithSqliteCollateInsideCheck_DoesNotEmitColumnCollation()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE CollateInCheck (
+                Id INTEGER PRIMARY KEY,
+                Checked TEXT NOT NULL CHECK (Checked COLLATE NOCASE <> ''),
+                Actual TEXT NOT NULL COLLATE RTRIM
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "CollateInCheckCtx");
+
+            var contextCode = File.ReadAllText(Path.Combine(dir, "CollateInCheckCtx.cs"));
+
+            Assert.Contains(".Entity<CollateInCheck>().HasCheckConstraint(", contextCode, StringComparison.Ordinal);
+            Assert.Contains(".Entity<CollateInCheck>().Property(e => e.Actual).HasCollation(\"RTRIM\");", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".Property(e => e.Checked).HasCollation", contextCode, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
 }

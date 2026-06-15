@@ -25,10 +25,10 @@ namespace nORM.Scaffolding
                 if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
                     continue;
 
-                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out _))
+                if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out var nextIndex))
                     continue;
 
-                var collateIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(trimmed, "COLLATE", 0);
+                var collateIndex = FindTopLevelSqlKeywordOutsideQuotes(trimmed, "COLLATE", nextIndex);
                 if (collateIndex < 0)
                     continue;
 
@@ -64,5 +64,70 @@ namespace nORM.Scaffolding
             name = value.Substring(start, index - start);
             return name.Length > 0;
         }
+
+        private static int FindTopLevelSqlKeywordOutsideQuotes(string sql, string keyword, int startIndex)
+        {
+            var depth = 0;
+            char? quote = null;
+            string? dollarQuote = null;
+            for (var i = startIndex; i < sql.Length; i++)
+            {
+                var ch = sql[i];
+                if (ScaffoldSqlMetadataParser.TryAdvancePostgresDollarQuote(sql, ref i, ref dollarQuote))
+                    continue;
+                if (ScaffoldSqlMetadataParser.TryAdvanceSqlComment(sql, ref i))
+                    continue;
+
+                if (quote is not null)
+                {
+                    var close = quote == '[' ? ']' : quote.Value;
+                    if (ch == close)
+                    {
+                        if (i + 1 < sql.Length && sql[i + 1] == close)
+                        {
+                            i++;
+                            continue;
+                        }
+
+                        quote = null;
+                    }
+
+                    continue;
+                }
+
+                if (ch is '\'' or '"' or '`' or '[')
+                {
+                    quote = ch;
+                    continue;
+                }
+
+                if (ch == '(')
+                {
+                    depth++;
+                    continue;
+                }
+
+                if (ch == ')')
+                {
+                    if (depth > 0)
+                        depth--;
+                    continue;
+                }
+
+                if (depth == 0
+                    && i + keyword.Length <= sql.Length
+                    && sql.AsSpan(i, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase)
+                    && (i == 0 || !IsSqlIdentifierChar(sql[i - 1]))
+                    && (i + keyword.Length == sql.Length || !IsSqlIdentifierChar(sql[i + keyword.Length])))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool IsSqlIdentifierChar(char value)
+            => char.IsLetterOrDigit(value) || value == '_' || value == '$';
     }
 }

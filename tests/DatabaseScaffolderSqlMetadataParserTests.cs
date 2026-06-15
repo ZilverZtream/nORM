@@ -246,6 +246,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 "Id" INTEGER PRIMARY KEY,
                 "Name" TEXT DEFAULT 'COLLATE ignored' COLLATE NOCASE,
                 "Commented" TEXT /* COLLATE ignored */,
+                "Checked" TEXT CHECK ("Checked" COLLATE NOCASE <> ''),
                 "Tagged" TEXT COLLATE /* COLLATE ignored trivia */ "custom-name",
                 "Flag" TEXT COLLATE [BINARY]
             );
@@ -257,6 +258,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Equal("NOCASE", collations["Name"]);
         Assert.Equal("custom-name", collations["Tagged"]);
         Assert.Equal("BINARY", collations["Flag"]);
+        Assert.False(collations.ContainsKey("Checked"));
         Assert.False(collations.ContainsKey("Commented"));
     }
 
