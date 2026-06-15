@@ -10,9 +10,12 @@ namespace nORM.Tests;
 public sealed partial class LiveProviderScaffoldingParityTests
 {
     private const string SyntheticCheckTable = "ScaffoldLiveSyntheticCheck";
+    private const string NamedUniqueTable = "ScaffoldLiveNamedUnique";
     private const string SyntheticUniqueTable = "ScaffoldLiveSyntheticUnique";
     private const string SyntheticFkParentTable = "ScaffoldLiveSyntheticFkParent";
     private const string SyntheticFkChildTable = "ScaffoldLiveSyntheticFkChild";
+    private const string NamedUniqueCodeConstraint = "UQ_ScaffoldLiveNamedUnique_Code";
+    private const string NamedUniqueCompositeConstraint = "UQ_ScaffoldLiveNamedUnique_Tenant_External";
 
     private static async Task SetupSyntheticCheckConstraintAsync(
         DbConnection connection,
@@ -66,6 +69,48 @@ public sealed partial class LiveProviderScaffoldingParityTests
         try
         {
             await ExecuteAsync(connection, DropTable(kind, SyntheticUniqueTable, provider.Escape(SyntheticUniqueTable)));
+        }
+        catch
+        {
+            // Best-effort cleanup; test body reports operational failures.
+        }
+    }
+
+    private static async Task SetupNamedUniqueConstraintIndexAsync(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind)
+    {
+        await TeardownNamedUniqueConstraintIndexAsync(connection, provider, kind);
+
+        var table = provider.Escape(NamedUniqueTable);
+        var id = provider.Escape("Id");
+        var code = provider.Escape("Code");
+        var tenantId = provider.Escape("TenantId");
+        var externalNo = provider.Escape("ExternalNo");
+        var name = provider.Escape("Name");
+        await ExecuteAsync(connection,
+            $"""
+            CREATE TABLE {table} (
+                {id} {IntType(kind)} NOT NULL PRIMARY KEY,
+                {code} {TextType(kind, 80)} NOT NULL,
+                {tenantId} {IntType(kind)} NOT NULL,
+                {externalNo} {TextType(kind, 80)} NOT NULL,
+                {name} {TextType(kind, 80)} NOT NULL,
+                CONSTRAINT {provider.Escape(NamedUniqueCodeConstraint)} UNIQUE ({code}),
+                CONSTRAINT {provider.Escape(NamedUniqueCompositeConstraint)} UNIQUE ({tenantId}, {externalNo})
+            )
+            """);
+    }
+
+    private static async Task TeardownNamedUniqueConstraintIndexAsync(
+        DbConnection connection,
+        DatabaseProvider provider,
+        ProviderKind kind)
+    {
+        try
+        {
+            await ExecuteAsync(connection, DropTable(kind, NamedUniqueTable, provider.Escape(NamedUniqueTable)));
         }
         catch
         {

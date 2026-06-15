@@ -107,6 +107,51 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    public async Task ScaffoldAsync_preserves_named_unique_constraint_index_names_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupNamedUniqueConstraintIndexAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_named_unique_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldNamedUniqueContext",
+                    new ScaffoldOptions { Tables = new[] { NamedUniqueTable }, OverwriteFiles = false });
+
+                var entityCode = await File.ReadAllTextAsync(DefaultScaffoldEntityPath(dir, NamedUniqueTable));
+
+                Assert.Contains($"[Index(\"{NamedUniqueCodeConstraint}\", IsUnique = true)]", entityCode, StringComparison.Ordinal);
+                Assert.Contains($"[Index(\"{NamedUniqueCompositeConstraint}\", IsUnique = true, Order = 0)]", entityCode, StringComparison.Ordinal);
+                Assert.Contains($"[Index(\"{NamedUniqueCompositeConstraint}\", IsUnique = true, Order = 1)]", entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("sqlite_autoindex", entityCode, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain($"UX_{NamedUniqueTable}_Code", entityCode, StringComparison.Ordinal);
+                Assert.DoesNotContain($"UX_{NamedUniqueTable}_TenantId_ExternalNo", entityCode, StringComparison.Ordinal);
+
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownNamedUniqueConstraintIndexAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
     public async Task ScaffoldAsync_suppresses_synthetic_fk_constraint_names_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
