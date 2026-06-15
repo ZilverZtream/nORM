@@ -29,6 +29,7 @@ public sealed class RepositoryHygieneTests
     private const int MaxFastPathQueryExecutorPartialFileLines = 1000;
     private const int MaxQueryExecutorPartialFileLines = 1000;
     private const int MaxIncludeProcessorPartialFileLines = 750;
+    private const int MaxMigrationSqlGeneratorFileLines = 800;
     private const int MaxSelectClauseVisitorPartialFileLines = 1500;
     private const int MaxExpressionToSqlVisitorPartialFileLines = 1200;
     private const int MaxSqliteProviderPartialFileLines = 1500;
@@ -671,6 +672,28 @@ public sealed class RepositoryHygieneTests
         Assert.True(
             oversizedFiles.Length == 0,
             "Split IncludeProcessor code by include-chain and many-to-many navigation responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
+    }
+
+    [Fact]
+    public void Migration_sql_generator_files_stay_split_by_provider_responsibility()
+    {
+        var ownership = File.ReadAllText(Path.Combine(RepoRoot, "docs", "test-suite-ownership.md"));
+        Assert.Contains("Every `*MigrationSqlGenerator*.cs` file stays below 800 lines", ownership, StringComparison.Ordinal);
+
+        var oversizedFiles = Directory.EnumerateFiles(Path.Combine(RepoRoot, "src", "nORM", "Migration"), "*MigrationSqlGenerator*.cs")
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepoRoot, path).Replace(Path.DirectorySeparatorChar, '/'),
+                LineCount = File.ReadLines(path).Count()
+            })
+            .Where(file => file.LineCount > MaxMigrationSqlGeneratorFileLines)
+            .OrderByDescending(file => file.LineCount)
+            .Select(file => $"{file.Path} ({file.LineCount} lines)")
+            .ToArray();
+
+        Assert.True(
+            oversizedFiles.Length == 0,
+            "Split migration SQL generator code by provider dialect, validation, and table-rebuild responsibilities before it becomes a god file: " + string.Join(", ", oversizedFiles));
     }
 
     [Fact]

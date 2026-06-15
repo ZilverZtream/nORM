@@ -217,6 +217,13 @@ Every `IncludeProcessor*.cs` partial stays below 750 lines so ordinary include
 chains and many-to-many include loading remain separate navigation
 responsibilities. `RepositoryHygieneTests` enforces this boundary.
 
+## Migration SQL Generator Source Size
+
+Every `*MigrationSqlGenerator*.cs` file stays below 800 lines so provider SQL
+dialects, SQLite table-rebuild helpers, and provider-specific validation remain
+separate migration responsibilities. `RepositoryHygieneTests` enforces this
+boundary.
+
 ## Select Clause Visitor Source Size
 
 Every `SelectClauseVisitor*.cs` partial stays below 1500 lines so projection
