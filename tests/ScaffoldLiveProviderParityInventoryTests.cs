@@ -109,6 +109,8 @@ public sealed class ScaffoldLiveProviderParityInventoryTests
                 Expect("MySQL ON UPDATE timestamp defaults are MySQL-specific provider-managed update behavior.", "MySql"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_emits_sqlite_virtual_table_as_read_only_query_artifact"] =
                 Expect("SQLite virtual tables and shadow-table diagnostics are SQLite-specific.", "Sqlite"),
+            ["LiveProviderScaffoldingSqliteUniqueConstraintTests.cs::ScaffoldAsync_preserves_sqlite_named_unique_constraint_index_names"] =
+                Expect("SQLite stores named UNIQUE constraints as autoindexes, so preserving declared names requires SQLite CREATE TABLE DDL recovery.", "Sqlite"),
             ["LiveProviderScaffoldingProviderObjectTests.cs::ScaffoldAsync_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =
                 Expect("PostgreSQL serial columns and owned sequences are PostgreSQL-specific catalog behavior.", "Postgres"),
             ["LiveProviderScaffoldCliPostgresSerialTests.cs::Dotnet_norm_scaffold_postgres_serial_primary_key_does_not_emit_default_or_owned_sequence_warnings"] =

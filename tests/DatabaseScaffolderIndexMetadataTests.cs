@@ -79,6 +79,41 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithNamedSqliteUniqueConstraints_PreservesConstraintNames()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE NamedUniqueConstraintWidget (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Code TEXT NOT NULL CONSTRAINT UQ_NamedUniqueConstraintWidget_Code UNIQUE,
+                TenantId INTEGER NOT NULL,
+                ExternalNo TEXT NOT NULL,
+                CONSTRAINT UQ_NamedUniqueConstraintWidget_Tenant_External UNIQUE (TenantId, ExternalNo)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(cn, new SqliteProvider(), dir, "TestNs", "NamedUniqueConstraintIndexCtx");
+
+            var entityCode = File.ReadAllText(Path.Combine(dir, "NamedUniqueConstraintWidget.cs"));
+            Assert.Contains("[Index(\"UQ_NamedUniqueConstraintWidget_Code\", IsUnique = true)]", entityCode);
+            Assert.Contains("[Index(\"UQ_NamedUniqueConstraintWidget_Tenant_External\", IsUnique = true, Order = 0)]", entityCode);
+            Assert.Contains("[Index(\"UQ_NamedUniqueConstraintWidget_Tenant_External\", IsUnique = true, Order = 1)]", entityCode);
+            Assert.DoesNotContain("sqlite_autoindex", entityCode, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("UX_NamedUniqueConstraintWidget", entityCode, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithCompositeIndex_GeneratesOrderedIndexAttributes()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

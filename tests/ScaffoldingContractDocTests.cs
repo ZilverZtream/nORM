@@ -329,6 +329,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("<table>_chk_<n>", doc, StringComparison.Ordinal);
         Assert.Contains("CK_<Entity>_<hash>", doc, StringComparison.Ordinal);
         Assert.Contains("SQLite autoindex", doc, StringComparison.Ordinal);
+        Assert.Contains("SQLite named `UNIQUE` constraints", doc, StringComparison.Ordinal);
         Assert.Contains("<table>_<columns>_key", doc, StringComparison.Ordinal);
         Assert.Contains("first key column", doc, StringComparison.Ordinal);
         Assert.Contains("<column>_UNIQUE", doc, StringComparison.Ordinal);
@@ -356,6 +357,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("isSyntheticName", syntheticFeatureNameMarkerSource, StringComparison.Ordinal);
         Assert.Contains("BuildGeneratedCheckConstraintName", checkFeatureConfigurationBuilderSource, StringComparison.Ordinal);
         Assert.Contains("NormalizeSyntheticIndexNames", indexDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("ExtractUniqueConstraintNamesByColumns", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("RequiresExplicitManyToManyReferentialActions", contextWriterSource, StringComparison.Ordinal);
         Assert.Contains("constraintName:", contextWriterSource, StringComparison.Ordinal);
         Assert.Contains("BuildScaffoldDefaultConstraintNameMap", scalarDefaultConfigurationSource, StringComparison.Ordinal);

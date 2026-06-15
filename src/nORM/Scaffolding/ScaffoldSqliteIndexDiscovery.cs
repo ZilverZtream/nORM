@@ -17,13 +17,24 @@ namespace nORM.Scaffolding
             var indexes = new List<ScaffoldIndexInfo>();
             foreach (var table in tables)
             {
+                var createTableSql = await GetSqliteCreateTableSqlAsync(connection, provider, table.Schema, table.Name).ConfigureAwait(false);
+                var uniqueConstraintNamesByColumns = ScaffoldSqliteDdlParser.ExtractUniqueConstraintNamesByColumns(createTableSql);
                 var tableIndexes = await GetSqliteTableIndexesAsync(connection, provider, table).ConfigureAwait(false);
                 foreach (var (name, isUnique, origin, isPartial) in tableIndexes)
                 {
                     if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    await AddSqliteIndexAsync(connection, provider, table, name, isUnique, origin, isPartial, indexes).ConfigureAwait(false);
+                    await AddSqliteIndexAsync(
+                        connection,
+                        provider,
+                        table,
+                        name,
+                        isUnique,
+                        origin,
+                        isPartial,
+                        uniqueConstraintNamesByColumns,
+                        indexes).ConfigureAwait(false);
                 }
             }
 

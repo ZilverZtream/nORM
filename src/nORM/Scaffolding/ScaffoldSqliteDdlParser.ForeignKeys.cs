@@ -69,6 +69,9 @@ namespace nORM.Scaffolding
         }
 
         public static string BuildForeignKeyColumnKey(IEnumerable<string> dependentColumns)
-            => string.Join("\u001f", dependentColumns.Select(static column => column.Trim()));
+            => BuildColumnListKey(dependentColumns);
+
+        public static string BuildColumnListKey(IEnumerable<string> columns)
+            => string.Join("\u001f", columns.Select(static column => column.Trim()));
     }
 }

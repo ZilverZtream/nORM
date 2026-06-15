@@ -211,6 +211,30 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void SqliteUniqueConstraintParser_ExtractsNamedTableAndColumnConstraints()
+    {
+        const string sql = """
+            CREATE TABLE "UniqueConstraintWidget" (
+                "Id" INTEGER PRIMARY KEY,
+                "Code" TEXT NOT NULL CONSTRAINT [UQ_UniqueConstraintWidget_Code] UNIQUE,
+                "TenantId" INTEGER NOT NULL,
+                "ExternalNo" TEXT NOT NULL,
+                "Note" TEXT DEFAULT 'UNIQUE ignored',
+                CONSTRAINT "UQ_UniqueConstraintWidget_Tenant_External" UNIQUE /* ignored */ ("TenantId", "ExternalNo"),
+                UNIQUE ("Id")
+            );
+            """;
+
+        var names = ScaffoldSqliteDdlParser.ExtractUniqueConstraintNamesByColumns(sql);
+
+        Assert.Equal("UQ_UniqueConstraintWidget_Code", names[ScaffoldSqliteDdlParser.BuildColumnListKey(new[] { "Code" })]);
+        Assert.Equal(
+            "UQ_UniqueConstraintWidget_Tenant_External",
+            names[ScaffoldSqliteDdlParser.BuildColumnListKey(new[] { "TenantId", "ExternalNo" })]);
+        Assert.False(names.ContainsKey(ScaffoldSqliteDdlParser.BuildColumnListKey(new[] { "Id" })));
+    }
+
+    [Fact]
     public void SqliteCollationParser_IgnoresSqlCommentsAndStringLiterals()
     {
         const string sql = """

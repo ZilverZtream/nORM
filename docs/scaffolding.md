@@ -276,13 +276,14 @@ must be reviewed and edited like handwritten model code.
   column instead of vague same-type names.
 - Single-column, composite, and multi-membership non-primary-key index
   generation through nORM's `[Index]` metadata, including unique composite
-  indexes without converting them into per-column uniqueness. SQLite autoindex
-  names for unnamed unique constraints and SQL Server unique-constraint indexes
-  marked `is_system_named`, PostgreSQL default `<table>_<columns>_key` unique
-  constraint indexes, and MySQL unnamed-unique indexes reported with their
-  first key column or `<column>_UNIQUE` as the index name are replaced with stable
-  `UX_<Table>_<Columns>` names instead of leaking generated catalog artifacts
-  into source.
+  indexes without converting them into per-column uniqueness. Recoverable
+  SQLite named `UNIQUE` constraints are preserved from `CREATE TABLE` DDL;
+  SQLite autoindex names for unnamed unique constraints and SQL Server
+  unique-constraint indexes marked `is_system_named`, PostgreSQL default
+  `<table>_<columns>_key` unique constraint indexes, and MySQL unnamed-unique
+  indexes reported with their first key column or `<column>_UNIQUE` as the
+  index name are replaced with stable `UX_<Table>_<Columns>` names instead of
+  leaking generated catalog artifacts into source.
   Provider-specific
   descending key order is preserved with `IndexAttribute.IsDescending`.
   SQL Server, PostgreSQL, and SQLite filtered/partial indexes are preserved

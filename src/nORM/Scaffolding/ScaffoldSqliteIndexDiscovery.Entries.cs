@@ -20,6 +20,7 @@ namespace nORM.Scaffolding
             bool isUnique,
             string origin,
             bool isPartial,
+            IReadOnlyDictionary<string, string> uniqueConstraintNamesByColumns,
             ICollection<ScaffoldIndexInfo> indexes)
         {
             var filterSql = isPartial
@@ -61,14 +62,27 @@ namespace nORM.Scaffolding
             if (hasUnsupportedKeyPart)
                 return;
 
+            var orderedColumns = columns.OrderBy(static c => c.Ordinal).ToArray();
             var isSyntheticName = string.Equals(origin, "u", StringComparison.OrdinalIgnoreCase)
                                   || name.StartsWith("sqlite_autoindex_", StringComparison.OrdinalIgnoreCase);
-            foreach (var column in columns.OrderBy(static c => c.Ordinal))
+            var indexName = name;
+            if (isUnique
+                && isSyntheticName
+                && uniqueConstraintNamesByColumns.TryGetValue(
+                    ScaffoldSqliteDdlParser.BuildColumnListKey(orderedColumns.Select(static column => column.Name)),
+                    out var declaredConstraintName)
+                && !string.IsNullOrWhiteSpace(declaredConstraintName))
+            {
+                indexName = declaredConstraintName;
+                isSyntheticName = false;
+            }
+
+            foreach (var column in orderedColumns)
             {
                 indexes.Add(new ScaffoldIndexInfo(
                     TableKey(table.Schema, table.Name),
                     column.Name,
-                    name,
+                    indexName,
                     isUnique,
                     columns.Count,
                     column.Ordinal,

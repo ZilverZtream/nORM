@@ -37,6 +37,22 @@ namespace nORM.Scaffolding
             return Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
         }
 
+        private static async Task<string?> GetSqliteCreateTableSqlAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            string? schemaName,
+            string tableName)
+        {
+            await using var cmd = connection.CreateCommand();
+            var schema = string.IsNullOrWhiteSpace(schemaName) ? "main" : schemaName!;
+            cmd.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name = @tableName";
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@tableName";
+            p.Value = tableName;
+            cmd.Parameters.Add(p);
+            return Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
+        }
+
         private static string SqlitePragma(DatabaseProvider provider, string? schema, string pragmaName, string argument)
         {
             var prefix = string.IsNullOrWhiteSpace(schema)

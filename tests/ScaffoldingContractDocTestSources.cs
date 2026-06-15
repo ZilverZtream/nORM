@@ -216,6 +216,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.Sql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.Models.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteIndexDiscovery.Helpers.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.UniqueConstraints.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldIndexNameNormalizer.cs"));
 
     private static string ReadKeyDiscoverySource()
