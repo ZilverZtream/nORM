@@ -115,8 +115,10 @@ must be reviewed and edited like handwritten model code.
   and SQL Server local table/view synonyms resolved to commented base objects, MySQL
   table/column comments flow for base tables, and SQLite keeps the existing
   column-mapping summaries because it has no native comment catalog.
-  PostgreSQL serial column defaults and their owned sequences are treated as
-  identity metadata, not as separate provider-owned warning rows.
+  PostgreSQL identity/serial column defaults and their owned sequences are
+  treated as identity metadata, not as separate provider-owned warning rows.
+  Independent PostgreSQL `nextval('sequence'::regclass)` defaults that are not
+  owned by the column are preserved as ordinary default SQL metadata.
   Simple SQL defaults that pass nORM's migration default allowlist (numeric,
   boolean, `NULL`, single-quoted ANSI/Unicode string literals, safe hex/binary/bit-string
   literals such as `0xDEADBEEF`, `X'DEADBEEF'`, and `B'1010'`, typed temporal
@@ -646,7 +648,10 @@ must be reviewed and edited like handwritten model code.
   SQL Server and PostgreSQL standalone sequences are discovered with scalar
   value type metadata where the provider exposes it, and generated context
   methods retrieve the next value with provider SQL (`NEXT VALUE FOR` or
-  PostgreSQL `nextval(...::regclass)`). Sequence DDL, allocation/caching, and
+  PostgreSQL `nextval(...::regclass)`). PostgreSQL serial/identity-owned
+  sequences stay attached to their generated columns; independent sequence
+  defaults are emitted as `HasDefaultValueSql` when the default expression
+  passes the shared allowlist. Sequence DDL, allocation/caching, and
   cross-provider migration remain provider-owned. Sequence warning metadata
   records the provider, discovered data type, generated CLR value type, and
   whether nORM can emit an opt-in next-value stub for that provider. SQL Server

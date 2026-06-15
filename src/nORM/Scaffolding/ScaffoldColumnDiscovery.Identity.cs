@@ -67,11 +67,14 @@ namespace nORM.Scaffolding
             {
                 return await QueryColumnNameMapAsync(connection, tableKeys, """
                     SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ColumnName
-                    FROM information_schema.columns
+                    FROM information_schema.columns c
                     WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                       AND (
                           is_identity = 'YES'
-                          OR column_default LIKE 'nextval(%'
+                          OR (
+                              column_default LIKE 'nextval(%'
+                              AND pg_get_serial_sequence(format('%I.%I', c.table_schema, c.table_name), c.column_name) IS NOT NULL
+                          )
                       )
                     """).ConfigureAwait(false);
             }

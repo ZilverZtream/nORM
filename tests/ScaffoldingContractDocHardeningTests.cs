@@ -637,7 +637,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("now() AT TIME ZONE 'utc'", doc, StringComparison.Ordinal);
         Assert.Contains("timezone('utc', now())", doc, StringComparison.Ordinal);
         Assert.Contains("Safe PostgreSQL cast suffixes", defaultValidator, StringComparison.Ordinal);
-        Assert.Contains("Hex/binary literals", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("Hex/binary/bit-string literals", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("Literal-only string normalization defaults", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("(?:lower|upper)", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("0x[0-9a-f]+", defaultValidator, StringComparison.Ordinal);
@@ -703,6 +703,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldSqlMetadataParser.TryNormalizeScaffoldDefaultSql(raw, out defaultValueSql)", dynamicSource, StringComparison.Ordinal);
         Assert.DoesNotContain("DefaultValueValidator.Validate(candidate)", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("AND is_identity <> 'YES'", dynamicSource, StringComparison.Ordinal);
+        Assert.Contains("pg_get_serial_sequence(format('%I.%I', c.table_schema, c.table_name), c.column_name)", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("QUOTE(column_default)", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("REPLACE(column_default, CHAR(92, 39), CHAR(39))", dynamicSource, StringComparison.Ordinal);
         Assert.Contains("HasWriteBlockingProviderSpecificColumns", dynamicSource, StringComparison.Ordinal);

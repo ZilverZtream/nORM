@@ -53,7 +53,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("domain-wrapped numeric type text", doc, StringComparison.Ordinal);
         Assert.Contains("provider metadata-backed identity", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL identity/serial", doc, StringComparison.Ordinal);
-        Assert.Contains("owned sequences are treated as", doc, StringComparison.Ordinal);
+        Assert.Contains("owned sequences", doc, StringComparison.Ordinal);
+        Assert.Contains("treated as identity metadata", doc, StringComparison.Ordinal);
+        Assert.Contains("Independent PostgreSQL `nextval('sequence'::regclass)` defaults", doc, StringComparison.Ordinal);
         Assert.Contains("dependent or principal table is intentionally filtered out", doc, StringComparison.Ordinal);
         Assert.Contains("FilterForeignKeysToScaffoldedTables", source, StringComparison.Ordinal);
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
@@ -73,8 +75,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("GetIdentityColumnNamesAsync", source, StringComparison.Ordinal);
         Assert.Contains("auto_increment", columnDiscoverySource, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("nextval(%", columnDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("pg_get_serial_sequence(format('%I.%I', c.table_schema, c.table_name), c.column_name)", columnDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("dependency.deptype IN ('a', 'i')", skippedDiscoverySource, StringComparison.Ordinal);
-        Assert.Contains("column_default NOT LIKE 'nextval(%'", postgresUnsupportedSource, StringComparison.Ordinal);
+        Assert.Contains("pg_get_serial_sequence(format('%I.%I', c.table_schema, c.table_name), c.column_name)", postgresUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("temporal_type <> 0", sqlServerUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("skippedDatabaseObjects", diagnosticsWriterSource, StringComparison.Ordinal);
         Assert.Contains("MissingPrimaryKey", source, StringComparison.Ordinal);

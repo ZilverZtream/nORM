@@ -136,6 +136,43 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Empty(configurations.GeneratedFeatureIndexes);
     }
 
+    [Fact]
+    public void BuildFeatureConfigurations_PromotesSafePostgresNextvalDefaultAndKeepsTypeWritable()
+    {
+        var entityByTable = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Orders"] = "Order"
+        };
+        var propertiesByTable = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["public.Orders"] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["OrderNumber"] = "OrderNumber"
+            }
+        };
+        var features = new[]
+        {
+            new ScaffoldFeatureInput(
+                0,
+                new ScaffoldUnsupportedFeatureInfo(
+                    "public.Orders",
+                    "Default",
+                    "OrderNumber",
+                    "nextval('public.order_numbers_seq'::regclass)"))
+        };
+
+        var configurations = ScaffoldFeatureConfigurationBuilder.BuildFeatureConfigurations(
+            features,
+            entityByTable,
+            propertiesByTable,
+            new Dictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.Equal("nextval('public.order_numbers_seq'::regclass)", configurations.DefaultValuesByTable["public.Orders"]["OrderNumber"]);
+        Assert.DoesNotContain("public.Orders", configurations.ProviderSpecificDefaultTableKeys);
+        Assert.DoesNotContain("public.Orders", configurations.ProviderOwnedWriteBlockedTableKeys);
+        Assert.Equal(new[] { 0 }, configurations.GeneratedFeatureIndexes);
+    }
+
     [Theory]
     [InlineData("character varying(320)", "character varying(320)")]
     [InlineData("varchar(64)", "character varying(64)")]

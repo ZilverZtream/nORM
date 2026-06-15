@@ -13,11 +13,14 @@ namespace nORM.Scaffolding
             HashSet<string> tableKeys)
             => AddFeaturesAsync(connection, features, tableKeys, """
                 SELECT table_schema AS TableSchema, table_name AS TableName, column_name AS ObjectName, 'Default' AS Kind, column_default::text AS Detail
-                FROM information_schema.columns
+                FROM information_schema.columns c
                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                   AND column_default IS NOT NULL
                   AND is_identity <> 'YES'
-                  AND column_default NOT LIKE 'nextval(%'
+                  AND NOT (
+                      column_default LIKE 'nextval(%'
+                      AND pg_get_serial_sequence(format('%I.%I', c.table_schema, c.table_name), c.column_name) IS NOT NULL
+                  )
                 """);
 
         private static Task AddComputedColumnFeaturesAsync(

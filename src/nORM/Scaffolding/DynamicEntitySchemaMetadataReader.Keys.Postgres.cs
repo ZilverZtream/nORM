@@ -10,12 +10,15 @@ namespace nORM.Scaffolding
         private static IReadOnlySet<string> GetPostgresIdentityColumns(DbConnection connection, string? schemaName, string tableName)
             => QueryColumnNameSet(connection, """
                 SELECT column_name AS ColumnName
-                FROM information_schema.columns
+                FROM information_schema.columns c
                 WHERE table_name = @tableName
                   AND (@schemaName IS NULL OR table_schema = @schemaName)
                   AND (
                       is_identity = 'YES'
-                      OR column_default LIKE 'nextval(%'
+                      OR (
+                          column_default LIKE 'nextval(%'
+                          AND pg_get_serial_sequence(format('%I.%I', c.table_schema, c.table_name), c.column_name) IS NOT NULL
+                      )
                   )
                 """, schemaName, tableName);
 
