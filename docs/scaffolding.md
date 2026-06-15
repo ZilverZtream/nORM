@@ -147,11 +147,12 @@ must be reviewed and edited like handwritten model code.
   Computed/generated columns are marked
   with `DatabaseGeneratedOption.Computed` so nORM does not treat them as normal
   insert columns, but their provider expressions remain provider-owned DDL.
-  SQLite generated-column `VIRTUAL`/`STORED`, SQL Server `PERSISTED`,
-  PostgreSQL stored generated, and MySQL `VIRTUAL GENERATED`/`STORED
-  GENERATED` storage tokens are separated from the expression before emitting
-  `HasComputedColumnSql(...)`; stored/persisted generated columns pass
-  `stored: true`.
+  SQLite generated-column `VIRTUAL`/`STORED`, including abbreviated
+  `AS (...)` generated-column declarations without `GENERATED ALWAYS`, SQL
+  Server `PERSISTED`, PostgreSQL stored generated, and MySQL `VIRTUAL
+  GENERATED`/`STORED GENERATED` storage tokens are separated from the
+  expression before emitting `HasComputedColumnSql(...)`; stored/persisted
+  generated columns pass `stored: true`.
   SQL Server rowversion/timestamp columns are marked as `[Timestamp]` and
   database-generated for optimistic concurrency, while the provider DDL remains
   outside the generated model.

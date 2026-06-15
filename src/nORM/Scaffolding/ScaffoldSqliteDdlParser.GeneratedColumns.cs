@@ -30,14 +30,11 @@ namespace nORM.Scaffolding
                 if (!TryReadLeadingSqlIdentifier(trimmed, out var columnName, out var nextIndex))
                     continue;
 
-                var generatedIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(trimmed, "GENERATED", nextIndex);
-                if (generatedIndex < 0)
-                    continue;
-
-                var asIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(
+                var generatedIndex = FindTopLevelSqlKeywordOutsideQuotes(trimmed, "GENERATED", nextIndex);
+                var asIndex = FindTopLevelSqlKeywordOutsideQuotes(
                     trimmed,
                     "AS",
-                    generatedIndex + "GENERATED".Length);
+                    generatedIndex >= 0 ? generatedIndex + "GENERATED".Length : nextIndex);
                 if (asIndex < 0)
                     continue;
 

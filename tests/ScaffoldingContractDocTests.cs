@@ -214,6 +214,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldComputedColumn", source, StringComparison.Ordinal);
         Assert.Contains("QueryComputedColumnMap", source, StringComparison.Ordinal);
         Assert.Contains("ExtractSqliteGeneratedColumns", source, StringComparison.Ordinal);
+        Assert.Contains("FindTopLevelSqlKeywordOutsideQuotes", source, StringComparison.Ordinal);
+        Assert.Contains("generatedIndex >= 0 ? generatedIndex + \"GENERATED\".Length : nextIndex", source, StringComparison.Ordinal);
+        Assert.Contains("abbreviated", doc, StringComparison.Ordinal);
+        Assert.Contains("`AS (...)` generated-column declarations", doc, StringComparison.Ordinal);
         Assert.Contains("NormalizeComputedColumnSql", source, StringComparison.Ordinal);
         Assert.Contains("column.ComputedColumn?.Sql", source, StringComparison.Ordinal);
         Assert.Contains("ResolveUniqueUnqualifiedSchema", source, StringComparison.Ordinal);

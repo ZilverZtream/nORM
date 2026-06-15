@@ -28,6 +28,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 Name TEXT COLLATE NOCASE NOT NULL DEFAULT 'new',
                 NameLength INTEGER GENERATED ALWAYS AS (length(Name)) VIRTUAL,
                 NameLengthStored INTEGER GENERATED ALWAYS AS (length(Name) + 1) STORED,
+                ShortNameLength INTEGER AS (length(Name) + 2) VIRTUAL,
+                ShortNameLengthStored INTEGER AS (length(Name) + 3) STORED,
                 "Display,Name" TEXT COLLATE NOCASE NOT NULL,
                 "Display,Length" INTEGER GENERATED ALWAYS AS (length("Display,Name")) VIRTUAL,
                 "Paren)Name" TEXT COLLATE NOCASE NOT NULL,
@@ -58,6 +60,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("mb.Entity<FeatureOwned>().HasCheckConstraint(\"CK_FeatureOwned_Name\", \"length(Name) > 0\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLength).HasComputedColumnSql(\"length(Name)\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.NameLengthStored).HasComputedColumnSql(\"length(Name) + 1\", stored: true);", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.ShortNameLength).HasComputedColumnSql(\"length(Name) + 2\");", contextCode);
+            Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.ShortNameLengthStored).HasComputedColumnSql(\"length(Name) + 3\", stored: true);", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.Name).HasCollation(\"NOCASE\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.DisplayLength).HasComputedColumnSql(\"length(\\\"Display,Name\\\")\");", contextCode);
             Assert.Contains("mb.Entity<FeatureOwned>().Property(e => e.DisplayName).HasCollation(\"NOCASE\");", contextCode);
@@ -72,6 +76,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("Trigger", warnings);
             Assert.Contains("TR_FeatureOwned_Audit", warnings);
             Assert.DoesNotContain("CheckConstraint", warnings);
+            Assert.DoesNotContain("ShortNameLength", warnings);
             Assert.DoesNotContain("Skipped Database Objects", warnings);
             Assert.Contains("FeatureOwnedView", warnings);
             var summary = warningJson.RootElement.GetProperty("summary");

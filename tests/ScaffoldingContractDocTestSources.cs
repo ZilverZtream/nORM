@@ -532,6 +532,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityTypeBuilder.Properties.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityComputedColumnReader.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityComputedColumnReader.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.GeneratedColumns.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityComputedColumnReader.SqlServer.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityComputedColumnReader.Postgres.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "DynamicEntityComputedColumnReader.MySql.cs"),

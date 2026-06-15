@@ -97,18 +97,26 @@ public partial class DatabaseScaffolderPrivateMethodTests
             CREATE TABLE "Metrics" (
                 "Note" TEXT DEFAULT 'GENERATED ALWAYS AS (ignored) STORED',
                 "Total" INTEGER GENERATED ALWAYS AS (([Quantity] * [Price])) PERSISTED,
+                "ShortTotal" INTEGER AS (([Quantity] + [Price])) VIRTUAL,
+                "ShortStored" INTEGER AS ([Quantity] - [Price]) STORED,
                 "Virtual" TEXT GENERATED ALWAYS AS ('PERSISTED') VIRTUAL,
-                "Commented" INTEGER GENERATED /* (ignored) */ ALWAYS AS /* (ignored) */ ([Quantity] + 1) STORED
+                "Commented" INTEGER GENERATED /* (ignored) */ ALWAYS AS /* (ignored) */ ([Quantity] + 1) STORED,
+                "Checked" TEXT CHECK ("Checked" AS TEXT <> '')
             )
             """);
 
         Assert.False(columns.ContainsKey("Note"));
         Assert.Equal("[Quantity] * [Price]", columns["Total"].Sql);
         Assert.True(columns["Total"].Stored);
+        Assert.Equal("[Quantity] + [Price]", columns["ShortTotal"].Sql);
+        Assert.False(columns["ShortTotal"].Stored);
+        Assert.Equal("[Quantity] - [Price]", columns["ShortStored"].Sql);
+        Assert.True(columns["ShortStored"].Stored);
         Assert.Equal("'PERSISTED'", columns["Virtual"].Sql);
         Assert.False(columns["Virtual"].Stored);
         Assert.Equal("[Quantity] + 1", columns["Commented"].Sql);
         Assert.True(columns["Commented"].Stored);
+        Assert.False(columns.ContainsKey("Checked"));
     }
 
     [Fact]
