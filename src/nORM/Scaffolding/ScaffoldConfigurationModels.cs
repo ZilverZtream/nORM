@@ -1,0 +1,78 @@
+#nullable enable
+using nORM.Configuration;
+
+namespace nORM.Scaffolding
+{
+    internal readonly record struct ScaffoldDefaultValueConfiguration(
+        string TableKey,
+        string EntityName,
+        string ColumnName,
+        string PropertyName,
+        string DefaultValueSql,
+        string? ConstraintName);
+
+    internal readonly record struct ScaffoldIdentityOptionConfiguration(
+        string TableKey,
+        string EntityName,
+        string ColumnName,
+        string PropertyName,
+        long Seed,
+        long Increment);
+
+    internal readonly record struct ScaffoldPrecisionConfiguration(
+        string TableKey,
+        string EntityName,
+        string ColumnName,
+        string PropertyName,
+        int Precision,
+        int? Scale);
+
+    internal readonly record struct ScaffoldColumnFacetConfiguration(
+        string TableKey,
+        string EntityName,
+        string ColumnName,
+        string PropertyName,
+        int? MaxLength,
+        bool? IsUnicode,
+        bool IsFixedLength);
+
+    internal readonly record struct ScaffoldCheckConstraintConfiguration(
+        string TableKey,
+        string EntityName,
+        string Name,
+        string Sql);
+
+    internal readonly record struct ScaffoldComputedColumnConfiguration(
+        string TableKey,
+        string EntityName,
+        string ColumnName,
+        string PropertyName,
+        string Sql,
+        bool Stored);
+
+    internal readonly record struct ScaffoldExpressionIndexConfiguration(
+        string TableKey,
+        string EntityName,
+        string Name,
+        string ExpressionSql,
+        bool IsUnique,
+        string? FilterSql)
+    {
+        public string[]? IncludedColumnNames { get; init; }
+
+        public IndexNullSortOrder NullSortOrder { get; init; }
+
+        public bool NullsNotDistinct { get; init; }
+    }
+
+    internal readonly record struct ScaffoldCollationConfiguration(
+        string TableKey,
+        string EntityName,
+        string ColumnName,
+        string PropertyName,
+        string Collation);
+
+    internal readonly record struct ScaffoldDecimalPrecision(
+        int Precision,
+        int? Scale);
+}

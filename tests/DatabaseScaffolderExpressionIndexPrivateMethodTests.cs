@@ -196,7 +196,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     private static DatabaseScaffolder.ScaffoldUnsupportedFeature Feature(string kind, string name, string detail)
         => new("public.Documents", kind, name, detail);
 
-    private static IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration> BuildExpressionIndexes(
+    private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexes(
         IReadOnlyDictionary<string, string> entityByTable,
         params DatabaseScaffolder.ScaffoldUnsupportedFeature[] features)
         => ScaffoldFeatureConfigurationAdapter.BuildExpressionIndexConfigurations(entityByTable, features);

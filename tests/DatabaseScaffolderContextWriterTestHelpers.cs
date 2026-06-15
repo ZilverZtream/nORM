@@ -141,7 +141,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             identityOptionConfigurations: new[]
             {
-                new DatabaseScaffolder.ScaffoldIdentityOptionConfiguration(
+                new ScaffoldIdentityOptionConfiguration(
                     "dbo.Users",
                     "User",
                     "Id",
@@ -157,7 +157,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "Invoice" },
             precisionConfigurations: new[]
             {
-                new DatabaseScaffolder.ScaffoldPrecisionConfiguration(
+                new ScaffoldPrecisionConfiguration(
                     "dbo.Invoices",
                     "Invoice",
                     "Amount",
@@ -173,7 +173,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "Customer" },
             columnFacetConfigurations: new[]
             {
-                new DatabaseScaffolder.ScaffoldColumnFacetConfiguration(
+                new ScaffoldColumnFacetConfiguration(
                     "dbo.Customers",
                     "Customer",
                     "Code",
@@ -181,7 +181,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     40,
                     false,
                     true),
-                new DatabaseScaffolder.ScaffoldColumnFacetConfiguration(
+                new ScaffoldColumnFacetConfiguration(
                     "dbo.Customers",
                     "Customer",
                     "Token",
@@ -199,15 +199,15 @@ public partial class DatabaseScaffolderPrivateMethodTests
         IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin>? manyToManyJoins = null,
         IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject>? routineStubs = null,
         IReadOnlyList<DatabaseScaffolder.ScaffoldPrimaryKey>? compositePrimaryKeys = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldCollationConfiguration>? collationConfigurations = null,
+        IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
+        IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
+        IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
+        IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
+        IReadOnlyList<ScaffoldCollationConfiguration>? collationConfigurations = null,
         IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject>? sequenceStubs = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
+        IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
+        IReadOnlyList<ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
+        IReadOnlyList<ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
         bool usePluralizer = true,
         bool useNullableReferenceTypes = true,
         string? entityNamespaceName = null,

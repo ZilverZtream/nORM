@@ -372,7 +372,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     [Fact]
     public void ScaffoldContext_WithExpressionIndexFacets_EmitsExtendedExpressionIndexCall()
     {
-        var expressionIndex = new DatabaseScaffolder.ScaffoldExpressionIndexConfiguration(
+        var expressionIndex = new ScaffoldExpressionIndexConfiguration(
             "main.IndexedProviderSpecific",
             "IndexedProviderSpecific",
             "IX_IndexedProviderSpecific_LowerName",

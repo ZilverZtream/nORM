@@ -53,7 +53,7 @@ namespace nORM.Scaffolding
                 .ToArray();
 
         public static IReadOnlyDictionary<string, ScaffoldDecimalPrecisionInfo>? ConvertEntityDecimalPrecisionInfos(
-            IReadOnlyDictionary<string, DatabaseScaffolder.ScaffoldDecimalPrecision>? decimalPrecisions)
+            IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions)
             => decimalPrecisions?.ToDictionary(
                 pair => pair.Key,
                 pair => new ScaffoldDecimalPrecisionInfo(pair.Value.Precision, pair.Value.Scale),

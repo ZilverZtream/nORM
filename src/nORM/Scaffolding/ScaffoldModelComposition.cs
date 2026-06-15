@@ -8,12 +8,12 @@ namespace nORM.Scaffolding
         IReadOnlySet<string> ManyToManyJoinTableKeys,
         IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> Relationships,
         IReadOnlyList<DatabaseScaffolder.ScaffoldPrimaryKey> CompositePrimaryKeys,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration> DefaultValueConfigurations,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldCheckConstraintConfiguration> CheckConstraints,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldComputedColumnConfiguration> ComputedColumnConfigurations,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration> ExpressionIndexConfigurations,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldCollationConfiguration> CollationConfigurations,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldIdentityOptionConfiguration> IdentityOptionConfigurations,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldPrecisionConfiguration> PrecisionConfigurations,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldColumnFacetConfiguration> ColumnFacetConfigurations);
+        IReadOnlyList<ScaffoldDefaultValueConfiguration> DefaultValueConfigurations,
+        IReadOnlyList<ScaffoldCheckConstraintConfiguration> CheckConstraints,
+        IReadOnlyList<ScaffoldComputedColumnConfiguration> ComputedColumnConfigurations,
+        IReadOnlyList<ScaffoldExpressionIndexConfiguration> ExpressionIndexConfigurations,
+        IReadOnlyList<ScaffoldCollationConfiguration> CollationConfigurations,
+        IReadOnlyList<ScaffoldIdentityOptionConfiguration> IdentityOptionConfigurations,
+        IReadOnlyList<ScaffoldPrecisionConfiguration> PrecisionConfigurations,
+        IReadOnlyList<ScaffoldColumnFacetConfiguration> ColumnFacetConfigurations);
 }

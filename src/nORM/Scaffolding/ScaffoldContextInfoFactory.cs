@@ -15,30 +15,30 @@ namespace nORM.Scaffolding
             IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> manyToManyJoins,
             IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject>? routineStubs = null,
             IReadOnlyList<DatabaseScaffolder.ScaffoldPrimaryKey>? compositePrimaryKeys = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldCollationConfiguration>? collationConfigurations = null,
+            IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
+            IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
+            IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
+            IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
+            IReadOnlyList<ScaffoldCollationConfiguration>? collationConfigurations = null,
             IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject>? sequenceStubs = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
+            IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
+            IReadOnlyList<ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
+            IReadOnlyList<ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
             bool usePluralizer = true,
             bool useNullableReferenceTypes = true,
             string? entityNamespaceName = null,
             bool useDatabaseNames = false)
         {
             compositePrimaryKeys ??= Array.Empty<DatabaseScaffolder.ScaffoldPrimaryKey>();
-            defaultValueConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldDefaultValueConfiguration>();
-            checkConstraintConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldCheckConstraintConfiguration>();
-            computedColumnConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldComputedColumnConfiguration>();
-            expressionIndexConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldExpressionIndexConfiguration>();
-            collationConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldCollationConfiguration>();
+            defaultValueConfigurations ??= Array.Empty<ScaffoldDefaultValueConfiguration>();
+            checkConstraintConfigurations ??= Array.Empty<ScaffoldCheckConstraintConfiguration>();
+            computedColumnConfigurations ??= Array.Empty<ScaffoldComputedColumnConfiguration>();
+            expressionIndexConfigurations ??= Array.Empty<ScaffoldExpressionIndexConfiguration>();
+            collationConfigurations ??= Array.Empty<ScaffoldCollationConfiguration>();
             sequenceStubs ??= Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>();
-            identityOptionConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldIdentityOptionConfiguration>();
-            precisionConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldPrecisionConfiguration>();
-            columnFacetConfigurations ??= Array.Empty<DatabaseScaffolder.ScaffoldColumnFacetConfiguration>();
+            identityOptionConfigurations ??= Array.Empty<ScaffoldIdentityOptionConfiguration>();
+            precisionConfigurations ??= Array.Empty<ScaffoldPrecisionConfiguration>();
+            columnFacetConfigurations ??= Array.Empty<ScaffoldColumnFacetConfiguration>();
             routineStubs ??= Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>();
 
             return new ScaffoldContextInfo(

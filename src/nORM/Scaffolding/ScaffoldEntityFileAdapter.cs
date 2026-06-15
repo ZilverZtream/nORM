@@ -28,7 +28,7 @@ namespace nORM.Scaffolding
             IReadOnlySet<string>? computedColumns = null,
             IReadOnlySet<string>? rowVersionColumns = null,
             IReadOnlySet<string>? identityColumns = null,
-            IReadOnlyDictionary<string, DatabaseScaffolder.ScaffoldDecimalPrecision>? decimalPrecisions = null,
+            IReadOnlyDictionary<string, ScaffoldDecimalPrecision>? decimalPrecisions = null,
             IReadOnlyDictionary<string, ScaffoldColumnFacet>? columnFacets = null,
             ScaffoldComments? comments = null,
             bool isReadOnlyEntity = false,

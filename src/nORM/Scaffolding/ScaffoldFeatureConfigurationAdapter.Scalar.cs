@@ -12,7 +12,7 @@ namespace nORM.Scaffolding
                 ConvertFeatureInputs(features),
                 columnPropertiesByTable);
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
+        public static IReadOnlyList<ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> defaultValuesByTable,
@@ -23,16 +23,16 @@ namespace nORM.Scaffolding
                 defaultValuesByTable,
                 defaultConstraintNamesByTable));
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldPrecisionConfiguration> BuildPrecisionConfigurations(
+        public static IReadOnlyList<ScaffoldPrecisionConfiguration> BuildPrecisionConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, DatabaseScaffolder.ScaffoldDecimalPrecision>> decimalPrecisionByTable)
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> decimalPrecisionByTable)
             => ConvertPrecisionConfigurations(ScaffoldFeatureConfigurationBuilder.BuildPrecisionConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
                 ConvertDecimalPrecisionInfoMap(decimalPrecisionByTable)));
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldColumnFacetConfiguration> BuildColumnFacetConfigurations(
+        public static IReadOnlyList<ScaffoldColumnFacetConfiguration> BuildColumnFacetConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> columnFacetsByTable)
@@ -41,7 +41,7 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable,
                 columnFacetsByTable));
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldIdentityOptionConfiguration> BuildIdentityOptionConfigurations(
+        public static IReadOnlyList<ScaffoldIdentityOptionConfiguration> BuildIdentityOptionConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
@@ -50,7 +50,7 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable,
                 ConvertFeatureInputs(features)));
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldCollationConfiguration> BuildCollationConfigurations(
+        public static IReadOnlyList<ScaffoldCollationConfiguration> BuildCollationConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
@@ -59,7 +59,7 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable,
                 ConvertFeatureInputs(features)));
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldComputedColumnConfiguration> BuildComputedColumnConfigurations(
+        public static IReadOnlyList<ScaffoldComputedColumnConfiguration> BuildComputedColumnConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
@@ -68,7 +68,7 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable,
                 ConvertFeatureInputs(features)));
 
-        public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, DatabaseScaffolder.ScaffoldDecimalPrecision>> BuildDecimalPrecisionMap(
+        public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldDecimalPrecision>> BuildDecimalPrecisionMap(
             IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
             => ConvertDecimalPrecisionMap(ScaffoldFeatureConfigurationBuilder.BuildDecimalPrecisionMap(ConvertFeatureInputs(features)));
     }

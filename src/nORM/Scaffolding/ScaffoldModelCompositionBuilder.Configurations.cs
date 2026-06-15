@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelCompositionBuilder
     {
-        private static IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
+        private static IReadOnlyList<ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
             ScaffoldModelDiscoveryResult discovery,
             ScaffoldFeatureConfigurations featureConfigurations)
             => ScaffoldFeatureConfigurationAdapter.BuildDefaultValueConfigurations(
