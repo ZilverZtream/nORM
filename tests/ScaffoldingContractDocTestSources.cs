@@ -222,6 +222,7 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.PrimaryKeys.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Fallback.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Queries.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldKeyDiscovery.Sql.cs"),

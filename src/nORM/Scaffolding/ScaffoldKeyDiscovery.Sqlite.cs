@@ -45,5 +45,32 @@ namespace nORM.Scaffolding
 
             return ToOrderedColumnDictionary(sqliteResult);
         }
+
+        private static async Task<IReadOnlyDictionary<string, string>> GetSqlitePrimaryKeyConstraintNameMapAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTableInfo> tables)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var table in tables)
+            {
+                await using var command = connection.CreateCommand();
+                var schema = string.IsNullOrWhiteSpace(table.Schema) ? "main" : table.Schema!;
+                command.CommandText = $"SELECT sql FROM {provider.Escape(schema)}.sqlite_master WHERE type = 'table' AND name = @tableName";
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = "@tableName";
+                parameter.Value = table.Name;
+                command.Parameters.Add(parameter);
+
+                var createSql = Convert.ToString(
+                    await command.ExecuteScalarAsync().ConfigureAwait(false),
+                    CultureInfo.InvariantCulture);
+                var constraintName = ScaffoldSqliteDdlParser.ExtractPrimaryKeyConstraintName(createSql);
+                if (!string.IsNullOrWhiteSpace(constraintName))
+                    result[TableKey(table.Schema, table.Name)] = constraintName;
+            }
+
+            return result;
+        }
     }
 }

@@ -39,6 +39,9 @@ namespace nORM.Scaffolding
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+            if (ScaffoldProviderKind.IsSqlite(provider))
+                return await GetSqlitePrimaryKeyConstraintNameMapAsync(connection, provider, tables).ConfigureAwait(false);
+
             if (ScaffoldProviderKind.IsSqlServer(provider))
                 return await QueryPrimaryKeyConstraintNameMapAsync(connection, tableKeys, SqlServerPrimaryKeyConstraintNameSql).ConfigureAwait(false);
 

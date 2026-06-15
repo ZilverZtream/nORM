@@ -83,9 +83,10 @@ view/materialized-view query-artifact comments plus SQL Server local-synonym
 comments in the same all-four view/provider-artifact gates. PostgreSQL routine
 coverage also proves extension-owned functions are suppressed from generated
 application routine wrappers. The CLI scaffold
-gate also verifies explicit SQL Server/PostgreSQL primary-key constraint-name
-preservation while MySQL's fixed `PRIMARY` metadata and SQLite's PRAGMA-only
-key shape remain unnamed generated `HasKey(...)` configuration. The same live scaffold parity tests are also included in
+gate also verifies explicit SQL Server/PostgreSQL/SQLite primary-key
+constraint-name preservation plus MySQL's fixed `PRIMARY` metadata while
+SQLite's unnamed PRAGMA-only key shape remains unnamed generated `HasKey(...)`
+configuration. The same live scaffold parity tests are also included in
 `eng\live-provider-gate.cmd live` and the RC gate.
 Run CLI scaffold consumer-build tests after `dotnet build` so they reference
 the already-built `nORM.dll` rather than rebuilding the source project inside a

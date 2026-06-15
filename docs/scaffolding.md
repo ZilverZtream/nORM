@@ -101,11 +101,13 @@ must be reviewed and edited like handwritten model code.
   Composite primary keys are also emitted in generated context configuration
   with `HasKey(e => new { ... })` in provider-reported key ordinal order, so
   the reverse-engineered model carries the full key shape explicitly. Explicit
-  SQL Server and PostgreSQL primary-key constraint names are preserved with
-  generated `HasKey(..., "constraint_name")` when provider catalogs expose a
-  meaningful non-default name. SQL Server system-generated names, PostgreSQL
-  default `<table>_pkey` names, MySQL's fixed `PRIMARY` metadata, and SQLite's
-  PRAGMA-only key shape are not emitted as no-op generated-code noise.
+  SQL Server, PostgreSQL, and SQLite primary-key constraint names are preserved
+  with generated `HasKey(..., "constraint_name")` when provider metadata or
+  recoverable SQLite `CREATE TABLE` DDL exposes a meaningful non-default name.
+  MySQL's fixed `PRIMARY` metadata is preserved because it is the provider's
+  observable primary-key constraint identity. SQL Server system-generated names,
+  PostgreSQL default `<table>_pkey` names, and SQLite's unnamed PRAGMA-only key
+  shape are not emitted as no-op generated-code noise.
   Native table, view, and column descriptions are preserved as generated XML
   documentation where provider catalogs expose them: SQL Server
   `MS_Description` and PostgreSQL `COMMENT ON` flow into escaped class/property
@@ -941,9 +943,10 @@ must be reviewed and edited like handwritten model code.
   `--msbuildprojectextensionspath`.
   Provider-bound routine stubs are verified through the real CLI with `--emit-routine-stubs` on SQL Server, PostgreSQL, and MySQL.
   Provider-bound sequence stubs are verified through the real CLI with `--emit-sequence-stubs` on SQL Server and PostgreSQL.
-  Explicit SQL Server/PostgreSQL primary-key constraint names are also verified
-  through the real CLI while MySQL's fixed `PRIMARY` metadata and SQLite's
-  PRAGMA-only key shape stay as unnamed `HasKey(...)` configuration.
+  Explicit SQL Server/PostgreSQL/SQLite primary-key constraint names and
+  MySQL's fixed `PRIMARY` metadata are also verified through the real CLI while
+  SQLite's unnamed PRAGMA-only key shape stays as unnamed `HasKey(...)`
+  configuration.
   Table-filtered direct API and CLI
   scaffolds both prove relationships to unselected principal tables are
   suppressed rather than emitted as broken navigations, and selected ordinary
@@ -975,7 +978,7 @@ must be reviewed and edited like handwritten model code.
   that provider-owned clause text. It also
   proves safe string/binary defaults, table CHECK constraints, computed/generated columns,
   column collations, provider-native table/column comments,
-  explicit SQL Server/PostgreSQL primary-key constraint names,
+  explicit SQL Server/PostgreSQL/SQLite primary-key constraint names,
   SQL Server/PostgreSQL/MySQL routine comments,
   SQL Server/PostgreSQL sequence comments, SQL Server local-synonym comments,
   and SQL Server/PostgreSQL

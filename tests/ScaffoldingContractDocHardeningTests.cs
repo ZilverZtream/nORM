@@ -460,9 +460,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("safe string/binary defaults, table CHECK constraints", doc, StringComparison.Ordinal);
         Assert.Contains("computed/generated columns", doc, StringComparison.Ordinal);
         Assert.Contains("provider-native table/column comments", doc, StringComparison.Ordinal);
-        Assert.Contains("explicit SQL Server/PostgreSQL primary-key constraint names", doc, StringComparison.Ordinal);
-        Assert.Contains("primary-key constraint-name", releaseGates, StringComparison.Ordinal);
-        Assert.Contains("preservation while MySQL's fixed `PRIMARY` metadata", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("explicit SQL Server/PostgreSQL/SQLite primary-key constraint names", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server/PostgreSQL/SQLite primary-key", releaseGates, StringComparison.Ordinal);
+        Assert.Contains("constraint-name preservation plus MySQL's fixed `PRIMARY` metadata", releaseGates, StringComparison.Ordinal);
         Assert.Contains("parentPkName", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_builds_composite_primary_key_fk_model_shape_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Routine <summary> & description", liveScaffoldCliTests, StringComparison.Ordinal);

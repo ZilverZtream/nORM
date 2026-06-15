@@ -71,7 +71,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
-    public async Task ScaffoldAsync_WithCompositePrimaryKey_UsesDeclaredKeyOrder()
+    public async Task ScaffoldAsync_WithNamedCompositePrimaryKey_UsesDeclaredKeyOrderAndPreservesName()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -81,7 +81,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 TenantId INTEGER NOT NULL,
                 LocalId INTEGER NOT NULL,
                 Name TEXT NOT NULL,
-                PRIMARY KEY (LocalId, TenantId)
+                CONSTRAINT "PK_OrderedKeyItem" PRIMARY KEY (LocalId, TenantId)
             );
             """;
         cmd.ExecuteNonQuery();
@@ -93,7 +93,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
             var contextCode = File.ReadAllText(Path.Combine(dir, "OrderedKeyCtx.cs"));
 
-            Assert.Contains("mb.Entity<OrderedKeyItem>().HasKey(e => new { e.LocalId, e.TenantId });", contextCode);
+            Assert.Contains("mb.Entity<OrderedKeyItem>().HasKey(e => new { e.LocalId, e.TenantId }, \"PK_OrderedKeyItem\");", contextCode);
             Assert.DoesNotContain("mb.Entity<OrderedKeyItem>().HasKey(e => new { e.TenantId, e.LocalId });", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }

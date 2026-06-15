@@ -186,6 +186,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldProviderKind.IsSqlServer(provider)", dispatchSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldProviderKind.IsPostgres(provider)", dispatchSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldProviderKind.IsMySql(provider)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("GetSqlitePrimaryKeyConstraintNameMapAsync", keyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("ExtractPrimaryKeyConstraintName", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("MySqlPrimaryKeyConstraintNameSql", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("information_schema.table_constraints", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("constraint_type = 'PRIMARY KEY'", keyDiscoverySource, StringComparison.Ordinal);
@@ -331,7 +333,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("<column>_UNIQUE", doc, StringComparison.Ordinal);
         Assert.Contains("UX_<Table>_<Columns>", doc, StringComparison.Ordinal);
         Assert.Contains("action-aware `UsingTable` overload", doc, StringComparison.Ordinal);
-        Assert.Contains("SQL Server and PostgreSQL primary-key constraint names", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server, PostgreSQL, and SQLite primary-key constraint names", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server system-generated names", doc, StringComparison.Ordinal);
         Assert.Contains("explicit non-system default-constraint names", doc, StringComparison.Ordinal);
         Assert.Contains("HasDefaultValueSql(..., constraintName: ...)", doc, StringComparison.Ordinal);
@@ -370,6 +372,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("FIRST_VALUE(s.column_name)", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("_UNIQUE", indexDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("GetPrimaryKeyConstraintNamesAsync", keyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("GetSqlitePrimaryKeyConstraintNameMapAsync", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("kc.is_system_named = 0", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("cls.relname || '_pkey'", keyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("PrimaryKeyConstraintName", builderSource, StringComparison.Ordinal);

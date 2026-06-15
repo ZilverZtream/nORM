@@ -160,6 +160,35 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void SqlitePrimaryKeyConstraintParser_ExtractsOnlyNamedPrimaryKeyConstraints()
+    {
+        const string tableConstraintSql = """
+            CREATE TABLE "Orders" (
+                "TenantId" INTEGER NOT NULL,
+                "OrderId" INTEGER NOT NULL,
+                "Note" TEXT DEFAULT 'PRIMARY KEY ignored',
+                CONSTRAINT "PK_Orders" PRIMARY /* ignored */ KEY ("TenantId", "OrderId")
+            );
+            """;
+        const string columnConstraintSql = """
+            CREATE TABLE "ColumnOrders" (
+                "Id" INTEGER CONSTRAINT [PK_ColumnOrders] PRIMARY KEY,
+                "Note" TEXT CONSTRAINT [CK_ColumnOrders_Note] CHECK (length("Note") > 0)
+            );
+            """;
+        const string unnamedSql = """
+            CREATE TABLE "UnnamedOrders" (
+                "Id" INTEGER CONSTRAINT [CK_UnnamedOrders_Id] CHECK ("Id" > 0) PRIMARY KEY,
+                "Note" TEXT
+            );
+            """;
+
+        Assert.Equal("PK_Orders", ScaffoldSqliteDdlParser.ExtractPrimaryKeyConstraintName(tableConstraintSql));
+        Assert.Equal("PK_ColumnOrders", ScaffoldSqliteDdlParser.ExtractPrimaryKeyConstraintName(columnConstraintSql));
+        Assert.Null(ScaffoldSqliteDdlParser.ExtractPrimaryKeyConstraintName(unnamedSql));
+    }
+
+    [Fact]
     public void SqliteCollationParser_IgnoresSqlCommentsAndStringLiterals()
     {
         const string sql = """

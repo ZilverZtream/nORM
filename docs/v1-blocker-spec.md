@@ -840,8 +840,9 @@ Resolution note:
   Server/PostgreSQL/SQLite attached databases, MySQL catalog-portable metadata,
   nullable-safe generated code, provider metadata-backed identity columns,
   computed/generated and rowversion metadata, deterministic generated output,
-  explicit SQL Server/PostgreSQL primary-key constraint names without
-  system/default-name noise, provider-native table/column comments,
+  explicit SQL Server/PostgreSQL/SQLite primary-key constraint names plus
+  MySQL's fixed `PRIMARY` metadata without system/default-name noise,
+  provider-native table/column comments,
   SQL Server/PostgreSQL/MySQL routine
   comments, SQL Server/PostgreSQL sequence comments, SQL Server local-synonym
   comments, and SQL Server/PostgreSQL view/materialized-view query-artifact
