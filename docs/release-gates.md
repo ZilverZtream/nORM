@@ -80,7 +80,10 @@ table/column comment preservation as generated XML docs across the all-four
 provider command path, SQL Server/PostgreSQL/MySQL routine comments,
 SQL Server/PostgreSQL sequence comments, and SQL Server/PostgreSQL
 view/materialized-view query-artifact comments plus SQL Server local-synonym
-comments in the same all-four view/provider-artifact gates. PostgreSQL routine
+comments in the same all-four view/provider-artifact gates. API and CLI
+relationship-suppression gates also verify `NoRelationships`/`--no-relationships`
+across all four provider kinds, including scalar FK preservation and explicit
+join-entity emission. PostgreSQL routine
 coverage also proves extension-owned functions are suppressed from generated
 application routine wrappers. The CLI scaffold
 gate also verifies explicit SQL Server/PostgreSQL/SQLite primary-key

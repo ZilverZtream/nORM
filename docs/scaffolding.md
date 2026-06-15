@@ -1142,6 +1142,9 @@ must be reviewed and edited like handwritten model code.
   shapes, single-column nullable and non-null alternate-key FK generation,
   dynamic scaffolding of computed/generated columns, identity columns,
   database-name preservation with role-named FK navigations,
+  relationship suppression that keeps scalar FK columns and pure bridge
+  tables as explicit entities when `NoRelationships`/`--no-relationships` is
+  enabled,
   and composite primary-key ordinal order across live providers,
   nullable-FK many-to-many bridge rejection,
   provider-owned many-to-many bridge rejection,

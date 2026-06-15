@@ -177,6 +177,100 @@ public sealed partial class LiveProviderScaffoldCliParityTests
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_no_relationships_keeps_scalar_fk_columns_and_join_entity_on_live_provider(ProviderKind kind)
+    {
+        var root = FindRepositoryRoot();
+        var suffix = IdentifierSuffix();
+        var authorTable = "CliNoRelAuthor" + suffix;
+        var bookTable = "CliNoRelBook" + suffix;
+        var labelTable = "CliNoRelLabel" + suffix;
+        var bookLabelTable = "CliNoRelBookLabel" + suffix;
+        var bookAuthorFkName = "FK_CliNoRelBook_Author_" + suffix;
+        var bookLabelBookFkName = "FK_CliNoRelBookLabel_Book_" + suffix;
+        var bookLabelLabelFkName = "FK_CliNoRelBookLabel_Label_" + suffix;
+        var bookAuthorTitleIndex = "IX_CliNoRelBook_Author_Title_" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_no_relationships_" + kind + "_" + suffix);
+        string? sqliteFile = null;
+
+        var live = OpenLive(kind, ref sqliteFile);
+        if (live is null)
+            return;
+
+        var (connection, provider, connectionString, cliProvider) = live.Value;
+        try
+        {
+            using (connection)
+            {
+                SetupMixedSingleForeignKeyAndManyToMany(connection, provider, kind, authorTable, bookTable, labelTable, bookLabelTable, bookAuthorFkName, bookLabelBookFkName, bookLabelLabelFkName, bookAuthorTitleIndex);
+            }
+
+            var scaffold = RunCli(
+                "scaffold " +
+                $"--provider {cliProvider} " +
+                $"--connection {Quote(connectionString)} " +
+                $"--output {Quote(output)} " +
+                "--namespace CliLiveScaffolded " +
+                "--context CliLiveNoRelationshipsCtx " +
+                "--no-relationships " +
+                $"--table {Quote(authorTable)} " +
+                $"--table {Quote(bookTable)} " +
+                $"--table {Quote(labelTable)} " +
+                $"--table {Quote(bookLabelTable)}",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            var authorCode = File.ReadAllText(Path.Combine(output, authorTable + ".cs"));
+            var bookCode = File.ReadAllText(Path.Combine(output, bookTable + ".cs"));
+            var labelCode = File.ReadAllText(Path.Combine(output, labelTable + ".cs"));
+            var joinCode = File.ReadAllText(Path.Combine(output, bookLabelTable + ".cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveNoRelationshipsCtx.cs"));
+
+            Assert.DoesNotContain($"List<{bookTable}>", authorCode, StringComparison.Ordinal);
+            Assert.DoesNotContain($"List<{bookTable}>", labelCode, StringComparison.Ordinal);
+            Assert.Matches(@"public (?:int|long) AuthorId \{ get; set; \}", bookCode);
+            Assert.Matches(@"public (?:int|long) BookId \{ get; set; \}", joinCode);
+            Assert.Matches(@"public (?:int|long) LabelId \{ get; set; \}", joinCode);
+            Assert.DoesNotContain("[ForeignKey(", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain($"public {authorTable}", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain($"List<{labelTable}>", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasMany", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("WithOne", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("WithMany", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("UsingTable", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+
+            WriteConsumerProject(root, output);
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try
+            {
+                using var cleanup = Reopen(kind, connectionString);
+                CleanupMixedSingleForeignKeyAndManyToMany(cleanup, provider, bookTable, authorTable, labelTable, bookLabelTable);
+            }
+            catch
+            {
+                // Best-effort cleanup; failed cleanup should not hide the original assertion.
+            }
+
+            TryDeleteDirectory(output);
+            if (sqliteFile is not null)
+            {
+                try { File.Delete(sqliteFile); } catch { }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
     public void Dotnet_norm_scaffold_suppresses_synthetic_fk_constraint_names_on_live_provider(ProviderKind kind)
     {
         var root = FindRepositoryRoot();

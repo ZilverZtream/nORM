@@ -82,6 +82,68 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_no_relationships_keeps_scalar_fk_columns_and_join_entity_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_no_relationships_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldNoRelationshipsContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { AuthorTable, BookTable, LabelTable, BookLabelTable },
+                        NoRelationships = true,
+                        OverwriteFiles = false
+                    });
+
+                var authorCode = await File.ReadAllTextAsync(Path.Combine(dir, AuthorTable + ".cs"));
+                var bookCode = await File.ReadAllTextAsync(Path.Combine(dir, BookTable + ".cs"));
+                var labelCode = await File.ReadAllTextAsync(Path.Combine(dir, LabelTable + ".cs"));
+                var joinCode = await File.ReadAllTextAsync(Path.Combine(dir, BookLabelTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldNoRelationshipsContext.cs"));
+
+                Assert.DoesNotContain("List<ScaffoldLiveBook>", authorCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("List<ScaffoldLiveBook>", labelCode, StringComparison.Ordinal);
+                Assert.Matches(@"public (?:int|long) AuthorId \{ get; set; \}", bookCode);
+                Assert.Matches(@"public (?:int|long) BookId \{ get; set; \}", joinCode);
+                Assert.Matches(@"public (?:int|long) LabelId \{ get; set; \}", joinCode);
+                Assert.DoesNotContain("[ForeignKey(", bookCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("public ScaffoldLiveAuthor", bookCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("List<ScaffoldLiveLabel>", bookCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("HasMany", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("WithOne", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("WithMany", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("UsingTable", contextCode, StringComparison.Ordinal);
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+                Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_preserves_database_names_and_role_navigations_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
