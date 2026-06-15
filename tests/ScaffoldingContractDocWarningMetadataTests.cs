@@ -285,6 +285,7 @@ public partial class ScaffoldingContractDocTests
         var principalKey = Metadata("RelationshipPrincipalKey", "FK_Order_Customer", "FK references crm.Customer.(TenantId, Code); generated principal key is Id");
         Assert.Equal(true, principalKey["navigationSuppressed"]);
         Assert.Equal("principal-key-not-scaffoldable", principalKey["reason"]);
+        Assert.Equal(false, principalKey["generatedNavigationSupported"]);
         Assert.Equal("dbo.Orders", principalKey["dependentTable"]);
         Assert.Equal("crm.Customer", principalKey["principalTable"]);
         Assert.Equal(new[] { "TenantId", "Code" }, (string[])principalKey["principalColumns"]!);
