@@ -49,7 +49,11 @@ public partial class ScaffoldingContractDocTests
         var sqlServerUnsupportedSource = ReadSqlServerUnsupportedFeatureSource();
         var mySqlUnsupportedSource = ReadMySqlUnsupportedFeatureSource();
         var sqliteUnsupportedSource = ReadSqliteUnsupportedFeatureSource();
-        var sqliteDdlParserSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.DeclaredTypes.cs");
+        var sqliteDdlParserSource = string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.DeclaredTypes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.DeclaredTypes.ProviderSpecific.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.DeclaredTypes.Facets.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldSqliteDdlParser.DeclaredTypes.Helpers.cs"));
         var sqliteFkSemanticsTests = ReadRepoFile("tests", "DatabaseScaffolderSqliteFkSemanticsTests.cs");
         var dynamicSource = ReadDynamicEntitySource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
