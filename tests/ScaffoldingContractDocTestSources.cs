@@ -425,6 +425,7 @@ public partial class ScaffoldingContractDocTests
     private static string ReadDatabaseScaffolderSource()
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "DatabaseScaffolder.Execution.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.Files.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldOutputManager.Namespaces.cs"),
