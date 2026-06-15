@@ -290,6 +290,86 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void ScaffoldEntityWriter_WithIncludedIndexColumn_EmitsOnlyIncludedFacetOnIncludedColumn()
+    {
+        var entity = new ScaffoldEntityInfo(
+            "TestNs",
+            "IndexedReport",
+            "IndexedReport",
+            SchemaName: null,
+            TableComment: null,
+            HasIndexes: true,
+            IsReadOnlyEntity: false,
+            UseNullableReferenceTypes: true,
+            Columns: new[]
+            {
+                new ScaffoldEntityColumnInfo(
+                    "Code",
+                    "Code",
+                    typeof(string),
+                    EffectiveAllowNull: false,
+                    IsKey: false,
+                    IsAutoIncrement: false,
+                    IsComputed: false,
+                    IsRowVersion: false,
+                    MaxLength: null,
+                    DecimalPrecision: null,
+                    Comment: null,
+                    Indexes: new[]
+                    {
+                        new ScaffoldEntityIndexInfo(
+                            "IX_IndexedReport_Code",
+                            IsUnique: true,
+                            ColumnCount: 1,
+                            Ordinal: 0,
+                            IsDescending: true,
+                            IsIncluded: false,
+                            NullSortOrder: IndexNullSortOrder.Last,
+                            NullsNotDistinct: true,
+                            FilterSql: "Code IS NOT NULL")
+                    }),
+                new ScaffoldEntityColumnInfo(
+                    "DisplayName",
+                    "DisplayName",
+                    typeof(string),
+                    EffectiveAllowNull: false,
+                    IsKey: false,
+                    IsAutoIncrement: false,
+                    IsComputed: false,
+                    IsRowVersion: false,
+                    MaxLength: null,
+                    DecimalPrecision: null,
+                    Comment: null,
+                    Indexes: new[]
+                    {
+                        new ScaffoldEntityIndexInfo(
+                            "IX_IndexedReport_Code",
+                            IsUnique: true,
+                            ColumnCount: 1,
+                            Ordinal: int.MaxValue,
+                            IsDescending: true,
+                            IsIncluded: true,
+                            NullSortOrder: IndexNullSortOrder.Last,
+                            NullsNotDistinct: true,
+                            FilterSql: "Code IS NOT NULL")
+                    })
+            },
+            References: Array.Empty<ScaffoldEntityReferenceInfo>(),
+            Collections: Array.Empty<ScaffoldEntityCollectionInfo>(),
+            ManyToManyCollections: Array.Empty<ScaffoldEntityManyToManyNavigationInfo>());
+
+        var code = ScaffoldEntityWriter.Write(entity);
+
+        Assert.Contains(
+            "[Index(\"IX_IndexedReport_Code\", IsUnique = true, IsDescending = true, NullSortOrder = IndexNullSortOrder.Last, NullsNotDistinct = true, FilterSql = \"Code IS NOT NULL\")]",
+            code,
+            StringComparison.Ordinal);
+        Assert.Contains("[Index(\"IX_IndexedReport_Code\", IsIncluded = true)]", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsIncluded = true, NullsNotDistinct", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsIncluded = true, FilterSql", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ScaffoldContext_WithExpressionIndexFacets_EmitsExtendedExpressionIndexCall()
     {
         var expressionIndex = new DatabaseScaffolder.ScaffoldExpressionIndexConfiguration(

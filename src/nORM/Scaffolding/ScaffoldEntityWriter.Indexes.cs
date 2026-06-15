@@ -20,13 +20,13 @@ namespace nORM.Scaffolding
                     continue;
 
                 var safeIndexName = EscapeStringLiteral(index.IndexName);
-                var uniqueSuffix = index.IsUnique ? ", IsUnique = true" : string.Empty;
+                var uniqueSuffix = !index.IsIncluded && index.IsUnique ? ", IsUnique = true" : string.Empty;
                 var orderSuffix = index.ColumnCount > 1 && !index.IsIncluded ? $", Order = {index.Ordinal.ToString(CultureInfo.InvariantCulture)}" : string.Empty;
-                var descendingSuffix = index.IsDescending ? ", IsDescending = true" : string.Empty;
+                var descendingSuffix = !index.IsIncluded && index.IsDescending ? ", IsDescending = true" : string.Empty;
                 var includedSuffix = index.IsIncluded ? ", IsIncluded = true" : string.Empty;
-                var nullSortOrderSuffix = index.NullSortOrder == IndexNullSortOrder.Default ? string.Empty : $", NullSortOrder = IndexNullSortOrder.{index.NullSortOrder}";
-                var nullsNotDistinctSuffix = index.NullsNotDistinct ? ", NullsNotDistinct = true" : string.Empty;
-                var filterSuffix = string.IsNullOrWhiteSpace(index.FilterSql) ? string.Empty : $", FilterSql = \"{EscapeStringLiteral(index.FilterSql)}\"";
+                var nullSortOrderSuffix = !index.IsIncluded && index.NullSortOrder != IndexNullSortOrder.Default ? $", NullSortOrder = IndexNullSortOrder.{index.NullSortOrder}" : string.Empty;
+                var nullsNotDistinctSuffix = !index.IsIncluded && index.NullsNotDistinct ? ", NullsNotDistinct = true" : string.Empty;
+                var filterSuffix = !index.IsIncluded && !string.IsNullOrWhiteSpace(index.FilterSql) ? $", FilterSql = \"{EscapeStringLiteral(index.FilterSql)}\"" : string.Empty;
                 sb.AppendLine($"    [Index(\"{safeIndexName}\"{uniqueSuffix}{orderSuffix}{descendingSuffix}{includedSuffix}{nullSortOrderSuffix}{nullsNotDistinctSuffix}{filterSuffix})]");
             }
         }
