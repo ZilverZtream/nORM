@@ -72,6 +72,9 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Collisions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Requests.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Matching.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Casing.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Identifiers.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.QueryArtifacts.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Validation.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldTableFilter.Validation.Selectable.cs"));
