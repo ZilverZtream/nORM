@@ -162,6 +162,10 @@ public sealed partial class LiveProviderScaffoldingParityTests
     private const string KeylessDependentParentTable = "ScaffoldLiveKeylessDependentParent";
     private const string KeylessDependentTable = "ScaffoldLiveKeylessDependent";
     private const string KeylessDependentFkName = "FK_ScaffoldLiveKeylessDependent_Parent";
+    private const string KeylessPrincipalTable = "ScaffoldLiveKeylessPrincipal";
+    private const string KeylessPrincipalChildTable = "ScaffoldLiveKeylessPrincipalChild";
+    private const string KeylessPrincipalFkName = "FK_ScaffoldLiveKeylessPrincipalChild_Principal";
+    private const string KeylessPrincipalUniqueName = "UX_ScaffoldLiveKeylessPrincipal_ExternalId";
     private const string WarningView = "ScaffoldLiveWarningView";
     private const string FeatureOwnedTable = "ScaffoldLiveFeatureOwned";
     private const string FeatureOwnedCheckName = "CK_ScaffoldLiveFeatureOwned_Name";

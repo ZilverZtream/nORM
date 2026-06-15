@@ -131,8 +131,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
             var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures");
             Assert.Contains(providerOwned.EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
-                item.GetProperty("name").GetString() == "sqlite_fk_0" &&
+                item.GetProperty("name").GetString() == "FK_ImportedOrder_ExternalCustomer" &&
                 item.GetProperty("metadata").GetProperty("navigationSuppressed").GetBoolean() &&
+                !item.GetProperty("metadata").GetProperty("generatedNavigationSupported").GetBoolean() &&
                 item.GetProperty("metadata").GetProperty("dependentTable").GetString() == "ImportedOrder" &&
                 item.GetProperty("metadata").GetProperty("dependentColumns").EnumerateArray().Single().GetString() == "CustomerExternalId" &&
                 item.GetProperty("metadata").GetProperty("principalTable").GetString() == "ExternalCustomer" &&

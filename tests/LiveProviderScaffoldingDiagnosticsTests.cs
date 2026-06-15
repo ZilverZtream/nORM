@@ -147,6 +147,86 @@ public sealed partial class LiveProviderScaffoldingParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task ScaffoldAsync_suppresses_keyless_principal_fk_navigation_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            await SetupKeylessPrincipalRelationshipAsync(connection, provider, kind);
+            var dir = Path.Combine(Path.GetTempPath(), "live_scaffold_keyless_principal_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                await DatabaseScaffolder.ScaffoldAsync(
+                    connection,
+                    provider,
+                    dir,
+                    "LiveScaffold",
+                    "LiveScaffoldKeylessPrincipalContext",
+                    new ScaffoldOptions
+                    {
+                        Tables = new[] { KeylessPrincipalTable, KeylessPrincipalChildTable },
+                        OverwriteFiles = false
+                    });
+
+                var principalCode = await File.ReadAllTextAsync(Path.Combine(dir, KeylessPrincipalTable + ".cs"));
+                var childCode = await File.ReadAllTextAsync(Path.Combine(dir, KeylessPrincipalChildTable + ".cs"));
+                var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldKeylessPrincipalContext.cs"));
+                using var warningJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+                var providerOwned = warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray().ToArray();
+
+                Assert.Contains("[ReadOnlyEntity]", principalCode, StringComparison.Ordinal);
+                Assert.Contains($"[Index(\"{KeylessPrincipalUniqueName}\", IsUnique = true)]", principalCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("[ForeignKey(", childCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(KeylessPrincipalTable + " { get; set; }", childCode, StringComparison.Ordinal);
+                Assert.DoesNotContain(KeylessPrincipalChildTable + "s", principalCode, StringComparison.Ordinal);
+                Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
+                Assert.Contains(providerOwned, item =>
+                {
+                    if (!item.TryGetProperty("kind", out var kindValue)
+                        || kindValue.GetString() != "RelationshipPrincipalKey"
+                        || !item.TryGetProperty("metadata", out var metadata))
+                    {
+                        return false;
+                    }
+
+                    return item.TryGetProperty("table", out var table) &&
+                           item.TryGetProperty("name", out var name) &&
+                           item.TryGetProperty("suggestedAction", out var suggestedAction) &&
+                           metadata.TryGetProperty("navigationSuppressed", out var navigationSuppressed) &&
+                           metadata.TryGetProperty("generatedNavigationSupported", out var generatedNavigationSupported) &&
+                           metadata.TryGetProperty("dependentTable", out var dependentTable) &&
+                           metadata.TryGetProperty("dependentColumns", out var dependentColumns) &&
+                           metadata.TryGetProperty("principalTable", out var principalTable) &&
+                           metadata.TryGetProperty("principalColumns", out var principalColumns) &&
+                           LastTableNameEquals(table.GetString(), KeylessPrincipalChildTable) &&
+                           name.GetString() == KeylessPrincipalFkName &&
+                           suggestedAction.GetString()!.Contains("primary key", StringComparison.OrdinalIgnoreCase) &&
+                           navigationSuppressed.GetBoolean() &&
+                           !generatedNavigationSupported.GetBoolean() &&
+                           LastTableNameEquals(dependentTable.GetString(), KeylessPrincipalChildTable) &&
+                           dependentColumns.EnumerateArray().Single().GetString() == "PrincipalExternalId" &&
+                           LastTableNameEquals(principalTable.GetString(), KeylessPrincipalTable) &&
+                           principalColumns.EnumerateArray().Single().GetString() == "ExternalId";
+                });
+                AssertScaffoldOutputBuilds(dir);
+            }
+            finally
+            {
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                await TeardownKeylessPrincipalRelationshipAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task ScaffoldAsync_promotes_check_and_computed_metadata_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);

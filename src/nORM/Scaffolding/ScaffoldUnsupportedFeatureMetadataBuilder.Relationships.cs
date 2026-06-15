@@ -47,6 +47,7 @@ namespace nORM.Scaffolding
         {
             metadata["navigationSuppressed"] = true;
             metadata["reason"] = "principal-key-not-scaffoldable";
+            metadata["generatedNavigationSupported"] = false;
             if (!metadata.ContainsKey("dependentTable"))
                 metadata["dependentTable"] = feature.TableKey;
             if (TryParseRelationshipPrincipalKeyDetail(feature.Detail, out var principalTable, out var principalColumns))

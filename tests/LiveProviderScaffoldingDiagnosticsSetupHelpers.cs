@@ -58,6 +58,26 @@ public sealed partial class LiveProviderScaffoldingParityTests
             $"CONSTRAINT {fkName} FOREIGN KEY ({parentId}) REFERENCES {parent} ({id}))");
     }
 
+    private static async Task SetupKeylessPrincipalRelationshipAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+    {
+        await TeardownKeylessPrincipalRelationshipAsync(connection, provider, kind);
+
+        var principal = provider.Escape(KeylessPrincipalTable);
+        var child = provider.Escape(KeylessPrincipalChildTable);
+        var id = provider.Escape("Id");
+        var externalId = provider.Escape("ExternalId");
+        var principalExternalId = provider.Escape("PrincipalExternalId");
+        var payload = provider.Escape("Payload");
+        var uniqueName = provider.Escape(KeylessPrincipalUniqueName);
+        var fkName = provider.Escape(KeylessPrincipalFkName);
+
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {principal} ({externalId} {TextType(kind, 40)} NOT NULL, {payload} {TextType(kind, 80)} NOT NULL, CONSTRAINT {uniqueName} UNIQUE ({externalId}))");
+        await ExecuteAsync(connection,
+            $"CREATE TABLE {child} ({id} {IntType(kind)} NOT NULL PRIMARY KEY, {principalExternalId} {TextType(kind, 40)} NOT NULL, {payload} {TextType(kind, 80)} NOT NULL, " +
+            $"CONSTRAINT {fkName} FOREIGN KEY ({principalExternalId}) REFERENCES {principal} ({externalId}))");
+    }
+
     private static async Task SetupFeatureOwnedMetadataAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {
         await TeardownFeatureOwnedMetadataAsync(connection, provider, kind);
