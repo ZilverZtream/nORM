@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -30,6 +31,19 @@ public class LiveProviderRecentScvParityTests
         cmd.CommandText = sql;
         await cmd.ExecuteNonQueryAsync();
     }
+
+    private static string UniqueTableName(string prefix)
+        => prefix + "_" + Guid.NewGuid().ToString("N")[..8];
+
+    private static DbContext CreateMappedContext<TEntity>(
+        System.Data.Common.DbConnection connection,
+        DatabaseProvider provider,
+        string tableName)
+        where TEntity : class
+        => new(connection, provider, new DbContextOptions
+        {
+            OnModelCreating = mb => mb.Entity<TEntity>().ToTable(tableName)
+        });
 
     private static string DtoCol(ProviderKind kind) => kind switch
     {
@@ -118,9 +132,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupDtoTableAsync(ctx, kind);
+            var tableName = UniqueTableName(DtoTable);
+            using var ctx = CreateMappedContext<DtoParityRow>(connection, provider, tableName);
+            await SetupDtoTableAsync(ctx, kind, tableName);
             try
             {
                 var literal = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
@@ -145,16 +160,16 @@ public class LiveProviderRecentScvParityTests
                     .ToListAsync();
                 Assert.Equal(new[] { 3, 4, 5, 6 }, notRows.Select(r => r.Id).ToArray());
             }
-            finally { await Teardown(ctx, DtoTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupDtoTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupDtoTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t = ctx.Provider.Escape(DtoTable);
+        var t = ctx.Provider.Escape(tableName);
         var id = EscapeCol(kind, "Id");
         var dto = EscapeCol(kind, "Dto");
-        var ddl = DropTable(kind, DtoTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {dto} {DtoCol(kind)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
@@ -220,9 +235,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupDsubTableAsync(ctx, kind);
+            var tableName = UniqueTableName(DsubTable);
+            using var ctx = CreateMappedContext<DsubParityRow>(connection, provider, tableName);
+            await SetupDsubTableAsync(ctx, kind, tableName);
             try
             {
                 var rows = (await ctx.Query<DsubParityRow>()
@@ -237,17 +253,17 @@ public class LiveProviderRecentScvParityTests
                 Assert.Equal(TimeSpan.FromHours(-1),   rows[2].Diff);  // 12:00:00Z - 13:00:00Z
                 Assert.InRange(rows[3].Diff.TotalMicroseconds, 455.5, 456.5);
             }
-            finally { await Teardown(ctx, DsubTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupDsubTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupDsubTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t = ctx.Provider.Escape(DsubTable);
+        var t = ctx.Provider.Escape(tableName);
         var id = EscapeCol(kind, "Id");
         var a  = EscapeCol(kind, "A");
         var b  = EscapeCol(kind, "B");
-        var ddl = DropTable(kind, DsubTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {a} {DtoCol(kind)} NOT NULL, {b} {DtoCol(kind)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
@@ -307,9 +323,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupDtsTableAsync(ctx, kind);
+            var tableName = UniqueTableName(DtsTable);
+            using var ctx = CreateMappedContext<DtsParityRow>(connection, provider, tableName);
+            await SetupDtsTableAsync(ctx, kind, tableName);
             try
             {
                 var rows = (await ctx.Query<DtsParityRow>()
@@ -325,7 +342,7 @@ public class LiveProviderRecentScvParityTests
                 // Row 3: 14:00:00Z + 00:45:00 → 14:45:00Z
                 Assert.Equal(new DateTime(2026, 5, 25, 14, 45,  0, DateTimeKind.Utc), rows[2].Shifted.UtcDateTime);
             }
-            finally { await Teardown(ctx, DtsTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
@@ -341,9 +358,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupDtsTableAsync(ctx, kind);
+            var tableName = UniqueTableName(DtsTable);
+            using var ctx = CreateMappedContext<DtsParityRow>(connection, provider, tableName);
+            await SetupDtsTableAsync(ctx, kind, tableName);
             try
             {
                 var rows = (await ctx.Query<DtsParityRow>()
@@ -359,17 +377,17 @@ public class LiveProviderRecentScvParityTests
                 // Row 3: 14:00:00Z - 00:45:00 → 13:15:00Z
                 Assert.Equal(new DateTime(2026, 5, 25, 13, 15,  0, DateTimeKind.Utc), rows[2].Shifted.UtcDateTime);
             }
-            finally { await Teardown(ctx, DtsTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupDtsTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupDtsTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t = ctx.Provider.Escape(DtsTable);
+        var t = ctx.Provider.Escape(tableName);
         var id   = EscapeCol(kind, "Id");
         var dto  = EscapeCol(kind, "Dto");
         var span = EscapeCol(kind, "Span");
-        var ddl = DropTable(kind, DtsTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {dto} {DtoCol(kind)} NOT NULL, {span} {TimeSpanCol(kind)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
@@ -426,9 +444,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupLocalDtoTableAsync(ctx, kind);
+            var tableName = UniqueTableName(LocalDtoTable);
+            using var ctx = CreateMappedContext<LocalDtoParityRow>(connection, provider, tableName);
+            await SetupLocalDtoTableAsync(ctx, kind, tableName);
             try
             {
                 var rows = (await ctx.Query<LocalDtoParityRow>()
@@ -444,16 +463,16 @@ public class LiveProviderRecentScvParityTests
                 Assert.InRange(rows[0].Local, expected1.AddSeconds(-1), expected1.AddSeconds(1));
                 Assert.InRange(rows[1].Local, expected2.AddSeconds(-1), expected2.AddSeconds(1));
             }
-            finally { await Teardown(ctx, LocalDtoTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupLocalDtoTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupLocalDtoTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t = ctx.Provider.Escape(LocalDtoTable);
+        var t = ctx.Provider.Escape(tableName);
         var id  = EscapeCol(kind, "Id");
         var dto = EscapeCol(kind, "Dto");
-        var ddl = DropTable(kind, LocalDtoTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {dto} {DtoCol(kind)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
@@ -503,9 +522,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupLocalDtoWhereTableAsync(ctx, kind);
+            var tableName = UniqueTableName(LocalDtoWhereTable);
+            using var ctx = CreateMappedContext<LocalDtoWhereParityRow>(connection, provider, tableName);
+            await SetupLocalDtoWhereTableAsync(ctx, kind, tableName);
             try
             {
                 var localOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
@@ -519,16 +539,16 @@ public class LiveProviderRecentScvParityTests
 
                 Assert.Equal(new[] { 3, 2 }, ids.Select(r => r.Id).ToArray());
             }
-            finally { await Teardown(ctx, LocalDtoWhereTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupLocalDtoWhereTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupLocalDtoWhereTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t = ctx.Provider.Escape(LocalDtoWhereTable);
+        var t = ctx.Provider.Escape(tableName);
         var id  = EscapeCol(kind, "Id");
         var dto = EscapeCol(kind, "Dto");
-        var ddl = DropTable(kind, LocalDtoWhereTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {dto} {DtoCol(kind)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
@@ -582,9 +602,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupEtpTableAsync(ctx, kind);
+            var tableName = UniqueTableName(EtpTable);
+            using var ctx = CreateMappedContext<EtpParityRow>(connection, provider, tableName);
+            await SetupEtpTableAsync(ctx, kind, tableName);
             try
             {
                 // Expression trees can't use `out _`; must name the sink variable.
@@ -603,16 +624,16 @@ public class LiveProviderRecentScvParityTests
                     .ToListAsync();
                 Assert.Equal(new[] { 1, 2, 4, 5 }, ignoreCaseRows.Select(r => r.Id).ToArray());
             }
-            finally { await Teardown(ctx, EtpTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupEtpTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupEtpTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t   = ctx.Provider.Escape(EtpTable);
+        var t   = ctx.Provider.Escape(tableName);
         var id  = EscapeCol(kind, "Id");
         var txt = EscapeCol(kind, "StatusText");
-        var ddl = DropTable(kind, EtpTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {txt} {VarCharCol(kind, 50)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
@@ -650,9 +671,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupCctTableAsync(ctx, kind);
+            var tableName = UniqueTableName(CctTable);
+            using var ctx = CreateMappedContext<CctParityRow>(connection, provider, tableName);
+            await SetupCctTableAsync(ctx, kind, tableName);
             try
             {
                 var intToStr = (await ctx.Query<CctParityRow>()
@@ -681,17 +703,17 @@ public class LiveProviderRecentScvParityTests
                 Assert.True(intToBool[1].B);   // 7  → true
                 Assert.False(intToBool[2].B);  // 0  → false
             }
-            finally { await Teardown(ctx, CctTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupCctTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupCctTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t    = ctx.Provider.Escape(CctTable);
+        var t    = ctx.Provider.Escape(tableName);
         var id   = EscapeCol(kind, "Id");
         var ival = EscapeCol(kind, "IntVal");
         var tval = EscapeCol(kind, "TextVal");
-        var ddl = DropTable(kind, CctTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {ival} INT NOT NULL, {tval} {VarCharCol(kind, 50)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
         await ExecuteAsync(ctx, $"INSERT INTO {t} ({id},{ival},{tval}) VALUES (1,42,'99'),(2,7,'13'),(3,0,'0')");
@@ -721,9 +743,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupAggTableAsync(ctx, kind);
+            var tableName = UniqueTableName(AggTable);
+            using var ctx = CreateMappedContext<AggParityRow>(connection, provider, tableName);
+            await SetupAggTableAsync(ctx, kind, tableName);
             try
             {
                 long total = ctx.Query<AggParityRow>()
@@ -736,7 +759,7 @@ public class LiveProviderRecentScvParityTests
                     .Aggregate((acc, s) => acc + s);
                 Assert.Equal(100L, noSeed);
             }
-            finally { await Teardown(ctx, AggTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
@@ -754,9 +777,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupAggTableAsync(ctx, kind);
+            var tableName = UniqueTableName(AggTable);
+            using var ctx = CreateMappedContext<AggParityRow>(connection, provider, tableName);
+            await SetupAggTableAsync(ctx, kind, tableName);
             try
             {
                 int max = ctx.Query<AggParityRow>()
@@ -774,7 +798,7 @@ public class LiveProviderRecentScvParityTests
                     .Aggregate((acc, x) => x < acc ? x : acc);
                 Assert.Equal(10, min);
             }
-            finally { await Teardown(ctx, AggTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
@@ -792,9 +816,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupAggTableAsync(ctx, kind);
+            var tableName = UniqueTableName(AggTable);
+            using var ctx = CreateMappedContext<AggParityRow>(connection, provider, tableName);
+            await SetupAggTableAsync(ctx, kind, tableName);
             try
             {
                 // Data: (10,20,30,40). Score > 15: rows with 20,30,40 → count = 3.
@@ -807,16 +832,16 @@ public class LiveProviderRecentScvParityTests
                     .Aggregate(0, (acc, x) => acc + (x.Score > 15 ? 2 : 1));
                 Assert.Equal(7, weighted);
             }
-            finally { await Teardown(ctx, AggTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupAggTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupAggTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t  = ctx.Provider.Escape(AggTable);
+        var t  = ctx.Provider.Escape(tableName);
         var id = EscapeCol(kind, "Id");
         var sc = EscapeCol(kind, "Score");
-        var ddl = DropTable(kind, AggTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {sc} INT NOT NULL)";
         await ExecuteAsync(ctx, ddl);
         // (10,20,30,40) → sum=100, max=40, min=10
@@ -846,9 +871,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupCcTableAsync(ctx, kind);
+            var tableName = UniqueTableName(CcTable);
+            using var ctx = CreateMappedContext<CcParityRow>(connection, provider, tableName);
+            await SetupCcTableAsync(ctx, kind, tableName);
             try
             {
                 // ORDER BY Id is preserved inside STRING_AGG / GROUP_CONCAT via the
@@ -860,16 +886,16 @@ public class LiveProviderRecentScvParityTests
 
                 Assert.Equal("alpha|bravo|charlie", joined);
             }
-            finally { await Teardown(ctx, CcTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
-    private static async Task SetupCcTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupCcTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t    = ctx.Provider.Escape(CcTable);
+        var t    = ctx.Provider.Escape(tableName);
         var id   = EscapeCol(kind, "Id");
         var name = EscapeCol(kind, "Name");
-        var ddl = DropTable(kind, CcTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {name} {VarCharCol(kind, 50)} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
         await ExecuteAsync(ctx, $"INSERT INTO {t} ({id},{name}) VALUES (1,'alpha'),(2,'bravo'),(3,'charlie')");
@@ -898,9 +924,10 @@ public class LiveProviderRecentScvParityTests
 
         var (connection, provider) = live!.Value;
         await using (connection)
-        using (var ctx = new DbContext(connection, provider))
         {
-            await SetupTsCmpTableAsync(ctx, kind);
+            var tableName = UniqueTableName(TsCmpTable);
+            using var ctx = CreateMappedContext<TsCmpParityRow>(connection, provider, tableName);
+            await SetupTsCmpTableAsync(ctx, kind, tableName);
             try
             {
                 // Rows 1 (10min < 20min) and, for providers supporting multi-day spans,
@@ -927,7 +954,7 @@ public class LiveProviderRecentScvParityTests
                 Assert.Equal(multiDay ? new[] { 2, 4 } : new[] { 2 }, loGtHi);
                 Assert.Equal(new[] { 5 }, loEqHi);
             }
-            finally { await Teardown(ctx, TsCmpTable); }
+            finally { await Teardown(ctx, tableName); }
         }
     }
 
@@ -940,14 +967,14 @@ public class LiveProviderRecentScvParityTests
         _ => throw new NotSupportedException()
     };
 
-    private static async Task SetupTsCmpTableAsync(DbContext ctx, ProviderKind kind)
+    private static async Task SetupTsCmpTableAsync(DbContext ctx, ProviderKind kind, string tableName)
     {
-        var t  = ctx.Provider.Escape(TsCmpTable);
+        var t  = ctx.Provider.Escape(tableName);
         var id = EscapeCol(kind, "Id");
         var lo = EscapeCol(kind, "Lo");
         var hi = EscapeCol(kind, "Hi");
         var tsType = TimeSpanCol(kind);
-        var ddl = DropTable(kind, TsCmpTable, t) +
+        var ddl = DropTable(kind, tableName, t) +
                   $" CREATE TABLE {t} ({id} {IdCol(kind)} PRIMARY KEY, {lo} {tsType} NOT NULL, {hi} {tsType} NOT NULL)";
         await ExecuteAsync(ctx, ddl);
 
