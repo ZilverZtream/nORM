@@ -88,6 +88,9 @@ public partial class ScaffoldingContractDocTests
         => string.Concat(
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sqlite.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sqlite.Query.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sqlite.Rows.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sqlite.Semantics.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Queries.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Sql.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldForeignKeyDiscovery.Helpers.cs"),
