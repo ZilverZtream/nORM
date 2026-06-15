@@ -33,6 +33,7 @@ public partial class ScaffoldingContractDocTests
         var sqlMetadataParserSource = ReadSqlMetadataParserSource();
         var unsupportedMetadataSource = ReadUnsupportedFeatureMetadataSource();
         var providerTypeClassifierSource = ReadProviderSpecificTypeClassifierSource();
+        var normalizedDoc = NormalizeDocWhitespace(doc);
         Assert.Contains("SQL Server provider-native temporal tables", doc, StringComparison.Ordinal);
         Assert.Contains("views", doc, StringComparison.Ordinal);
         Assert.Contains("virtual tables", doc, StringComparison.Ordinal);
@@ -57,9 +58,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("FilterForeignKeysToScaffoldedTables", source, StringComparison.Ordinal);
         Assert.Contains("rowversion/timestamp", doc, StringComparison.Ordinal);
         Assert.Contains("identity seed/increment", doc, StringComparison.Ordinal);
-        Assert.Contains("SQL Server `PERSISTED`", doc, StringComparison.Ordinal);
-        Assert.Contains("PostgreSQL stored generated", doc, StringComparison.Ordinal);
-        Assert.Contains("MySQL `VIRTUAL GENERATED`/`STORED", doc, StringComparison.Ordinal);
+        Assert.Contains("SQL Server `PERSISTED`", normalizedDoc, StringComparison.Ordinal);
+        Assert.Contains("PostgreSQL stored generated", normalizedDoc, StringComparison.Ordinal);
+        Assert.Contains("MySQL `VIRTUAL GENERATED`/`STORED", normalizedDoc, StringComparison.Ordinal);
         Assert.Contains("unrecognized FK referential actions", doc, StringComparison.Ordinal);
         Assert.Contains("relationships that do not target the generated principal primary key or an", doc, StringComparison.Ordinal);
         Assert.Contains("exact ordered unfiltered unique index", doc, StringComparison.Ordinal);

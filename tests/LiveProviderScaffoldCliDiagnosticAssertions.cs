@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using nORM.Providers;
 using Xunit;
@@ -96,6 +97,42 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         }
 
         Assert.Fail($"Expected relationship dependent-key diagnostic for {tableName}.");
+    }
+
+    private static void AssertRelationshipPrincipalKeyDiagnostic(
+        string warningJsonPath,
+        string dependentTable,
+        string principalTable,
+        string fkName,
+        string dependentColumn,
+        string principalColumn)
+    {
+        Assert.True(File.Exists(warningJsonPath), $"Expected scaffold warning JSON at {warningJsonPath}.");
+        using var warningJson = JsonDocument.Parse(File.ReadAllText(warningJsonPath));
+        foreach (var item in warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray())
+        {
+            if (!item.TryGetProperty("kind", out var kind) ||
+                kind.GetString() != "RelationshipPrincipalKey" ||
+                !item.TryGetProperty("metadata", out var metadata))
+            {
+                continue;
+            }
+
+            if (LastTableNameEquals(item.GetProperty("table").GetString(), dependentTable) &&
+                item.GetProperty("name").GetString() == fkName &&
+                item.GetProperty("suggestedAction").GetString()?.Contains("primary key", StringComparison.OrdinalIgnoreCase) == true &&
+                metadata.GetProperty("navigationSuppressed").GetBoolean() &&
+                !metadata.GetProperty("generatedNavigationSupported").GetBoolean() &&
+                LastTableNameEquals(metadata.GetProperty("dependentTable").GetString(), dependentTable) &&
+                metadata.GetProperty("dependentColumns").EnumerateArray().Single().GetString() == dependentColumn &&
+                LastTableNameEquals(metadata.GetProperty("principalTable").GetString(), principalTable) &&
+                metadata.GetProperty("principalColumns").EnumerateArray().Single().GetString() == principalColumn)
+            {
+                return;
+            }
+        }
+
+        Assert.Fail($"Expected relationship principal-key diagnostic for {dependentTable}.{dependentColumn} -> {principalTable}.{principalColumn}.");
     }
 
     private static void AssertTriggerDiagnostic(string warningJsonPath, string tableName, string triggerName, ProviderKind kind)

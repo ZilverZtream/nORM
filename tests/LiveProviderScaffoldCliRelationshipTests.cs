@@ -243,4 +243,87 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             }
         }
     }
+
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public void Dotnet_norm_scaffold_suppresses_keyless_principal_relationship_on_live_provider(ProviderKind kind)
+    {
+        var root = FindRepositoryRoot();
+        var suffix = IdentifierSuffix();
+        var principalTable = "CliKeylessPrincipal" + suffix;
+        var childTable = "CliKeylessPrincipalChild" + suffix;
+        var uniqueName = "UX_CliKeylessPrincipal_ExternalId_" + suffix;
+        var fkName = "FK_CliKeylessPrincipalChild_Principal_" + suffix;
+        var output = Path.Combine(Path.GetTempPath(), "norm_live_cli_keyless_principal_" + kind + "_" + suffix);
+        string? sqliteFile = null;
+
+        var live = OpenLive(kind, ref sqliteFile);
+        if (live is null)
+            return;
+
+        var (connection, provider, connectionString, cliProvider) = live.Value;
+        try
+        {
+            using (connection)
+            {
+                SetupKeylessPrincipalRelationship(connection, provider, kind, principalTable, childTable, uniqueName, fkName);
+            }
+
+            var scaffold = RunCli(
+                "scaffold " +
+                $"--provider {cliProvider} " +
+                $"--connection {Quote(connectionString)} " +
+                $"--output {Quote(output)} " +
+                "--namespace CliLiveScaffolded " +
+                "--context CliLiveKeylessPrincipalCtx " +
+                $"--table {Quote(principalTable)} " +
+                $"--table {Quote(childTable)}",
+                root);
+
+            Assert.True(scaffold.ExitCode == 0,
+                $"CLI failed with exit code {scaffold.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{scaffold.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{scaffold.Stderr}");
+
+            var principalCode = File.ReadAllText(Path.Combine(output, principalTable + ".cs"));
+            var childCode = File.ReadAllText(Path.Combine(output, childTable + ".cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliLiveKeylessPrincipalCtx.cs"));
+
+            Assert.Contains("[ReadOnlyEntity]", principalCode, StringComparison.Ordinal);
+            Assert.Contains($"[Index(\"{uniqueName}\", IsUnique = true)]", principalCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("[ForeignKey(", childCode, StringComparison.Ordinal);
+            Assert.DoesNotContain($"public {principalTable}", childCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(childTable + "s", principalCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("HasForeignKey", contextCode, StringComparison.Ordinal);
+            AssertRelationshipPrincipalKeyDiagnostic(
+                Path.Combine(output, "nORM.ScaffoldWarnings.json"),
+                childTable,
+                principalTable,
+                fkName,
+                "PrincipalExternalId",
+                "ExternalId");
+
+            WriteConsumerProject(root, output);
+            RunDotNet("build -c Release --nologo", output);
+        }
+        finally
+        {
+            try
+            {
+                using var cleanup = Reopen(kind, connectionString);
+                CleanupKeylessPrincipalRelationship(cleanup, provider, principalTable, childTable);
+            }
+            catch
+            {
+                // Best-effort cleanup; failed cleanup should not hide the original assertion.
+            }
+
+            TryDeleteDirectory(output);
+            if (sqliteFile is not null)
+            {
+                try { File.Delete(sqliteFile); } catch { }
+            }
+        }
+    }
 }
