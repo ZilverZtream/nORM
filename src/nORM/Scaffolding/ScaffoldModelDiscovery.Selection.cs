@@ -17,16 +17,17 @@ namespace nORM.Scaffolding
         {
             var filterCatalog = GetScaffoldFilterCatalog(connection, provider);
             var discoveredTables = await ScaffoldSchemaDiscoveryAdapter.GetTablesAsync(connection, provider).ConfigureAwait(false);
-            var discoveredSkippedObjects = await ScaffoldSchemaDiscoveryAdapter.GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
+            var discoveredSkippedObjects = await ScaffoldSkippedObjectDiscovery.GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
             var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
                 discoveredTables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray(),
-                ScaffoldSchemaDiscoveryAdapter.ConvertSkippedObjectInfos(discoveredSkippedObjects),
+                discoveredSkippedObjects,
                 options,
                 provider,
                 filterCatalog);
+            var skippedObjects = await ScaffoldSkippedObjectDiscovery.AttachCommentsAsync(connection, provider, selection.SkippedObjects).ConfigureAwait(false);
             return (
                 selection.Tables.Select(ScaffoldSchemaDiscoveryAdapter.ToScaffoldTable).ToArray(),
-                selection.SkippedObjects.Select(ScaffoldSchemaDiscoveryAdapter.ToScaffoldSkippedObject).ToArray(),
+                skippedObjects.Select(ScaffoldSchemaDiscoveryAdapter.ToScaffoldSkippedObject).ToArray(),
                 selection.QueryArtifactTableKeys);
         }
 

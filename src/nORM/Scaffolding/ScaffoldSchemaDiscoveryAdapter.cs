@@ -22,6 +22,7 @@ namespace nORM.Scaffolding
             DatabaseProvider provider)
         {
             var discoveredObjects = await ScaffoldSkippedObjectDiscovery.GetSkippedObjectsAsync(connection, provider).ConfigureAwait(false);
+            discoveredObjects = await ScaffoldSkippedObjectDiscovery.AttachCommentsAsync(connection, provider, discoveredObjects).ConfigureAwait(false);
             if (discoveredObjects.Count == 0)
                 return Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>();
 

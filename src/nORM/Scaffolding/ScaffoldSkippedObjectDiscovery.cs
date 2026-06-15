@@ -31,6 +31,12 @@ namespace nORM.Scaffolding
             return Array.Empty<ScaffoldSkippedObjectInfo>();
         }
 
+        public static Task<IReadOnlyList<ScaffoldSkippedObjectInfo>> AttachCommentsAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldSkippedObjectInfo> objects)
+            => ScaffoldSkippedObjectQuery.AttachSkippedObjectCommentsAsync(connection, provider, objects);
+
         public static Task<IReadOnlyList<string>> GetSqliteSchemasAsync(DbConnection connection)
             => ScaffoldSqliteSkippedObjectDiscovery.GetSqliteSchemasAsync(connection);
 
