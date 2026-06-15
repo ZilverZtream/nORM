@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace nORM.Scaffolding
@@ -109,6 +110,22 @@ namespace nORM.Scaffolding
 
             result.Add(sql[start..]);
             return result;
+        }
+
+        private static IReadOnlyList<string> SplitCreateTableBodyParts(string? createTableSql)
+        {
+            if (string.IsNullOrWhiteSpace(createTableSql))
+                return Array.Empty<string>();
+
+            var bodyOpen = createTableSql.IndexOf('(');
+            if (bodyOpen < 0)
+                return Array.Empty<string>();
+
+            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
+            if (bodyClose <= bodyOpen)
+                return Array.Empty<string>();
+
+            return SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1));
         }
     }
 }

@@ -10,18 +10,8 @@ namespace nORM.Scaffolding
             string? createTableSql)
         {
             var result = new Dictionary<string, (string Sql, bool Stored)>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(createTableSql))
-                return result;
 
-            var bodyOpen = createTableSql.IndexOf('(');
-            if (bodyOpen < 0)
-                return result;
-
-            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
-            if (bodyClose <= bodyOpen)
-                return result;
-
-            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
+            foreach (var part in SplitCreateTableBodyParts(createTableSql))
             {
                 var trimmed = part.Trim();
                 if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))

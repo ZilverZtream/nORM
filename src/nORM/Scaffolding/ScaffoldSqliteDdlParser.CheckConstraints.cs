@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Collections.Generic;
 
 namespace nORM.Scaffolding
@@ -10,20 +9,9 @@ namespace nORM.Scaffolding
             string tableName,
             string? createTableSql)
         {
-            if (string.IsNullOrWhiteSpace(createTableSql))
-                return Array.Empty<(string Name, string Sql)>();
-
-            var bodyOpen = createTableSql.IndexOf('(');
-            if (bodyOpen < 0)
-                return Array.Empty<(string Name, string Sql)>();
-
-            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
-            if (bodyClose <= bodyOpen)
-                return Array.Empty<(string Name, string Sql)>();
-
             var result = new List<(string Name, string Sql)>();
             var ordinal = 0;
-            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
+            foreach (var part in SplitCreateTableBodyParts(createTableSql))
             {
                 var trimmed = part.Trim();
                 if (trimmed.Length == 0)

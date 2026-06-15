@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 
 namespace nORM.Scaffolding
 {
@@ -7,18 +6,7 @@ namespace nORM.Scaffolding
     {
         public static string? ExtractPrimaryKeyConstraintName(string? createTableSql)
         {
-            if (string.IsNullOrWhiteSpace(createTableSql))
-                return null;
-
-            var bodyOpen = createTableSql.IndexOf('(');
-            if (bodyOpen < 0)
-                return null;
-
-            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
-            if (bodyClose <= bodyOpen)
-                return null;
-
-            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
+            foreach (var part in SplitCreateTableBodyParts(createTableSql))
             {
                 var trimmed = part.Trim();
                 if (trimmed.Length == 0
