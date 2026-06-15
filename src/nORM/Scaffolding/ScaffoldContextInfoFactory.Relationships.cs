@@ -6,7 +6,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldContextInfoFactory
     {
         private static ScaffoldContextRelationshipInfo[] ConvertContextRelationshipInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> relationships)
+            IReadOnlyList<ScaffoldRelationship> relationships)
         {
             var converted = new ScaffoldContextRelationshipInfo[relationships.Count];
             for (var i = 0; i < relationships.Count; i++)
@@ -30,7 +30,7 @@ namespace nORM.Scaffolding
         }
 
         private static ScaffoldManyToManyJoinInfo[] ConvertManyToManyJoinInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> joins)
+            IReadOnlyList<ScaffoldManyToManyJoin> joins)
         {
             var converted = new ScaffoldManyToManyJoinInfo[joins.Count];
             for (var i = 0; i < joins.Count; i++)

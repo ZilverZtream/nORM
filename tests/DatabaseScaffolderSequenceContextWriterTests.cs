@@ -89,13 +89,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             sequenceStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "billing",
                     "OrderNo",
                     "Sequence",
                     "SQL Server sequence; dataType=bigint",
                     null),
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "audit",
                     "OrderNo",
                     "Sequence",

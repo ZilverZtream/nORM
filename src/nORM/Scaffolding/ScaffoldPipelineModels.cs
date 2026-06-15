@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace nORM.Scaffolding
 {
     internal sealed record ScaffoldFeatureConfigurations(
-        IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> GeneratedModelFeatureDiagnostics,
+        IReadOnlyList<ScaffoldUnsupportedFeature> GeneratedModelFeatureDiagnostics,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ProviderSpecificColumnTypesByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultValuesByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DefaultConstraintNamesByTable,

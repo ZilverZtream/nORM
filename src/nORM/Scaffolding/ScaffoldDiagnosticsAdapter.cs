@@ -6,7 +6,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldDiagnosticsAdapter
     {
         public static IReadOnlyDictionary<string, object?> BuildUnsupportedFeatureMetadata(
-            DatabaseScaffolder.ScaffoldUnsupportedFeature feature)
+            ScaffoldUnsupportedFeature feature)
             => ScaffoldUnsupportedFeatureMetadataBuilder.BuildMetadata(
                 new ScaffoldUnsupportedFeatureInfo(feature.TableKey, feature.Kind, feature.Name, feature.Detail)
                 {
@@ -17,7 +17,7 @@ namespace nORM.Scaffolding
             => ScaffoldUnsupportedFeatureMetadataBuilder.TryParseMetadataBoolean(value, out parsed);
 
         public static IReadOnlyList<ScaffoldUnsupportedFeatureInfo> ConvertUnsupportedFeatureInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+            IReadOnlyList<ScaffoldUnsupportedFeature> features)
         {
             var converted = new ScaffoldUnsupportedFeatureInfo[features.Count];
             for (var i = 0; i < features.Count; i++)

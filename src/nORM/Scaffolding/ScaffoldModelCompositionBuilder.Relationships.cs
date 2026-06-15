@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelCompositionBuilder
     {
-        private static IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> BuildManyToManyJoins(
+        private static IReadOnlyList<ScaffoldManyToManyJoin> BuildManyToManyJoins(
             ScaffoldModelDiscoveryResult discovery,
             ScaffoldFeatureConfigurations featureConfigurations)
             => ScaffoldRelationshipAdapter.BuildManyToManyJoins(
@@ -24,12 +24,12 @@ namespace nORM.Scaffolding
                 discovery.MemberNamesByTable);
 
         private static IReadOnlySet<string> BuildManyToManyJoinTableKeys(
-            IEnumerable<DatabaseScaffolder.ScaffoldManyToManyJoin> manyToManyJoins)
+            IEnumerable<ScaffoldManyToManyJoin> manyToManyJoins)
             => manyToManyJoins
                 .Select(static join => join.JoinTableKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        private static IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> BuildNonJoinRelationships(
+        private static IReadOnlyList<ScaffoldRelationship> BuildNonJoinRelationships(
             ScaffoldModelDiscoveryResult discovery,
             IReadOnlySet<string> manyToManyJoinTableKeys)
             => ScaffoldRelationshipAdapter.BuildRelationships(

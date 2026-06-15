@@ -4,10 +4,10 @@ using System.Collections.Generic;
 namespace nORM.Scaffolding
 {
     internal sealed record ScaffoldModelComposition(
-        IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> ManyToManyJoins,
+        IReadOnlyList<ScaffoldManyToManyJoin> ManyToManyJoins,
         IReadOnlySet<string> ManyToManyJoinTableKeys,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> Relationships,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldPrimaryKey> CompositePrimaryKeys,
+        IReadOnlyList<ScaffoldRelationship> Relationships,
+        IReadOnlyList<ScaffoldPrimaryKey> CompositePrimaryKeys,
         IReadOnlyList<ScaffoldDefaultValueConfiguration> DefaultValueConfigurations,
         IReadOnlyList<ScaffoldCheckConstraintConfiguration> CheckConstraints,
         IReadOnlyList<ScaffoldComputedColumnConfiguration> ComputedColumnConfigurations,

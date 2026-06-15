@@ -6,12 +6,12 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldFeatureConfigurationAdapter
     {
         public static IReadOnlyDictionary<string, IReadOnlySet<string>> BuildFeatureNameMap(
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
+            IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
             => ScaffoldFeatureConfigurationBuilder.BuildFeatureNameMap(ConvertFeatureInputs(features), kinds);
 
         public static HashSet<string> BuildProviderNativeTemporalTableKeys(
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+            IEnumerable<ScaffoldUnsupportedFeature> features)
             => ScaffoldFeatureConfigurationBuilder.BuildProviderNativeTemporalTableKeys(ConvertFeatureInputs(features));
 
         public static HashSet<string> BuildProviderOwnedWriteBlockedTableKeys(
@@ -28,12 +28,12 @@ namespace nORM.Scaffolding
                 providerSpecificColumnTypesByTable);
 
         public static HashSet<string> BuildFeatureTableKeys(
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
+            IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
             => ScaffoldFeatureConfigurationBuilder.BuildFeatureTableKeys(ConvertFeatureInputs(features), kinds);
 
         public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> BuildFeatureDetailMap(
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
+            IEnumerable<ScaffoldUnsupportedFeature> features,
             params string[] kinds)
             => ScaffoldFeatureConfigurationBuilder.BuildFeatureDetailMap(ConvertFeatureInputs(features), kinds);
     }

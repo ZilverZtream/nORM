@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace nORM.Scaffolding
 {
     internal sealed record ScaffoldModelDiscoveryResult(
-        IReadOnlyList<DatabaseScaffolder.ScaffoldTable> Tables,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> SkippedObjects,
+        IReadOnlyList<ScaffoldTable> Tables,
+        IReadOnlyList<ScaffoldSkippedObject> SkippedObjects,
         IReadOnlySet<string> QueryArtifactTableKeys,
         IReadOnlyDictionary<string, string> EntityByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ColumnPropertiesByTable,
@@ -19,8 +19,8 @@ namespace nORM.Scaffolding
         IReadOnlyDictionary<string, ScaffoldComments> CommentsByTable,
         IReadOnlyDictionary<string, IReadOnlySet<string>> IdentityColumnsByTable,
         IReadOnlySet<string> ScaffoldedTableKeys,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> Indexes,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> ForeignKeys,
-        List<DatabaseScaffolder.ScaffoldUnsupportedFeature> UnsupportedFeatures,
+        IReadOnlyList<ScaffoldIndex> Indexes,
+        IReadOnlyList<ScaffoldForeignKey> ForeignKeys,
+        List<ScaffoldUnsupportedFeature> UnsupportedFeatures,
         ScaffoldFeatureConfigurations FeatureConfigurations);
 }

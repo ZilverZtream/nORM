@@ -122,13 +122,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
     {
         var tables = new[]
         {
-            new DatabaseScaffolder.ScaffoldTable("Author", null),
-            new DatabaseScaffolder.ScaffoldTable("Book", null),
-            new DatabaseScaffolder.ScaffoldTable("AuthorBook", null)
+            new ScaffoldTable("Author", null),
+            new ScaffoldTable("Book", null),
+            new ScaffoldTable("AuthorBook", null)
         };
         var foreignKeys = new[]
         {
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 null,
                 "AuthorBook",
                 "AuthorId",
@@ -140,7 +140,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 "PROVIDER CASCADE",
                 "NO ACTION",
                 false),
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 null,
                 "AuthorBook",
                 "BookId",
@@ -178,7 +178,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         };
         var emptySets = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
         var emptyTableKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var indexes = Array.Empty<DatabaseScaffolder.ScaffoldIndex>();
+        var indexes = Array.Empty<ScaffoldIndex>();
         var nonNullableColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Author"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase),
@@ -452,13 +452,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
     {
         var tables = new[]
         {
-            new DatabaseScaffolder.ScaffoldTable("Author", null),
-            new DatabaseScaffolder.ScaffoldTable("Book", null),
-            new DatabaseScaffolder.ScaffoldTable("AuthorBook", null)
+            new ScaffoldTable("Author", null),
+            new ScaffoldTable("Book", null),
+            new ScaffoldTable("AuthorBook", null)
         };
         var foreignKeys = new[]
         {
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 null,
                 "AuthorBook",
                 "AuthorId",
@@ -467,7 +467,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                 "Id",
                 "FK_AuthorBook_Author",
                 1),
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 null,
                 "AuthorBook",
                 "BookId",
@@ -519,7 +519,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
         var indexes = includeUniqueForeignKeyIndex
             ? new[]
             {
-                new DatabaseScaffolder.ScaffoldIndex(
+                new ScaffoldIndex(
                     "AuthorBook",
                     "AuthorId",
                     "UX_AuthorBook_AuthorId_BookId",
@@ -531,7 +531,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     IndexNullSortOrder.Default,
                     false,
                     null),
-                new DatabaseScaffolder.ScaffoldIndex(
+                new ScaffoldIndex(
                     "AuthorBook",
                     "BookId",
                     "UX_AuthorBook_AuthorId_BookId",
@@ -544,7 +544,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
                     false,
                     null)
             }
-            : Array.Empty<DatabaseScaffolder.ScaffoldIndex>();
+            : Array.Empty<ScaffoldIndex>();
 
         return new SyntheticBridgeShape(
             tables,
@@ -561,14 +561,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     private sealed record SyntheticBridgeShape(
-        IReadOnlyList<DatabaseScaffolder.ScaffoldTable> Tables,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> ForeignKeys,
+        IReadOnlyList<ScaffoldTable> Tables,
+        IReadOnlyList<ScaffoldForeignKey> ForeignKeys,
         IReadOnlyDictionary<string, string> EntityByTable,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ColumnProperties,
         IReadOnlyDictionary<string, IReadOnlyList<string>> PrimaryKeys,
         IReadOnlyDictionary<string, IReadOnlySet<string>> DatabaseGeneratedColumns,
         IReadOnlyDictionary<string, IReadOnlySet<string>> IdentityColumns,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> Indexes,
+        IReadOnlyList<ScaffoldIndex> Indexes,
         IReadOnlyDictionary<string, IReadOnlySet<string>> NonNullableColumns,
         IReadOnlySet<string> ProviderOwnedWriteBlockedTableKeys,
         Dictionary<string, HashSet<string>> MemberNames);

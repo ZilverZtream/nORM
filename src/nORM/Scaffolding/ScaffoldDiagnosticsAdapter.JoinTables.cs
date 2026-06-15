@@ -6,9 +6,9 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldDiagnosticsAdapter
     {
         public static ScaffoldCompositeForeignKeyDiagnosticInfo[] BuildCompositeForeignKeyDiagnostics(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
             => ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyDiagnostics(
                 ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(foreignKeys),
@@ -17,13 +17,13 @@ namespace nORM.Scaffolding
                 nonNullableColumnsByTable);
 
         public static ScaffoldPossibleJoinTableDiagnosticInfo[] BuildPossibleJoinTableDiagnostics(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             IReadOnlySet<string>? emittedManyToManyJoinTableKeys = null)
             => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableDiagnostics(
@@ -39,13 +39,13 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyDictionary<string, object?> BuildPossibleJoinTableMetadata(
             string tableKey,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys)
             => ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableMetadata(
                 tableKey,
@@ -59,9 +59,9 @@ namespace nORM.Scaffolding
                 providerOwnedWriteBlockedTableKeys);
 
         public static IReadOnlyDictionary<string, object?> BuildCompositeForeignKeyMetadata(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> rows,
+            IReadOnlyList<ScaffoldForeignKey> rows,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable)
             => ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyMetadata(
                 ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(rows),
@@ -71,13 +71,13 @@ namespace nORM.Scaffolding
 
         public static string[] BuildPossibleJoinTableReasons(
             string tableKey,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys)
             => ScaffoldJoinTableReasonBuilder.BuildPossibleJoinTableReasons(
                 tableKey,

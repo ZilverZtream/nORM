@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldContextInfoFactory
     {
         private static ScaffoldContextPrimaryKeyInfo[] ConvertContextPrimaryKeyInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldPrimaryKey> primaryKeys)
+            IReadOnlyList<ScaffoldPrimaryKey> primaryKeys)
             => primaryKeys
                 .Select(key => new ScaffoldContextPrimaryKeyInfo(key.EntityName, key.PropertyNames, key.ConstraintName))
                 .ToArray();

@@ -30,7 +30,7 @@ namespace nORM.Scaffolding
 
         private static async Task<EntityFileResult?> BuildEntityFileAsync(
             ScaffoldEntityFileSetRequest request,
-            DatabaseScaffolder.ScaffoldTable table)
+            ScaffoldTable table)
         {
             var tableName = table.Name;
             var schemaName = table.Schema;

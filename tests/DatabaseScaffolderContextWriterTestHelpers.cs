@@ -37,7 +37,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "Author", "Book" },
             relationships: new[]
             {
-                new DatabaseScaffolder.ScaffoldRelationship(
+                new ScaffoldRelationship(
                     "Book",
                     "Author",
                     "Book",
@@ -60,7 +60,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             compositePrimaryKeys: new[]
             {
-                new DatabaseScaffolder.ScaffoldPrimaryKey(
+                new ScaffoldPrimaryKey(
                     "User",
                     new[] { "Id" },
                     "PK_User_Custom")
@@ -76,7 +76,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Array.Empty<string>(),
             routineStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "dbo",
                     "GetRevenue",
                     "Routine",
@@ -94,7 +94,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             routineStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     schema,
                     name,
                     "Routine",
@@ -110,7 +110,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             sequenceStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     schema,
                     name,
                     "Sequence",
@@ -126,7 +126,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Array.Empty<string>(),
             sequenceStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "dbo",
                     "OrderNo",
                     "Sequence",
@@ -195,16 +195,16 @@ public partial class DatabaseScaffolderPrivateMethodTests
         string namespaceName,
         string contextName,
         IEnumerable<string> entities,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship>? relationships = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin>? manyToManyJoins = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject>? routineStubs = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldPrimaryKey>? compositePrimaryKeys = null,
+        IReadOnlyList<ScaffoldRelationship>? relationships = null,
+        IReadOnlyList<ScaffoldManyToManyJoin>? manyToManyJoins = null,
+        IReadOnlyList<ScaffoldSkippedObject>? routineStubs = null,
+        IReadOnlyList<ScaffoldPrimaryKey>? compositePrimaryKeys = null,
         IReadOnlyList<ScaffoldDefaultValueConfiguration>? defaultValueConfigurations = null,
         IReadOnlyList<ScaffoldCheckConstraintConfiguration>? checkConstraintConfigurations = null,
         IReadOnlyList<ScaffoldComputedColumnConfiguration>? computedColumnConfigurations = null,
         IReadOnlyList<ScaffoldExpressionIndexConfiguration>? expressionIndexConfigurations = null,
         IReadOnlyList<ScaffoldCollationConfiguration>? collationConfigurations = null,
-        IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject>? sequenceStubs = null,
+        IReadOnlyList<ScaffoldSkippedObject>? sequenceStubs = null,
         IReadOnlyList<ScaffoldIdentityOptionConfiguration>? identityOptionConfigurations = null,
         IReadOnlyList<ScaffoldPrecisionConfiguration>? precisionConfigurations = null,
         IReadOnlyList<ScaffoldColumnFacetConfiguration>? columnFacetConfigurations = null,
@@ -216,8 +216,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
             namespaceName,
             contextName,
             entities,
-            relationships ?? Array.Empty<DatabaseScaffolder.ScaffoldRelationship>(),
-            manyToManyJoins ?? Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>(),
+            relationships ?? Array.Empty<ScaffoldRelationship>(),
+            manyToManyJoins ?? Array.Empty<ScaffoldManyToManyJoin>(),
             routineStubs,
             compositePrimaryKeys,
             defaultValueConfigurations,

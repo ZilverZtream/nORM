@@ -13,7 +13,7 @@ namespace nORM.Scaffolding
         public static async Task<ScaffoldModelMetadataDiscoveryResult> DiscoverAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
+            IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyList<ScaffoldTableInfo> tableInfos,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlySet<string> queryArtifactTableKeys,

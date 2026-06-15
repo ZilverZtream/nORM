@@ -6,7 +6,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldRelationshipAdapter
     {
         public static IReadOnlyList<ScaffoldForeignKeyInfo> ConvertForeignKeyInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys)
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys)
         {
             var converted = new ScaffoldForeignKeyInfo[foreignKeys.Count];
             for (var i = 0; i < foreignKeys.Count; i++)
@@ -30,7 +30,7 @@ namespace nORM.Scaffolding
         }
 
         public static IReadOnlyList<ScaffoldIndexInfo> ConvertIndexInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes)
+            IReadOnlyList<ScaffoldIndex> indexes)
         {
             var converted = new ScaffoldIndexInfo[indexes.Count];
             for (var i = 0; i < indexes.Count; i++)
@@ -54,14 +54,14 @@ namespace nORM.Scaffolding
             return converted;
         }
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> ConvertManyToManyJoins(
+        public static IReadOnlyList<ScaffoldManyToManyJoin> ConvertManyToManyJoins(
             IReadOnlyList<ScaffoldManyToManyJoinInfo> joins)
         {
-            var converted = new DatabaseScaffolder.ScaffoldManyToManyJoin[joins.Count];
+            var converted = new ScaffoldManyToManyJoin[joins.Count];
             for (var i = 0; i < joins.Count; i++)
             {
                 var join = joins[i];
-                converted[i] = new DatabaseScaffolder.ScaffoldManyToManyJoin(
+                converted[i] = new ScaffoldManyToManyJoin(
                     join.JoinTableKey,
                     join.LeftTableKey,
                     join.RightTableKey,
@@ -85,14 +85,14 @@ namespace nORM.Scaffolding
             return converted;
         }
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> ConvertRelationships(
+        public static IReadOnlyList<ScaffoldRelationship> ConvertRelationships(
             IReadOnlyList<ScaffoldRelationshipInfo> relationships)
         {
-            var converted = new DatabaseScaffolder.ScaffoldRelationship[relationships.Count];
+            var converted = new ScaffoldRelationship[relationships.Count];
             for (var i = 0; i < relationships.Count; i++)
             {
                 var relationship = relationships[i];
-                converted[i] = new DatabaseScaffolder.ScaffoldRelationship(
+                converted[i] = new ScaffoldRelationship(
                     relationship.DependentTableKey,
                     relationship.PrincipalTableKey,
                     relationship.DependentEntityName,

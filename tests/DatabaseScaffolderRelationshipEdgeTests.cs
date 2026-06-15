@@ -251,7 +251,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     {
         var foreignKeys = new[]
         {
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 null,
                 "Child",
                 "ParentId",
@@ -293,7 +293,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             ["Parent"] = new HashSet<string>(new[] { "Id" }, StringComparer.OrdinalIgnoreCase)
         };
         var memberNames = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        var indexes = Array.Empty<DatabaseScaffolder.ScaffoldIndex>();
+        var indexes = Array.Empty<ScaffoldIndex>();
         var relationships = ScaffoldRelationshipAdapter.BuildRelationships(
             foreignKeys,
             entityByTable,

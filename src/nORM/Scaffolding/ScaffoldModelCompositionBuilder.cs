@@ -10,11 +10,11 @@ namespace nORM.Scaffolding
         {
             var featureConfigurations = discovery.FeatureConfigurations;
             var manyToManyJoins = noRelationships
-                ? Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>()
+                ? Array.Empty<ScaffoldManyToManyJoin>()
                 : BuildManyToManyJoins(discovery, featureConfigurations);
             var manyToManyJoinTableKeys = BuildManyToManyJoinTableKeys(manyToManyJoins);
             var relationships = noRelationships
-                ? Array.Empty<DatabaseScaffolder.ScaffoldRelationship>()
+                ? Array.Empty<ScaffoldRelationship>()
                 : BuildNonJoinRelationships(discovery, manyToManyJoinTableKeys);
             var compositePrimaryKeys = ScaffoldRelationshipAdapter.BuildPrimaryKeyConfigurations(
                 discovery.EntityByTable,

@@ -6,7 +6,7 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldFeatureConfigurationAdapter
     {
-        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IReadOnlyList<ScaffoldUnsupportedFeature> features)
         {
             var converted = new ScaffoldFeatureInput[features.Count];
             for (var i = 0; i < features.Count; i++)
@@ -17,14 +17,14 @@ namespace nORM.Scaffolding
             return converted;
         }
 
-        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+        private static IReadOnlyList<ScaffoldFeatureInput> ConvertFeatureInputs(IEnumerable<ScaffoldUnsupportedFeature> features)
         {
-            var featureList = features as IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> ?? features.ToArray();
+            var featureList = features as IReadOnlyList<ScaffoldUnsupportedFeature> ?? features.ToArray();
             return ConvertFeatureInputs(featureList);
         }
 
         private static ScaffoldUnsupportedFeatureInfo ConvertUnsupportedFeatureInputInfo(
-            DatabaseScaffolder.ScaffoldUnsupportedFeature feature)
+            ScaffoldUnsupportedFeature feature)
             => new(feature.TableKey, feature.Kind, feature.Name, feature.Detail)
             {
                 Metadata = feature.Metadata
@@ -32,7 +32,7 @@ namespace nORM.Scaffolding
 
         private static ScaffoldFeatureConfigurations ConvertFeatureConfigurations(
             ScaffoldFeatureConfigurationsInfo configurations,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
+            IReadOnlyList<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
             => new(
                 generatedModelFeatureDiagnostics,
                 configurations.ProviderSpecificColumnTypesByTable,

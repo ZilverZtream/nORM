@@ -8,8 +8,8 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldUnsupportedDiagnosticAdapter
     {
         public static void AddMissingPrimaryKeyDiagnostics(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable)
         {
@@ -22,7 +22,7 @@ namespace nORM.Scaffolding
                 columnPropertiesByTable.TryGetValue(tableKey, out var properties);
                 var columnNames = properties?.Keys.ToArray() ?? Array.Empty<string>();
                 var propertyNames = properties?.Values.ToArray() ?? Array.Empty<string>();
-                features.Add(new DatabaseScaffolder.ScaffoldUnsupportedFeature(
+                features.Add(new ScaffoldUnsupportedFeature(
                     tableKey,
                     "MissingPrimaryKey",
                     table.Name,

@@ -6,15 +6,15 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldRelationshipAdapter
     {
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> BuildManyToManyJoins(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
+        public static IReadOnlyList<ScaffoldManyToManyJoin> BuildManyToManyJoins(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> identityColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlySet<string>> databaseGeneratedColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
             Dictionary<string, HashSet<string>> memberNamesByTable)
@@ -35,7 +35,7 @@ namespace nORM.Scaffolding
         }
 
         public static IReadOnlyList<ScaffoldManyToManyNavigation> BuildManyToManyNavigations(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> joins,
+            IReadOnlyList<ScaffoldManyToManyJoin> joins,
             string tableKey)
         {
             var navigations = new List<ScaffoldManyToManyNavigation>();
@@ -59,12 +59,12 @@ namespace nORM.Scaffolding
             return navigations;
         }
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship> BuildRelationships(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+        public static IReadOnlyList<ScaffoldRelationship> BuildRelationships(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             Dictionary<string, HashSet<string>> memberNamesByTable)
             => ConvertRelationships(ScaffoldRelationshipDiscovery.BuildRelationships(

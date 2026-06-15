@@ -92,13 +92,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             routineStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "billing",
                     "SyncLedger",
                     "Routine",
                     "SQL Server stored procedure; parameters=0",
                     null),
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "audit",
                     "SyncLedger",
                     "Routine",
@@ -137,13 +137,13 @@ public partial class DatabaseScaffolderPrivateMethodTests
             new[] { "User" },
             routineStubs: new[]
             {
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "public",
                     "CalculateScore",
                     "Routine",
                     "PostgreSQL function; parameters=1; parameterModes=value:IN:integer; callShape=scalar-function; dataType=integer",
                     null),
-                new DatabaseScaffolder.ScaffoldSkippedObject(
+                new ScaffoldSkippedObject(
                     "public",
                     "CalculateScore",
                     "Routine",

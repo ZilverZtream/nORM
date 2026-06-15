@@ -10,7 +10,7 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelDiscovery
     {
-        private static async Task<(IReadOnlyList<DatabaseScaffolder.ScaffoldTable> Tables, IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> SkippedObjects, IReadOnlySet<string> QueryArtifactTableKeys)> BuildScaffoldObjectSelectionAsync(
+        private static async Task<(IReadOnlyList<ScaffoldTable> Tables, IReadOnlyList<ScaffoldSkippedObject> SkippedObjects, IReadOnlySet<string> QueryArtifactTableKeys)> BuildScaffoldObjectSelectionAsync(
             DbConnection connection,
             DatabaseProvider provider,
             ScaffoldOptions options)
@@ -31,7 +31,7 @@ namespace nORM.Scaffolding
                 selection.QueryArtifactTableKeys);
         }
 
-        private static ScaffoldTableInfo[] BuildTableInfos(IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables)
+        private static ScaffoldTableInfo[] BuildTableInfos(IReadOnlyList<ScaffoldTable> tables)
             => tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
 
         private static string? GetScaffoldFilterCatalog(DbConnection connection, DatabaseProvider provider)

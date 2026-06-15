@@ -6,15 +6,15 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelMetadataDiscovery
     {
-        private static IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> FilterIndexesToScaffoldedTables(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
+        private static IReadOnlyList<ScaffoldIndex> FilterIndexesToScaffoldedTables(
+            IReadOnlyList<ScaffoldIndex> indexes,
             IReadOnlySet<string> scaffoldedTableKeys)
             => indexes
                 .Where(index => scaffoldedTableKeys.Contains(index.TableKey))
                 .ToArray();
 
-        private static IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> FilterForeignKeysToScaffoldedTables(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+        private static IReadOnlyList<ScaffoldForeignKey> FilterForeignKeysToScaffoldedTables(
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlySet<string> scaffoldedTableKeys)
             => foreignKeys
                 .Where(fk => scaffoldedTableKeys.Contains(TableKey(fk.DependentSchema, fk.DependentTable))

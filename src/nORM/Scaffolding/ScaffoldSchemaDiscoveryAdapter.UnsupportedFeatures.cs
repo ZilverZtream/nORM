@@ -10,10 +10,10 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldSchemaDiscoveryAdapter
     {
-        public static async Task<IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature>> GetUnsupportedSchemaFeaturesAsync(
+        public static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables)
+            IReadOnlyList<ScaffoldTable> tables)
         {
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -29,17 +29,17 @@ namespace nORM.Scaffolding
             if (ScaffoldProviderKind.IsMySql(provider))
                 return await GetMySqlUnsupportedSchemaFeaturesAsync(connection, provider, tables, tableKeys).ConfigureAwait(false);
 
-            return Array.Empty<DatabaseScaffolder.ScaffoldUnsupportedFeature>();
+            return Array.Empty<ScaffoldUnsupportedFeature>();
         }
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> ConvertUnsupportedFeatures(
+        public static IReadOnlyList<ScaffoldUnsupportedFeature> ConvertUnsupportedFeatures(
             IReadOnlyList<ScaffoldUnsupportedFeatureInfo> features)
         {
-            var converted = new DatabaseScaffolder.ScaffoldUnsupportedFeature[features.Count];
+            var converted = new ScaffoldUnsupportedFeature[features.Count];
             for (var i = 0; i < features.Count; i++)
             {
                 var feature = features[i];
-                converted[i] = new DatabaseScaffolder.ScaffoldUnsupportedFeature(
+                converted[i] = new ScaffoldUnsupportedFeature(
                     feature.TableKey,
                     feature.Kind,
                     feature.Name,
@@ -52,30 +52,30 @@ namespace nORM.Scaffolding
             return converted;
         }
 
-        public static async Task<IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature>> GetPostgresEnumColumnFeaturesAsync(
+        public static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetPostgresEnumColumnFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables)
+            IReadOnlyList<ScaffoldTable> tables)
         {
             if (!ScaffoldProviderKind.IsPostgres(provider))
-                return Array.Empty<DatabaseScaffolder.ScaffoldUnsupportedFeature>();
+                return Array.Empty<ScaffoldUnsupportedFeature>();
 
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var features = await ScaffoldPostgresUnsupportedFeatureDiscovery.GetEnumColumnFeaturesAsync(connection, tableKeys).ConfigureAwait(false);
             return ConvertUnsupportedFeatures(features);
         }
 
-        private static async Task<IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature>> GetSqliteUnsupportedSchemaFeaturesAsync(
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetSqliteUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
+            IReadOnlyList<ScaffoldTable> tables,
             HashSet<string> tableKeys)
         {
             var features = await ScaffoldSqliteUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, provider, ToScaffoldTableInfos(tables), tableKeys).ConfigureAwait(false);
             return ConvertUnsupportedFeatures(features);
         }
 
-        private static async Task<IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature>> GetSqlServerUnsupportedSchemaFeaturesAsync(
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetSqlServerUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             HashSet<string> tableKeys)
         {
@@ -83,7 +83,7 @@ namespace nORM.Scaffolding
             return ConvertUnsupportedFeatures(features);
         }
 
-        private static async Task<IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature>> GetPostgresUnsupportedSchemaFeaturesAsync(
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetPostgresUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             HashSet<string> tableKeys)
         {
@@ -91,10 +91,10 @@ namespace nORM.Scaffolding
             return ConvertUnsupportedFeatures(features);
         }
 
-        private static async Task<IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature>> GetMySqlUnsupportedSchemaFeaturesAsync(
+        private static async Task<IReadOnlyList<ScaffoldUnsupportedFeature>> GetMySqlUnsupportedSchemaFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
+            IReadOnlyList<ScaffoldTable> tables,
             HashSet<string> tableKeys)
         {
             var features = await ScaffoldMySqlUnsupportedFeatureDiscovery.GetFeaturesAsync(connection, provider, ToScaffoldTableInfos(tables), tableKeys).ConfigureAwait(false);

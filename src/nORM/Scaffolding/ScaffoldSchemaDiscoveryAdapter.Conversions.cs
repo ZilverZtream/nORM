@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldSchemaDiscoveryAdapter
     {
         public static IReadOnlyList<ScaffoldSkippedObjectInfo> ConvertSkippedObjectInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> objects)
+            IReadOnlyList<ScaffoldSkippedObject> objects)
         {
             var converted = new ScaffoldSkippedObjectInfo[objects.Count];
             for (var i = 0; i < objects.Count; i++)
@@ -22,29 +22,29 @@ namespace nORM.Scaffolding
             return converted;
         }
 
-        public static ScaffoldTableInfo[] ToScaffoldTableInfos(IEnumerable<DatabaseScaffolder.ScaffoldTable> tables)
+        public static ScaffoldTableInfo[] ToScaffoldTableInfos(IEnumerable<ScaffoldTable> tables)
             => tables.Select(static table => new ScaffoldTableInfo(table.Name, table.Schema)).ToArray();
 
-        public static DatabaseScaffolder.ScaffoldTable ToScaffoldTable(ScaffoldTableInfo table)
+        public static ScaffoldTable ToScaffoldTable(ScaffoldTableInfo table)
             => new(table.Name, table.Schema);
 
         public static ScaffoldSkippedObjectInfo[] ToSkippedObjectInfos(
-            IEnumerable<DatabaseScaffolder.ScaffoldSkippedObject> objects)
+            IEnumerable<ScaffoldSkippedObject> objects)
             => objects.Select(ToSkippedObjectInfo).ToArray();
 
-        public static ScaffoldSkippedObjectInfo ToSkippedObjectInfo(DatabaseScaffolder.ScaffoldSkippedObject obj)
+        public static ScaffoldSkippedObjectInfo ToSkippedObjectInfo(ScaffoldSkippedObject obj)
             => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
 
-        public static DatabaseScaffolder.ScaffoldSkippedObject ToScaffoldSkippedObject(ScaffoldSkippedObjectInfo obj)
+        public static ScaffoldSkippedObject ToScaffoldSkippedObject(ScaffoldSkippedObjectInfo obj)
             => new(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment);
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> ConvertIndexes(IReadOnlyList<ScaffoldIndexInfo> indexes)
+        public static IReadOnlyList<ScaffoldIndex> ConvertIndexes(IReadOnlyList<ScaffoldIndexInfo> indexes)
         {
-            var converted = new DatabaseScaffolder.ScaffoldIndex[indexes.Count];
+            var converted = new ScaffoldIndex[indexes.Count];
             for (var i = 0; i < indexes.Count; i++)
             {
                 var index = indexes[i];
-                converted[i] = new DatabaseScaffolder.ScaffoldIndex(
+                converted[i] = new ScaffoldIndex(
                     index.TableKey,
                     index.ColumnName,
                     index.IndexName,
@@ -62,13 +62,13 @@ namespace nORM.Scaffolding
             return converted;
         }
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> ConvertForeignKeys(IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys)
+        public static IReadOnlyList<ScaffoldForeignKey> ConvertForeignKeys(IReadOnlyList<ScaffoldForeignKeyInfo> foreignKeys)
         {
-            var converted = new DatabaseScaffolder.ScaffoldForeignKey[foreignKeys.Count];
+            var converted = new ScaffoldForeignKey[foreignKeys.Count];
             for (var i = 0; i < foreignKeys.Count; i++)
             {
                 var foreignKey = foreignKeys[i];
-                converted[i] = new DatabaseScaffolder.ScaffoldForeignKey(
+                converted[i] = new ScaffoldForeignKey(
                     foreignKey.DependentSchema,
                     foreignKey.DependentTable,
                     foreignKey.DependentColumn,
@@ -86,7 +86,7 @@ namespace nORM.Scaffolding
         }
 
         public static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(
-            DatabaseScaffolder.ScaffoldSkippedObject obj)
+            ScaffoldSkippedObject obj)
             => ScaffoldSkippedObjectMetadataBuilder.BuildMetadata(
                 new ScaffoldSkippedObjectInfo(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment));
     }

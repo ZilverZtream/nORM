@@ -46,7 +46,7 @@ namespace nORM.Scaffolding
             return (Path.Combine(request.ContextOutputDirectory, request.SafeContextName + ".cs"), ctxCode);
         }
 
-        private static DatabaseScaffolder.ScaffoldSkippedObject[] SelectSkippedObjectStubs(
+        private static ScaffoldSkippedObject[] SelectSkippedObjectStubs(
             ScaffoldModelDiscoveryResult discovery,
             bool emit,
             string kind)
@@ -54,6 +54,6 @@ namespace nORM.Scaffolding
                 ? discovery.SkippedObjects
                     .Where(obj => string.Equals(obj.Kind, kind, StringComparison.OrdinalIgnoreCase))
                     .ToArray()
-                : Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>();
+                : Array.Empty<ScaffoldSkippedObject>();
     }
 }

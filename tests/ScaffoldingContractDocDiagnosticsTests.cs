@@ -121,10 +121,10 @@ public partial class ScaffoldingContractDocTests
     [Fact]
     public void Referential_action_diagnostic_metadata_includes_relationship_shape()
     {
-        var features = new List<DatabaseScaffolder.ScaffoldUnsupportedFeature>();
+        var features = new List<ScaffoldUnsupportedFeature>();
         var foreignKeys = new[]
         {
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 "sales",
                 "OrderLine",
                 "TenantId",
@@ -136,7 +136,7 @@ public partial class ScaffoldingContractDocTests
                 "PROVIDER CASCADE",
                 "NO ACTION",
                 false),
-            new DatabaseScaffolder.ScaffoldForeignKey(
+            new ScaffoldForeignKey(
                 "sales",
                 "OrderLine",
                 "OrderId",

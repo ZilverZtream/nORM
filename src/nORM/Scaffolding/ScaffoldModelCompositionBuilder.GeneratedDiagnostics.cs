@@ -7,8 +7,8 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldModelCompositionBuilder
     {
         public static void RestoreGeneratedManyToManyUnsupportedFeatures(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> unsupportedFeatures,
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics,
+            List<ScaffoldUnsupportedFeature> unsupportedFeatures,
+            IEnumerable<ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics,
             IReadOnlySet<string> manyToManyJoinTableKeys)
         {
             foreach (var feature in generatedModelFeatureDiagnostics)

@@ -450,7 +450,7 @@ public partial class ScaffoldingContractDocTests
     {
         var features = new[]
         {
-            new DatabaseScaffolder.ScaffoldUnsupportedFeature(
+            new ScaffoldUnsupportedFeature(
                 "dbo.Orders",
                 "PrecisionScale",
                 "Amount",
@@ -458,11 +458,11 @@ public partial class ScaffoldingContractDocTests
         };
         var json = ScaffoldDiagnosticsAdapter.ScaffoldDiagnosticsJson(
             new ScaffoldDiagnosticsRequest(
-                Array.Empty<DatabaseScaffolder.ScaffoldForeignKey>(),
+                Array.Empty<ScaffoldForeignKey>(),
                 features,
-                Array.Empty<DatabaseScaffolder.ScaffoldSkippedObject>(),
+                Array.Empty<ScaffoldSkippedObject>(),
                 new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
-                Array.Empty<DatabaseScaffolder.ScaffoldIndex>(),
+                Array.Empty<ScaffoldIndex>(),
                 new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase),
                 new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),
                 new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase),

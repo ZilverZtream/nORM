@@ -8,8 +8,8 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldUnsupportedDiagnosticAdapter
     {
         public static void RemoveSupportedDescendingIndexDiagnostics(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes)
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldIndex> indexes)
         {
             var supportedDescending = indexes
                 .Where(static index => index.IsDescending)
@@ -22,8 +22,8 @@ namespace nORM.Scaffolding
         }
 
         public static void RemoveSupportedIncludedColumnIndexDiagnostics(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes)
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldIndex> indexes)
         {
             var supportedIncluded = indexes
                 .Where(static index => index.IsIncluded)
@@ -36,8 +36,8 @@ namespace nORM.Scaffolding
         }
 
         public static void RemoveSupportedPartialIndexDiagnostics(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes)
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldIndex> indexes)
         {
             var supportedPartial = indexes
                 .Where(static index => !string.IsNullOrWhiteSpace(index.FilterSql))

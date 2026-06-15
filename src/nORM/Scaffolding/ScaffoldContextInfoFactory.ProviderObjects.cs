@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldContextInfoFactory
     {
         private static ScaffoldRoutineStubInfo[] ConvertRoutineStubInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> routineStubs)
+            IReadOnlyList<ScaffoldSkippedObject> routineStubs)
         {
             var converted = new ScaffoldRoutineStubInfo[routineStubs.Count];
             for (var i = 0; i < routineStubs.Count; i++)
@@ -26,13 +26,13 @@ namespace nORM.Scaffolding
         }
 
         private static ScaffoldContextSequenceInfo[] ConvertContextSequenceInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldSkippedObject> sequenceStubs)
+            IReadOnlyList<ScaffoldSkippedObject> sequenceStubs)
             => sequenceStubs
                 .Select(sequence => new ScaffoldContextSequenceInfo(sequence.Schema, sequence.Name, sequence.Detail, sequence.Comment))
                 .ToArray();
 
         private static IReadOnlyDictionary<string, object?> BuildSkippedObjectMetadata(
-            DatabaseScaffolder.ScaffoldSkippedObject obj)
+            ScaffoldSkippedObject obj)
             => ScaffoldSkippedObjectMetadataBuilder.BuildMetadata(
                 new ScaffoldSkippedObjectInfo(obj.Schema, obj.Name, obj.Kind, obj.Detail, obj.Comment));
     }

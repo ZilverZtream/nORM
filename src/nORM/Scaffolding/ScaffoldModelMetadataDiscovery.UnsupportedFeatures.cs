@@ -9,14 +9,14 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelMetadataDiscovery
     {
-        private static async Task<List<DatabaseScaffolder.ScaffoldUnsupportedFeature>> BuildUnsupportedFeaturesAsync(
+        private static async Task<List<ScaffoldUnsupportedFeature>> BuildUnsupportedFeaturesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables,
+            IReadOnlyList<ScaffoldTable> tables,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            IReadOnlyList<ScaffoldIndex> indexes,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             bool noRelationships)
         {
             var unsupportedFeatures = (await ScaffoldSchemaDiscoveryAdapter.GetUnsupportedSchemaFeaturesAsync(connection, provider, tables).ConfigureAwait(false)).ToList();
@@ -35,10 +35,10 @@ namespace nORM.Scaffolding
         }
 
         private static void AddRelationshipPrincipalKeyDiagnostics(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> indexes)
+            IReadOnlyList<ScaffoldIndex> indexes)
             => features.AddRange(ScaffoldSchemaDiscoveryAdapter.ConvertUnsupportedFeatures(
                 ScaffoldRelationshipDiagnosticBuilder.BuildPrincipalKeyDiagnostics(
                     ScaffoldRelationshipAdapter.ConvertForeignKeyInfos(foreignKeys),
@@ -46,8 +46,8 @@ namespace nORM.Scaffolding
                     ScaffoldRelationshipAdapter.ConvertIndexInfos(indexes))));
 
         private static void AddRelationshipDependentKeyDiagnostics(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> features,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> foreignKeys,
+            List<ScaffoldUnsupportedFeature> features,
+            IReadOnlyList<ScaffoldForeignKey> foreignKeys,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable)
             => features.AddRange(ScaffoldSchemaDiscoveryAdapter.ConvertUnsupportedFeatures(
                 ScaffoldRelationshipDiagnosticBuilder.BuildDependentKeyDiagnostics(

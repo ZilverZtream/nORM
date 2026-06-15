@@ -8,8 +8,8 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldEntityFileAdapter
     {
         public static ScaffoldEntityIndexSourceInfo[] ConvertEntityIndexInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldIndex>? indexes)
-            => (indexes ?? Array.Empty<DatabaseScaffolder.ScaffoldIndex>())
+            IReadOnlyList<ScaffoldIndex>? indexes)
+            => (indexes ?? Array.Empty<ScaffoldIndex>())
                 .Select(index => new ScaffoldEntityIndexSourceInfo(
                     index.ColumnName,
                     index.IndexName,
@@ -24,8 +24,8 @@ namespace nORM.Scaffolding
                 .ToArray();
 
         public static ScaffoldEntityReferenceInfo[] ConvertEntityReferenceInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship>? references)
-            => (references ?? Array.Empty<DatabaseScaffolder.ScaffoldRelationship>())
+            IReadOnlyList<ScaffoldRelationship>? references)
+            => (references ?? Array.Empty<ScaffoldRelationship>())
                 .Select(reference => new ScaffoldEntityReferenceInfo(
                     reference.PrincipalEntityName,
                     reference.ReferenceNavigationName,
@@ -35,8 +35,8 @@ namespace nORM.Scaffolding
                 .ToArray();
 
         public static ScaffoldEntityCollectionInfo[] ConvertEntityCollectionInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship>? collections)
-            => (collections ?? Array.Empty<DatabaseScaffolder.ScaffoldRelationship>())
+            IReadOnlyList<ScaffoldRelationship>? collections)
+            => (collections ?? Array.Empty<ScaffoldRelationship>())
                 .Select(collection => new ScaffoldEntityCollectionInfo(
                     collection.DependentEntityName,
                     collection.CollectionNavigationName,

@@ -7,7 +7,7 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldFeatureConfigurationAdapter
     {
         public static ScaffoldFeatureConfigurations BuildFeatureConfigurations(
-            List<DatabaseScaffolder.ScaffoldUnsupportedFeature> unsupportedFeatures,
+            List<ScaffoldUnsupportedFeature> unsupportedFeatures,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, ScaffoldColumnFacet>> stringBinaryFacetsByTable)

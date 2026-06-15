@@ -389,8 +389,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
             "TestNs",
             "ProviderIndexCtx",
             new[] { "IndexedProviderSpecific" },
-            Array.Empty<DatabaseScaffolder.ScaffoldRelationship>(),
-            Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>(),
+            Array.Empty<ScaffoldRelationship>(),
+            Array.Empty<ScaffoldManyToManyJoin>(),
             expressionIndexConfigurations: new[] { expressionIndex });
 
         Assert.Contains(

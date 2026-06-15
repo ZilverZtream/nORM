@@ -228,8 +228,8 @@ public class DatabaseScaffolderCoverageTests
             namespaceName,
             contextName,
             entities,
-            Array.Empty<DatabaseScaffolder.ScaffoldRelationship>(),
-            Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>());
+            Array.Empty<ScaffoldRelationship>(),
+            Array.Empty<ScaffoldManyToManyJoin>());
 
     [Fact]
     public void ScaffoldContext_GeneratesClassWithQueryProperties()

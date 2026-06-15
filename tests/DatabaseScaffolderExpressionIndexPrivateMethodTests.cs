@@ -113,7 +113,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     {
         var result = Assert.Single(BuildExpressionIndexes(
             EntityMap("main.Documents"),
-            new DatabaseScaffolder.ScaffoldUnsupportedFeature(
+            new ScaffoldUnsupportedFeature(
                 "main.Documents",
                 "ExpressionIndex",
                 "IX_Documents_LowerName_Filtered",
@@ -172,7 +172,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
     {
         var result = Assert.Single(BuildExpressionIndexes(
             EntityMap("public.Documents(Archive)", "DocumentArchive"),
-            new DatabaseScaffolder.ScaffoldUnsupportedFeature(
+            new ScaffoldUnsupportedFeature(
                 "public.Documents(Archive)",
                 "ExpressionIndex",
                 "IX_Documents_Archive_LowerName",
@@ -190,14 +190,14 @@ public partial class DatabaseScaffolderPrivateMethodTests
             [tableKey] = entityName
         };
 
-    private static DatabaseScaffolder.ScaffoldUnsupportedFeature ExpressionFeature(string name, string detail)
+    private static ScaffoldUnsupportedFeature ExpressionFeature(string name, string detail)
         => Feature("ExpressionIndex", name, detail);
 
-    private static DatabaseScaffolder.ScaffoldUnsupportedFeature Feature(string kind, string name, string detail)
+    private static ScaffoldUnsupportedFeature Feature(string kind, string name, string detail)
         => new("public.Documents", kind, name, detail);
 
     private static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexes(
         IReadOnlyDictionary<string, string> entityByTable,
-        params DatabaseScaffolder.ScaffoldUnsupportedFeature[] features)
+        params ScaffoldUnsupportedFeature[] features)
         => ScaffoldFeatureConfigurationAdapter.BuildExpressionIndexConfigurations(entityByTable, features);
 }

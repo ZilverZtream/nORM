@@ -7,14 +7,14 @@ namespace nORM.Scaffolding
     {
         public static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildCheckConstraintConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+            IEnumerable<ScaffoldUnsupportedFeature> features)
             => ConvertCheckConstraintConfigurations(ScaffoldFeatureConfigurationBuilder.BuildCheckConstraintConfigurations(
                 entityByTable,
                 ConvertFeatureInputs(features)));
 
         public static bool CheckConstraintConfigurationMatchesFeature(
             ScaffoldCheckConstraintConfiguration check,
-            DatabaseScaffolder.ScaffoldUnsupportedFeature feature)
+            ScaffoldUnsupportedFeature feature)
             => ScaffoldFeatureConfigurationBuilder.CheckConstraintConfigurationMatchesFeature(
                 ConvertCheckConstraintConfiguration(check),
                 ConvertUnsupportedFeatureInputInfo(feature));
@@ -22,7 +22,7 @@ namespace nORM.Scaffolding
         public static IReadOnlyList<ScaffoldCheckConstraintConfiguration> BuildEnumCheckConstraintConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+            IEnumerable<ScaffoldUnsupportedFeature> features)
             => ConvertCheckConstraintConfigurations(ScaffoldFeatureConfigurationBuilder.BuildEnumCheckConstraintConfigurations(
                 entityByTable,
                 columnPropertiesByTable,
@@ -30,7 +30,7 @@ namespace nORM.Scaffolding
 
         public static IReadOnlyList<ScaffoldExpressionIndexConfiguration> BuildExpressionIndexConfigurations(
             IReadOnlyDictionary<string, string> entityByTable,
-            IEnumerable<DatabaseScaffolder.ScaffoldUnsupportedFeature> features)
+            IEnumerable<ScaffoldUnsupportedFeature> features)
             => ConvertExpressionIndexConfigurations(ScaffoldFeatureConfigurationBuilder.BuildExpressionIndexConfigurations(
                 entityByTable,
                 ConvertFeatureInputs(features)));

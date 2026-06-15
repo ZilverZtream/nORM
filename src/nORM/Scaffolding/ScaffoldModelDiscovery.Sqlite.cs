@@ -13,7 +13,7 @@ namespace nORM.Scaffolding
         public static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> GetSqliteDeclaredColumnTypesAsync(
             DbConnection connection,
             DatabaseProvider provider,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldTable> tables)
+            IReadOnlyList<ScaffoldTable> tables)
         {
             var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var table in tables)
