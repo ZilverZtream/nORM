@@ -213,7 +213,7 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedDiagnosticAdapter.Keys.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldUnsupportedDiagnosticAdapter.ReferentialActions.cs"));
         var codeSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Codes.cs");
-        var actionSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.cs");
+        var actionSource = ReadSuggestedActionSource();
 
         var emittedKinds = Regex.Matches(
                 source,
@@ -245,7 +245,7 @@ public partial class ScaffoldingContractDocTests
     {
         var source = ReadSkippedObjectDiscoverySource();
         var codeSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Codes.cs");
-        var actionSource = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.cs");
+        var actionSource = ReadSuggestedActionSource();
         var emittedKinds = source
             .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
             .SelectMany(line => new[]

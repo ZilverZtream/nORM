@@ -331,10 +331,18 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Categories.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Codes.cs"),
-            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.cs"),
+            ReadSuggestedActionSource(),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Markdown.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Json.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.Json.Items.cs"));
+
+    private static string ReadSuggestedActionSource()
+        => string.Concat(
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.Indexes.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.Objects.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.Relationships.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldDiagnosticsWriter.SuggestedActions.Scalar.cs"));
 
     private static string ReadEntityWriterSource()
         => string.Concat(
