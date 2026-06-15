@@ -107,7 +107,8 @@ can also select matching provider routines or sequences without generating every
 discovered provider object.
 Ambiguous explicit filters that match more than one selectable table, query artifact,
 routine, or sequence fail closed; use schema-qualified filters for cross-schema
-matches and object-kind selectors for same-schema object-kind collisions.
+matches, object-kind selectors for same-schema object-kind collisions, and
+literal-name selectors for filtered literal dotted-name collisions.
 By default, nORM's scaffold pluralizer singularizes plural database object
 names for entity classes and emits collection-style generated `IQueryable<T>`
 context property names, with deterministic cleanup for descriptor-like entity

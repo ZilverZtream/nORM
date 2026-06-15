@@ -398,6 +398,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("cannot expand the explicit", cliReadme, StringComparison.Ordinal);
         Assert.Contains("opposite config default", cliReadme, StringComparison.Ordinal);
         Assert.Contains("matching supported query artifacts", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("literal-name selectors for filtered literal dotted-name collisions", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--json` or config `json` emits a machine-readable", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--verbose`/`-v`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--no-pluralize`", cliReadme, StringComparison.Ordinal);
@@ -465,6 +466,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("cannot expand the explicit", rootReadme, StringComparison.Ordinal);
         Assert.Contains("opposite config default", rootReadme, StringComparison.Ordinal);
         Assert.Contains("matching supported query artifacts", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("literal-name selectors for filtered literal dotted-name collisions", rootReadme, StringComparison.Ordinal);
         Assert.Contains("Unfiltered ordinary views", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`--json` emits a machine-readable", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`--verbose`/`-v`", rootReadme, StringComparison.Ordinal);

@@ -435,8 +435,12 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("same-schema object-kind collisions", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void BuildSelection_WithLiteralNameSelector_SelectsLiteralDottedTable()
+    [Theory]
+    [InlineData(ProviderKind.Sqlite)]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public void BuildSelection_WithLiteralNameSelector_SelectsLiteralDottedTableOnProvider(ProviderKind providerKind)
     {
         var tables = new[]
         {
@@ -448,14 +452,24 @@ public partial class DatabaseScaffolderPrivateMethodTests
             tables,
             Array.Empty<ScaffoldSkippedObjectInfo>(),
             new ScaffoldOptions { Tables = new[] { "name:aux.orders" } },
-            new SqliteProvider(),
-            null);
+            CreateScaffoldFilterProvider(providerKind),
+            providerKind == ProviderKind.MySql ? "current_catalog" : null);
 
         var table = Assert.Single(selection.Tables);
         Assert.Equal("aux.orders", table.Name);
         Assert.Null(table.Schema);
         Assert.Empty(selection.SkippedObjects);
     }
+
+    private static DatabaseProvider CreateScaffoldFilterProvider(ProviderKind providerKind)
+        => providerKind switch
+        {
+            ProviderKind.Sqlite => new SqliteProvider(),
+            ProviderKind.SqlServer => new SqlServerProvider(new SqliteParameterFactory()),
+            ProviderKind.Postgres => new PostgresProvider(new SqliteParameterFactory()),
+            ProviderKind.MySql => new MySqlProvider(new SqliteParameterFactory()),
+            _ => throw new ArgumentOutOfRangeException(nameof(providerKind), providerKind, null)
+        };
 
     [Fact]
     public async Task ScaffoldAsync_WithMissingTableFilter_ThrowsNormConfigurationException()

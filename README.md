@@ -416,7 +416,9 @@ remain C#-style names derived from FK roles.
 When routine or sequence stubs are enabled, table filters can select matching provider routines or sequences
 without generating every discovered provider object.
 Ambiguous explicit filters that match more than one selectable table, query artifact,
-routine, or sequence fail closed; use schema-qualified filters for cross-schema matches.
+routine, or sequence fail closed; use schema-qualified filters for cross-schema
+matches, object-kind selectors for same-schema object-kind collisions, and
+literal-name selectors for filtered literal dotted-name collisions.
 The CLI accepts EF's `--no-onconfiguring` switch as a no-op because nORM never
 emits generated `OnConfiguring` connection-string code.
 It also accepts EF-style aliases including `--output-dir`/`-o`, `-n`, `-c`,
