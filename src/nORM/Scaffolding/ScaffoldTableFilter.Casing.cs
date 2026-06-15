@@ -20,6 +20,13 @@ namespace nORM.Scaffolding
 
             var filterRequest = ParseObjectFilterRequest(request);
             var requestedName = filterRequest.Identifier;
+            if (filterRequest.LiteralNameOnly)
+            {
+                return string.Equals(requestedName, table.Name, StringComparison.OrdinalIgnoreCase)
+                    ? new ScaffoldTableInfo(requestedName, table.Schema, table.Kind)
+                    : table;
+            }
+
             var requestedSchema = GetSchemaNameOrNull(requestedName);
             if (!string.IsNullOrWhiteSpace(requestedSchema)
                 && string.Equals(requestedSchema, table.Schema, StringComparison.OrdinalIgnoreCase))

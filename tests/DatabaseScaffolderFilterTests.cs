@@ -341,6 +341,47 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithLiteralDottedNameSelector_SelectsLiteralTable()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            ATTACH DATABASE ':memory:' AS aux;
+            CREATE TABLE "aux.orders" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            CREATE TABLE "aux"."orders" (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "DottedSelectorCtx",
+                new ScaffoldOptions { Tables = new[] { "table:name:aux.orders" } });
+
+            var generatedCode = string.Join(
+                Environment.NewLine,
+                Directory.GetFiles(dir, "*.cs")
+                    .OrderBy(Path.GetFileName, StringComparer.Ordinal)
+                    .Select(File.ReadAllText));
+
+            Assert.Contains("[Table(\"aux.orders\")]", generatedCode);
+            Assert.DoesNotContain("[Table(\"orders\", Schema = \"aux\")]", generatedCode);
+            Assert.DoesNotContain("Schema = \"aux\"", generatedCode);
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithSelectedTableKeyCollision_ThrowsBeforeGeneratingAmbiguousModel()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -392,6 +433,28 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Table dbo.Report", ex.Message, StringComparison.Ordinal);
         Assert.Contains("View dbo.Report", ex.Message, StringComparison.Ordinal);
         Assert.Contains("same-schema object-kind collisions", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildSelection_WithLiteralNameSelector_SelectsLiteralDottedTable()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("aux.orders", null),
+            new ScaffoldTableInfo("orders", "aux")
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            tables,
+            Array.Empty<ScaffoldSkippedObjectInfo>(),
+            new ScaffoldOptions { Tables = new[] { "name:aux.orders" } },
+            new SqliteProvider(),
+            null);
+
+        var table = Assert.Single(selection.Tables);
+        Assert.Equal("aux.orders", table.Name);
+        Assert.Null(table.Schema);
+        Assert.Empty(selection.SkippedObjects);
     }
 
     [Fact]

@@ -85,10 +85,11 @@ object-kind selector, but generated model metadata remains unqualified because
 MySQL catalogs are not emitted as nORM schemas. Use repeatable `--table` for
 literal table names that contain commas and must not be split; EF-style
 multi-value `--table First Second`
-tokens are also accepted. Literal dotted table names are supported, but if a literal dotted
-table name collides with the same text as a schema-qualified table, scaffolding
-fails with an actionable error because the v1 filter syntax cannot disambiguate
-those objects safely.
+tokens are also accepted. Literal-name selectors such as `name:aux.orders` and
+`table:name:aux.orders` select literal dotted object names when the same text
+could otherwise be interpreted as a schema-qualified filter. Unfiltered runs
+that include a literal dotted table name with the same display string as a
+schema-qualified table still fail deterministically.
 Blank CLI table/schema filters are rejected so an empty option cannot broaden
 the run to every table.
 `--schemas`, repeatable `--schema`, and EF-style multi-value

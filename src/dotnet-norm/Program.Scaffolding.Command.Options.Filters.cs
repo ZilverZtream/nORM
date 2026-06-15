@@ -6,7 +6,7 @@ partial class Program
         => new(
             new Option<string?>("--schemas") { Description = "Optional comma-separated schema filter. All discovered tables and supported query artifacts in matching schemas are included." },
             new Option<string[]>("--schema") { Description = "Optional repeatable schema filter. May be specified multiple times." },
-            new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table or schema.table names; literal dotted names that collide with schema-qualified names are rejected." },
+            new Option<string?>("--tables") { Description = "Optional comma-separated table filter. Entries may be table, schema.table, or selector-prefixed names such as table:Foo and name:literal.dotted." },
             new Option<string[]>("--table", "-t") { Description = "Optional repeatable table filter for names that should not be comma-split. May be specified multiple times." });
 
     private static void AddScaffoldFilterCommandSymbols(Command scaffold, ScaffoldCommandSymbols symbols)

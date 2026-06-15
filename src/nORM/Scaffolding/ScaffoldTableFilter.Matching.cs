@@ -16,18 +16,14 @@ namespace nORM.Scaffolding
         {
             var filter = ParseObjectFilterRequest(requested);
             return MatchesSkippedObjectKindSelector(filter.KindSelector, obj)
-                   && (MatchesSkippedObjectFilter(obj, filter.Identifier)
-                       || IsDefaultSqliteSchemaQualifiedFilter(provider, obj.Schema, obj.Name, filter.Identifier)
-                       || IsDefaultMySqlCatalogQualifiedFilter(provider, obj.Schema, obj.Name, filter.Identifier, filterCatalog));
+                   && MatchesSkippedObjectIdentifierFilter(provider, obj, filter, filterCatalog);
         }
 
         private static bool MatchesTableFilter(DatabaseProvider provider, ScaffoldTableInfo table, string requested, string? filterCatalog)
         {
             var filter = ParseObjectFilterRequest(requested);
             return MatchesTableKindSelector(filter.KindSelector, table)
-                   && (MatchesTableFilter(table, filter.Identifier)
-                       || IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, filter.Identifier)
-                       || IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, filter.Identifier, filterCatalog));
+                   && MatchesTableIdentifierFilter(provider, table, filter, filterCatalog);
         }
 
         private static bool MatchesTableFilter(ScaffoldTableInfo table, string requested)
@@ -37,6 +33,28 @@ namespace nORM.Scaffolding
         private static bool MatchesSkippedObjectFilter(ScaffoldSkippedObjectInfo obj, string requested)
             => string.Equals(obj.Name, requested, StringComparison.OrdinalIgnoreCase)
                || string.Equals(TableKey(obj.Schema, obj.Name), requested, StringComparison.OrdinalIgnoreCase);
+
+        private static bool MatchesTableIdentifierFilter(
+            DatabaseProvider provider,
+            ScaffoldTableInfo table,
+            ScaffoldObjectFilterRequest filter,
+            string? filterCatalog)
+            => filter.LiteralNameOnly
+                ? string.Equals(table.Name, filter.Identifier, StringComparison.OrdinalIgnoreCase)
+                : MatchesTableFilter(table, filter.Identifier)
+                  || IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, filter.Identifier)
+                  || IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, filter.Identifier, filterCatalog);
+
+        private static bool MatchesSkippedObjectIdentifierFilter(
+            DatabaseProvider provider,
+            ScaffoldSkippedObjectInfo obj,
+            ScaffoldObjectFilterRequest filter,
+            string? filterCatalog)
+            => filter.LiteralNameOnly
+                ? string.Equals(obj.Name, filter.Identifier, StringComparison.OrdinalIgnoreCase)
+                : MatchesSkippedObjectFilter(obj, filter.Identifier)
+                  || IsDefaultSqliteSchemaQualifiedFilter(provider, obj.Schema, obj.Name, filter.Identifier)
+                  || IsDefaultMySqlCatalogQualifiedFilter(provider, obj.Schema, obj.Name, filter.Identifier, filterCatalog);
 
         private static bool IsDefaultSqliteSchemaQualifiedFilter(DatabaseProvider provider, string? schemaName, string objectName, string requested)
             => ScaffoldProviderKind.IsSqlite(provider)

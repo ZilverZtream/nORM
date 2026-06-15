@@ -103,6 +103,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`query:dbo.Report`", doc, StringComparison.Ordinal);
         Assert.Contains("`routine:dbo.RebuildCache`", doc, StringComparison.Ordinal);
         Assert.Contains("`sequence:dbo.InvoiceNumber`", doc, StringComparison.Ordinal);
+        Assert.Contains("Literal-name selectors", doc, StringComparison.Ordinal);
+        Assert.Contains("`name:aux.orders`", doc, StringComparison.Ordinal);
+        Assert.Contains("`table:name:aux.orders`", doc, StringComparison.Ordinal);
+        Assert.Contains("literal dotted object names", doc, StringComparison.Ordinal);
         Assert.Contains("object-kind-prefixed", doc, StringComparison.Ordinal);
         Assert.Contains("`table:`, `view:`, and `query:` filters", doc, StringComparison.Ordinal);
         Assert.Contains("object-kind selectors disambiguate same-schema object-kind", doc, StringComparison.Ordinal);
@@ -196,6 +200,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("IsDefaultMySqlCatalogQualifiedFilter", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("ParseObjectFilterRequest", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("NormalizeObjectKindSelector", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("LiteralNameOnly", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("IsLiteralNameSelector", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("MatchesTableIdentifierFilter", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("MatchesSkippedObjectIdentifierFilter", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("MatchesTableKindSelector", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("MatchesSkippedObjectKindSelector", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("MatchesTableFilter(provider, table, request, filterCatalog)", tableFilterSource, StringComparison.Ordinal);

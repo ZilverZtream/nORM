@@ -398,7 +398,9 @@ unqualified because MySQL catalogs are not emitted as nORM schemas.
 Object-kind selectors such as `table:dbo.Report`, `view:dbo.Report`,
 `query:dbo.Report`, `routine:dbo.RebuildCache`, and
 `sequence:dbo.InvoiceNumber` disambiguate same-schema database objects that
-share a name.
+share a name. Literal-name selectors such as `name:aux.orders` and
+`table:name:aux.orders` select literal dotted object names that would otherwise
+look schema-qualified.
 Blank CLI table/schema filters are rejected so an empty option cannot broaden
 the run to every table.
 Schema filters select all discovered user tables and supported query

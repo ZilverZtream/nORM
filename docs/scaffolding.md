@@ -390,15 +390,18 @@ must be reviewed and edited like handwritten model code.
   are accepted when the catalog matches the current
   database, including after an object-kind selector, but generated model
   metadata remains unqualified because MySQL catalogs are not emitted as nORM
-  schemas. Use repeatable `--table` for literal table names that contain commas
-  and must not be split.
+  schemas. Literal-name selectors such as `name:aux.orders` and
+  `table:name:aux.orders` select literal dotted object names when the same text
+  could otherwise be interpreted as a schema-qualified filter. Use repeatable
+  `--table` for literal table names that contain commas and must not be split.
   Null or blank API filters are treated as empty rather than producing raw
   runtime exceptions; blank CLI filters are rejected so an empty command-line
   option cannot broaden the run to all tables. Bare table-name filters fail with an
   actionable error when the same table name exists in multiple schemas; use a
-  schema-qualified filter in that case. If a literal dotted table name collides
-  with the same display string as a schema-qualified table, scaffolding fails
-  deterministically because v1 filter syntax cannot disambiguate those objects.
+  schema-qualified filter in that case. Unfiltered runs that include a literal
+  dotted table name with the same display string as a schema-qualified table
+  still fail deterministically because the generated model would otherwise be
+  ambiguous.
   Relationship and index metadata is scoped to selected tables; FKs whose
   dependent or principal table is intentionally filtered out are not emitted as
   navigations and do not create unrelated scaffold warnings.
@@ -409,8 +412,9 @@ must be reviewed and edited like handwritten model code.
   Because bare table filters are not object-kind selectors, an explicit filter that
   matches more than one selectable table, query artifact, routine, or sequence
   fails deterministically; schema-qualified filters disambiguate cross-schema
-  matches, while object-kind selectors disambiguate same-schema object-kind
-  collisions.
+  matches, object-kind selectors disambiguate same-schema object-kind
+  collisions, and literal-name selectors disambiguate filtered literal dotted
+  name collisions.
 - When no table/schema filter is supplied, ordinary views and PostgreSQL
   materialized views are scaffolded by default as read-only query artifacts,
   matching EF's database-first view coverage without inferring provider-neutral
