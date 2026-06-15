@@ -78,53 +78,5 @@ namespace nORM.Scaffolding
                 requiresPositionalFunctionArguments,
                 parameterSignature);
         }
-
-        private static string? GetMetadataString(IReadOnlyDictionary<string, object?> metadata, string name)
-            => Convert.ToString(metadata.TryGetValue(name, out var value) ? value : null);
-
-        private static int GetMetadataInt(IReadOnlyDictionary<string, object?> metadata, string name)
-            => metadata.TryGetValue(name, out var value) && value is int intValue
-                ? intValue
-                : 0;
-
-        private static string BuildRoutineParameterSignature(
-            bool requiresPositionalFunctionArguments,
-            bool requiresDictionaryRoutineArguments,
-            string? parameterType,
-            string nullableObjectType,
-            string nullableReferenceSuffix)
-        {
-            if (requiresPositionalFunctionArguments)
-                return $"{nullableObjectType}[]{nullableReferenceSuffix} arguments = null";
-
-            if (requiresDictionaryRoutineArguments)
-                return $"IReadOnlyDictionary<string, {nullableObjectType}>{nullableReferenceSuffix} parameters = null";
-
-            return parameterType == null
-                ? $"{nullableObjectType} parameters = null"
-                : $"{parameterType}{nullableReferenceSuffix} parameters = null";
-        }
-
-        private readonly record struct RoutineStubPlan(
-            string RoutineType,
-            int OutputParameterCount,
-            IReadOnlyList<RoutineStubParameter> InputParameters,
-            IReadOnlyList<string> InputParameterDataTypes,
-            IReadOnlyList<RoutineOutputParameter> OutputParameters,
-            int DiscoveredInputParameterCount,
-            string RoutineMemberName,
-            string MethodBase,
-            string? ParameterType,
-            bool ScalarSetReturnsValue,
-            IReadOnlyList<RoutineResultColumn> ResultColumns,
-            string? ResultType,
-            bool IsFunctionCallShape,
-            bool HasKnownNoResultSet,
-            string? OutputFactory,
-            string RoutineNameExpression,
-            string ParameterSummary,
-            bool IsScalarFunction,
-            bool RequiresPositionalFunctionArguments,
-            string ParameterSignature);
     }
 }
