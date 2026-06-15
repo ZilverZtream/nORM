@@ -9,26 +9,31 @@ namespace nORM.Scaffolding
     {
         private static bool TryReadForeignKeyClause(
             string sql,
+            out string? constraintName,
             out IReadOnlyList<string> dependentColumns,
             out string semanticTail)
-            => TryReadTableForeignKeyClause(sql, out dependentColumns, out semanticTail)
-               || TryReadColumnForeignKeyClause(sql, out dependentColumns, out semanticTail);
+            => TryReadTableForeignKeyClause(sql, out constraintName, out dependentColumns, out semanticTail)
+               || TryReadColumnForeignKeyClause(sql, out constraintName, out dependentColumns, out semanticTail);
 
         private static bool TryReadTableForeignKeyClause(
             string sql,
+            out string? constraintName,
             out IReadOnlyList<string> dependentColumns,
             out string semanticTail)
         {
+            constraintName = null;
             dependentColumns = Array.Empty<string>();
             semanticTail = string.Empty;
-            var searchStart = SkipOptionalConstraintName(sql);
-            var foreignIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, "FOREIGN", searchStart);
+            var foreignIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, "FOREIGN", 0);
             if (foreignIndex < 0)
                 return false;
 
             var keyIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, "KEY", foreignIndex + "FOREIGN".Length);
             if (keyIndex < 0)
                 return false;
+
+            if (TryReadConstraintNameImmediatelyBefore(sql, foreignIndex, out var name))
+                constraintName = name;
 
             var openIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(sql, keyIndex + "KEY".Length);
             if (openIndex < 0 || sql[openIndex] != '(')
@@ -48,9 +53,11 @@ namespace nORM.Scaffolding
 
         private static bool TryReadColumnForeignKeyClause(
             string sql,
+            out string? constraintName,
             out IReadOnlyList<string> dependentColumns,
             out string semanticTail)
         {
+            constraintName = null;
             dependentColumns = Array.Empty<string>();
             semanticTail = string.Empty;
             if (StartsWithTableConstraint(sql)
@@ -63,21 +70,12 @@ namespace nORM.Scaffolding
             if (referencesIndex < 0)
                 return false;
 
+            if (TryReadConstraintNameImmediatelyBefore(sql, referencesIndex, out var name))
+                constraintName = name;
+
             dependentColumns = new[] { columnName };
             semanticTail = sql[(referencesIndex + "REFERENCES".Length)..];
             return true;
-        }
-
-        private static int SkipOptionalConstraintName(string sql)
-        {
-            var constraintIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(sql, "CONSTRAINT", 0);
-            if (constraintIndex != 0)
-                return 0;
-
-            var nameIndex = ScaffoldSqlMetadataParser.FindNextSqlTokenStart(sql, "CONSTRAINT".Length);
-            return nameIndex >= 0 && TryReadSqlIdentifier(sql, nameIndex, out _, out var nextIndex)
-                ? nextIndex
-                : "CONSTRAINT".Length;
         }
     }
 }

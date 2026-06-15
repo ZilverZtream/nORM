@@ -52,7 +52,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
 
             Assert.Contains("List<TenantOrderLine>", principalCode);
             Assert.Contains("public TenantOrder TenantOrder { get; set; } = default!;", dependentCode);
-            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderId }, p => new { p.TenantId, p.OrderId }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.OrderId }, p => new { p.TenantId, p.OrderId }, \"FK_Line_Order\", false);", contextCode);
             Assert.Contains("mb.Entity<TenantOrder>().HasKey(e => new { e.TenantId, e.OrderId });", contextCode);
             Assert.Contains("mb.Entity<TenantOrderLine>().HasKey(e => new { e.TenantId, e.OrderId, e.LineNo });", contextCode);
             Assert.Contains("[Key]", principalCode);
@@ -141,7 +141,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Index(\"UX_ExternalOrder_Tenant_ExternalNo\", IsUnique = true, Order = 1)]", principalCode);
             Assert.Contains("List<ExternalOrderEvent>", principalCode);
             Assert.Contains("public ExternalOrder ExternalOrder { get; set; } = default!;", dependentCode);
-            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.ExternalNo }, p => new { p.TenantId, p.ExternalNo }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.ExternalNo }, p => new { p.TenantId, p.ExternalNo }, \"FK_Event_Order\", false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -188,7 +188,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public List<NullableAltOrder> NullableAltOrders { get; set; } = new();", principalCode);
             Assert.Contains("[ForeignKey(nameof(CustomerExternalId))]", dependentCode);
             Assert.Contains("public NullableAltCustomer NullableAltCustomer { get; set; } = default!;", dependentCode);
-            Assert.Contains(".HasForeignKey(d => d.CustomerExternalId, p => p.ExternalId, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.CustomerExternalId, p => p.ExternalId, \"FK_NullableAltOrder_Customer\", false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -234,9 +234,9 @@ public partial class DatabaseScaffolderPrivateMethodTests
             var contextCode = File.ReadAllText(Path.Combine(dir, "FkActionCtx.cs"));
             var warningPath = Path.Combine(dir, "nORM.ScaffoldWarnings.md");
 
-            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id);", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.Restrict, ReferentialAction.Cascade);", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetNull, ReferentialAction.NoAction);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, \"FK_Cascade_Parent\");", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.Restrict, ReferentialAction.Cascade, \"FK_Restrict_Parent\");", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, ReferentialAction.SetNull, ReferentialAction.NoAction, \"FK_SetNull_Parent\");", contextCode);
             Assert.DoesNotContain("sqlite_fk_", contextCode);
             Assert.False(File.Exists(warningPath), "Valid referential actions should scaffold into fluent configuration rather than warning-only diagnostics.");
         }

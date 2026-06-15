@@ -233,10 +233,11 @@ must be reviewed and edited like handwritten model code.
   navigations; single-column references include `[ForeignKey]` metadata, and
   composite references are wired through ordered fluent `HasForeignKey`
   selectors. The generated `DbContext` preserves caller-supplied model
-  configuration, including provider-reported foreign key constraint names when
-  the provider exposes real names. SQLite `PRAGMA foreign_key_list` does not
-  expose declared constraint names, so synthetic SQLite FK ids are not emitted
-  into generated source. SQL Server foreign-key names marked
+  configuration, including provider-reported foreign key constraint names and
+  recoverable SQLite `CREATE TABLE` foreign-key constraint names when the
+  provider exposes real names. SQLite `PRAGMA foreign_key_list` does not expose
+  declared constraint names, so unnamed synthetic SQLite FK ids are still not
+  emitted into generated source. SQL Server foreign-key names marked
   `is_system_named` by the catalog are likewise treated as generated database
   noise and are not emitted as fluent constraint-name arguments; explicit SQL
   Server FK names are still preserved. PostgreSQL default

@@ -201,9 +201,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         string foreignKeySelector,
         string principalKeySelector,
         string constraintName)
-        => kind == ProviderKind.Sqlite
-            ? $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, cascadeDelete: false);"
-            : $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, \"{constraintName}\", false);";
+        => $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, \"{constraintName}\", false);";
 
     private static string ExpectedReferentialForeignKey(
         ProviderKind kind,
@@ -212,9 +210,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
         string onDelete,
         string onUpdate,
         string constraintName)
-        => kind == ProviderKind.Sqlite
-            ? $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate});"
-            : $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate}, \"{constraintName}\");";
+        => $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate}, \"{constraintName}\");";
 
     private static void SetupUnnamedForeignKeyRelationship(
         DbConnection connection,

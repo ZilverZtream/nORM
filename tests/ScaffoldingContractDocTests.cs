@@ -320,6 +320,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("generated output are ordered deterministically", doc, StringComparison.Ordinal);
         Assert.Contains("Relationship navigations and fluent relationship", doc, StringComparison.Ordinal);
         Assert.Contains("provider-reported foreign key constraint names", doc, StringComparison.Ordinal);
+        Assert.Contains("recoverable SQLite `CREATE TABLE` foreign-key constraint names", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server foreign-key names marked", doc, StringComparison.Ordinal);
         Assert.Contains("PostgreSQL default", doc, StringComparison.Ordinal);
         Assert.Contains("MySQL default", doc, StringComparison.Ordinal);
@@ -338,6 +339,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("explicit non-system default-constraint names", doc, StringComparison.Ordinal);
         Assert.Contains("HasDefaultValueSql(..., constraintName: ...)", doc, StringComparison.Ordinal);
         Assert.Contains("ConstraintName", source, StringComparison.Ordinal);
+        Assert.Contains("ExtractForeignKeyConstraintNamesByColumns", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("fk.is_system_named AS IsSyntheticConstraintName", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("dep.relname || '_'", foreignKeyDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("CHAR_LENGTH(kcu.table_name) + 6", foreignKeyDiscoverySource, StringComparison.Ordinal);

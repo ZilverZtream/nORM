@@ -27,12 +27,42 @@ namespace nORM.Scaffolding
                 if (trimmed.Length == 0)
                     continue;
 
-                if (!TryReadForeignKeyClause(trimmed, out var dependentColumns, out var semanticTail))
+                if (!TryReadForeignKeyClause(trimmed, out _, out var dependentColumns, out var semanticTail))
                     continue;
 
                 var semantics = ExtractForeignKeyProviderSemantics(semanticTail);
                 if (!string.IsNullOrWhiteSpace(semantics))
                     result[BuildForeignKeyColumnKey(dependentColumns)] = semantics;
+            }
+
+            return result;
+        }
+
+        public static IReadOnlyDictionary<string, string> ExtractForeignKeyConstraintNamesByColumns(string? createTableSql)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(createTableSql))
+                return result;
+
+            var bodyOpen = createTableSql.IndexOf('(');
+            if (bodyOpen < 0)
+                return result;
+
+            var bodyClose = FindMatchingParenthesis(createTableSql, bodyOpen);
+            if (bodyClose <= bodyOpen)
+                return result;
+
+            foreach (var part in SplitTopLevelCommaSeparated(createTableSql.Substring(bodyOpen + 1, bodyClose - bodyOpen - 1)))
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Length == 0
+                    || !TryReadForeignKeyClause(trimmed, out var constraintName, out var dependentColumns, out _)
+                    || string.IsNullOrWhiteSpace(constraintName))
+                {
+                    continue;
+                }
+
+                result[BuildForeignKeyColumnKey(dependentColumns)] = constraintName;
             }
 
             return result;

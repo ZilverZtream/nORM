@@ -13,9 +13,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
         string foreignKeySelector,
         string principalKeySelector,
         string constraintName)
-        => kind == ProviderKind.Sqlite
-            ? $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, cascadeDelete: false);"
-            : $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, \"{constraintName}\", false);";
+        => $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, \"{constraintName}\", false);";
 
     private static string ExpectedReferentialForeignKey(
         ProviderKind kind,
@@ -24,9 +22,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
         string onDelete,
         string onUpdate,
         string constraintName)
-        => kind == ProviderKind.Sqlite
-            ? $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate});"
-            : $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate}, \"{constraintName}\");";
+        => $".HasForeignKey({foreignKeySelector}, {principalKeySelector}, {onDelete}, {onUpdate}, \"{constraintName}\");";
 
     private static async Task SetupAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
     {

@@ -96,7 +96,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public User User { get; set; } = default!;", profileCode);
             Assert.Contains(".HasOne(p => p.UserProfile)", contextCode);
             Assert.Contains(".WithOne(d => d.User)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.UserId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.UserId, p => p.Id, \"FK_UserProfile_User\", false);", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -143,7 +143,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("public Person Person { get; set; } = default!;", avatarCode, StringComparison.Ordinal);
             Assert.Contains(".HasOne(p => p.PersonAvatar)", contextCode);
             Assert.Contains(".WithOne(d => d.Person)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.PersonId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.PersonId, p => p.Id, \"FK_PersonAvatar_Person\", false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -195,7 +195,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public Account Account { get; set; } = default!;", profileCode);
             Assert.Contains(".HasOne(p => p.AccountProfile)", contextCode);
             Assert.Contains(".WithOne(d => d.Account)", contextCode);
-            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.AccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.AccountNo }, p => new { p.TenantId, p.AccountNo }, \"FK_AccountProfile_Account\", false);", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -248,7 +248,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("public Account Account { get; set; } = default!;", profileCode, StringComparison.Ordinal);
             Assert.Contains(".HasOne(p => p.AccountProfile)", contextCode);
             Assert.Contains(".WithOne(d => d.Account)", contextCode);
-            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.AccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.AccountNo }, p => new { p.TenantId, p.AccountNo }, \"FK_AccountProfile_Account\", false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -294,7 +294,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public Customer Customer { get; set; } = default!;", profileCode);
             Assert.Contains(".HasOne(p => p.CustomerProfile)", contextCode);
             Assert.Contains(".WithOne(d => d.Customer)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.Id, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.Id, p => p.Id, \"FK_CustomerProfile_Customer\", false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -345,10 +345,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("public Address? Address { get; set; }", shipmentCode);
             Assert.Contains(".HasMany(p => p.ShipmentsByBillingAddressId)", contextCode);
             Assert.Contains(".WithOne(d => d.BillingAddress)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.BillingAddressId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BillingAddressId, p => p.Id, \"FK_Shipment_BillingAddress\", false);", contextCode);
             Assert.Contains(".HasMany(p => p.ShipmentsByShippingAddressId)", contextCode);
             Assert.Contains(".WithOne(d => d.ShippingAddress)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.ShippingAddressId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ShippingAddressId, p => p.Id, \"FK_Shipment_ShippingAddress\", false);", contextCode);
         }
         finally
         {
@@ -400,10 +400,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("AccountTransfersByTenantId", accountCode, StringComparison.Ordinal);
             Assert.Contains(".HasMany(p => p.AccountTransfersByBackupAccountNo)", contextCode);
             Assert.Contains(".WithOne(d => d.BackupAccount)", contextCode);
-            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.BackupAccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.BackupAccountNo }, p => new { p.TenantId, p.AccountNo }, \"FK_Transfer_BackupAccount\", false);", contextCode);
             Assert.Contains(".HasMany(p => p.AccountTransfersByPrimaryAccountNo)", contextCode);
             Assert.Contains(".WithOne(d => d.PrimaryAccount)", contextCode);
-            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.PrimaryAccountNo }, p => new { p.TenantId, p.AccountNo }, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => new { d.TenantId, d.PrimaryAccountNo }, p => new { p.TenantId, p.AccountNo }, \"FK_Transfer_PrimaryAccount\", false);", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally
@@ -454,10 +454,10 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("public Account Account { get; set; }", profileCode, StringComparison.Ordinal);
             Assert.Contains(".HasOne(p => p.AccountProfileByBackupAccountId)", contextCode);
             Assert.Contains(".WithOne(d => d.BackupAccount)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.BackupAccountId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BackupAccountId, p => p.Id, \"FK_Profile_BackupAccount\", false);", contextCode);
             Assert.Contains(".HasOne(p => p.AccountProfileByPrimaryAccountId)", contextCode);
             Assert.Contains(".WithOne(d => d.PrimaryAccount)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.PrimaryAccountId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.PrimaryAccountId, p => p.Id, \"FK_Profile_PrimaryAccount\", false);", contextCode);
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
             Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
@@ -499,7 +499,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.DoesNotContain("public Person? Person { get; set; }", personCode);
             Assert.Contains(".HasMany(p => p.PeopleByParentId)", contextCode);
             Assert.Contains(".WithOne(d => d.Parent)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.ParentId, p => p.Id, \"FK_Person_Parent\", false);", contextCode);
             AssertScaffoldOutputBuildsAsConsumerProject(dir);
         }
         finally

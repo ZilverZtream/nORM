@@ -19,8 +19,11 @@ namespace nORM.Scaffolding
             var foreignKeys = new List<ScaffoldForeignKeyInfo>();
             foreach (var table in tables)
             {
+                var createTableSql = await GetSqliteCreateTableSqlAsync(connection, provider, table).ConfigureAwait(false);
                 var providerSemanticsByColumns = ScaffoldSqliteDdlParser.ExtractForeignKeyProviderSemanticsByColumns(
-                    await GetSqliteCreateTableSqlAsync(connection, provider, table).ConfigureAwait(false));
+                    createTableSql);
+                var constraintNamesByColumns = ScaffoldSqliteDdlParser.ExtractForeignKeyConstraintNamesByColumns(
+                    createTableSql);
                 await using var cmd = connection.CreateCommand();
                 cmd.CommandText = SqlitePragma(provider, table.Schema, "foreign_key_list", table.Name);
                 await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
@@ -40,7 +43,7 @@ namespace nORM.Scaffolding
                 }
 
                 foreach (var group in rows.GroupBy(static row => row.Id))
-                    AddSqliteForeignKeyRows(table, group.OrderBy(static row => row.Seq).ToArray(), providerSemanticsByColumns, foreignKeys);
+                    AddSqliteForeignKeyRows(table, group.OrderBy(static row => row.Seq).ToArray(), providerSemanticsByColumns, constraintNamesByColumns, foreignKeys);
             }
 
             return foreignKeys;
@@ -65,9 +68,13 @@ namespace nORM.Scaffolding
             ScaffoldTableInfo table,
             IReadOnlyList<(long Id, long Seq, string PrincipalTable, string DependentColumn, string PrincipalColumn, string OnUpdate, string OnDelete, string Match)> rows,
             IReadOnlyDictionary<string, string> providerSemanticsByColumns,
+            IReadOnlyDictionary<string, string> constraintNamesByColumns,
             ICollection<ScaffoldForeignKeyInfo> foreignKeys)
         {
             var providerSemantics = TryGetSqliteProviderSemantics(rows, providerSemanticsByColumns);
+            var columnKey = ScaffoldSqliteDdlParser.BuildForeignKeyColumnKey(rows.Select(static row => row.DependentColumn));
+            var hasDeclaredConstraintName = constraintNamesByColumns.TryGetValue(columnKey, out var declaredConstraintName)
+                                            && !string.IsNullOrWhiteSpace(declaredConstraintName);
             foreach (var row in rows)
             {
                 if (string.IsNullOrWhiteSpace(row.PrincipalTable)
@@ -84,11 +91,11 @@ namespace nORM.Scaffolding
                     PrincipalSchema: table.Schema,
                     PrincipalTable: row.PrincipalTable,
                     PrincipalColumn: row.PrincipalColumn,
-                    ConstraintName: "sqlite_fk_" + row.Id,
+                    ConstraintName: hasDeclaredConstraintName ? declaredConstraintName! : "sqlite_fk_" + row.Id,
                     ColumnCount: rows.Count,
                     OnDelete: ScaffoldReferentialAction.Normalize(row.OnDelete),
                     OnUpdate: NormalizeSqliteReferentialAction(row.OnUpdate, row.Match, providerSemantics),
-                    IsSyntheticConstraintName: true));
+                    IsSyntheticConstraintName: !hasDeclaredConstraintName));
             }
         }
 

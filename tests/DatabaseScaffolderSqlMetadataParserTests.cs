@@ -189,6 +189,28 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void SqliteForeignKeyConstraintParser_ExtractsNamedTableAndColumnConstraints()
+    {
+        const string sql = """
+            CREATE TABLE "Orders" (
+                "Id" INTEGER PRIMARY KEY,
+                "CustomerId" INTEGER CONSTRAINT [FK_Orders_Customer] REFERENCES "Customer"("Id"),
+                "TenantId" INTEGER NOT NULL,
+                "OrderNo" INTEGER NOT NULL,
+                "Note" TEXT DEFAULT 'FOREIGN KEY ignored',
+                CONSTRAINT "FK_Orders_Tenant" FOREIGN /* ignored */ KEY ("TenantId", "OrderNo") REFERENCES "TenantOrder"("TenantId", "OrderNo"),
+                FOREIGN KEY ("Id") REFERENCES "Audit"("OrderId")
+            );
+            """;
+
+        var names = ScaffoldSqliteDdlParser.ExtractForeignKeyConstraintNamesByColumns(sql);
+
+        Assert.Equal("FK_Orders_Customer", names[ScaffoldSqliteDdlParser.BuildForeignKeyColumnKey(new[] { "CustomerId" })]);
+        Assert.Equal("FK_Orders_Tenant", names[ScaffoldSqliteDdlParser.BuildForeignKeyColumnKey(new[] { "TenantId", "OrderNo" })]);
+        Assert.False(names.ContainsKey(ScaffoldSqliteDdlParser.BuildForeignKeyColumnKey(new[] { "Id" })));
+    }
+
+    [Fact]
     public void SqliteCollationParser_IgnoresSqlCommentsAndStringLiterals()
     {
         const string sql = """
