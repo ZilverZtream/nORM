@@ -83,9 +83,5 @@ namespace nORM.Scaffolding
 
             public bool IsComposite => LeftForeignKeyColumns.Length > 1 || RightForeignKeyColumns.Length > 1;
         }
-
-        internal readonly record struct ScaffoldManyToManyNavigation(
-            string TargetEntityName,
-            string CollectionNavigationName);
     }
 }

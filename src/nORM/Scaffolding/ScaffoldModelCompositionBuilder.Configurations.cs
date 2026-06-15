@@ -9,7 +9,7 @@ namespace nORM.Scaffolding
     {
         private static IReadOnlyList<DatabaseScaffolder.ScaffoldDefaultValueConfiguration> BuildDefaultValueConfigurations(
             ScaffoldModelDiscoveryResult discovery,
-            DatabaseScaffolder.ScaffoldFeatureConfigurations featureConfigurations)
+            ScaffoldFeatureConfigurations featureConfigurations)
             => ScaffoldFeatureConfigurationAdapter.BuildDefaultValueConfigurations(
                 discovery.EntityByTable,
                 discovery.ColumnPropertiesByTable,

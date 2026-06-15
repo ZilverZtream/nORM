@@ -9,7 +9,7 @@ namespace nORM.Scaffolding
 {
     internal static class ScaffoldEntityFileSetBuilder
     {
-        public static async Task<DatabaseScaffolder.ScaffoldEntityFileSet> BuildAsync(
+        public static async Task<ScaffoldEntityFileSet> BuildAsync(
             ScaffoldEntityFileSetRequest request)
         {
             var entityNames = new List<string>();
@@ -25,7 +25,7 @@ namespace nORM.Scaffolding
                 generatedFiles.Add((file.Value.Path, file.Value.Content));
             }
 
-            return new DatabaseScaffolder.ScaffoldEntityFileSet(generatedFiles, entityNames);
+            return new ScaffoldEntityFileSet(generatedFiles, entityNames);
         }
 
         private static async Task<EntityFileResult?> BuildEntityFileAsync(

@@ -9,7 +9,7 @@ namespace nORM.Scaffolding
     {
         private static IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> BuildManyToManyJoins(
             ScaffoldModelDiscoveryResult discovery,
-            DatabaseScaffolder.ScaffoldFeatureConfigurations featureConfigurations)
+            ScaffoldFeatureConfigurations featureConfigurations)
             => ScaffoldRelationshipAdapter.BuildManyToManyJoins(
                 discovery.ForeignKeys,
                 discovery.Tables,

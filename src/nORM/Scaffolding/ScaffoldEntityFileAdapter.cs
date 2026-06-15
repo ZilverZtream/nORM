@@ -9,7 +9,7 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldEntityFileAdapter
     {
-        public static async Task<DatabaseScaffolder.ScaffoldEntityFileSet> BuildScaffoldEntityFilesAsync(
+        public static async Task<ScaffoldEntityFileSet> BuildScaffoldEntityFilesAsync(
             ScaffoldEntityFileSetRequest request)
             => await ScaffoldEntityFileSetBuilder.BuildAsync(request).ConfigureAwait(false);
 
@@ -24,7 +24,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<DatabaseScaffolder.ScaffoldIndex>? indexes = null,
             IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship>? references = null,
             IReadOnlyList<DatabaseScaffolder.ScaffoldRelationship>? collections = null,
-            IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyNavigation>? manyToManyCollections = null,
+            IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections = null,
             IReadOnlySet<string>? computedColumns = null,
             IReadOnlySet<string>? rowVersionColumns = null,
             IReadOnlySet<string>? identityColumns = null,

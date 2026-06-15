@@ -20,7 +20,7 @@ namespace nORM.Scaffolding
             return new ScaffoldOutputPlan(generatedFiles, diagnostics, diagnosticsJson);
         }
 
-        private static Task<DatabaseScaffolder.ScaffoldEntityFileSet> BuildEntityFilesAsync(
+        private static Task<ScaffoldEntityFileSet> BuildEntityFilesAsync(
             ScaffoldOutputPlanRequest request)
             => ScaffoldEntityFileAdapter.BuildScaffoldEntityFilesAsync(new ScaffoldEntityFileSetRequest(
                 request.Connection,

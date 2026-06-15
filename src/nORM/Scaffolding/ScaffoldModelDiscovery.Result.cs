@@ -22,5 +22,5 @@ namespace nORM.Scaffolding
         IReadOnlyList<DatabaseScaffolder.ScaffoldIndex> Indexes,
         IReadOnlyList<DatabaseScaffolder.ScaffoldForeignKey> ForeignKeys,
         List<DatabaseScaffolder.ScaffoldUnsupportedFeature> UnsupportedFeatures,
-        DatabaseScaffolder.ScaffoldFeatureConfigurations FeatureConfigurations);
+        ScaffoldFeatureConfigurations FeatureConfigurations);
 }

@@ -30,7 +30,7 @@ namespace nORM.Scaffolding
                 Metadata = feature.Metadata
             };
 
-        private static DatabaseScaffolder.ScaffoldFeatureConfigurations ConvertFeatureConfigurations(
+        private static ScaffoldFeatureConfigurations ConvertFeatureConfigurations(
             ScaffoldFeatureConfigurationsInfo configurations,
             IReadOnlyList<DatabaseScaffolder.ScaffoldUnsupportedFeature> generatedModelFeatureDiagnostics)
             => new(

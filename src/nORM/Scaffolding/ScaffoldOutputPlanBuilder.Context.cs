@@ -9,7 +9,7 @@ namespace nORM.Scaffolding
     {
         private static (string Path, string Content) BuildContextFile(
             ScaffoldOutputPlanRequest request,
-            DatabaseScaffolder.ScaffoldEntityFileSet entityFiles)
+            ScaffoldEntityFileSet entityFiles)
         {
             var options = request.Options;
             var composition = request.Composition;

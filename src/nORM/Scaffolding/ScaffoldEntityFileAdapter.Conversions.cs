@@ -45,8 +45,8 @@ namespace nORM.Scaffolding
                 .ToArray();
 
         public static ScaffoldEntityManyToManyNavigationInfo[] ConvertEntityManyToManyNavigationInfos(
-            IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyNavigation>? manyToManyCollections)
-            => (manyToManyCollections ?? Array.Empty<DatabaseScaffolder.ScaffoldManyToManyNavigation>())
+            IReadOnlyList<ScaffoldManyToManyNavigation>? manyToManyCollections)
+            => (manyToManyCollections ?? Array.Empty<ScaffoldManyToManyNavigation>())
                 .Select(collection => new ScaffoldEntityManyToManyNavigationInfo(
                     collection.TargetEntityName,
                     collection.CollectionNavigationName))

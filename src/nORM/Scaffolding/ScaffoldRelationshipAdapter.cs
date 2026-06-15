@@ -34,23 +34,23 @@ namespace nORM.Scaffolding
             return ConvertManyToManyJoins(joins);
         }
 
-        public static IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyNavigation> BuildManyToManyNavigations(
+        public static IReadOnlyList<ScaffoldManyToManyNavigation> BuildManyToManyNavigations(
             IReadOnlyList<DatabaseScaffolder.ScaffoldManyToManyJoin> joins,
             string tableKey)
         {
-            var navigations = new List<DatabaseScaffolder.ScaffoldManyToManyNavigation>();
+            var navigations = new List<ScaffoldManyToManyNavigation>();
             foreach (var join in joins)
             {
                 if (string.Equals(join.LeftTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    navigations.Add(new DatabaseScaffolder.ScaffoldManyToManyNavigation(
+                    navigations.Add(new ScaffoldManyToManyNavigation(
                         join.RightEntityName,
                         join.LeftCollectionNavigationName));
                 }
 
                 if (string.Equals(join.RightTableKey, tableKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    navigations.Add(new DatabaseScaffolder.ScaffoldManyToManyNavigation(
+                    navigations.Add(new ScaffoldManyToManyNavigation(
                         join.LeftEntityName,
                         join.RightCollectionNavigationName));
                 }
