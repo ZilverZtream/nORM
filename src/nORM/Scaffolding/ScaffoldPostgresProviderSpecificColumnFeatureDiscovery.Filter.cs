@@ -10,6 +10,7 @@ namespace nORM.Scaffolding
             """;
 
         private const string ProviderSpecificColumnFilterSql = """
+
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
               AND (
                   domain_name IS NOT NULL
