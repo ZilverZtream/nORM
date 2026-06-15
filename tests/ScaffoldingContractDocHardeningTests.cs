@@ -628,6 +628,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("0xDEADBEEF", doc, StringComparison.Ordinal);
         Assert.Contains("X'DEADBEEF'", doc, StringComparison.Ordinal);
         Assert.Contains("B'1010'", doc, StringComparison.Ordinal);
+        Assert.Contains("DATE '2026-06-15'", doc, StringComparison.Ordinal);
+        Assert.Contains("INTERVAL '1 hour'", doc, StringComparison.Ordinal);
         Assert.Contains("LOWER('value')", doc, StringComparison.Ordinal);
         Assert.Contains("UPPER('value')", doc, StringComparison.Ordinal);
         Assert.Contains("provider-normalized PostgreSQL casts or MySQL character-set literals", doc, StringComparison.Ordinal);
@@ -641,6 +643,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("0x[0-9a-f]+", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("x'(?:[0-9a-f]{2})*'", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("b'[01]+'", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("TypedTemporalLiteralPattern", defaultValidator, StringComparison.Ordinal);
+        Assert.Contains("IntervalLiteralPattern", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("Strict PostgreSQL UTC timestamp defaults", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("at\\s+time\\s+zone\\s+'utc'", defaultValidator, StringComparison.Ordinal);
         Assert.Contains("timezone\\s*\\(", defaultValidator, StringComparison.Ordinal);

@@ -17,6 +17,8 @@ namespace nORM.Migration
     ///   <item>Boolean keywords: TRUE, FALSE</item>
     ///   <item>Integer and decimal numeric literals (optional leading minus)</item>
     ///   <item>Hex/binary/bit-string literals: 0xDEADBEEF, X'DEADBEEF', and B'1010'</item>
+    ///   <item>SQL typed temporal literals: DATE '2026-06-15', TIME '12:34:56',
+    ///         TIMESTAMP '2026-06-15 12:34:56', and INTERVAL '1 hour'</item>
     ///   <item>Single-quoted ANSI/Unicode/MySQL-character-set string literals with SQL-escaped interior quotes</item>
     ///   <item>Literal-only string normalization defaults: LOWER('value') and UPPER('value'),
     ///         including provider-normalized literal casts such as LOWER('value'::text)
@@ -43,6 +45,16 @@ namespace nORM.Migration
     {
         private const string QuotedStringLiteralPattern = @"(?:n|_[A-Za-z][A-Za-z0-9_]*)?'(?:[^']|'')*'";
         private const string BitStringLiteralPattern = @"b'[01]+'";
+        private const string IsoDatePattern = @"[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])";
+        private const string IsoTimePattern = @"(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]{1,6})?(?:z|[+-](?:[01][0-9]|2[0-3])(?::?[0-5][0-9])?)?";
+        private const string TypedTemporalLiteralPattern =
+            @"(?:date\s+'" + IsoDatePattern + @"'" +
+            @"|time(?:\s+(?:with|without)\s+time\s+zone)?\s+'" + IsoTimePattern + @"'" +
+            @"|timestamp(?:\s+(?:with|without)\s+time\s+zone)?\s+'" + IsoDatePattern + @"[ t]" + IsoTimePattern + @"')";
+        private const string IntervalUnitPattern = @"(?:year|years|month|months|day|days|hour|hours|minute|minutes|second|seconds|millisecond|milliseconds|microsecond|microseconds)";
+        private const string IntervalLiteralPattern =
+            @"interval\s+'[+-]?[0-9]+(?:\.[0-9]+)?\s+" + IntervalUnitPattern +
+            @"(?:\s+[+-]?[0-9]+(?:\.[0-9]+)?\s+" + IntervalUnitPattern + @")*'";
         private const string SafePostgresCastTypePattern =
             @"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?(?:\s*\(\s*[0-9]+(?:\s*,\s*[0-9]+)?\s*\))?(?:\[\])?" +
             @"|character\s+varying(?:\s*\(\s*[0-9]+\s*\))?" +
@@ -61,6 +73,8 @@ namespace nORM.Migration
             @"|true|false" +                                            // boolean keywords
             @"|-?[0-9]+(?:\.[0-9]+)?" +                                 // numeric literal (int or decimal)
             @"|0x[0-9a-f]+|x'(?:[0-9a-f]{2})*'|" + BitStringLiteralPattern + // provider binary/hex/bit literals
+            @"|" + TypedTemporalLiteralPattern +                          // SQL typed date/time/timestamp literals
+            @"|" + IntervalLiteralPattern +                               // SQL interval literals with known units
             @"|" + QuotedStringLiteralPattern +                          // single-quoted ANSI/Unicode/provider string literal
             @"|" + StringNormalizationLiteralPattern +                    // literal-only string normalization functions
             @"|current_timestamp(?:\([0-6]?\))?|current_date(?:\(\))?|current_time(?:\([0-6]?\))?" + // ANSI standard date/time functions
@@ -102,7 +116,7 @@ namespace nORM.Migration
                 throw new ArgumentException(
                     $"DefaultValue '{value}' is not a permitted SQL literal. " +
                     "Only numeric literals, single-quoted ANSI/Unicode/provider strings, boolean literals (TRUE/FALSE), NULL, " +
-                    "safe hex/binary/bit-string literals, literal-only LOWER/UPPER string normalization defaults over string literals, " +
+                    "safe hex/binary/bit-string literals, typed temporal/interval literals, literal-only LOWER/UPPER string normalization defaults over string literals, " +
                     "standard SQL functions (CURRENT_TIMESTAMP, NOW(), GETDATE(), SYSUTCDATETIME(), NEWID(), UUID(), etc.), " +
                     "and safe PostgreSQL cast suffixes on those values are allowed. " +
                     "Values containing semicolons, comments, or DML keywords are rejected.");
