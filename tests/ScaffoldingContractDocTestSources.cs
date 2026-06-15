@@ -413,6 +413,8 @@ public partial class ScaffoldingContractDocTests
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ModelConfiguration.Keys.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ModelConfiguration.Properties.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ManyToMany.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ManyToMany.UsingTable.cs"),
+            ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.ManyToMany.ReferentialActions.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldContextWriter.Relationships.cs"),
             ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldReferentialAction.cs"));
 
