@@ -804,7 +804,7 @@ must be reviewed and edited like handwritten model code.
   schema-qualified many-to-many junction-table mappings, including
   filtered-unique surrogate join tables that must remain
   explicit entities instead of unsafe skip navigations, plus keyless dependent
-  FK shapes that must suppress generated navigations.
+  and keyless principal FK shapes that must suppress generated navigations.
 - `LiveProviderScaffoldCliParityTests` runs the real `dotnet-norm scaffold`
   command against live SQLite, SQL Server, PostgreSQL, and MySQL schemas with a
   shared-tenant composite-key many-to-many bridge, an alternate-key many-to-many
@@ -1052,9 +1052,10 @@ must be reviewed and edited like handwritten model code.
   through the same command path. Self-referencing FKs are verified as role-named
   one-to-many relationships through the real CLI path. Self-referencing unique dependent FKs are verified
   as role-named one-to-one relationships through the real CLI path. Shared primary-key FK shapes are verified as
-  one-to-one relationships through the real CLI as well. Keyless dependent FK shapes are verified
-  through the real CLI to remain read-only, navigation-free, and reported as
-  `RelationshipDependentKey` diagnostics.
+  one-to-one relationships through the real CLI as well. Keyless dependent and
+  keyless principal FK shapes are verified through the real CLI to remain
+  read-only, navigation-free, and reported as `RelationshipDependentKey` or
+  `RelationshipPrincipalKey` diagnostics.
   Self-referencing pure join tables are also verified through the real CLI path
   with distinct role-based skip navigations. Generated-surrogate pure join
   tables are verified through the real CLI path by suppressing the bridge

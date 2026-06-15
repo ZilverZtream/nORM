@@ -176,6 +176,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_generates_optional_composite_unique_dependent_one_to_one_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_self_referencing_one_to_one_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_generates_self_referencing_one_to_many_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_suppresses_keyless_dependent_fk_navigation_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldAsync_suppresses_keyless_principal_fk_navigation_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_keyless_dependent_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_suppresses_keyless_principal_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_json_fail_on_warnings_reports_live_provider_diagnostics", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -415,7 +417,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Provider-bound sequence stubs are verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("--emit-sequence-stubs", doc, StringComparison.Ordinal);
         Assert.Contains("SQL Server/PostgreSQL sequence comments", doc, StringComparison.Ordinal);
-        Assert.Contains("relationships to unselected principal tables are", doc, StringComparison.Ordinal);
+        Assert.Contains("relationships to unselected principal or dependent tables are", doc, StringComparison.Ordinal);
         Assert.Contains("mixed one-to-many plus many-to-many model shape", doc, StringComparison.Ordinal);
         Assert.Contains("composite index metadata through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("direct composite primary-key FK model shape", doc, StringComparison.Ordinal);
@@ -533,9 +535,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("role-named one-to-one relationships through the real CLI path", doc, StringComparison.Ordinal);
         Assert.Contains("Shared primary-key FK shapes", doc, StringComparison.Ordinal);
         Assert.Contains("one-to-one relationships through the real CLI", doc, StringComparison.Ordinal);
-        Assert.Contains("Keyless dependent FK shapes", doc, StringComparison.Ordinal);
+        Assert.Contains("Keyless dependent and", doc, StringComparison.Ordinal);
+        Assert.Contains("keyless principal FK shapes", doc, StringComparison.Ordinal);
         Assert.Contains("navigation-free", doc, StringComparison.Ordinal);
         Assert.Contains("RelationshipDependentKey", doc, StringComparison.Ordinal);
+        Assert.Contains("RelationshipPrincipalKey", doc, StringComparison.Ordinal);
         Assert.Contains("Self-referencing pure join tables are also verified through the real CLI", doc, StringComparison.Ordinal);
         Assert.Contains("distinct role-based skip navigations", doc, StringComparison.Ordinal);
         Assert.Contains("Pure composite primary-key join tables are verified through the real CLI", doc, StringComparison.Ordinal);
