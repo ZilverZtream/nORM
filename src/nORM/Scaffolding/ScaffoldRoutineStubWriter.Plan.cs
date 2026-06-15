@@ -17,11 +17,9 @@ namespace nORM.Scaffolding
             string nullableObjectType)
         {
             var metadata = routine.Metadata;
-            var routineType = Convert.ToString(metadata.TryGetValue("routineType", out var type) ? type : null) ?? "routine";
-            var callShape = Convert.ToString(metadata.TryGetValue("callShape", out var shape) ? shape : null);
-            var outputParameterCount = metadata.TryGetValue("outputParameterCount", out var outputCountValue) && outputCountValue is int outputCount
-                ? outputCount
-                : 0;
+            var routineType = GetMetadataString(metadata, "routineType") ?? "routine";
+            var callShape = GetMetadataString(metadata, "callShape");
+            var outputParameterCount = GetMetadataInt(metadata, "outputParameterCount");
             var inputParameters = GetRoutineInputParameters(metadata, useNullableReferenceTypes);
             var inputParameterDataTypes = GetRoutineInputParameterDataTypes(metadata);
             var outputParameters = GetRoutineOutputParameters(metadata);
@@ -51,10 +49,12 @@ namespace nORM.Scaffolding
             var requiresDictionaryRoutineArguments = !isFunctionCallShape
                 && discoveredInputParameterCount > 0
                 && inputParameters.Count == 0;
-            var parameterSignature = requiresPositionalFunctionArguments
-                ? $"{nullableObjectType}[]{nullableReferenceSuffix} arguments = null"
-                : requiresDictionaryRoutineArguments ? $"IReadOnlyDictionary<string, {nullableObjectType}>{nullableReferenceSuffix} parameters = null"
-                : parameterType == null ? $"{nullableObjectType} parameters = null" : $"{parameterType}{nullableReferenceSuffix} parameters = null";
+            var parameterSignature = BuildRoutineParameterSignature(
+                requiresPositionalFunctionArguments,
+                requiresDictionaryRoutineArguments,
+                parameterType,
+                nullableObjectType,
+                nullableReferenceSuffix);
 
             return new RoutineStubPlan(
                 routineType,
@@ -77,6 +77,32 @@ namespace nORM.Scaffolding
                 isScalarFunction,
                 requiresPositionalFunctionArguments,
                 parameterSignature);
+        }
+
+        private static string? GetMetadataString(IReadOnlyDictionary<string, object?> metadata, string name)
+            => Convert.ToString(metadata.TryGetValue(name, out var value) ? value : null);
+
+        private static int GetMetadataInt(IReadOnlyDictionary<string, object?> metadata, string name)
+            => metadata.TryGetValue(name, out var value) && value is int intValue
+                ? intValue
+                : 0;
+
+        private static string BuildRoutineParameterSignature(
+            bool requiresPositionalFunctionArguments,
+            bool requiresDictionaryRoutineArguments,
+            string? parameterType,
+            string nullableObjectType,
+            string nullableReferenceSuffix)
+        {
+            if (requiresPositionalFunctionArguments)
+                return $"{nullableObjectType}[]{nullableReferenceSuffix} arguments = null";
+
+            if (requiresDictionaryRoutineArguments)
+                return $"IReadOnlyDictionary<string, {nullableObjectType}>{nullableReferenceSuffix} parameters = null";
+
+            return parameterType == null
+                ? $"{nullableObjectType} parameters = null"
+                : $"{parameterType}{nullableReferenceSuffix} parameters = null";
         }
 
         private readonly record struct RoutineStubPlan(
