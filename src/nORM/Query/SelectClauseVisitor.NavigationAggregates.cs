@@ -16,6 +16,139 @@ namespace nORM.Query
 {
     internal sealed partial class SelectClauseVisitor
     {
+        private bool TryVisitNavigationAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            Expression navCandidate = node.Arguments.Count >= 1 ? node.Arguments[0] : null!;
+            LambdaExpression? navFilter = null;
+            if (navCandidate is MethodCallExpression whereCall
+                && whereCall.Method.Name == nameof(Queryable.Where)
+                && whereCall.Arguments.Count == 2
+                && StripQuotes(whereCall.Arguments[1]) is LambdaExpression whereLambda)
+            {
+                navFilter = whereLambda;
+                navCandidate = whereCall.Arguments[0];
+            }
+
+            if (_ctx != null
+                && navCandidate is MethodCallExpression twoHopCall
+                && twoHopCall.Method.Name == nameof(Enumerable.SelectMany)
+                && twoHopCall.Arguments.Count == 2
+                && twoHopCall.Arguments[0] is MemberExpression hop1NavMember
+                && hop1NavMember.Expression is ParameterExpression
+                && _mapping.Relations.TryGetValue(hop1NavMember.Member.Name, out var hop1Relation)
+                && StripQuotes(twoHopCall.Arguments[1]) is LambdaExpression hop2SelectorLambda
+                && hop2SelectorLambda.Body is MemberExpression hop2NavMember
+                && (node.Method.Name is nameof(Queryable.Count)
+                                     or nameof(Queryable.LongCount)
+                                     or nameof(Queryable.Any)))
+            {
+                var intermediateMapping = _ctx.GetMapping(hop1Relation.DependentType);
+                if (intermediateMapping.Relations.TryGetValue(hop2NavMember.Member.Name, out var hop2Relation))
+                {
+                    var hop2Filter = node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression hop2Predicate
+                        ? hop2Predicate
+                        : null;
+                    EmitTwoHopNavigationCountSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation, hop2Filter);
+                    return true;
+                }
+            }
+
+            if (navCandidate is MemberExpression navMember
+                && navMember.Expression is ParameterExpression
+                && _mapping.Relations.TryGetValue(navMember.Member.Name, out var relation)
+                && (node.Method.Name is nameof(Queryable.Count)
+                                     or nameof(Queryable.LongCount)
+                                     or nameof(Queryable.Any)
+                                     or nameof(Queryable.All)))
+            {
+                if (navFilter == null
+                    && node.Arguments.Count == 2
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression directPred)
+                {
+                    navFilter = directPred;
+                }
+
+                EmitNavigationCountSubquery(sb, node, relation, navFilter);
+                return true;
+            }
+
+            if (TryVisitSelectedNavigationScalarAggregate(node, sb))
+                return true;
+
+            return TryVisitDirectNavigationScalarAggregate(node, sb);
+        }
+
+        private bool TryVisitSelectedNavigationScalarAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            if (node.Arguments.Count != 1
+                || node.Method.Name is not (nameof(Queryable.Sum)
+                                            or nameof(Queryable.Min)
+                                            or nameof(Queryable.Max)
+                                            or nameof(Queryable.Average))
+                || node.Arguments[0] is not MethodCallExpression selCall
+                || selCall.Method.Name != nameof(Queryable.Select)
+                || selCall.Arguments.Count != 2
+                || StripQuotes(selCall.Arguments[1]) is not LambdaExpression selectorLambda)
+            {
+                return false;
+            }
+
+            Expression selSource = selCall.Arguments[0];
+            LambdaExpression? selFilter = null;
+            if (selSource is MethodCallExpression preWhere
+                && preWhere.Method.Name == nameof(Queryable.Where)
+                && preWhere.Arguments.Count == 2
+                && StripQuotes(preWhere.Arguments[1]) is LambdaExpression preWhereLambda)
+            {
+                selFilter = preWhereLambda;
+                selSource = preWhere.Arguments[0];
+            }
+
+            if (selSource is not MemberExpression selNav
+                || selNav.Expression is not ParameterExpression
+                || !_mapping.Relations.TryGetValue(selNav.Member.Name, out var selRelation))
+            {
+                return false;
+            }
+
+            EmitNavigationScalarAggregateSubquery(sb, node.Method.Name, selRelation, selectorLambda, selFilter);
+            return true;
+        }
+
+        private bool TryVisitDirectNavigationScalarAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            if (node.Arguments.Count != 2
+                || node.Method.Name is not (nameof(Queryable.Sum)
+                                            or nameof(Queryable.Min)
+                                            or nameof(Queryable.Max)
+                                            or nameof(Queryable.Average))
+                || StripQuotes(node.Arguments[1]) is not LambdaExpression directSelectorLambda)
+            {
+                return false;
+            }
+
+            Expression directSource = node.Arguments[0];
+            LambdaExpression? directFilter = null;
+            if (directSource is MethodCallExpression directWhere
+                && directWhere.Method.Name == nameof(Queryable.Where)
+                && directWhere.Arguments.Count == 2
+                && StripQuotes(directWhere.Arguments[1]) is LambdaExpression directWhereLambda)
+            {
+                directFilter = directWhereLambda;
+                directSource = directWhere.Arguments[0];
+            }
+
+            if (directSource is not MemberExpression directNav
+                || directNav.Expression is not ParameterExpression
+                || !_mapping.Relations.TryGetValue(directNav.Member.Name, out var directRelation))
+            {
+                return false;
+            }
+
+            EmitNavigationScalarAggregateSubquery(sb, node.Method.Name, directRelation, directSelectorLambda, directFilter);
+            return true;
+        }
+
         private void EmitNavigationCountSubquery(StringBuilder sb, MethodCallExpression node, TableMapping.Relation relation, LambdaExpression? extraFilter)
         {
             // Resolve the dependent table mapping from the relation's DependentType. The
