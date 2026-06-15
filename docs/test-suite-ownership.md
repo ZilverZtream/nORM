@@ -211,6 +211,12 @@ materialization, group-join materialization, dependent split-query loading, and
 support helpers remain separate responsibilities. `RepositoryHygieneTests`
 enforces this boundary.
 
+## Include Processor Source Size
+
+Every `IncludeProcessor*.cs` partial stays below 750 lines so ordinary include
+chains and many-to-many include loading remain separate navigation
+responsibilities. `RepositoryHygieneTests` enforces this boundary.
+
 ## Select Clause Visitor Source Size
 
 Every `SelectClauseVisitor*.cs` partial stays below 1500 lines so projection
