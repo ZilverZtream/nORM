@@ -3,12 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
-using Microsoft.Extensions.ObjectPool;
 using nORM.Core;
-using nORM.Mapping;
-using nORM.Providers;
 
 #nullable enable
 
@@ -20,190 +15,14 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
-            // Convert.ChangeType(value, typeof(T)) — the target type is conveyed
-            // as a Type constant; pattern-match it at build time and emit the
-            // equivalent CAST. Mirrors ETSV's Convert.ToXxx single-arg path.
-            // Runtime-variable target types remain unsupported and fall through.
-            if (node.Method.DeclaringType == typeof(Convert)
-                && node.Method.Name == nameof(Convert.ChangeType)
-                && node.Arguments.Count == 2
-                && node.Arguments[1] is ConstantExpression typeConst
-                && typeConst.Value is Type targetType)
+            if (TryVisitConvertChangeType(node, sb)
+                || TryVisitTimeSpanUnary(node, sb)
+                || TryVisitDateTimeTimeSpanArithmetic(node, sb)
+                || TryVisitEnumParse(node, sb)
+                || TryVisitDateTimeOffsetToOffset(node, sb)
+                || TryVisitDateOnlyArithmetic(node, sb))
             {
-                var innerStart = sb.Length;
-                Visit(node.Arguments[0]);
-                var innerSql = sb.ToString(innerStart, sb.Length - innerStart);
-                sb.Length = innerStart;
-                // Route through provider hooks so each engine uses the correct CAST syntax.
-                // SQL Server: NVARCHAR(MAX), MySQL: CHAR/SIGNED, Postgres/SQLite: TEXT/INTEGER.
-                if (targetType == typeof(string))
-                {
-                    sb.Append(_provider.GetToStringSql(innerSql));
-                    return node;
-                }
-                if (targetType == typeof(int) || targetType == typeof(short)
-                    || targetType == typeof(byte) || targetType == typeof(sbyte))
-                {
-                    sb.Append(_provider.GetIntCastSql(innerSql, asLong: false));
-                    return node;
-                }
-                if (targetType == typeof(long))
-                {
-                    sb.Append(_provider.GetIntCastSql(innerSql, asLong: true));
-                    return node;
-                }
-                if (targetType == typeof(double) || targetType == typeof(float))
-                {
-                    sb.Append(_provider.GetRealCastSql(innerSql, asDecimal: false));
-                    return node;
-                }
-                if (targetType == typeof(decimal))
-                {
-                    sb.Append(_provider.GetRealCastSql(innerSql, asDecimal: true));
-                    return node;
-                }
-                if (targetType == typeof(bool))
-                {
-                    sb.Append(_provider.GetBoolCastSql(innerSql));
-                    return node;
-                }
-            }
-
-            // TimeSpan.Negate() and TimeSpan.Duration() (abs) on a column receiver.
-            // Both route through the seconds-as-REAL hook (sister of 502c24a's unary
-            // negate fix) so the materialiser reconstructs via TimeSpan.FromSeconds
-            // rather than mis-reading the negated/abs'd column-text numeric prefix.
-            if (node.Object != null
-                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(TimeSpan)
-                && node.Arguments.Count == 0
-                && (node.Method.Name == nameof(TimeSpan.Negate) || node.Method.Name == nameof(TimeSpan.Duration)))
-            {
-                var tsObjStart = sb.Length;
-                Visit(node.Object);
-                var tsObjSql = sb.ToString(tsObjStart, sb.Length - tsObjStart);
-                sb.Length = tsObjStart;
-                var secondsSql = _provider.GetTimeSpanColumnSecondsSql(tsObjSql);
-                if (node.Method.Name == nameof(TimeSpan.Negate))
-                    sb.Append("(-1.0 * ").Append(secondsSql).Append(')');
-                else
-                    sb.Append("ABS(").Append(secondsSql).Append(')');
                 return node;
-            }
-
-            // DateTime.Add(TimeSpan) / DateTime.Subtract(TimeSpan) /
-            // DateTimeOffset.Add(TimeSpan) / DateTimeOffset.Subtract(TimeSpan) --
-            // the instance-method forms route through the same provider hooks
-            // as the binary `dt +/- ts` operator (which lowers to MethodCall via
-            // op_Addition / op_Subtraction in some expression-tree shapes). Two
-            // shapes for the arg: a foldable constant TimeSpan (use seconds
-            // literal) or a TimeSpan column (use column-arg hook).
-            if (node.Object != null
-                && ((Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateTime)
-                    || (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateTimeOffset))
-                && (node.Method.Name == nameof(DateTime.Add) || node.Method.Name == nameof(DateTime.Subtract))
-                && node.Arguments.Count == 1
-                && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(TimeSpan))
-            {
-                var dtSql = TranslateProjectionArg(node.Object);
-                bool subtract = node.Method.Name == nameof(DateTime.Subtract);
-                // Use TryGetTimeSpanConstant so the TimeSpan.From*(constNum)
-                // factory MethodCall folds correctly — ExpressionValueExtractor
-                // refuses MethodCallExpression by design (RCE safety).
-                if (TryGetTimeSpanConstant(node.Arguments[0], out var tsConst))
-                {
-                    var seconds = tsConst.TotalSeconds;
-                    if (subtract) seconds = -seconds;
-                    var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-                    var addSql = _provider.AddSecondsToDateTimeSql(dtSql, secondsLiteral);
-                    if (addSql != null)
-                    {
-                        sb.Append(addSql);
-                        return node;
-                    }
-                }
-                else
-                {
-                    var spanSql = TranslateProjectionArg(node.Arguments[0]);
-                    var addColSql = _provider.AddTimeSpanColumnToDateTimeSql(dtSql, spanSql, subtract);
-                    if (addColSql != null)
-                    {
-                        sb.Append(addColSql);
-                        return node;
-                    }
-                }
-            }
-
-            // Generic Enum.Parse<T>(string) on a column. Emit a CASE-WHEN
-            // cascade mapping each enum member's name to its underlying integer
-            // (sister of the Enum.GetName(int) translation). Materialiser routes
-            // the integer through ConvertToEnum<T>.
-            if (node.Method.Name == nameof(Enum.Parse)
-                && node.Method.DeclaringType == typeof(Enum)
-                && node.Method.IsGenericMethod
-                && node.Arguments.Count == 1
-                && node.Method.GetGenericArguments() is { Length: 1 } scvParseGenericArgs
-                && scvParseGenericArgs[0].IsEnum)
-            {
-                var nameSql = TranslateProjectionArg(node.Arguments[0]);
-                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(nameSql, scvParseGenericArgs[0]));
-                return node;
-            }
-            // Legacy Enum.Parse(Type, string).
-            if (node.Method.Name == nameof(Enum.Parse)
-                && node.Method.DeclaringType == typeof(Enum)
-                && !node.Method.IsGenericMethod
-                && node.Arguments.Count >= 2
-                && node.Arguments[0] is ConstantExpression scvParseTypeConst
-                && scvParseTypeConst.Value is Type scvParseEnumType
-                && scvParseEnumType.IsEnum)
-            {
-                var nameSql = TranslateProjectionArg(node.Arguments[1]);
-                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(nameSql, scvParseEnumType));
-                return node;
-            }
-
-            // DateTimeOffset.ToOffset(constTimeSpan) -- recompute the column at
-            // the new offset. The UTC instant is invariant; only the wall clock
-            // and trailing offset suffix change. Provider hook handles per-storage
-            // emit (SqlServer SWITCHOFFSET native; canonical text on others).
-            if (node.Object != null
-                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateTimeOffset)
-                && node.Method.Name == nameof(DateTimeOffset.ToOffset)
-                && node.Arguments.Count == 1
-                && TryGetTimeSpanConstant(node.Arguments[0], out var toOffsetTs))
-            {
-                var dtoSql = TranslateProjectionArg(node.Object);
-                sb.Append(_provider.GetDateTimeOffsetWithOffsetSql(dtoSql, toOffsetTs));
-                return node;
-            }
-
-            // DateOnly.AddDays / AddMonths / AddYears -- route through the
-            // matching AddXToDateOnlySql hook so each provider uses its
-            // native date arithmetic.
-            if (node.Object != null
-                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(DateOnly)
-                && node.Arguments.Count == 1
-                && (node.Method.Name == nameof(DateOnly.AddDays)
-                    || node.Method.Name == nameof(DateOnly.AddMonths)
-                    || node.Method.Name == nameof(DateOnly.AddYears)))
-            {
-                var dateSql = TranslateProjectionArg(node.Object);
-                var nSql = TranslateProjectionArg(node.Arguments[0]);
-                var arithSql = node.Method.Name switch
-                {
-                    nameof(DateOnly.AddDays) => _provider.AddDaysToDateOnlySql(dateSql, nSql),
-                    nameof(DateOnly.AddMonths) => _provider.AddMonthsToDateOnlySql(dateSql, nSql),
-                    nameof(DateOnly.AddYears) => _provider.AddYearsToDateOnlySql(dateSql, nSql),
-                    _ => null
-                };
-                if (arithSql != null)
-                {
-                    sb.Append(arithSql);
-                    return node;
-                }
-                throw new InvalidOperationException(
-                    $"{_provider.GetType().Name} does not implement {node.Method.Name}ToDateOnlySql; " +
-                    $"DateOnly.{node.Method.Name} in projection requires this provider hook.");
             }
 
             // string.Trim / TrimStart / TrimEnd with explicit char[] -- the
@@ -389,7 +208,7 @@ namespace nORM.Query
                     ignoreCase = true;
                 }
                 var receiverSql = TranslateProjectionArg(node.Object);
-                var escapeChar = nORM.Core.NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
+                var escapeChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
                 var effectivePattern = ignoreCase ? patternStr.ToLowerInvariant() : patternStr;
                 var escaped = _provider.EscapeLikePattern(effectivePattern);
                 var wrapped = node.Method.Name switch
@@ -817,5 +636,6 @@ namespace nORM.Query
             sb.Append(')');
             return node;
         }
+
     }
 }
