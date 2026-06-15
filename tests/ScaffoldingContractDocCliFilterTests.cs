@@ -98,6 +98,12 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("table and query-artifact filters", doc, StringComparison.Ordinal);
         Assert.Contains("current catalog can still be used in table/query-artifact filters", doc, StringComparison.Ordinal);
         Assert.Contains("table filters can also select matching routine or sequence stubs", doc, StringComparison.Ordinal);
+        Assert.Contains("object-kind selectors", doc, StringComparison.Ordinal);
+        Assert.Contains("`table:dbo.Report`", doc, StringComparison.Ordinal);
+        Assert.Contains("`query:dbo.Report`", doc, StringComparison.Ordinal);
+        Assert.Contains("`routine:dbo.RebuildCache`", doc, StringComparison.Ordinal);
+        Assert.Contains("`sequence:dbo.InvoiceNumber`", doc, StringComparison.Ordinal);
+        Assert.Contains("object-kind selectors disambiguate same-schema object-kind", doc, StringComparison.Ordinal);
         Assert.Contains("more than one selectable table, query artifact, routine, or sequence", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.Schemas", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UsePluralizer", doc, StringComparison.Ordinal);
@@ -186,6 +192,10 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ShouldEmitQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("IsDefaultQueryArtifactObject", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("IsDefaultMySqlCatalogQualifiedFilter", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("ParseObjectFilterRequest", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("NormalizeObjectKindSelector", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("MatchesTableKindSelector", tableFilterSource, StringComparison.Ordinal);
+        Assert.Contains("MatchesSkippedObjectKindSelector", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("MatchesTableFilter(provider, table, request, filterCatalog)", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("MatchesSkippedObjectFilter(provider, obj, request, filterCatalog)", tableFilterSource, StringComparison.Ordinal);
         Assert.Contains("MatchesSelectableSkippedObjectFilter", tableFilterSource, StringComparison.Ordinal);

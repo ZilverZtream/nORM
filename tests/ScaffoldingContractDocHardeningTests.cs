@@ -611,7 +611,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("providerOwnedWriteBlockingSchema", joinDiagnosticBuilderSource, StringComparison.Ordinal);
         Assert.Contains("candidateQueryArtifacts", source, StringComparison.Ordinal);
         Assert.Contains("emittedQueryArtifacts", source, StringComparison.Ordinal);
-        Assert.Contains("selectedTableKeys", source, StringComparison.Ordinal);
+        Assert.Contains("selectedTableObjectKeys", source, StringComparison.Ordinal);
+        Assert.Contains("TableObjectKey", source, StringComparison.Ordinal);
         Assert.Contains("provider-specific-default", unsupportedMetadataSource, StringComparison.Ordinal);
         Assert.Contains("QUOTE(column_default)", mySqlUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("REPLACE(column_default, CHAR(92, 39), CHAR(39))", mySqlUnsupportedSource, StringComparison.Ordinal);

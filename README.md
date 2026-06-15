@@ -395,6 +395,10 @@ accepted, and table filters can use `schema.table` or `schema.view`. MySQL
 catalog-qualified table and query-artifact filters are accepted when the
 catalog matches the current database, while generated model metadata remains
 unqualified because MySQL catalogs are not emitted as nORM schemas.
+Object-kind selectors such as `table:dbo.Report`, `view:dbo.Report`,
+`query:dbo.Report`, `routine:dbo.RebuildCache`, and
+`sequence:dbo.InvoiceNumber` disambiguate same-schema database objects that
+share a name.
 Blank CLI table/schema filters are rejected so an empty option cannot broaden
 the run to every table.
 Schema filters select all discovered user tables and supported query

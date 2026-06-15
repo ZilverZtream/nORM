@@ -13,14 +13,22 @@ namespace nORM.Scaffolding
                      || ScaffoldProviderKind.IsMySql(provider) && !string.IsNullOrWhiteSpace(filterCatalog) && string.Equals(filterCatalog, requested, StringComparison.OrdinalIgnoreCase);
 
         public static bool MatchesSkippedObjectFilter(DatabaseProvider provider, ScaffoldSkippedObjectInfo obj, string requested, string? filterCatalog = null)
-            => MatchesSkippedObjectFilter(obj, requested)
-               || IsDefaultSqliteSchemaQualifiedFilter(provider, obj.Schema, obj.Name, requested)
-               || IsDefaultMySqlCatalogQualifiedFilter(provider, obj.Schema, obj.Name, requested, filterCatalog);
+        {
+            var filter = ParseObjectFilterRequest(requested);
+            return MatchesSkippedObjectKindSelector(filter.KindSelector, obj)
+                   && (MatchesSkippedObjectFilter(obj, filter.Identifier)
+                       || IsDefaultSqliteSchemaQualifiedFilter(provider, obj.Schema, obj.Name, filter.Identifier)
+                       || IsDefaultMySqlCatalogQualifiedFilter(provider, obj.Schema, obj.Name, filter.Identifier, filterCatalog));
+        }
 
         private static bool MatchesTableFilter(DatabaseProvider provider, ScaffoldTableInfo table, string requested, string? filterCatalog)
-            => MatchesTableFilter(table, requested)
-               || IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, requested)
-               || IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, requested, filterCatalog);
+        {
+            var filter = ParseObjectFilterRequest(requested);
+            return MatchesTableKindSelector(filter.KindSelector, table)
+                   && (MatchesTableFilter(table, filter.Identifier)
+                       || IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, filter.Identifier)
+                       || IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, filter.Identifier, filterCatalog));
+        }
 
         private static bool MatchesTableFilter(ScaffoldTableInfo table, string requested)
             => string.Equals(table.Name, requested, StringComparison.OrdinalIgnoreCase)
@@ -42,5 +50,21 @@ namespace nORM.Scaffolding
                && !string.IsNullOrWhiteSpace(filterCatalog)
                && string.Equals(GetSchemaNameOrNull(requested), filterCatalog, StringComparison.OrdinalIgnoreCase)
                && string.Equals(GetUnqualifiedName(requested), objectName, StringComparison.OrdinalIgnoreCase);
+
+        private static bool MatchesTableKindSelector(string? kindSelector, ScaffoldTableInfo table)
+            => kindSelector is null
+               || string.Equals(kindSelector, "QueryArtifact", StringComparison.OrdinalIgnoreCase) && IsQueryArtifactKind(table.Kind)
+               || string.Equals(table.Kind, kindSelector, StringComparison.OrdinalIgnoreCase);
+
+        private static bool MatchesSkippedObjectKindSelector(string? kindSelector, ScaffoldSkippedObjectInfo obj)
+            => kindSelector is null
+               || string.Equals(kindSelector, "QueryArtifact", StringComparison.OrdinalIgnoreCase) && IsQueryArtifactObject(obj)
+               || string.Equals(obj.Kind, kindSelector, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsQueryArtifactKind(string kind)
+            => string.Equals(kind, "View", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(kind, "MaterializedView", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(kind, "VirtualTable", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(kind, "Synonym", StringComparison.OrdinalIgnoreCase);
     }
 }

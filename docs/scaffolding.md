@@ -380,11 +380,18 @@ must be reviewed and edited like handwritten model code.
 - Optional table filtering through `ScaffoldOptions.Tables`, CLI
   comma-separated `--tables`, repeatable CLI `--table` entries, and EF-style
   multi-value `--table First Second` tokens. Filters may use `schema.table`
-  or `schema.view` for schema-qualified tables and views. MySQL catalog-qualified
-  table and query-artifact filters are accepted when the catalog matches the
-  current database, but generated model metadata remains unqualified because
-  MySQL catalogs are not emitted as nORM schemas. Use repeatable `--table` for
-  literal table names that contain commas and must not be split.
+  or `schema.view` for schema-qualified tables and views, and may use
+  object-kind selectors such as `table:dbo.Report`, `view:dbo.Report`,
+  `query:dbo.Report`, `routine:dbo.RebuildCache`, or
+  `sequence:dbo.InvoiceNumber` when same-schema database objects share a name.
+  The `query:` selector covers supported query artifacts including views,
+  materialized views, explicitly selected SQLite virtual tables, and local
+  table/view SQL Server synonyms. MySQL catalog-qualified table and query-artifact filters
+  are accepted when the catalog matches the current
+  database, including after an object-kind selector, but generated model
+  metadata remains unqualified because MySQL catalogs are not emitted as nORM
+  schemas. Use repeatable `--table` for literal table names that contain commas
+  and must not be split.
   Null or blank API filters are treated as empty rather than producing raw
   runtime exceptions; blank CLI filters are rejected so an empty command-line
   option cannot broaden the run to all tables. Bare table-name filters fail with an
@@ -399,11 +406,11 @@ must be reviewed and edited like handwritten model code.
   table filters can also select matching routine or sequence stubs without
   broadening the run to every discovered provider object; without the matching
   opt-in those filters still fail as non-entity database objects.
-  Because table filters are not object-kind selectors, an explicit filter that
+  Because bare table filters are not object-kind selectors, an explicit filter that
   matches more than one selectable table, query artifact, routine, or sequence
   fails deterministically; schema-qualified filters disambiguate cross-schema
-  matches, while same-schema object-kind collisions must be scaffolded in
-  separate runs.
+  matches, while object-kind selectors disambiguate same-schema object-kind
+  collisions.
 - When no table/schema filter is supplied, ordinary views and PostgreSQL
   materialized views are scaffolded by default as read-only query artifacts,
   matching EF's database-first view coverage without inferring provider-neutral

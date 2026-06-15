@@ -18,27 +18,29 @@ namespace nORM.Scaffolding
             if (string.IsNullOrWhiteSpace(request))
                 return table;
 
-            var requestedSchema = GetSchemaNameOrNull(request);
+            var filterRequest = ParseObjectFilterRequest(request);
+            var requestedName = filterRequest.Identifier;
+            var requestedSchema = GetSchemaNameOrNull(requestedName);
             if (!string.IsNullOrWhiteSpace(requestedSchema)
                 && string.Equals(requestedSchema, table.Schema, StringComparison.OrdinalIgnoreCase))
             {
-                return new ScaffoldTableInfo(GetUnqualifiedName(request), requestedSchema, table.Kind);
+                return new ScaffoldTableInfo(GetUnqualifiedName(requestedName), requestedSchema, table.Kind);
             }
 
             if (!string.IsNullOrWhiteSpace(requestedSchema)
-                && IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, request))
+                && IsDefaultSqliteSchemaQualifiedFilter(provider, table.Schema, table.Name, requestedName))
             {
-                return new ScaffoldTableInfo(GetUnqualifiedName(request), table.Schema, table.Kind);
+                return new ScaffoldTableInfo(GetUnqualifiedName(requestedName), table.Schema, table.Kind);
             }
 
             if (!string.IsNullOrWhiteSpace(requestedSchema)
-                && IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, request, filterCatalog))
+                && IsDefaultMySqlCatalogQualifiedFilter(provider, table.Schema, table.Name, requestedName, filterCatalog))
             {
-                return new ScaffoldTableInfo(GetUnqualifiedName(request), table.Schema, table.Kind);
+                return new ScaffoldTableInfo(GetUnqualifiedName(requestedName), table.Schema, table.Kind);
             }
 
-            if (requestedSchema is null && string.Equals(request, table.Name, StringComparison.OrdinalIgnoreCase))
-                return new ScaffoldTableInfo(request, table.Schema, table.Kind);
+            if (requestedSchema is null && string.Equals(requestedName, table.Name, StringComparison.OrdinalIgnoreCase))
+                return new ScaffoldTableInfo(requestedName, table.Schema, table.Kind);
 
             return table;
         }

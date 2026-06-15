@@ -636,6 +636,56 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public void BuildSelection_WithTableKindSelectorAndRoutineNameCollision_SelectsTableOnly()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("RebuildCache", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "RebuildCache", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            tables,
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "table:dbo.RebuildCache" }, EmitRoutineStubs = true },
+            new SqliteProvider(),
+            null);
+
+        var table = Assert.Single(selection.Tables);
+        Assert.Equal("Table", table.Kind);
+        Assert.Equal("RebuildCache", table.Name);
+        Assert.Empty(selection.SkippedObjects);
+    }
+
+    [Fact]
+    public void BuildSelection_WithRoutineKindSelectorAndTableNameCollision_SelectsRoutineOnly()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("RebuildCache", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "RebuildCache", "Routine", "SQL Server stored procedure; parameters=0", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            tables,
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "routine:dbo.RebuildCache" }, EmitRoutineStubs = true },
+            new SqliteProvider(),
+            null);
+
+        Assert.Empty(selection.Tables);
+        var routine = Assert.Single(selection.SkippedObjects);
+        Assert.Equal("Routine", routine.Kind);
+        Assert.Equal("RebuildCache", routine.Name);
+    }
+
+    [Fact]
     public void BuildSelection_WithTableAndQueryArtifactFilterNameCollision_ReportsArtifactKind()
     {
         var tables = new[]
@@ -659,6 +709,58 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("Table dbo.Report", ex.Message, StringComparison.Ordinal);
         Assert.Contains("View dbo.Report", ex.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("Table dbo.Report, Table dbo.Report", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildSelection_WithTableKindSelectorAndQueryArtifactNameCollision_SelectsTableOnly()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("Report", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "Report", "View", "SQL Server view", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            tables,
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "table:dbo.Report" }, EmitQueryArtifacts = true },
+            new SqliteProvider(),
+            null);
+
+        var table = Assert.Single(selection.Tables);
+        Assert.Equal("Table", table.Kind);
+        Assert.Equal("Report", table.Name);
+        Assert.Empty(selection.QueryArtifactTableKeys);
+        Assert.Empty(selection.SkippedObjects);
+    }
+
+    [Fact]
+    public void BuildSelection_WithQueryArtifactKindSelectorAndTableNameCollision_SelectsViewOnly()
+    {
+        var tables = new[]
+        {
+            new ScaffoldTableInfo("Report", "dbo")
+        };
+        var skippedObjects = new[]
+        {
+            new ScaffoldSkippedObjectInfo("dbo", "Report", "View", "SQL Server view", null)
+        };
+
+        var selection = ScaffoldObjectSelectionBuilder.BuildSelection(
+            tables,
+            skippedObjects,
+            new ScaffoldOptions { Tables = new[] { "query:dbo.Report" } },
+            new SqliteProvider(),
+            null);
+
+        var view = Assert.Single(selection.Tables);
+        Assert.Equal("View", view.Kind);
+        Assert.Equal("Report", view.Name);
+        Assert.Contains("dbo.Report", selection.QueryArtifactTableKeys);
+        Assert.Empty(selection.SkippedObjects);
     }
 
     [Fact]

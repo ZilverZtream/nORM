@@ -76,11 +76,15 @@ reports when overwrite is explicitly allowed, so old warnings do not leak into
 CI logs.
 
 `--tables` accepts comma-separated bare table names plus `schema.table` and
-`schema.view` filters. MySQL catalog-qualified table and query-artifact filters
-are accepted when the catalog matches the current database, but generated model
-metadata remains unqualified because MySQL catalogs are not emitted as nORM
-schemas. Use repeatable `--table` for literal table names that contain commas
-and must not be split; EF-style multi-value `--table First Second`
+`schema.view` filters. Object-kind selectors such as `table:dbo.Report`,
+`view:dbo.Report`, `query:dbo.Report`, `routine:dbo.RebuildCache`, and
+`sequence:dbo.InvoiceNumber` disambiguate same-schema database objects that
+share a name. MySQL catalog-qualified table and query-artifact filters are
+accepted when the catalog matches the current database, including after an
+object-kind selector, but generated model metadata remains unqualified because
+MySQL catalogs are not emitted as nORM schemas. Use repeatable `--table` for
+literal table names that contain commas and must not be split; EF-style
+multi-value `--table First Second`
 tokens are also accepted. Literal dotted table names are supported, but if a literal dotted
 table name collides with the same text as a schema-qualified table, scaffolding
 fails with an actionable error because the v1 filter syntax cannot disambiguate
@@ -101,7 +105,8 @@ When `--emit-routine-stubs` or `--emit-sequence-stubs` is enabled, table filters
 can also select matching provider routines or sequences without generating every
 discovered provider object.
 Ambiguous explicit filters that match more than one selectable table, query artifact,
-routine, or sequence fail closed; use schema-qualified filters for cross-schema matches.
+routine, or sequence fail closed; use schema-qualified filters for cross-schema
+matches and object-kind selectors for same-schema object-kind collisions.
 By default, nORM's scaffold pluralizer singularizes plural database object
 names for entity classes and emits collection-style generated `IQueryable<T>`
 context property names, with deterministic cleanup for descriptor-like entity

@@ -44,7 +44,7 @@ namespace nORM.Scaffolding
             throw new NormConfigurationException(
                 "Scaffolding table filter is ambiguous because it matches multiple selectable database objects: " +
                 string.Join("; ", ambiguousRequests.Select(match => $"{match.Request} matched {string.Join(", ", match.Matches)}")) +
-                ". Use schema-qualified table filters when the ambiguity is across schemas; literal dotted table names that collide with schema-qualified names must be scaffolded without a table filter; same-schema object-kind collisions must be scaffolded in separate runs.");
+                ". Use schema-qualified table filters when the ambiguity is across schemas; use object-kind selectors such as table:, view:, query:, routine:, or sequence: for same-schema object-kind collisions. Literal dotted table names that collide with schema-qualified names must be scaffolded without a table filter.");
         }
 
         private static void ThrowIfMissingTableFilterRequest(

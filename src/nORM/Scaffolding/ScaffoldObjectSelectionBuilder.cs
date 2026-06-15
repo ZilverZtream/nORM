@@ -27,11 +27,11 @@ namespace nORM.Scaffolding
                 options,
                 provider,
                 filterCatalog);
-            var selectedTableKeys = tables
-                .Select(table => TableKey(table.Schema, table.Name))
+            var selectedTableObjectKeys = tables
+                .Select(table => TableObjectKey(table.Kind, table.Schema, table.Name))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var emittedQueryArtifacts = candidateQueryArtifacts
-                .Where(obj => selectedTableKeys.Contains(TableKey(obj.Schema, obj.Name)))
+                .Where(obj => selectedTableObjectKeys.Contains(TableObjectKey(obj.Kind, obj.Schema, obj.Name)))
                 .ToArray();
             var queryArtifactTableKeys = emittedQueryArtifacts
                 .Select(obj => TableKey(obj.Schema, obj.Name))
@@ -51,6 +51,9 @@ namespace nORM.Scaffolding
 
         private static string TableKey(string? schema, string table)
             => string.IsNullOrEmpty(schema) ? table : $"{schema}.{table}";
+
+        private static string TableObjectKey(string kind, string? schema, string table)
+            => kind + "\u001f" + (schema ?? string.Empty) + "\u001f" + table;
     }
 
     internal readonly record struct ScaffoldObjectSelectionInfo(

@@ -30,7 +30,7 @@ namespace nORM.Scaffolding
             throw new NormConfigurationException(
                 "Scaffolding discovered database objects whose display names collide with schema-qualified names: " +
                 string.Join("; ", collisions.Select(c => $"{c.DisplayKey} matched {string.Join(", ", c.Matches)}")) +
-                ". Rename one object or scaffold a provider-specific model manually; v1 table filters cannot disambiguate literal dotted table names from schema-qualified table names, and same-schema object-kind collisions must be scaffolded in separate runs.");
+                ". Rename one object or scaffold a provider-specific model manually; v1 table filters cannot disambiguate literal dotted table names from schema-qualified table names. For same-schema object-kind collisions, narrow the run with object-kind selectors such as table:, view:, query:, routine:, or sequence:.");
         }
 
         private static string DisplaySelectableTableMatch(ScaffoldTableInfo table)
