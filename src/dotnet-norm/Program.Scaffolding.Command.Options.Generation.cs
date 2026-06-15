@@ -6,6 +6,7 @@ partial class Program
         => new(
             new Option<bool>("--no-pluralize") { Description = "Do not singularize entity class names or pluralize generated IQueryable<T> context property names." },
             new Option<bool>("--use-database-names") { Description = "Preserve legal table, view, sequence, routine, column, and routine result-column names as generated CLR names instead of applying PascalCase naming." },
+            new Option<bool>("--no-relationships") { Description = "Do not generate relationship navigation properties, many-to-many skip mappings, or fluent relationship configuration." },
             new Option<bool>("--json") { Description = "Emit a machine-readable scaffold result summary." },
             new Option<bool>("--force", "-f") { Description = "Overwrite existing generated files. By default, scaffold output conflicts are refused." },
             new Option<bool>("--no-overwrite") { Description = "Explicitly refuse to overwrite existing generated files." },
@@ -20,6 +21,7 @@ partial class Program
     {
         scaffold.Add(symbols.NoPluralizeOption);
         scaffold.Add(symbols.UseDatabaseNamesOption);
+        scaffold.Add(symbols.NoRelationshipsOption);
         scaffold.Add(symbols.JsonOption);
         scaffold.Add(symbols.ForceOption);
         scaffold.Add(symbols.NoOverwriteOption);

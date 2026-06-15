@@ -266,6 +266,59 @@ public partial class CliIntegrationTests
     }
 
     [Fact]
+    public void Scaffold_no_relationships_omits_navigation_properties_and_model_relationships()
+    {
+        var root = FindRepositoryRoot();
+        var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_no_relationships_" + Guid.NewGuid().ToString("N") + ".db");
+        var output = Path.Combine(Path.GetTempPath(), "norm_scaffold_no_relationships_out_" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (var cn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}"))
+            {
+                cn.Open();
+                using var cmd = cn.CreateCommand();
+                cmd.CommandText = """
+                    PRAGMA foreign_keys=ON;
+                    CREATE TABLE Author (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL
+                    );
+                    CREATE TABLE Book (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Author_Id INTEGER NOT NULL,
+                        Title TEXT NOT NULL,
+                        FOREIGN KEY (Author_Id) REFERENCES Author(Id)
+                    );
+                    """;
+                cmd.ExecuteNonQuery();
+            }
+
+            var result = RunCli(
+                $"scaffold --provider sqlite --connection {Quote($"Data Source={dbFile}")} --output {Quote(output)} --namespace CliScaffolded --context CliCtx --no-relationships",
+                root);
+
+            Assert.True(result.ExitCode == 0,
+                $"CLI failed with exit code {result.ExitCode}.{Environment.NewLine}STDOUT:{Environment.NewLine}{result.Stdout}{Environment.NewLine}STDERR:{Environment.NewLine}{result.Stderr}");
+
+            var authorCode = File.ReadAllText(Path.Combine(output, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(output, "Book.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(output, "CliCtx.cs"));
+            Assert.DoesNotContain("List<Book>", authorCode, StringComparison.Ordinal);
+            Assert.Contains("AuthorId", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("[ForeignKey(", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("public Author Author", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".HasForeignKey(", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
+        }
+        finally
+        {
+            try { File.Delete(dbFile); } catch { }
+            TryDeleteDirectory(output);
+        }
+    }
+
+    [Fact]
     public void Scaffold_context_dir_and_namespace_generate_split_context()
     {
         var dbFile = Path.Combine(Path.GetTempPath(), "norm_scaffold_context_dir_" + Guid.NewGuid().ToString("N") + ".db");

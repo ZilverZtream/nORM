@@ -49,6 +49,14 @@ namespace nORM.Scaffolding
         public bool UseDatabaseNames { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether generated entities and contexts should
+        /// omit relationship navigations, many-to-many skip mappings, and fluent
+        /// relationship configuration while still scaffolding scalar foreign-key
+        /// columns and other table metadata.
+        /// </summary>
+        public bool NoRelationships { get; init; }
+
+        /// <summary>
         /// Gets a value indicating whether generated files should emit nullable
         /// reference type annotations and <c>#nullable enable</c>. The runtime
         /// API defaults to enabled for nullable-safe output; the CLI sets this

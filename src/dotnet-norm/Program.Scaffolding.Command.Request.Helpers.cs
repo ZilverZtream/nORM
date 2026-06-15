@@ -62,6 +62,7 @@ partial class Program
             Tables = filters.Tables,
             UsePluralizer = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize),
             UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames),
+            NoRelationships = GetScaffoldBoolOptionOrConfig(result, bindings.NoRelationshipsOption, efToolConfig?.NoRelationships),
             UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true,
             ContextOutputDirectory = naming.ContextOutputDirectory,
             ContextNamespace = naming.ContextNamespace,

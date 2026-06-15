@@ -1,16 +1,21 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelCompositionBuilder
     {
-        public static ScaffoldModelComposition Build(ScaffoldModelDiscoveryResult discovery)
+        public static ScaffoldModelComposition Build(ScaffoldModelDiscoveryResult discovery, bool noRelationships = false)
         {
             var featureConfigurations = discovery.FeatureConfigurations;
-            var manyToManyJoins = BuildManyToManyJoins(discovery, featureConfigurations);
+            var manyToManyJoins = noRelationships
+                ? Array.Empty<DatabaseScaffolder.ScaffoldManyToManyJoin>()
+                : BuildManyToManyJoins(discovery, featureConfigurations);
             var manyToManyJoinTableKeys = BuildManyToManyJoinTableKeys(manyToManyJoins);
-            var relationships = BuildNonJoinRelationships(discovery, manyToManyJoinTableKeys);
+            var relationships = noRelationships
+                ? Array.Empty<DatabaseScaffolder.ScaffoldRelationship>()
+                : BuildNonJoinRelationships(discovery, manyToManyJoinTableKeys);
             var compositePrimaryKeys = ScaffoldRelationshipAdapter.BuildPrimaryKeyConfigurations(
                 discovery.EntityByTable,
                 discovery.ColumnPropertiesByTable,

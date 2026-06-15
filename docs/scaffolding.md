@@ -439,6 +439,11 @@ must be reviewed and edited like handwritten model code.
   deterministic cleanup for descriptor-like entity names. Disabling
   pluralization preserves generated names without singularizing or pluralizing
   them.
+- Optional relationship suppression through `ScaffoldOptions.NoRelationships`
+  and CLI `--no-relationships`. When enabled, nORM still scaffolds tables,
+  scalar foreign-key columns, keys, indexes, and scalar/provider metadata, but
+  omits relationship navigation properties, many-to-many skip mappings, fluent
+  `HasForeignKey` configuration, and relationship-only diagnostics.
 - Optional database-name preservation through `ScaffoldOptions.UseDatabaseNames`
   and CLI `--use-database-names`. When enabled, legal database table, view,
   sequence, routine, column, and routine result-column names are preserved as
@@ -519,7 +524,7 @@ must be reviewed and edited like handwritten model code.
   `contextDir`, `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
   `framework`/`targetFramework`, `configuration`, `runtime`,
   `msbuildProjectExtensionsPath`, `noBuild`, `json`,
-  `verbose`, `noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`,
+  `verbose`, `noColor`, `prefixOutput`, `noPluralize`, `useDatabaseNames`, `noRelationships`,
   `noOnConfiguring`, `dataAnnotations`,
   `force`, `noOverwrite`, `dryRun`, `failOnWarnings`, `emitRoutineStubs`,
   `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`. Relative project paths are

@@ -40,6 +40,7 @@ partial class Program
                 ReadEfToolConfigBool(document.RootElement, "prefixOutput"),
                 ReadEfToolConfigBool(document.RootElement, "noPluralize"),
                 ReadEfToolConfigBool(document.RootElement, "useDatabaseNames"),
+                ReadEfToolConfigBool(document.RootElement, "noRelationships"),
                 ReadEfToolConfigBool(document.RootElement, "noOnConfiguring"),
                 ReadEfToolConfigBool(document.RootElement, "dataAnnotations"),
                 ReadEfToolConfigBool(document.RootElement, "force"),

@@ -61,6 +61,60 @@ public partial class DatabaseScaffolderPrivateMethodTests
     }
 
     [Fact]
+    public async Task ScaffoldAsync_WithNoRelationships_EmitsScalarForeignKeysWithoutNavigations()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = """
+            PRAGMA foreign_keys=ON;
+            CREATE TABLE Author (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL
+            );
+            CREATE TABLE Book (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Author_Id INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                FOREIGN KEY (Author_Id) REFERENCES Author(Id)
+            );
+            """;
+        cmd.ExecuteNonQuery();
+
+        var dir = Path.Combine(Path.GetTempPath(), "san_scaffold_no_relationships_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await DatabaseScaffolder.ScaffoldAsync(
+                cn,
+                new SqliteProvider(),
+                dir,
+                "TestNs",
+                "NoRelationshipsCtx",
+                new ScaffoldOptions { NoRelationships = true });
+
+            var authorCode = File.ReadAllText(Path.Combine(dir, "Author.cs"));
+            var bookCode = File.ReadAllText(Path.Combine(dir, "Book.cs"));
+            var contextCode = File.ReadAllText(Path.Combine(dir, "NoRelationshipsCtx.cs"));
+
+            Assert.DoesNotContain("List<Book>", authorCode, StringComparison.Ordinal);
+            Assert.Contains("AuthorId", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("[ForeignKey(", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain("public Author Author", bookCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".HasMany(", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".HasOne(", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".WithOne(", contextCode, StringComparison.Ordinal);
+            Assert.DoesNotContain(".HasForeignKey(", contextCode, StringComparison.Ordinal);
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.md")));
+            Assert.False(File.Exists(Path.Combine(dir, "nORM.ScaffoldWarnings.json")));
+            AssertScaffoldOutputBuildsAsConsumerProject(dir);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ScaffoldAsync_WithUniqueForeignKey_GeneratesOneToOneNavigationsAndModelConfig()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");

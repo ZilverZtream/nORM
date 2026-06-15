@@ -491,7 +491,7 @@ EF-style `.config/dotnet-ef.json` defaults are read for `project`,
 `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
 `framework`/`targetFramework`, `configuration`, `runtime`,
 `msbuildProjectExtensionsPath`, `verbose`, `noColor`, `prefixOutput`,
-`noPluralize`, `useDatabaseNames`, `force`, `noOverwrite`, `dryRun`,
+`noPluralize`, `useDatabaseNames`, `noRelationships`, `force`, `noOverwrite`, `dryRun`,
 `failOnWarnings`, `emitRoutineStubs`,
 `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`; relative project paths are resolved relative to the
 parent of `.config`, comma-separated or array table/schema defaults are

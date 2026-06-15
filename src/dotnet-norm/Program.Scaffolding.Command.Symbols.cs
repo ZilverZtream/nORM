@@ -38,6 +38,7 @@ partial class Program
             TableOption = filters.TableOption;
             NoPluralizeOption = generation.NoPluralizeOption;
             UseDatabaseNamesOption = generation.UseDatabaseNamesOption;
+            NoRelationshipsOption = generation.NoRelationshipsOption;
             JsonOption = generation.JsonOption;
             ForceOption = generation.ForceOption;
             NoOverwriteOption = generation.NoOverwriteOption;
@@ -75,6 +76,7 @@ partial class Program
         public Option<string[]> TableOption { get; }
         public Option<bool> NoPluralizeOption { get; }
         public Option<bool> UseDatabaseNamesOption { get; }
+        public Option<bool> NoRelationshipsOption { get; }
         public Option<bool> NoOnConfiguringOption { get; }
         public Option<bool> DataAnnotationsOption { get; }
         public Option<bool> ForceOption { get; }
@@ -123,6 +125,7 @@ partial class Program
     private sealed record ScaffoldGenerationCommandSymbols(
         Option<bool> NoPluralizeOption,
         Option<bool> UseDatabaseNamesOption,
+        Option<bool> NoRelationshipsOption,
         Option<bool> JsonOption,
         Option<bool> ForceOption,
         Option<bool> NoOverwriteOption,

@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
@@ -47,21 +48,25 @@ namespace nORM.Scaffolding
 
         private static ScaffoldDiagnosticReport BuildReport(ScaffoldDiagnosticReportRequest request)
         {
-            var compositeForeignKeys = ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyDiagnostics(
-                request.ForeignKeys,
-                request.PrimaryKeyColumnsByTable,
-                request.Indexes,
-                request.NonNullableColumnsByTable);
-            var possibleJoinTables = ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableDiagnostics(
-                request.ForeignKeys,
-                request.PrimaryKeyColumnsByTable,
-                request.ColumnPropertiesByTable,
-                request.NonNullableColumnsByTable,
-                request.DatabaseGeneratedColumnsByTable,
-                request.IdentityColumnsByTable,
-                request.Indexes,
-                request.ProviderOwnedWriteBlockedTableKeys,
-                request.EmittedManyToManyJoinTableKeys);
+            var compositeForeignKeys = request.SuppressRelationshipDiagnostics
+                ? Array.Empty<ScaffoldCompositeForeignKeyDiagnosticInfo>()
+                : ScaffoldJoinTableDiagnosticBuilder.BuildCompositeForeignKeyDiagnostics(
+                    request.ForeignKeys,
+                    request.PrimaryKeyColumnsByTable,
+                    request.Indexes,
+                    request.NonNullableColumnsByTable);
+            var possibleJoinTables = request.SuppressRelationshipDiagnostics
+                ? Array.Empty<ScaffoldPossibleJoinTableDiagnosticInfo>()
+                : ScaffoldJoinTableDiagnosticBuilder.BuildPossibleJoinTableDiagnostics(
+                    request.ForeignKeys,
+                    request.PrimaryKeyColumnsByTable,
+                    request.ColumnPropertiesByTable,
+                    request.NonNullableColumnsByTable,
+                    request.DatabaseGeneratedColumnsByTable,
+                    request.IdentityColumnsByTable,
+                    request.Indexes,
+                    request.ProviderOwnedWriteBlockedTableKeys,
+                    request.EmittedManyToManyJoinTableKeys);
 
             return new ScaffoldDiagnosticReport(
                 compositeForeignKeys,

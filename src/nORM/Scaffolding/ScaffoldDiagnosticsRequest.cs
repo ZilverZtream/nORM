@@ -14,5 +14,6 @@ namespace nORM.Scaffolding
         IReadOnlyDictionary<string, IReadOnlySet<string>> DatabaseGeneratedColumnsByTable,
         IReadOnlyDictionary<string, IReadOnlySet<string>> IdentityColumnsByTable,
         IReadOnlySet<string> ProviderOwnedWriteBlockedTableKeys,
-        IReadOnlySet<string>? EmittedManyToManyJoinTableKeys);
+        IReadOnlySet<string>? EmittedManyToManyJoinTableKeys,
+        bool SuppressRelationshipDiagnostics = false);
 }

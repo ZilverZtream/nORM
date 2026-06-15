@@ -40,6 +40,7 @@ public partial class CliIntegrationTests
         Assert.Contains("--table", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--no-pluralize", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--use-database-names", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--no-relationships", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--no-onconfiguring", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--output-dir", result.Stdout, StringComparison.Ordinal);
         Assert.Contains("--data-annotations", result.Stdout, StringComparison.Ordinal);

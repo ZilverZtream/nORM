@@ -17,7 +17,8 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldTableInfo> tableInfos,
             IReadOnlyDictionary<string, string> entityByTable,
             IReadOnlySet<string> queryArtifactTableKeys,
-            bool useDatabaseNames)
+            bool useDatabaseNames,
+            bool noRelationships)
         {
             var columnPropertiesByTable = await ScaffoldColumnPropertyDiscovery.GetColumnPropertyNamesAsync(
                 connection,
@@ -54,7 +55,8 @@ namespace nORM.Scaffolding
                 scaffoldModelPrimaryKeyColumnsByTable,
                 columnPropertiesByTable,
                 indexes,
-                foreignKeys).ConfigureAwait(false);
+                foreignKeys,
+                noRelationships).ConfigureAwait(false);
             var featureConfigurations = ScaffoldFeatureConfigurationAdapter.BuildFeatureConfigurations(
                 unsupportedFeatures,
                 entityByTable,

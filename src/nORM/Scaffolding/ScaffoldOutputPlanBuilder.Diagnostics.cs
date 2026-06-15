@@ -36,7 +36,8 @@ namespace nORM.Scaffolding
                 discovery.FeatureConfigurations.ComputedColumnsByTable,
                 discovery.IdentityColumnsByTable,
                 discovery.FeatureConfigurations.ProviderOwnedWriteBlockedTableKeys,
-                request.Composition.ManyToManyJoinTableKeys);
+                request.Composition.ManyToManyJoinTableKeys,
+                request.Options.NoRelationships);
         }
     }
 }

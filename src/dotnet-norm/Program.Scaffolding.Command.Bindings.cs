@@ -32,6 +32,7 @@ partial class Program
             TableOption = symbols.TableOption,
             NoPluralizeOption = symbols.NoPluralizeOption,
             UseDatabaseNamesOption = symbols.UseDatabaseNamesOption,
+            NoRelationshipsOption = symbols.NoRelationshipsOption,
             NoOnConfiguringOption = symbols.NoOnConfiguringOption,
             DataAnnotationsOption = symbols.DataAnnotationsOption,
             ForceOption = symbols.ForceOption,
@@ -72,6 +73,7 @@ partial class Program
         public required Option<string[]> TableOption { get; init; }
         public required Option<bool> NoPluralizeOption { get; init; }
         public required Option<bool> UseDatabaseNamesOption { get; init; }
+        public required Option<bool> NoRelationshipsOption { get; init; }
         public required Option<bool> NoOnConfiguringOption { get; init; }
         public required Option<bool> DataAnnotationsOption { get; init; }
         public required Option<bool> ForceOption { get; init; }

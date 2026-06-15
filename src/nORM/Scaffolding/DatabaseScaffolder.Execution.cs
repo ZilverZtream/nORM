@@ -49,7 +49,7 @@ namespace nORM.Scaffolding
 
                 var discovery = await ScaffoldModelDiscovery.BuildAsync(connection, provider, options).ConfigureAwait(false);
                 safeContextName = ScaffoldNameHelper.MakeUniqueContextName(safeContextName, discovery.EntityByTable.Values);
-                var composition = ScaffoldModelCompositionBuilder.Build(discovery);
+                var composition = ScaffoldModelCompositionBuilder.Build(discovery, options.NoRelationships);
                 var outputPlan = await ScaffoldOutputPlanBuilder.BuildAsync(new ScaffoldOutputPlanRequest(
                     connection,
                     provider,

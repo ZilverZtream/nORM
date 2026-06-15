@@ -125,7 +125,8 @@ member names instead of opaque numeric suffixes.
 is a no-op because nORM generated contexts never emit `OnConfiguring` or a
 hard-coded connection string.
 EF-style aliases are accepted for common options: `--output-dir`/`-o`,
-`-n`, `-c`, `-t`, `--data-annotations`/`-d`, and `--force`/`-f`.
+`-n`, `-c`, `-t`, `--data-annotations`/`-d`, `--no-relationships`, and
+`--force`/`-f`.
 EF-style positional arguments are also accepted as
 `norm scaffold <connection> <provider> ...`; explicit `--connection` and
 `--provider` options take precedence when both forms are supplied. A single
@@ -192,7 +193,7 @@ EF-style `.config/dotnet-ef.json` defaults are read for `project`,
 `contextNamespace`, `schema`/`schemas`, `table`/`tables`,
 `framework`/`targetFramework`, `configuration`, `runtime`,
 `msbuildProjectExtensionsPath`, `noBuild`, `json`, `verbose`, `noColor`, `prefixOutput`,
-`noPluralize`, `useDatabaseNames`, `noOnConfiguring`, `dataAnnotations`,
+`noPluralize`, `useDatabaseNames`, `noRelationships`, `noOnConfiguring`, `dataAnnotations`,
 `force`, `noOverwrite`, `dryRun`,
 `failOnWarnings`, `emitRoutineStubs`,
 `emitSequenceStubs`, `emitViewEntities`, and `emitQueryArtifacts`; relative project paths are resolved relative to the

@@ -651,7 +651,7 @@ public partial class CliIntegrationTests
     [Fact]
     public void Scaffold_dotnet_ef_config_rejects_non_boolean_common_flags()
     {
-        foreach (var propertyName in new[] { "verbose", "json", "noBuild", "noOnConfiguring", "dataAnnotations" })
+        foreach (var propertyName in new[] { "verbose", "json", "noBuild", "noRelationships", "noOnConfiguring", "dataAnnotations" })
         {
             var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_bool_" + Guid.NewGuid().ToString("N"));
             var configDir = Path.Combine(tempRoot, ".config");

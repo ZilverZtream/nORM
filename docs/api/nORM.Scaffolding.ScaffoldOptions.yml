@@ -18,6 +18,7 @@ items:
   - nORM.Scaffolding.ScaffoldOptions.Schemas
   - nORM.Scaffolding.ScaffoldOptions.Tables
   - nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames
+  - nORM.Scaffolding.ScaffoldOptions.NoRelationships
   - nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes
   - nORM.Scaffolding.ScaffoldOptions.UsePluralizer
   langs:
@@ -223,6 +224,44 @@ items:
       type: System.Boolean
     content.vb: Public Property UseDatabaseNames As Boolean
   overload: nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames*
+- uid: nORM.Scaffolding.ScaffoldOptions.NoRelationships
+  commentId: P:nORM.Scaffolding.ScaffoldOptions.NoRelationships
+  id: NoRelationships
+  parent: nORM.Scaffolding.ScaffoldOptions
+  langs:
+  - csharp
+  - vb
+  name: NoRelationships
+  nameWithType: ScaffoldOptions.NoRelationships
+  fullName: nORM.Scaffolding.ScaffoldOptions.NoRelationships
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Scaffolding/ScaffoldOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NoRelationships
+    path: src/nORM/Scaffolding/ScaffoldOptions.cs
+    startLine: 57
+  assemblies:
+  - nORM
+  namespace: nORM.Scaffolding
+  summary: >-
+    Gets a value indicating whether generated entities and contexts should
+
+    omit relationship navigations, many-to-many skip mappings, and fluent
+
+    relationship configuration while still scaffolding scalar foreign-key
+
+    columns and other table metadata.
+  example: []
+  syntax:
+    content: public bool NoRelationships { get; init; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property NoRelationships As Boolean
+  overload: nORM.Scaffolding.ScaffoldOptions.NoRelationships*
 - uid: nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes
   commentId: P:nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes
   id: UseNullableReferenceTypes
@@ -1724,6 +1763,12 @@ references:
   name: UseDatabaseNames
   nameWithType: ScaffoldOptions.UseDatabaseNames
   fullName: nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames
+- uid: nORM.Scaffolding.ScaffoldOptions.NoRelationships*
+  commentId: Overload:nORM.Scaffolding.ScaffoldOptions.NoRelationships
+  href: nORM.Scaffolding.ScaffoldOptions.html#nORM_Scaffolding_ScaffoldOptions_NoRelationships
+  name: NoRelationships
+  nameWithType: ScaffoldOptions.NoRelationships
+  fullName: nORM.Scaffolding.ScaffoldOptions.NoRelationships
 - uid: nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes*
   commentId: Overload:nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes
   href: nORM.Scaffolding.ScaffoldOptions.html#nORM_Scaffolding_ScaffoldOptions_UseNullableReferenceTypes

@@ -465,6 +465,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldOptions.Schemas", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UsePluralizer", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseDatabaseNames", optionsDoc, StringComparison.Ordinal);
+        Assert.Contains("ScaffoldOptions.NoRelationships", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.UseNullableReferenceTypes", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.ContextDirectory", optionsDoc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.ContextNamespace", optionsDoc, StringComparison.Ordinal);

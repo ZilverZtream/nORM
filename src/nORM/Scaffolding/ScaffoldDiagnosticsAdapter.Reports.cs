@@ -30,6 +30,7 @@ namespace nORM.Scaffolding
                 request.DatabaseGeneratedColumnsByTable,
                 request.IdentityColumnsByTable,
                 request.ProviderOwnedWriteBlockedTableKeys,
-                request.EmittedManyToManyJoinTableKeys);
+                request.EmittedManyToManyJoinTableKeys,
+                request.SuppressRelationshipDiagnostics);
     }
 }

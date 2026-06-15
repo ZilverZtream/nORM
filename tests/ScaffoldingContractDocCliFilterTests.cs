@@ -173,6 +173,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`verbose`, `noColor`", doc, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", doc, StringComparison.Ordinal);
         Assert.Contains("`noPluralize`, `useDatabaseNames`", doc, StringComparison.Ordinal);
+        Assert.Contains("`noRelationships`", doc, StringComparison.Ordinal);
         Assert.Contains("`force`, `noOverwrite`", doc, StringComparison.Ordinal);
         Assert.Contains("`dryRun`, `failOnWarnings`, `emitRoutineStubs`", doc, StringComparison.Ordinal);
         Assert.Contains("`emitSequenceStubs`", doc, StringComparison.Ordinal);
@@ -306,6 +307,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("\"pomelo.entityframeworkcore.mysql\"", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--no-pluralize\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--use-database-names\")", cliSource, StringComparison.Ordinal);
+        Assert.Contains("Option<bool>(\"--no-relationships\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("sequence, routine, column, and routine result-column names as generated CLR names", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--no-onconfiguring\")", cliSource, StringComparison.Ordinal);
         Assert.Contains("Option<bool>(\"--data-annotations\", \"-d\")", cliSource, StringComparison.Ordinal);
@@ -324,6 +326,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("efToolConfig?.OutputDir", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.NoPluralize", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.UseDatabaseNames", cliSource, StringComparison.Ordinal);
+        Assert.Contains("efToolConfig?.NoRelationships", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.Force", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.NoOverwrite", cliSource, StringComparison.Ordinal);
         Assert.Contains("efToolConfig?.DryRun", cliSource, StringComparison.Ordinal);
@@ -337,6 +340,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("efToolConfig?.MsbuildProjectExtensionsPath", cliSource, StringComparison.Ordinal);
         Assert.Contains("UsePluralizer = !GetScaffoldBoolOptionOrConfig(result, bindings.NoPluralizeOption, efToolConfig?.NoPluralize)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseDatabaseNames = GetScaffoldBoolOptionOrConfig(result, bindings.UseDatabaseNamesOption, efToolConfig?.UseDatabaseNames)", cliSource, StringComparison.Ordinal);
+        Assert.Contains("NoRelationships = GetScaffoldBoolOptionOrConfig(result, bindings.NoRelationshipsOption, efToolConfig?.NoRelationships)", cliSource, StringComparison.Ordinal);
         Assert.Contains("DryRun = GetScaffoldBoolOptionOrConfig(result, bindings.DryRunOption, efToolConfig?.DryRun)", cliSource, StringComparison.Ordinal);
         Assert.Contains("UseNullableReferenceTypes = projectInfo?.UseNullableReferenceTypes ?? true", cliSource, StringComparison.Ordinal);
         Assert.Contains("options.UseDatabaseNames", scaffolderSource, StringComparison.Ordinal);
@@ -386,6 +390,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`msbuildProjectExtensionsPath`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`noPluralize`, `useDatabaseNames`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`noRelationships`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`force`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`noOverwrite`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`dryRun`", cliReadme, StringComparison.Ordinal);
@@ -403,6 +408,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`--verbose`/`-v`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--no-pluralize`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--use-database-names`", cliReadme, StringComparison.Ordinal);
+        Assert.Contains("`--no-relationships`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--no-onconfiguring`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--output-dir`/`-o`", cliReadme, StringComparison.Ordinal);
         Assert.Contains("`--data-annotations`/`-d`", cliReadme, StringComparison.Ordinal);
@@ -454,6 +460,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`msbuildProjectExtensionsPath`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`prefixOutput`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`noPluralize`, `useDatabaseNames`", rootReadme, StringComparison.Ordinal);
+        Assert.Contains("`noRelationships`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`force`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`noOverwrite`", rootReadme, StringComparison.Ordinal);
         Assert.Contains("`dryRun`", rootReadme, StringComparison.Ordinal);

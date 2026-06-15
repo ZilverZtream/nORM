@@ -23,6 +23,7 @@ partial class Program
         bool? PrefixOutput,
         bool? NoPluralize,
         bool? UseDatabaseNames,
+        bool? NoRelationships,
         bool? NoOnConfiguring,
         bool? DataAnnotations,
         bool? Force,

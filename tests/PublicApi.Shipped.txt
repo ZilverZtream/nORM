@@ -1504,6 +1504,7 @@ P:nORM.Scaffolding.ScaffoldOptions.EmitRoutineStubs:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitSequenceStubs:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.EmitViewEntities:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.FailOnWarnings:System.Boolean
+P:nORM.Scaffolding.ScaffoldOptions.NoRelationships:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.OverwriteFiles:System.Boolean
 P:nORM.Scaffolding.ScaffoldOptions.Schemas:System.Collections.Generic.IReadOnlyCollection{System.String}
 P:nORM.Scaffolding.ScaffoldOptions.Tables:System.Collections.Generic.IReadOnlyCollection{System.String}
