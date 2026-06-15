@@ -41,7 +41,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     new ScaffoldOptions
                     {
                         Schemas = new[] { SchemaFilterRequest(kind, scratchDatabase) },
-                        Tables = new[] { SchemaFilterExplicitTable },
+                        Tables = new[] { "table:" + SchemaFilterExplicitTable },
                         OverwriteFiles = false
                     });
 

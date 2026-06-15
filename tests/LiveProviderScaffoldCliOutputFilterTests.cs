@@ -166,8 +166,8 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 $"--output {Quote(output)} " +
                 "--namespace CliLiveScaffolded " +
                 "--context CliLiveTableFilterValuesCtx " +
-                $"--tables {Quote(csvTableOne + "," + csvTableTwo)} " +
-                $"--table {multiTableOne} {multiTableTwo}",
+                $"--tables {Quote("table:" + csvTableOne + ",table:" + csvTableTwo)} " +
+                $"--table table:{multiTableOne} table:{multiTableTwo}",
                 root);
 
             Assert.True(scaffold.ExitCode == 0,

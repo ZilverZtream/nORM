@@ -103,6 +103,8 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("`query:dbo.Report`", doc, StringComparison.Ordinal);
         Assert.Contains("`routine:dbo.RebuildCache`", doc, StringComparison.Ordinal);
         Assert.Contains("`sequence:dbo.InvoiceNumber`", doc, StringComparison.Ordinal);
+        Assert.Contains("object-kind-prefixed", doc, StringComparison.Ordinal);
+        Assert.Contains("`table:`, `view:`, and `query:` filters", doc, StringComparison.Ordinal);
         Assert.Contains("object-kind selectors disambiguate same-schema object-kind", doc, StringComparison.Ordinal);
         Assert.Contains("more than one selectable table, query artifact, routine, or sequence", doc, StringComparison.Ordinal);
         Assert.Contains("ScaffoldOptions.Schemas", doc, StringComparison.Ordinal);

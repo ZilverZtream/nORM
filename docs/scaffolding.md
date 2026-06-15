@@ -924,10 +924,11 @@ must be reviewed and edited like handwritten model code.
   are verified through the real CLI across all four providers as well:
   successful `--dry-run --json` does not create output files, `--no-overwrite`
   fails before touching existing files, and `--force --json` removes stale
-  warning reports when the current scaffold is clean. CSV `--tables` filters
-  and EF-style multi-value `--table First Second` filters are also verified
-  through the real CLI across all four providers so filter parsing and provider
-  catalog matching stay aligned. CSV `--schemas` filters and EF-style
+  warning reports when the current scaffold is clean. CSV `--tables` filters,
+  EF-style multi-value `--table First Second` filters, and object-kind-prefixed
+  `table:`, `view:`, and `query:` filters are also verified through the real
+  CLI across all four providers so filter parsing and provider catalog matching
+  stay aligned. CSV `--schemas` filters and EF-style
   multi-value `--schema Accounting Sales` filters are also verified through the
   real CLI across all four providers: SQLite `main`, SQL Server and PostgreSQL
   schemas, plus MySQL's current database as a filter-only catalog that remains

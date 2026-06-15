@@ -226,6 +226,7 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_ambient_environment_selects_appsettings_environment_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_enforces_output_safety_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_accepts_csv_and_multi_value_table_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("\"table:\" + csvTableOne", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_accepts_csv_and_multi_value_schema_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_unions_schema_and_table_filters_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_accepts_no_onconfiguring_data_annotations_and_no_pluralize_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
@@ -238,9 +239,13 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("Dotnet_norm_scaffold_emits_sequence_stubs_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_table_filter_suppresses_unselected_principal_relationship_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_table_filter_emits_view_query_artifact_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("\"view:\" + viewName", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_emits_provider_query_artifacts_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
+        Assert.Contains("\"query:\" + tableFilter", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("Dotnet_norm_scaffold_default_discovery_emits_table_and_view_query_artifacts_on_live_provider", liveScaffoldCliTests, StringComparison.Ordinal);
         Assert.Contains("ScaffoldAsync_default_discovery_emits_table_and_view_query_artifacts_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("Tables = new[] { \"table:\" + SchemaFilterExplicitTable }", liveScaffoldTests, StringComparison.Ordinal);
+        Assert.Contains("Tables = new[] { \"view:\" + WarningView }", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dynamic_scaffolding_marks_view_query_artifacts_read_only_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dynamic_scaffolding_marks_keyless_tables_read_only_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);
         Assert.Contains("Dynamic_scaffolding_marks_unmodeled_defaults_read_only_on_live_provider", liveScaffoldTests, StringComparison.Ordinal);

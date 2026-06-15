@@ -37,7 +37,7 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     dir,
                     "LiveScaffold",
                     "LiveScaffoldViewContext",
-                    new ScaffoldOptions { Tables = new[] { WarningView }, OverwriteFiles = false });
+                    new ScaffoldOptions { Tables = new[] { "view:" + WarningView }, OverwriteFiles = false });
 
                 var viewCode = await File.ReadAllTextAsync(Path.Combine(dir, WarningView + ".cs"));
                 var contextCode = await File.ReadAllTextAsync(Path.Combine(dir, "LiveScaffoldViewContext.cs"));

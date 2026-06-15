@@ -193,7 +193,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 $"--output {Quote(output)} " +
                 "--namespace CliLiveScaffolded " +
                 "--context CliLiveViewCtx " +
-                $"--table {Quote(viewName)}",
+                $"--table {Quote("view:" + viewName)}",
                 root);
 
             Assert.True(scaffold.ExitCode == 0,
@@ -276,7 +276,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 "--namespace CliLiveScaffolded " +
                 "--context CliLiveQueryArtifactCtx " +
                 "--emit-query-artifacts " +
-                $"--table {Quote(tableFilter)}",
+                $"--table {Quote("query:" + tableFilter)}",
                 root);
 
             Assert.True(scaffold.ExitCode == 0,
