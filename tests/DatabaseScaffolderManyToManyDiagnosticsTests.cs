@@ -340,8 +340,8 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("public List<AuthorBook>", authorCode);
             Assert.Contains("public List<AuthorBook>", bookCode);
             Assert.Contains(".HasMany(p => p.AuthorBooks)", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false);", contextCode);
-            Assert.Contains(".HasForeignKey(d => d.BookId, p => p.Id, cascadeDelete: false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.AuthorId, p => p.Id, \"FK_AuthorBook_Author\", false);", contextCode);
+            Assert.Contains(".HasForeignKey(d => d.BookId, p => p.Id, \"FK_AuthorBook_Book\", false);", contextCode);
             Assert.Contains("Possible Many-To-Many Join Tables", warnings);
             Assert.Contains("AuthorBook", warnings);
             Assert.Contains("Author", warnings);

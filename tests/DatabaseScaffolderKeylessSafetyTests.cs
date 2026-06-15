@@ -256,7 +256,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.False(compositeMetadata.GetProperty("referencesScaffoldableUniqueIndex").GetBoolean());
             Assert.Contains(warningJson.RootElement.GetProperty("providerOwnedSchemaFeatures").EnumerateArray(), item =>
                 item.GetProperty("kind").GetString() == "RelationshipPrincipalKey" &&
-                item.GetProperty("name").GetString() == "sqlite_fk_0" &&
+                item.GetProperty("name").GetString() == "FK_Dependent_Principal" &&
                 item.GetProperty("metadata").GetProperty("reason").GetString() == "principal-key-not-scaffoldable" &&
                 string.Join(",", item.GetProperty("metadata").GetProperty("dependentColumns").EnumerateArray().Select(column => column.GetString())) == "TenantId,Code" &&
                 string.Join(",", item.GetProperty("metadata").GetProperty("principalColumns").EnumerateArray().Select(column => column.GetString())) == "TenantId,Code");

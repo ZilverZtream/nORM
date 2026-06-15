@@ -51,7 +51,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("MATCH FULL", diagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
             Assert.Contains("DEFERRABLE", diagnostic.GetProperty("detail").GetString(), StringComparison.OrdinalIgnoreCase);
             var metadata = diagnostic.GetProperty("metadata");
-            Assert.Equal("sqlite_fk_0", diagnostic.GetProperty("name").GetString());
+            Assert.Equal("FK_MatchChild_Parent", diagnostic.GetProperty("name").GetString());
             Assert.True(metadata.GetProperty("navigationSuppressed").GetBoolean());
             Assert.False(metadata.GetProperty("generatedNavigationSupported").GetBoolean());
             Assert.Contains("MATCH FULL", metadata.GetProperty("onUpdate").GetString(), StringComparison.OrdinalIgnoreCase);

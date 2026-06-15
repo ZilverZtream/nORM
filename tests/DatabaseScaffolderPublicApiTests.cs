@@ -367,7 +367,7 @@ public partial class DatabaseScaffolderPrivateMethodTests
             Assert.Contains("[Table(\"SchemaBookView\", Schema = \"aux\")]", viewCode);
             Assert.Contains("[ReadOnlyEntity]", viewCode);
             Assert.Contains("[ForeignKey(nameof(AuthorId))]", bookCode);
-            Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id, cascadeDelete: false)", contextCode);
+            Assert.Contains("HasForeignKey(d => d.AuthorId, p => p.Id, \"FK_SchemaBook_Author\", false)", contextCode);
             Assert.Contains("IQueryable<SchemaBookView> SchemaBookViews", contextCode);
             Assert.Contains("[Index(\"IX_SchemaBook_Title\")]", bookCode);
             Assert.Contains("[Index(\"IX_SchemaBook_Title_Filtered\", FilterSql = \"Title <> ''\")]", bookCode);
