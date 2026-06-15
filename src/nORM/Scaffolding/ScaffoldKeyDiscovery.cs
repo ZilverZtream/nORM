@@ -45,6 +45,9 @@ namespace nORM.Scaffolding
             if (ScaffoldProviderKind.IsPostgres(provider))
                 return await QueryPrimaryKeyConstraintNameMapAsync(connection, tableKeys, PostgresPrimaryKeyConstraintNameSql).ConfigureAwait(false);
 
+            if (ScaffoldProviderKind.IsMySql(provider))
+                return await QueryPrimaryKeyConstraintNameMapAsync(connection, tableKeys, MySqlPrimaryKeyConstraintNameSql).ConfigureAwait(false);
+
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
     }

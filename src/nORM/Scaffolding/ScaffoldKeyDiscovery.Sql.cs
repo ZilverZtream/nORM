@@ -57,5 +57,16 @@ namespace nORM.Scaffolding
               AND con.conname <> cls.relname || '_pkey'
             ORDER BY ns.nspname, cls.relname
             """;
+
+        private const string MySqlPrimaryKeyConstraintNameSql = """
+            SELECT NULL AS TableSchema,
+                   table_name AS TableName,
+                   constraint_name AS ConstraintName
+            FROM information_schema.table_constraints
+            WHERE table_schema = DATABASE()
+              AND constraint_type = 'PRIMARY KEY'
+              AND constraint_name = 'PRIMARY'
+            ORDER BY table_name
+            """;
     }
 }

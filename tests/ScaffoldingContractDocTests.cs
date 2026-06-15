@@ -175,6 +175,7 @@ public partial class ScaffoldingContractDocTests
     {
         var helper = ReadRepoFile("src", "nORM", "Scaffolding", "ScaffoldProviderKind.cs");
         var dispatchSource = ReadScaffoldProviderDispatchSource();
+        var keyDiscoverySource = ReadKeyDiscoverySource();
 
         Assert.Contains("internal static class ScaffoldProviderKind", helper, StringComparison.Ordinal);
         Assert.Contains("IsSqlite(DatabaseProvider provider)", helper, StringComparison.Ordinal);
@@ -185,6 +186,9 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("ScaffoldProviderKind.IsSqlServer(provider)", dispatchSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldProviderKind.IsPostgres(provider)", dispatchSource, StringComparison.Ordinal);
         Assert.Contains("ScaffoldProviderKind.IsMySql(provider)", dispatchSource, StringComparison.Ordinal);
+        Assert.Contains("MySqlPrimaryKeyConstraintNameSql", keyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("information_schema.table_constraints", keyDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("constraint_type = 'PRIMARY KEY'", keyDiscoverySource, StringComparison.Ordinal);
         Assert.DoesNotContain("provider.GetType().Name", dispatchSource, StringComparison.Ordinal);
         Assert.DoesNotContain("providerName", dispatchSource, StringComparison.Ordinal);
         Assert.DoesNotContain("provider is SqliteProvider", dispatchSource, StringComparison.Ordinal);

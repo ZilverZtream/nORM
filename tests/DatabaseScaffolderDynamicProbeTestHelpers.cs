@@ -14,10 +14,20 @@ public partial class DatabaseScaffolderPrivateMethodTests
     private sealed class DynamicMySqlMetadataProbeConnection : DbConnection
     {
         private readonly IReadOnlyList<string> _columnTypes;
+        private readonly IReadOnlyList<IReadOnlyDictionary<string, object?>> _rows;
         private ConnectionState _state = ConnectionState.Open;
 
         public DynamicMySqlMetadataProbeConnection(params string[] columnTypes)
-            => _columnTypes = columnTypes;
+        {
+            _columnTypes = columnTypes;
+            _rows = Array.Empty<IReadOnlyDictionary<string, object?>>();
+        }
+
+        public DynamicMySqlMetadataProbeConnection(IReadOnlyList<IReadOnlyDictionary<string, object?>> rows)
+        {
+            _columnTypes = Array.Empty<string>();
+            _rows = rows;
+        }
 
         public string LastCommandText { get; private set; } = string.Empty;
         public Dictionary<string, object?> LastParameters { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -50,9 +60,33 @@ public partial class DatabaseScaffolderPrivateMethodTests
         internal DbDataReader ExecuteReader(string commandText, DbParameterCollection parameters)
         {
             Capture(commandText, parameters);
+            if (_rows.Count > 0)
+                return CreateRowReader(_rows);
+
             return _columnTypes.Count == 0
                 ? new EmptyMetadataReader()
                 : new SingleColumnMetadataReader("ColumnType", _columnTypes);
+        }
+
+        private static DbDataReader CreateRowReader(IReadOnlyList<IReadOnlyDictionary<string, object?>> rows)
+        {
+            var table = new DataTable();
+            var columns = rows
+                .SelectMany(static row => row.Keys)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            foreach (var column in columns)
+                table.Columns.Add(column, typeof(object));
+
+            foreach (var sourceRow in rows)
+            {
+                var row = table.NewRow();
+                foreach (var column in columns)
+                    row[column] = sourceRow.TryGetValue(column, out var value) && value is not null ? value : DBNull.Value;
+                table.Rows.Add(row);
+            }
+
+            return table.CreateDataReader();
         }
     }
 

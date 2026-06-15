@@ -1,8 +1,12 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using nORM.Core;
+using nORM.Providers;
+using nORM.Scaffolding;
 using Xunit;
 
 namespace nORM.Tests;
@@ -27,6 +31,38 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Contains("table_schema = COALESCE(@schemaName, DATABASE())", sql, StringComparison.Ordinal);
         Assert.Equal("tenant_catalog", parameters["@schemaName"]);
         Assert.Equal("Orders", parameters["@tableName"]);
+    }
+
+    [Fact]
+    public async Task StaticMySqlPrimaryKeyConstraintNameProbe_PreservesPrimaryConstraintName()
+    {
+        var connection = new DynamicMySqlMetadataProbeConnection(new[]
+        {
+            new Dictionary<string, object?>
+            {
+                ["TableSchema"] = DBNull.Value,
+                ["TableName"] = "Orders",
+                ["ConstraintName"] = "PRIMARY"
+            },
+            new Dictionary<string, object?>
+            {
+                ["TableSchema"] = DBNull.Value,
+                ["TableName"] = "Ignored",
+                ["ConstraintName"] = "PRIMARY"
+            }
+        });
+        var tableInfos = new[] { new ScaffoldTableInfo("Orders", null) };
+
+        var names = await ScaffoldKeyDiscovery.GetPrimaryKeyConstraintNamesAsync(
+            connection,
+            new MySqlProvider(new SqliteParameterFactory()),
+            tableInfos);
+
+        var name = Assert.Single(names);
+        Assert.Equal("Orders", name.Key);
+        Assert.Equal("PRIMARY", name.Value);
+        Assert.Contains("information_schema.table_constraints", connection.LastCommandText, StringComparison.Ordinal);
+        Assert.Contains("constraint_type = 'PRIMARY KEY'", connection.LastCommandText, StringComparison.Ordinal);
     }
 
     [Fact]
