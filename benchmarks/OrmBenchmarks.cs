@@ -234,15 +234,15 @@ namespace nORM.Benchmarks
 
             // Prepared statements (once)
             _adoSimplePrepared = _dapperConnection.CreateCommand();
-            _adoSimplePrepared.CommandText = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT @Take";
+            _adoSimplePrepared.CommandText = $"SELECT {OptimizedUserColumns} FROM BenchmarkUser WHERE IsActive = 1 LIMIT @Take";
             _adoSimpleTakeParam = _adoSimplePrepared.CreateParameter();
             _adoSimpleTakeParam.ParameterName = "@Take";
             _adoSimplePrepared.Parameters.Add(_adoSimpleTakeParam);
             _adoSimplePrepared.Prepare();
 
             _adoComplexPrepared = _dapperConnection.CreateCommand();
-            _adoComplexPrepared.CommandText = @"
-                SELECT * FROM BenchmarkUser
+            _adoComplexPrepared.CommandText = $@"
+                SELECT {OptimizedUserColumns} FROM BenchmarkUser
                 WHERE IsActive = 1 AND Age > @Age AND City = @City
                 ORDER BY Name
                 LIMIT 20 OFFSET 5";
@@ -420,7 +420,7 @@ namespace nORM.Benchmarks
         [Benchmark(Description = "Query Simple Raw ADO (Optimized)")]
         public async Task<List<BenchmarkUser>> Query_Simple_RawAdo_Optimized()
         {
-            const string sql = "SELECT * FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
+            const string sql = $"SELECT {OptimizedUserColumns} FROM BenchmarkUser WHERE IsActive = 1 LIMIT 10";
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
             return await ReadUsersOptimizedAsync(command);
@@ -523,8 +523,8 @@ namespace nORM.Benchmarks
         public async Task<List<BenchmarkUser>> Query_Complex_RawAdo_Optimized()
         {
             using var command = _dapperConnection!.CreateCommand();
-            command.CommandText = @"
-                SELECT * FROM BenchmarkUser
+            command.CommandText = $@"
+                SELECT {OptimizedUserColumns} FROM BenchmarkUser
                 WHERE IsActive = 1 AND Age > @Age AND City = @City
                 ORDER BY Name
                 LIMIT 20 OFFSET 5";
@@ -540,6 +540,11 @@ namespace nORM.Benchmarks
             _adoComplexCityParam!.Value = "New York";
             return await ReadUsersOptimizedAsync(_adoComplexPrepared!);
         }
+
+        // The optimized readers bind by ordinal, so their SQL must pin the column order
+        // explicitly — EF's EnsureCreated emits table columns in entity property order,
+        // which does not match this projection order.
+        private const string OptimizedUserColumns = "Id, Name, Email, CreatedAt, IsActive, Age, City, Department, Salary";
 
         private static async Task<List<BenchmarkUser>> ReadUsersOptimizedAsync(SqliteCommand command)
         {
