@@ -178,6 +178,13 @@ $rows = Import-BenchmarkRows $ResultsDirectory
 $violations = New-Object System.Collections.Generic.List[string]
 $results = New-Object System.Collections.Generic.List[object]
 
+if ($rows.Count -eq 0 -and -not $AllowMissingRules) {
+    # Wildcard-provider rules enumerate providers from the imported rows, so an
+    # empty row set would skip every rule and pass vacuously. Reports without a
+    # Provider column (e.g. OrmBenchmarks) are not threshold evidence.
+    throw "No benchmark rows with a Provider column were found in $ResultsDirectory. Run the provider-matrix benchmarks to produce threshold evidence; refusing to report a vacuous pass."
+}
+
 foreach ($rule in $thresholds.rules) {
     $providers = if ($rule.provider -eq '*') {
         @($rows | Select-Object -ExpandProperty Provider -Unique | Sort-Object)
