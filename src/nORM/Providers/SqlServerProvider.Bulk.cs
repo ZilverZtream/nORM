@@ -29,6 +29,8 @@ namespace nORM.Providers
         /// <param name="entities">Entities to insert.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total rows inserted.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
@@ -79,6 +81,8 @@ namespace nORM.Providers
         /// <param name="entities">Entities containing updated values.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Number of rows updated.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
@@ -196,6 +200,8 @@ namespace nORM.Providers
         /// <param name="entities">Entities identifying rows to delete.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total number of rows deleted.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
@@ -351,6 +357,8 @@ namespace nORM.Providers
             return escapedIdentifier;
         }
 
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072",
+            Justification = "Key column types are mapped entity property types rooted by TableMapping registration; DataColumn only needs the type identity for TVP schema definition.")]
         private static DataTable GetKeyTable(TableMapping m)
         {
             var schema = _keyTableSchemas.GetOrAdd(m.Type, _ =>
@@ -435,6 +443,9 @@ namespace nORM.Providers
             /// <summary>
             /// Gets the <see cref="Type"/> of the column at the specified ordinal.
             /// </summary>
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2073",
+                Justification = "Mapped entity property types are rooted by TableMapping registration and their members are accessed by the materializer, so the trimmer preserves them.")]
+            [return: System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties)]
             public Type GetFieldType(int i) => _columns[i].Prop.PropertyType;
 
             /// <summary>
@@ -492,6 +503,8 @@ namespace nORM.Providers
             /// Returns a <see cref="DataTable"/> describing the column metadata for this reader.
             /// Implemented to support SqlBulkCopy scenarios that rely on schema information.
             /// </summary>
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2111",
+                Justification = "The DataType schema column stores Type instances only as SqlBulkCopy metadata; no member of those types is invoked through the schema table.")]
             public DataTable? GetSchemaTable()
             {
                 var schemaTable = new DataTable("SchemaTable");

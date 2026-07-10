@@ -9,6 +9,8 @@ namespace nORM.Scaffolding
         private static readonly IReadOnlyDictionary<string, object?> EmptyMetadata =
             new Dictionary<string, object?>(0, StringComparer.Ordinal);
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class CompositeForeignKeyJsonItem
         {
             public string code { get; init; } = string.Empty;
@@ -23,6 +25,8 @@ namespace nORM.Scaffolding
             public string suggestedAction { get; init; } = string.Empty;
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class PossibleJoinTableJsonItem
         {
             public string code { get; init; } = string.Empty;
@@ -36,6 +40,8 @@ namespace nORM.Scaffolding
             public string suggestedAction { get; init; } = string.Empty;
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ProviderOwnedSchemaFeatureJsonItem
         {
             public string code { get; init; } = string.Empty;
@@ -49,6 +55,8 @@ namespace nORM.Scaffolding
             public string suggestedAction { get; init; } = string.Empty;
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class SkippedDatabaseObjectJsonItem
         {
             public string code { get; init; } = string.Empty;

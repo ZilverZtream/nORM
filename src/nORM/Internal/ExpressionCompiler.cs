@@ -21,6 +21,8 @@ namespace nORM.Internal
     /// and reused across calls — only parameter values are updated. This eliminates per-call costs
     /// of DbCommand creation, DbParameter allocation, and SQL compilation (sqlite3_prepare_v2).
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal sealed class CompiledQueryState
     {
         // Q1 fix: pool of prepared commands — concurrent callers each dequeue their own command.
@@ -29,6 +31,8 @@ namespace nORM.Internal
         public int FixedParamCount;
     }
 
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal static class ExpressionCompiler
     {
         /// <summary>Maximum number of compiled delegate cache entries before LRU eviction.</summary>
@@ -51,6 +55,8 @@ namespace nORM.Internal
         internal static int CompileSemaphoreCurrentCount => _compileSemaphore.CurrentCount;
         internal static int CompileSemaphoreCapacity => _compileSemaphoreCapacity;
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class CompiledQueryContextState
         {
             public string? StableCtxKey;
@@ -80,6 +86,14 @@ namespace nORM.Internal
             public static CompiledParameterValueSource FromQueryMember(MemberInfo member)
                 => new(null, member, false);
 
+            // Structs cannot carry RequiresDynamicCode/RequiresUnreferencedCode, so the
+            // requirement is suppressed here: this value source only exists inside compiled
+            // query plans, which are reachable exclusively through public entry points that
+            // carry the annotations (Norm.CompileQuery, DbContext query APIs).
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026",
+                Justification = "Reachable only through RequiresUnreferencedCode-annotated compiled-query entry points.")]
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050",
+                Justification = "Reachable only through RequiresDynamicCode-annotated compiled-query entry points.")]
             public object? GetValue(object? queryValue)
             {
                 if (_useQueryValue)
@@ -103,6 +117,8 @@ namespace nORM.Internal
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class CompiledParameterValueSourceCollector : ExpressionVisitor
         {
             private readonly ParameterExpression _queryParameter;
@@ -561,6 +577,8 @@ namespace nORM.Internal
             return detector.Found;
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ClosureValueDetector : ExpressionVisitor
         {
             public bool Found { get; private set; }
@@ -684,6 +702,8 @@ namespace nORM.Internal
             return del.DynamicInvoke();
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class QueryCallEvaluator : ExpressionVisitor
         {
             protected override Expression VisitMethodCall(MethodCallExpression node)

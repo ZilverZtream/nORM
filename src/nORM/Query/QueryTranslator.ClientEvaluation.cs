@@ -15,6 +15,8 @@ namespace nORM.Query
         /// Analyzes a projection expression to determine if it contains untranslatable operations
         /// that require client-side evaluation.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class TranslatabilityAnalyzer : ExpressionVisitor
         {
             private readonly DatabaseProvider _provider;
@@ -339,6 +341,8 @@ namespace nORM.Query
         /// Extracts all member accesses from an expression that reference the parameter.
         /// These are the columns we need to fetch from the database.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class MemberAccessExtractor : ExpressionVisitor
         {
             private readonly ParameterExpression _parameter;
@@ -456,6 +460,8 @@ namespace nORM.Query
         /// <summary>
         /// Replaces a parameter with a different expression throughout an expression tree.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ParameterReplacer : ExpressionVisitor
         {
             private readonly ParameterExpression _oldParameter;

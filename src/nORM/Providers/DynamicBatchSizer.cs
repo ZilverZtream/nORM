@@ -63,8 +63,6 @@ namespace nORM.Providers
         /// <param name="operationKey">Key identifying the operation for caching performance history.</param>
         /// <param name="totalRecords">Optional total record count to further constrain the batch size.</param>
         /// <returns>Calculated sizing information including optimal batch size and estimates.</returns>
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Delegates to EstimateRecordSize which calls JsonSerializer.Serialize(object).")]
-        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Delegates to EstimateRecordSize which reflects over entity value types.")]
         public BatchSizingResult CalculateOptimalBatchSize<T>(
             IEnumerable<T> sample,
             TableMapping mapping,
@@ -107,8 +105,6 @@ namespace nORM.Providers
             };
         }
 
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Delegates to EstimateValueSize which calls JsonSerializer.Serialize(object).")]
-        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Delegates to EstimateValueSize which reflects over value types.")]
         private int EstimateRecordSize<T>(T sampleRecord, TableMapping mapping) where T : class
         {
             var baseSize = BaseObjectOverhead;
@@ -117,17 +113,28 @@ namespace nORM.Providers
             foreach (var column in mapping.Columns)
             {
                 var value = column.Getter(sampleRecord);
-                columnSizes += EstimateValueSize(value, column.Prop.PropertyType);
+                // The wire cost of a column is determined by the value the provider binds,
+                // so size the converted provider-side representation when a converter exists.
+                if (column.Converter != null && value != null)
+                {
+                    try { value = column.Converter.ConvertToProvider(value); }
+                    catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+                    {
+                        // A converter that rejects the sample value still gets a usable
+                        // batch estimate from the unconverted value's size class.
+                    }
+                }
+                columnSizes += EstimateValueSize(value);
             }
 
             return baseSize + columnSizes;
         }
 
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Delegates to EstimateComplexObjectSize which calls JsonSerializer.Serialize(object).")]
-        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Delegates to EstimateComplexObjectSize which reflects over the value type.")]
-        private int EstimateValueSize(object? value, Type type)
+        private static int EstimateValueSize(object? value)
         {
             if (value == null) return 4;
+
+            if (value.GetType().IsEnum) return 4;
 
             return value switch
             {
@@ -142,35 +149,35 @@ namespace nORM.Providers
                 bool => 1,
                 float => 4,
                 double => 8,
-                _ => EstimateComplexObjectSize(value, type)
+                byte or sbyte => 1,
+                short or ushort or char => 2,
+                uint => 4,
+                ulong => 8,
+                TimeSpan or TimeOnly => 8,
+                DateOnly => 4,
+                char[] chars => chars.Length * 2 + 8,
+                // Provider-bound collections (e.g. PostgreSQL arrays): size each element so
+                // large arrays scale the estimate instead of hiding behind a flat constant.
+                System.Collections.ICollection col => EstimateCollectionSize(col),
+                _ => DefaultFallbackSize
             };
         }
 
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("JsonSerializer.Serialize(object) is not NativeAOT-compatible; use the generic overload with a known type.")]
-        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("JsonSerializer.Serialize(object) reflects over the value type at runtime; trimming may remove required members.")]
-        private int EstimateComplexObjectSize(object value, Type type)
+        private static int EstimateCollectionSize(System.Collections.ICollection collection)
         {
-            if (type.IsEnum) return 4;
-
-            try
+            var total = 16;
+            var counted = 0;
+            foreach (var item in collection)
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(value);
-                return json.Length * 2;
+                total += EstimateValueSize(item);
+                // A bounded sample keeps estimation O(1) for very large collections.
+                if (++counted >= 100)
+                {
+                    total = (int)Math.Min(int.MaxValue, (long)total * collection.Count / counted);
+                    break;
+                }
             }
-            catch (System.Text.Json.JsonException)
-            {
-                // Unserializable type (circular refs, unsupported converters) -- use fallback
-                return DefaultFallbackSize;
-            }
-            catch (NotSupportedException)
-            {
-                return DefaultFallbackSize;
-            }
-            catch (InvalidOperationException)
-            {
-                // JsonSerializer can throw InvalidOperationException for certain type configurations
-                return DefaultFallbackSize;
-            }
+            return total;
         }
 
         private int GetHistoricalOptimalBatchSize(string operationKey)

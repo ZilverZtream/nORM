@@ -11,6 +11,8 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class IncludeTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -69,6 +71,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ThenIncludeTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -107,6 +111,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class AsNoTrackingTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -123,6 +129,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class CastOrOfTypeTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
@@ -164,6 +172,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class AsSplitQueryTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -180,6 +190,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class AsOfTranslator : IMethodCallTranslator
         {
             /// <summary>

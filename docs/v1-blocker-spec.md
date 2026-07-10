@@ -583,6 +583,26 @@ Acceptance gate:
 - The AOT baseline is either empty for supported surfaces or every remaining
   diagnostic is intentionally documented and tested.
 
+Current status:
+
+- This blocker is closed for the current working tree. `eng/aot-baseline.txt`
+  is empty: the AOT publish scan reports zero IL diagnostics.
+- Every previously baselined diagnostic was triaged: dynamic subsystems
+  (query translation, materializers, mapping construction, bulk transfer
+  building, compiled queries, scaffolding) now carry complete
+  `RequiresDynamicCode`/`RequiresUnreferencedCode` boundaries including nested
+  types; genuinely fixable sites were refactored to static code (JSON-free
+  batch sizing, `Enum.GetValuesAsUnderlyingType` SQL casing, static PostgreSQL
+  array-type tables, typed `SqlException` transient-error checks, static
+  nullable-type tables for PostgreSQL array parameters); the few remaining
+  safe-by-construction patterns carry per-member justified suppressions.
+- The release gate now fails on any IL diagnostic at all, which removes the
+  recurring baseline line-number refresh churn and fences new dynamic code.
+- `docs/aot-trimming.md` documents the annotated boundary and the empty
+  baseline policy. NativeAOT/trimmed deployment remains explicitly unsupported
+  for v1; the negative `PublishTrimmed=true` smoke test still pins that
+  contract.
+
 ### 22. Treat Raw SQL and Stored Procedures as Security Boundaries
 
 Problem: Raw SQL and stored procedures bypass normal translation and tenant

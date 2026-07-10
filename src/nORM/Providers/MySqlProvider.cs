@@ -131,7 +131,17 @@ namespace nORM.Providers
 
         private sealed class ReflectionMySqlParameterFactory : IDbParameterFactory
         {
-            private readonly Type? _parameterType =
+            [System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)]
+            private readonly Type? _parameterType = ResolveMySqlParameterType();
+
+            // The driver assembly is loaded by name at runtime without a build-time reference, so
+            // the trimmer cannot preserve its members. Trimmed or NativeAOT deployments must pass
+            // the driver's native IDbParameterFactory to the provider constructor instead; this
+            // fallback throws with package guidance when the driver types are unavailable.
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2073",
+                Justification = "Optional driver types are resolved by name at runtime; trimmed deployments use an explicit IDbParameterFactory.")]
+            [return: System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)]
+            private static Type? ResolveMySqlParameterType() =>
                 Type.GetType("MySqlConnector.MySqlParameter, MySqlConnector") ??
                 Type.GetType("MySql.Data.MySqlClient.MySqlParameter, MySql.Data");
 

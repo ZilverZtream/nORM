@@ -8,6 +8,8 @@ using ColumnInfo = nORM.Scaffolding.DynamicEntityTypeGenerator.ColumnInfo;
 
 namespace nORM.Scaffolding
 {
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Database scaffolding emits dynamic entity types and traverses live mapping metadata; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Database scaffolding reflects over provider and entity metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal static partial class DynamicEntityTableSchemaReader
     {
         public static IReadOnlyList<ColumnInfo> GetTableSchema(DbConnection connection, string? schemaName, string tableName)

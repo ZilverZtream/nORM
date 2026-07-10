@@ -316,33 +316,30 @@ namespace nORM.Core
 
         /// <summary>
         /// Determines if a database exception represents a transient error (network,
-        /// timeout, or service-unavailable). Checks SQL Server error codes via
-        /// reflection, then falls back to walking the inner-exception chain for
-        /// <see cref="System.Net.Sockets.SocketException"/>.
+        /// timeout, or service-unavailable). Checks SQL Server error codes on
+        /// <see cref="Microsoft.Data.SqlClient.SqlException"/>, then falls back to walking
+        /// the inner-exception chain for <see cref="System.Net.Sockets.SocketException"/>.
         /// </summary>
         /// <param name="ex">The database exception to check.</param>
         /// <returns>True if the exception represents a transient connection/network error.</returns>
         internal static bool IsTransientDatabaseError(DbException ex)
         {
-            // Check for SQL Server specific errors
-            if (ex.GetType().Name == "SqlException")
+            // Check for SQL Server specific errors. nORM's SQL Server support always uses
+            // Microsoft.Data.SqlClient, so the typed check covers every supported configuration.
+            if (ex is Microsoft.Data.SqlClient.SqlException sqlEx)
             {
-                var numberProp = ex.GetType().GetProperty("Number");
-                if (numberProp != null && numberProp.GetValue(ex) is int errorNumber)
-                {
-                    // SQL Server transient errors:
-                    // -2: Timeout
-                    // 53: Named Pipes Provider error (network)
-                    // 64: Error located on server
-                    // 233: Connection initialization error
-                    // 10053: Transport-level error (broken connection)
-                    // 10054: Existing connection forcibly closed by remote host
-                    // 10060: Connection timeout
-                    // 40197: Service error processing request
-                    // 40501: Service busy
-                    // 40613: Database unavailable
-                    return errorNumber is -2 or 53 or 64 or 233 or 10053 or 10054 or 10060 or 40197 or 40501 or 40613;
-                }
+                // SQL Server transient errors:
+                // -2: Timeout
+                // 53: Named Pipes Provider error (network)
+                // 64: Error located on server
+                // 233: Connection initialization error
+                // 10053: Transport-level error (broken connection)
+                // 10054: Existing connection forcibly closed by remote host
+                // 10060: Connection timeout
+                // 40197: Service error processing request
+                // 40501: Service busy
+                // 40613: Database unavailable
+                return sqlEx.Number is -2 or 53 or 64 or 233 or 10053 or 10054 or 10060 or 40197 or 40501 or 40613;
             }
 
             // Check inner exception for SocketException (more reliable than message parsing)

@@ -80,8 +80,10 @@ namespace nORM.Core
         /// for typical flat entities (e.g., BenchmarkUser with int/string/DateTime/bool/double).
         /// </summary>
         private static readonly ConcurrentDictionary<Type, PropertyInfo[]> NavigablePropertyCache = new();
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2070",
+            Justification = "Entity graph validation only sees mapped entity types, whose public instance properties are rooted by TableMapping registration.")]
         private static PropertyInfo[] GetNavigableProperties(Type type)
-            => NavigablePropertyCache.GetOrAdd(type, t =>
+            => NavigablePropertyCache.GetOrAdd(type, static t =>
                 t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                     .Where(p => p.CanRead && p.PropertyType.IsClass && p.PropertyType != typeof(string) && p.PropertyType != typeof(byte[]))
                     .ToArray());

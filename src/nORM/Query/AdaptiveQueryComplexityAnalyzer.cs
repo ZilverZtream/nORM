@@ -11,6 +11,8 @@ namespace nORM.Query
     /// <summary>
     /// Analyzes query expression trees and adapts complexity limits based on current system resources.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal sealed class AdaptiveQueryComplexityAnalyzer : IDisposable
     {
         private readonly IMemoryMonitor _memoryMonitor;
@@ -42,6 +44,8 @@ namespace nORM.Query
         {
             _memoryMonitor = memoryMonitor;
         }
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         internal sealed class QueryComplexityInfo
         {
             public int JoinCount { get; set; }
@@ -51,6 +55,8 @@ namespace nORM.Query
             public bool HasCartesianProduct { get; set; }
             public List<string> WarningMessages { get; } = new();
         }
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class AdaptiveLimits
         {
             public int MaxJoinDepth { get; init; }
@@ -171,6 +177,8 @@ namespace nORM.Query
             if (info.HasCartesianProduct)
                 info.WarningMessages.Add("Query may produce cartesian product - verify join conditions");
         }
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ComplexityVisitor : ExpressionVisitor
         {
             private readonly QueryComplexityInfo _complexity = new();

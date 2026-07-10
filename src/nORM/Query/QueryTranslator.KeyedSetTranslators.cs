@@ -15,6 +15,8 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class DistinctByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
@@ -133,18 +135,24 @@ namespace nORM.Query
         /// that sequence to a parameterized derived table, then applies the same
         /// row-number key dedupe with source rows ordered before appended rows.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ExceptByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
                 => RewriteKeyedFilterSetOp(t, node, keepMatches: false);
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class IntersectByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
                 => RewriteKeyedFilterSetOp(t, node, keepMatches: true);
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class UnionByTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
@@ -315,6 +323,8 @@ namespace nORM.Query
         /// null (no-arg form) or the provided default value (1-arg form).
         /// Mirrors LINQ-to-Objects semantics exactly.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class DefaultIfEmptyTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)

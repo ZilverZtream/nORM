@@ -67,6 +67,7 @@ namespace nORM.Query
                     $"Available columns ({_fieldCount}): {available}.");
             }
             public override string GetDataTypeName(int ordinal) => nameof(Object);
+            [return: System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties)]
             public override Type GetFieldType(int ordinal) => typeof(object);
             public override bool HasRows => false;
             /// <summary>
@@ -239,6 +240,7 @@ namespace nORM.Query
             /// </summary>
             /// <param name="ordinal">The column ordinal.</param>
             /// <returns>The column's <see cref="Type"/>.</returns>
+            [return: System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties)]
             public override Type GetFieldType(int ordinal)
             {
                 var mapped = MapOrdinal(ordinal);

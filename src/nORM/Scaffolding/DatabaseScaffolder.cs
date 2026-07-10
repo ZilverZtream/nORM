@@ -11,6 +11,8 @@ namespace nORM.Scaffolding
     /// Provides reverse-engineering utilities that can scaffold entity classes and a DbContext
     /// from an existing database schema.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Database scaffolding emits dynamic entity types and traverses live mapping metadata; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Database scaffolding reflects over provider and entity metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
     public static partial class DatabaseScaffolder
     {
         private static readonly ObjectPool<StringBuilder> _stringBuilderPool =

@@ -22,6 +22,8 @@ namespace nORM.Core
         /// <typeparam name="T">Element type returned by the query.</typeparam>
         /// <param name="queryExpression">Expression describing the query to compile.</param>
         /// <returns>A delegate that executes the query and returns the results as a <see cref="List{T}"/>.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public static Func<TContext, TParam, Task<List<T>>> CompileQuery<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression)
             where TContext : DbContext
             where T : class

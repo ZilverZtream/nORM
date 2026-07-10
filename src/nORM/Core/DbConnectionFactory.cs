@@ -66,6 +66,13 @@ internal static class DbConnectionFactory
         return factory(connectionString);
     }
 
+    // Optional driver assemblies (Npgsql, MySqlConnector/MySql.Data) are loaded by name at
+    // runtime without a build-time reference, so the trimmer cannot preserve their connection
+    // constructors. Trimmed or NativeAOT deployments are unsupported for reflection-loaded
+    // providers (docs/aot-trimming.md); when the constructor is missing this throws with
+    // package guidance instead of failing silently.
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2070",
+        Justification = "Optional driver connection types are resolved by name at runtime; trimmed deployments are documented as unsupported for reflection-loaded providers.")]
     private static Func<string, DbConnection> CreateConnectionFactory(Type connectionType)
     {
         var constructor = connectionType.GetConstructor(new[] { typeof(string) });

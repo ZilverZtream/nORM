@@ -200,6 +200,8 @@ namespace nORM.Query
             // so delegate directly to avoid a redundant SqlBuilder allocation.
             Clear();
         }
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class QueryTranslatorPooledObjectPolicy : PooledObjectPolicy<QueryTranslator>
         {
             /// <summary>
@@ -220,6 +222,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ListPooledObjectPolicy<T> : PooledObjectPolicy<List<T>>
         {
             /// <summary>

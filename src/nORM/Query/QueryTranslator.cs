@@ -26,8 +26,12 @@ namespace nORM.Query
     /// so parameters, aliases, projection state, and recursion depth unwind deterministically.
     /// The recursion depth limit is configured by <see cref="nORM.Configuration.DbContextOptions.MaxRecursionDepth"/>.
     /// </remarks>
-    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("QueryTranslator builds Expression-based materializers via reflection; not NativeAOT-compatible.")]
-    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("QueryTranslator reflects over entity types to build SQL and materializers; trimming may remove the required members.")]
+    // Runtime LINQ translation is a dynamic surface: it can route to client-evaluation
+    // fallbacks that instantiate generics and build delegates at runtime. The class-level
+    // annotations cover every member; nested translator classes carry the same annotations
+    // because nested types do not inherit them from the containing type.
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal sealed partial class QueryTranslator : ExpressionVisitor, IDisposable
     {
         /// <summary>Default initial capacity for cross-join SQL builders.</summary>

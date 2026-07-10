@@ -47,6 +47,8 @@ namespace nORM.Query
             return def == typeof(IGrouping<,>) || def == typeof(IEnumerable<>);
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ProjectedTailSelectorRewriter : ExpressionVisitor
         {
             private readonly ParameterExpression _source;
@@ -74,6 +76,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ProjectionMemberReplacer : ExpressionVisitor
         {
             protected override Expression VisitMember(MemberExpression node)
@@ -119,6 +123,8 @@ namespace nORM.Query
     /// <summary>
     /// Concrete IGrouping implementation returned by the streaming GroupBy transform.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal sealed class ClientGrouping<TKey, TElement> : IGrouping<TKey, TElement>
     {
         private readonly List<TElement> _elements;

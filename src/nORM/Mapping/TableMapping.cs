@@ -19,8 +19,10 @@ namespace nORM.Mapping
     /// <summary>
     /// Describes how a CLR type maps to a database table including column and relationship metadata.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("TableMapping reflects over entity properties; not NativeAOT-compatible.")]
-    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("TableMapping reflects over entity properties; trimming may remove the required members.")]
+    // Mapping construction reflects over the entity type and builds column accessor
+    // delegates, so the constructor carries RequiresDynamicCode/RequiresUnreferencedCode.
+    // The static expression-analysis helpers and materialized instance state are safe to
+    // use from any context once a mapping exists, so the class itself is not annotated.
     public sealed class TableMapping
     {
         /// <summary>Gets the CLR type represented by this mapping.</summary>
@@ -99,6 +101,8 @@ namespace nORM.Mapping
         /// <param name="p">Database provider used for identifier escaping.</param>
         /// <param name="ctx">Context used to resolve related mappings.</param>
         /// <param name="fluentConfig">Optional configuration overrides.</param>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("TableMapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("TableMapping construction reflects over entity properties; trimming may remove the required members.")]
         public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
         {
             Type = t;
@@ -337,6 +341,8 @@ namespace nORM.Mapping
         /// configured relationships and convention-based matches are considered.
         /// </summary>
         /// <param name="ctx">The <see cref="DbContext"/> used to resolve related entity mappings.</param>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Mapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Mapping construction reflects over entity properties; trimming may remove the required members.")]
         private void DiscoverRelations(DbContext ctx)
         {
             if (_fluentConfig?.Relationships.Count > 0)
@@ -416,6 +422,8 @@ namespace nORM.Mapping
             return elementType != typeof(string);
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Mapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Mapping construction reflects over entity properties; trimming may remove the required members.")]
         private static bool HasCollectionNavigationTo(Type type, Type targetType)
             => type.GetProperties()
                 .Where(static prop => prop.GetCustomAttribute<NotMappedAttribute>() == null)
@@ -472,6 +480,8 @@ namespace nORM.Mapping
             return Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Mapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Mapping construction reflects over entity properties; trimming may remove the required members.")]
         private void BuildOwnedCollections(IEntityTypeConfiguration? fluentConfig, DatabaseProvider p)
         {
             if (fluentConfig?.OwnedCollectionNavigations == null) return;
@@ -538,6 +548,8 @@ namespace nORM.Mapping
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Mapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Mapping construction reflects over entity properties; trimming may remove the required members.")]
         private void BuildManyToManyJoins(IEntityTypeConfiguration? fluentConfig, DatabaseProvider p, DbContext ctx)
         {
             if (fluentConfig?.ManyToManyRelationships == null || fluentConfig.ManyToManyRelationships.Count == 0)

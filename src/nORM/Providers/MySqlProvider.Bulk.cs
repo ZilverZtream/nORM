@@ -29,6 +29,8 @@ namespace nORM.Providers
         /// <param name="entities">Entities to insert.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total number of rows inserted.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public override async Task<int> BulkInsertAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
@@ -134,6 +136,8 @@ namespace nORM.Providers
         /// <param name="entities">Entities containing updated values.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Number of rows updated.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
@@ -227,6 +231,8 @@ namespace nORM.Providers
         /// <param name="entities">Entities whose keys determine the rows to remove.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Total number of rows deleted.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         public override async Task<int> BulkDeleteAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
@@ -321,6 +327,8 @@ namespace nORM.Providers
         /// Returns a cloned DataTable with the schema matching the specified columns.
         /// Caches the schema per entity type to avoid repeated reflection.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072",
+            Justification = "Column types are mapped entity property types rooted by TableMapping registration; DataColumn only needs the type identity for bulk-load schema definition.")]
         private static DataTable GetDataTable(TableMapping m, List<Column> cols)
         {
             var schema = _tableSchemas.GetOrAdd(m.Type, _ =>

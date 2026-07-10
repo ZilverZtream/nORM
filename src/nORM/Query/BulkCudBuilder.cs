@@ -13,6 +13,8 @@ namespace nORM.Query
     /// <summary>
     /// Builds SQL fragments for bulk update and delete operations.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal sealed class BulkCudBuilder
     {
         private readonly DbContext _ctx;

@@ -199,6 +199,8 @@ namespace nORM.Providers
         /// </summary>
         /// <param name="values">Values to convert into a typed array.</param>
         /// <returns>A strongly-typed array when all non-null values share the same type; otherwise an <c>object[]</c>.</returns>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050",
+            Justification = "Element types are runtime types of live values or entries from the static nullable table; when the runtime cannot provide the array type the catch below falls back to object[].")]
         private static Array CreateTypedArray(IReadOnlyList<object?> values)
         {
             Type? commonType = null;
@@ -216,14 +218,55 @@ namespace nORM.Providers
             // When the collection contains nulls AND the common type is a non-nullable
             // value type (e.g., int), use Nullable<T> as the array element type. Otherwise
             // Array.SetValue(null, i) throws InvalidCastException on value-type arrays.
-            var elementType = (hasNull && commonType.IsValueType && Nullable.GetUnderlyingType(commonType) == null)
-                ? typeof(Nullable<>).MakeGenericType(commonType)
-                : commonType;
+            // The nullable type comes from a static table of statically-referenced
+            // instantiations (runtime Nullable<> construction is not NativeAOT-compatible);
+            // exotic value types keep the documented object[] fallback.
+            var elementType = commonType;
+            if (hasNull && commonType.IsValueType && Nullable.GetUnderlyingType(commonType) == null)
+            {
+                elementType = GetKnownNullableType(commonType);
+                if (elementType == null)
+                    return values.ToArray();
+            }
 
-            var arr = Array.CreateInstance(elementType, values.Count);
+            Array arr;
+            try
+            {
+                arr = Array.CreateInstance(elementType, values.Count);
+            }
+            catch (NotSupportedException)
+            {
+                // NativeAOT cannot create arrays of types it never saw as array elements;
+                // the object[] fallback keeps parameter binding functional.
+                return values.ToArray();
+            }
             for (int i = 0; i < values.Count; i++)
                 arr.SetValue(values[i], i);
             return arr;
+        }
+
+        private static Type? GetKnownNullableType(Type valueType)
+        {
+            if (valueType == typeof(bool)) return typeof(bool?);
+            if (valueType == typeof(byte)) return typeof(byte?);
+            if (valueType == typeof(sbyte)) return typeof(sbyte?);
+            if (valueType == typeof(short)) return typeof(short?);
+            if (valueType == typeof(ushort)) return typeof(ushort?);
+            if (valueType == typeof(int)) return typeof(int?);
+            if (valueType == typeof(uint)) return typeof(uint?);
+            if (valueType == typeof(long)) return typeof(long?);
+            if (valueType == typeof(ulong)) return typeof(ulong?);
+            if (valueType == typeof(float)) return typeof(float?);
+            if (valueType == typeof(double)) return typeof(double?);
+            if (valueType == typeof(decimal)) return typeof(decimal?);
+            if (valueType == typeof(char)) return typeof(char?);
+            if (valueType == typeof(Guid)) return typeof(Guid?);
+            if (valueType == typeof(DateTime)) return typeof(DateTime?);
+            if (valueType == typeof(DateTimeOffset)) return typeof(DateTimeOffset?);
+            if (valueType == typeof(TimeSpan)) return typeof(TimeSpan?);
+            if (valueType == typeof(DateOnly)) return typeof(DateOnly?);
+            if (valueType == typeof(TimeOnly)) return typeof(TimeOnly?);
+            return null;
         }
     }
 }

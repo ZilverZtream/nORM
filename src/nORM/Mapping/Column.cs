@@ -111,6 +111,8 @@ namespace nORM.Mapping
         /// <param name="getterOverride">Custom getter delegate.</param>
         /// <param name="setterOverride">Custom setter delegate.</param>
         /// <param name="setterMethodOverride">Custom setter method.</param>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Column construction builds property accessor delegates with DynamicMethod when no overrides are supplied; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Column construction reflects over the mapped property; trimming may remove the required members.")]
         public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null,
             Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null,
             MethodInfo? setterMethodOverride = null)

@@ -21,6 +21,8 @@ namespace nORM.Providers
         /// concrete provider supplies the per batch action which performs the
         /// actual database work.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Bulk operations build provider transfer structures from mapping metadata and may dispatch to reflection-loaded driver APIs; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk operations reflect over entity and driver types; trimming may remove the required members. See docs/aot-trimming.md.")]
         protected async Task<int> ExecuteBulkOperationAsync<T>(
             DbContext ctx,
             TableMapping mapping,

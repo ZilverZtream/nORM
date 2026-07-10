@@ -165,6 +165,8 @@ namespace nORM.Query
             return LocalSequenceOpDetector.Has(expression);
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class LocalSequenceOpDetector : ExpressionVisitor
         {
             private bool _found;
@@ -366,6 +368,8 @@ namespace nORM.Query
                 throw new ArgumentException($"Cannot determine element type from expression of type {t}");
             });
         }
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ParameterValueExtractor : ExpressionVisitor
         {
             private readonly List<object?> _values = new();

@@ -44,20 +44,28 @@ namespace nORM.Providers
 
         internal override object? GetCommandGeneratedKey(DbCommand command, TableMapping mapping)
         {
-            var accessor = _lastInsertedIdAccessors.GetOrAdd(command.GetType(), static commandType =>
-            {
-                var property = commandType.GetProperty("LastInsertedId");
-                if (property == null)
-                    return static _ => null;
-
-                var commandParameter = Expression.Parameter(typeof(DbCommand), "command");
-                var typedCommand = Expression.Convert(commandParameter, commandType);
-                var propertyAccess = Expression.Property(typedCommand, property);
-                var boxed = Expression.Convert(propertyAccess, typeof(object));
-                return Expression.Lambda<Func<DbCommand, object?>>(boxed, commandParameter).Compile();
-            });
+            var accessor = _lastInsertedIdAccessors.GetOrAdd(command.GetType(), static commandType => BuildLastInsertedIdAccessor(commandType));
 
             return accessor(command);
+        }
+
+        // The MySQL command type comes from an optional driver assembly loaded by name at
+        // runtime, so the trimmer cannot see the LastInsertedId property. The probe is
+        // best-effort: when the property is unavailable the accessor returns null and key
+        // retrieval falls back to the appended `SELECT LAST_INSERT_ID()` statement.
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2070",
+            Justification = "Best-effort probe of the optional MySQL driver's LastInsertedId property; a missing property falls back to SQL-based generated-key retrieval.")]
+        private static Func<DbCommand, object?> BuildLastInsertedIdAccessor(Type commandType)
+        {
+            var property = commandType.GetProperty("LastInsertedId");
+            if (property == null)
+                return static _ => null;
+
+            var commandParameter = Expression.Parameter(typeof(DbCommand), "command");
+            var typedCommand = Expression.Convert(commandParameter, commandType);
+            var propertyAccess = Expression.Property(typedCommand, property);
+            var boxed = Expression.Convert(propertyAccess, typeof(object));
+            return Expression.Lambda<Func<DbCommand, object?>>(boxed, commandParameter).Compile();
         }
 
         private static bool IsNumericType(Type t) =>

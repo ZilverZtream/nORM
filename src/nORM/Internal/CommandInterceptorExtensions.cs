@@ -696,6 +696,7 @@ namespace nORM.Internal
             public override DateTime GetDateTime(int ordinal) => _inner.GetDateTime(ordinal);
             public override decimal GetDecimal(int ordinal) => _inner.GetDecimal(ordinal);
             public override double GetDouble(int ordinal) => _inner.GetDouble(ordinal);
+            [return: System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicFields | System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties)]
             public override Type GetFieldType(int ordinal) => _inner.GetFieldType(ordinal);
             public override T GetFieldValue<T>(int ordinal) => _inner.GetFieldValue<T>(ordinal);
             public override Task<T> GetFieldValueAsync<T>(int ordinal, CancellationToken cancellationToken)

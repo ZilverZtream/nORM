@@ -540,14 +540,14 @@ namespace nORM.Query
                 && enumType.IsEnum)
             {
                 var valueSql = GetSql(node.Arguments[1]);
-                var defined = Enum.GetValues(enumType);
-                var underlyingType = Enum.GetUnderlyingType(enumType);
+                // GetValuesAsUnderlyingType returns underlying-typed values directly, which
+                // avoids the runtime enum-array instantiation NativeAOT cannot provide.
+                var defined = Enum.GetValuesAsUnderlyingType(enumType);
                 _sql.Append('(').Append(valueSql).Append(" IN (");
                 bool first = true;
-                foreach (var v in defined)
+                foreach (var underlying in defined)
                 {
                     if (!first) _sql.Append(", ");
-                    var underlying = Convert.ChangeType(v, underlyingType, System.Globalization.CultureInfo.InvariantCulture)!;
                     _sql.Append(Convert.ToString(underlying, System.Globalization.CultureInfo.InvariantCulture)!);
                     first = false;
                 }

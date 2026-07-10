@@ -199,12 +199,13 @@ namespace nORM.Query
         {
             var sb = new System.Text.StringBuilder();
             sb.Append("(CASE");
-            var values = Enum.GetValues(enumType);
-            var underlyingType = Enum.GetUnderlyingType(enumType);
-            foreach (var value in values)
+            // GetValuesAsUnderlyingType avoids boxing enum-typed values (and the runtime
+            // enum-array instantiation NativeAOT cannot provide); the returned values are
+            // already underlying-typed so no Convert.ChangeType round-trip is needed.
+            var values = Enum.GetValuesAsUnderlyingType(enumType);
+            foreach (var underlying in values)
             {
-                var name = Enum.GetName(enumType, value!) ?? value!.ToString()!;
-                var underlying = Convert.ChangeType(value, underlyingType, System.Globalization.CultureInfo.InvariantCulture)!;
+                var name = Enum.GetName(enumType, underlying!) ?? underlying!.ToString()!;
                 sb.Append(" WHEN ").Append(columnSql).Append(" = ").Append(underlying)
                   .Append(" THEN '").Append(name.Replace("'", "''")).Append('\'');
             }
@@ -226,12 +227,11 @@ namespace nORM.Query
         {
             var sb = new System.Text.StringBuilder();
             sb.Append("(CASE");
-            var values = Enum.GetValues(enumType);
-            var underlyingType = Enum.GetUnderlyingType(enumType);
-            foreach (var value in values)
+            // Same underlying-typed enumeration rationale as BuildEnumToStringCase.
+            var values = Enum.GetValuesAsUnderlyingType(enumType);
+            foreach (var underlying in values)
             {
-                var name = Enum.GetName(enumType, value!) ?? value!.ToString()!;
-                var underlying = Convert.ChangeType(value, underlyingType, System.Globalization.CultureInfo.InvariantCulture)!;
+                var name = Enum.GetName(enumType, underlying!) ?? underlying!.ToString()!;
                 sb.Append(" WHEN ").Append(columnSql).Append(" = '")
                   .Append(name.Replace("'", "''")).Append("' THEN ").Append(underlying);
             }

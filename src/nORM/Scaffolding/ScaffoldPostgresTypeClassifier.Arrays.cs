@@ -32,12 +32,12 @@ namespace nORM.Scaffolding
                 normalized = canonicalCastType;
 
             if (!TryGetPostgresArrayElementType(normalized, out var element)
-                || !TryMapPostgresArrayElementClrType(element, out var elementType))
+                || !TryGetPostgresArrayElementMapping(element, out var mapping))
             {
                 return false;
             }
 
-            arrayType = elementType.MakeArrayType();
+            arrayType = mapping.ClrArrayType;
             return true;
         }
     }

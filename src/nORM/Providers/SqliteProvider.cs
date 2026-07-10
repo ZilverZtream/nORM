@@ -170,7 +170,7 @@ namespace nORM.Providers
         /// </summary>
         public override string? FormatDateUsingDotNetPattern(string sql, string dotNetFormat)
         {
-            if (!nORM.Query.SelectClauseVisitor.TryConvertDotNetDateFormatToStrftime(dotNetFormat, out var strftimeFmt))
+            if (!nORM.Query.DateFormatSqlConversion.TryConvertDotNetDateFormatToStrftime(dotNetFormat, out var strftimeFmt))
                 return null;
             return $"strftime('{strftimeFmt}', {sql})";
         }

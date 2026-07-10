@@ -78,51 +78,6 @@ namespace nORM.Query
             public FormatSegment(int i, string? f, int a) { IsLiteral = false; Literal = null; ArgIndex = i; FormatSpec = f; Alignment = a; }
         }
 
-        /// <summary>
-        /// Translates a .NET DateTime custom format string into a SQLite
-        /// strftime format string. Returns false on any unsupported token
-        /// (notably locale-aware MMM/MMMM/dddd/ddd). Single-quote characters
-        /// in literal segments are doubled per SQL string-literal rules so the
-        /// caller can wrap the result in '...'. Strftime % is escaped as %%.
-        /// </summary>
-        internal static bool TryConvertDotNetDateFormatToStrftime(string fmt, out string strftime)
-        {
-            var sb = new StringBuilder(fmt.Length + 4);
-            int i = 0;
-            while (i < fmt.Length)
-            {
-                if (i + 4 <= fmt.Length && fmt[i] == 'y' && fmt[i + 1] == 'y' && fmt[i + 2] == 'y' && fmt[i + 3] == 'y')
-                { sb.Append("%Y"); i += 4; continue; }
-                if (i + 2 <= fmt.Length && fmt[i] == 'y' && fmt[i + 1] == 'y')
-                { sb.Append("%y"); i += 2; continue; }
-                if (i + 2 <= fmt.Length && fmt[i] == 'M' && fmt[i + 1] == 'M')
-                { sb.Append("%m"); i += 2; continue; }
-                if (i + 2 <= fmt.Length && fmt[i] == 'd' && fmt[i + 1] == 'd')
-                { sb.Append("%d"); i += 2; continue; }
-                if (i + 2 <= fmt.Length && fmt[i] == 'H' && fmt[i + 1] == 'H')
-                { sb.Append("%H"); i += 2; continue; }
-                if (i + 2 <= fmt.Length && fmt[i] == 'm' && fmt[i + 1] == 'm')
-                { sb.Append("%M"); i += 2; continue; }
-                if (i + 2 <= fmt.Length && fmt[i] == 's' && fmt[i + 1] == 's')
-                { sb.Append("%S"); i += 2; continue; }
-                // Reject locale-aware and unsupported single-character tokens
-                // before they end up in the strftime literal as themselves.
-                char c = fmt[i];
-                if (c == 'M' || c == 'd' || c == 'H' || c == 'h' || c == 'm'
-                    || c == 's' || c == 'y' || c == 'f' || c == 'F' || c == 'z' || c == 'K' || c == 't')
-                {
-                    strftime = string.Empty;
-                    return false;
-                }
-                if (c == '\'') sb.Append("''");
-                else if (c == '%') sb.Append("%%");
-                else sb.Append(c);
-                i++;
-            }
-            strftime = sb.ToString();
-            return true;
-        }
-
         private static List<FormatSegment>? TryParseFormatSegments(string template)
         {
             var segments = new List<FormatSegment>();
@@ -172,6 +127,59 @@ namespace nORM.Query
             }
             if (literal.Length > 0) segments.Add(new FormatSegment(literal.ToString()));
             return segments;
+        }
+    }
+
+    /// <summary>
+    /// Pure string conversion between .NET date format patterns and SQL dialect format
+    /// strings. Lives outside the annotated query-translation visitors because it performs
+    /// no reflection and providers call it directly for SQL generation.
+    /// </summary>
+    internal static class DateFormatSqlConversion
+    {
+        /// <summary>
+        /// Translates a .NET DateTime custom format string into a SQLite
+        /// strftime format string. Returns false on any unsupported token
+        /// (notably locale-aware MMM/MMMM/dddd/ddd). Single-quote characters
+        /// in literal segments are doubled per SQL string-literal rules so the
+        /// caller can wrap the result in '...'. Strftime % is escaped as %%.
+        /// </summary>
+        internal static bool TryConvertDotNetDateFormatToStrftime(string fmt, out string strftime)
+        {
+            var sb = new StringBuilder(fmt.Length + 4);
+            int i = 0;
+            while (i < fmt.Length)
+            {
+                if (i + 4 <= fmt.Length && fmt[i] == 'y' && fmt[i + 1] == 'y' && fmt[i + 2] == 'y' && fmt[i + 3] == 'y')
+                { sb.Append("%Y"); i += 4; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'y' && fmt[i + 1] == 'y')
+                { sb.Append("%y"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'M' && fmt[i + 1] == 'M')
+                { sb.Append("%m"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'd' && fmt[i + 1] == 'd')
+                { sb.Append("%d"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'H' && fmt[i + 1] == 'H')
+                { sb.Append("%H"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 'm' && fmt[i + 1] == 'm')
+                { sb.Append("%M"); i += 2; continue; }
+                if (i + 2 <= fmt.Length && fmt[i] == 's' && fmt[i + 1] == 's')
+                { sb.Append("%S"); i += 2; continue; }
+                // Reject locale-aware and unsupported single-character tokens
+                // before they end up in the strftime literal as themselves.
+                char c = fmt[i];
+                if (c == 'M' || c == 'd' || c == 'H' || c == 'h' || c == 'm'
+                    || c == 's' || c == 'y' || c == 'f' || c == 'F' || c == 'z' || c == 'K' || c == 't')
+                {
+                    strftime = string.Empty;
+                    return false;
+                }
+                if (c == '\'') sb.Append("''");
+                else if (c == '%') sb.Append("%%");
+                else sb.Append(c);
+                i++;
+            }
+            strftime = sb.ToString();
+            return true;
         }
     }
 }

@@ -15,6 +15,8 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class TakeTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -50,6 +52,8 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class SkipTranslator : IMethodCallTranslator
         {
             /// <summary>
@@ -129,6 +133,8 @@ namespace nORM.Query
         /// a cumulative break flag. Without an upstream ordering these operators have
         /// no deterministic relational meaning, so the translator still fails closed.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class TakeSkipWhileTranslator(bool takeWhile) : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
@@ -252,6 +258,8 @@ namespace nORM.Query
         /// Requires an upstream OrderBy or a mapped key column the translator can
         /// default-order by; without either, the reversed direction is undefined.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class TakeLastTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
@@ -265,6 +273,8 @@ namespace nORM.Query
         /// so the caller sees rows in the original order. For "drop the last N",
         /// scanning all-minus-N rows is unavoidable in any provider.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class SkipLastTranslator : IMethodCallTranslator
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
