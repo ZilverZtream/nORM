@@ -1076,6 +1076,10 @@ P:nORM.Configuration.DbContextOptions.EagerChangeTracking:System.Boolean
 P:nORM.Configuration.DbContextOptions.GlobalFilters:System.Collections.Generic.IReadOnlyDictionary{System.Type,System.Collections.Generic.IReadOnlyList{System.Linq.Expressions.LambdaExpression}}
 P:nORM.Configuration.DbContextOptions.Logger:Microsoft.Extensions.Logging.ILogger
 P:nORM.Configuration.DbContextOptions.MaxGroupJoinSize:System.Int32
+P:nORM.Configuration.DbContextOptions.MaxQueryComplexityCost:System.Nullable{System.Int32}
+P:nORM.Configuration.DbContextOptions.MaxQueryJoinDepth:System.Nullable{System.Int32}
+P:nORM.Configuration.DbContextOptions.MaxQueryParameterCount:System.Nullable{System.Int32}
+P:nORM.Configuration.DbContextOptions.MaxQueryWhereConditions:System.Nullable{System.Int32}
 P:nORM.Configuration.DbContextOptions.MaxRecursionDepth:System.Int32
 P:nORM.Configuration.DbContextOptions.NativeTenantSecurityMode:nORM.Configuration.NativeTenantSecurityMode
 P:nORM.Configuration.DbContextOptions.NativeTenantSessionKey:System.String

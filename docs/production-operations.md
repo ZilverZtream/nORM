@@ -110,10 +110,43 @@ queries for hot paths, use `AsNoTracking()` for read-only queries, batch writes
 where possible, and prefer native bulk insert paths for large inserts. Benchmark
 claims and baselines are governed by `docs/benchmark-governance.md`.
 
+## Query Admission Limits
+
+Before translation, every non-trivial query passes a complexity check that
+bounds join depth, WHERE condition count, bound parameter count, and an
+estimated cost score (joins weigh quadratically). By default these limits scale
+with available system memory — 10 joins, 50 WHERE conditions, 2,000 parameters,
+and 10,000 cost per GB, clamped between 1 and 16 GB — which protects small
+hosts from pathological queries but makes admission machine-dependent: a
+report-style query that translates on a 16 GB developer machine can be rejected
+with `NormQueryException` inside a 4 GB container.
+
+For deterministic admission across environments, set explicit limits on
+`DbContextOptions`; each `null` (the default) keeps the memory-scaled value:
+
+```csharp
+var options = new DbContextOptions
+{
+    MaxQueryJoinDepth = 50,
+    MaxQueryWhereConditions = 500,
+    MaxQueryParameterCount = 4_000,
+    MaxQueryComplexityCost = 500_000,
+};
+```
+
+Explicit limits are enforced consistently even when another context with more
+permissive settings already translated the same query shape. Providers still
+enforce their own hard parameter ceilings (for example SQLite's variable limit)
+regardless of these settings. A warning is logged when a query's estimated cost
+exceeds half the effective ceiling.
+
 ## Troubleshooting
 
 - `NormUnsupportedFeatureException`: check `docs/linq-support.md`; use a
   supported LINQ shape or raw SQL.
+- `NormQueryException` mentioning join depth, WHERE conditions, parameter
+  count, or complexity cost: the query exceeded an admission limit — see
+  "Query Admission Limits" above for the explicit `DbContextOptions` overrides.
 - `NormConfigurationException`: validate provider, model, tenant, transaction,
   and options setup.
 - `DbConcurrencyException`: handle merge/reload/retry workflows explicitly.

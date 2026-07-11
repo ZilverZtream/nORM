@@ -79,7 +79,14 @@ namespace nORM.Query
             if (options is null) throw new ArgumentNullException(nameof(options));
             var fingerprint = ExpressionFingerprint.Compute(query);
             if (_analysisCache.TryGetValue(fingerprint, out var cached))
+            {
+                // The structural metrics are cache-stable, but the admission limits are
+                // not: they depend on the calling context's explicit option overrides and
+                // on current memory. Re-check admission (cheap integer comparisons) so a
+                // context with stricter limits cannot ride a permissive context's cache entry.
+                ValidateAgainstAdaptiveLimits(cached, CalculateAdaptiveLimits(_memoryMonitor.GetAvailableMemory(), options), addWarnings: false);
                 return cached;
+            }
             if (_analysisCache.Count >= MaxCacheSize)
             {
                 // Evict oldest half rather than wiping the entire cache to avoid
@@ -97,7 +104,7 @@ namespace nORM.Query
             var baseAnalysis = AnalyzeQueryStructure(query);
             var availableMemory = _memoryMonitor.GetAvailableMemory();
             var adaptedLimits = CalculateAdaptiveLimits(availableMemory, options);
-            ValidateAgainstAdaptiveLimits(baseAnalysis, adaptedLimits);
+            ValidateAgainstAdaptiveLimits(baseAnalysis, adaptedLimits, addWarnings: true);
             _analysisCache[fingerprint] = baseAnalysis;
             return baseAnalysis;
         }
@@ -151,27 +158,34 @@ namespace nORM.Query
         }
         private static AdaptiveLimits CalculateAdaptiveLimits(long availableMemory, DbContextOptions options)
         {
-            // Scale limits based on available memory in GB, clamped between MinMemoryFactorGb and MaxMemoryFactorGb
+            // Scale limits based on available memory in GB, clamped between MinMemoryFactorGb
+            // and MaxMemoryFactorGb. Explicit option overrides take precedence so callers can
+            // opt out of machine-dependent admission.
             var memoryFactor = Math.Clamp((int)(availableMemory / BytesPerGigabyte), MinMemoryFactorGb, MaxMemoryFactorGb);
+            var maxEstimatedCost = options.MaxQueryComplexityCost ?? BaseMaxEstimatedCostPerGb * memoryFactor;
             return new AdaptiveLimits
             {
-                MaxJoinDepth = BaseJoinDepthPerGb * memoryFactor,
-                MaxWhereConditions = BaseWhereConditionsPerGb * memoryFactor,
-                MaxParameterCount = BaseParameterCountPerGb * memoryFactor,
-                MaxEstimatedCost = BaseMaxEstimatedCostPerGb * memoryFactor,
-                HighCostThreshold = BaseHighCostThresholdPerGb * memoryFactor
+                MaxJoinDepth = options.MaxQueryJoinDepth ?? BaseJoinDepthPerGb * memoryFactor,
+                MaxWhereConditions = options.MaxQueryWhereConditions ?? BaseWhereConditionsPerGb * memoryFactor,
+                MaxParameterCount = options.MaxQueryParameterCount ?? BaseParameterCountPerGb * memoryFactor,
+                MaxEstimatedCost = maxEstimatedCost,
+                // The warning threshold tracks half the admission ceiling, matching the
+                // ratio of the base constants, so explicit ceilings scale their warning too.
+                HighCostThreshold = maxEstimatedCost / 2
             };
         }
-        private static void ValidateAgainstAdaptiveLimits(QueryComplexityInfo info, AdaptiveLimits limits)
+        private static void ValidateAgainstAdaptiveLimits(QueryComplexityInfo info, AdaptiveLimits limits, bool addWarnings)
         {
             if (info.JoinCount > limits.MaxJoinDepth)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum join depth of {limits.MaxJoinDepth}"));
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum join depth of {limits.MaxJoinDepth}. Raise DbContextOptions.MaxQueryJoinDepth or break the query into smaller operations."));
             if (info.WhereConditionCount > limits.MaxWhereConditions)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum WHERE conditions of {limits.MaxWhereConditions}"));
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum WHERE conditions of {limits.MaxWhereConditions}. Raise DbContextOptions.MaxQueryWhereConditions or simplify the predicate."));
             if (info.ParameterCount > limits.MaxParameterCount)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum parameter count of {limits.MaxParameterCount}"));
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query exceeds maximum parameter count of {limits.MaxParameterCount}. Raise DbContextOptions.MaxQueryParameterCount or reduce the number of bound values."));
             if (info.EstimatedCost > limits.MaxEstimatedCost)
-                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query complexity too high (cost: {info.EstimatedCost}, max: {limits.MaxEstimatedCost}). Consider simplifying the query or breaking it into smaller operations."));
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, $"Query complexity too high (cost: {info.EstimatedCost}, max: {limits.MaxEstimatedCost}). Raise DbContextOptions.MaxQueryComplexityCost, simplify the query, or break it into smaller operations."));
+            if (!addWarnings)
+                return;
             if (info.EstimatedCost > limits.HighCostThreshold)
                 info.WarningMessages.Add($"High query cost ({info.EstimatedCost}) - may impact performance");
             if (info.HasCartesianProduct)

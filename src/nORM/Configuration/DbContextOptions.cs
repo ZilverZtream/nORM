@@ -141,6 +141,11 @@ namespace nORM.Configuration
         // Maximum 200 to prevent stack overflows from adversarial inputs.
         private int _maxRecursionDepth = DefaultMaxRecursionDepth;
 
+        private int? _maxQueryJoinDepth;
+        private int? _maxQueryWhereConditions;
+        private int? _maxQueryParameterCount;
+        private int? _maxQueryComplexityCost;
+
         /// <summary>
         /// Gets or sets the timeout configuration used when executing database commands.
         /// This allows fine grained control over different operation types like queries,
@@ -164,6 +169,83 @@ namespace nORM.Configuration
                         $"MaxRecursionDepth must be between 1 and {AbsoluteMaxRecursionDepth}. " +
                         "If you need deeper nesting, consider breaking the query into multiple queries.");
                 _maxRecursionDepth = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets an explicit upper bound on the number of joins a single query may
+        /// contain before translation is rejected. When null (the default), the limit scales
+        /// with available system memory (10 joins per GB, clamped between 1 and 16 GB), which
+        /// means the same query can be admitted on one machine and rejected on a smaller one.
+        /// Set an explicit value for deterministic admission across environments.
+        /// </summary>
+        public int? MaxQueryJoinDepth
+        {
+            get => _maxQueryJoinDepth;
+            set
+            {
+                if (value is < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                        "MaxQueryJoinDepth must be at least 1, or null to scale with available memory.");
+                _maxQueryJoinDepth = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets an explicit upper bound on the number of WHERE conditions a single
+        /// query may contain before translation is rejected. When null (the default), the
+        /// limit scales with available system memory (50 conditions per GB, clamped between
+        /// 1 and 16 GB). Set an explicit value for deterministic admission across environments,
+        /// for example when dynamic filter builders or many global filters compose large predicates.
+        /// </summary>
+        public int? MaxQueryWhereConditions
+        {
+            get => _maxQueryWhereConditions;
+            set
+            {
+                if (value is < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                        "MaxQueryWhereConditions must be at least 1, or null to scale with available memory.");
+                _maxQueryWhereConditions = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets an explicit upper bound on the number of parameters a single query may
+        /// bind (including values expanded from local collections in Contains) before translation
+        /// is rejected. When null (the default), the limit scales with available system memory
+        /// (2000 parameters per GB, clamped between 1 and 16 GB). Providers additionally enforce
+        /// their own hard parameter ceilings regardless of this setting.
+        /// </summary>
+        public int? MaxQueryParameterCount
+        {
+            get => _maxQueryParameterCount;
+            set
+            {
+                if (value is < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                        "MaxQueryParameterCount must be at least 1, or null to scale with available memory.");
+                _maxQueryParameterCount = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets an explicit ceiling for the estimated complexity cost above which query
+        /// translation is rejected. When null (the default), the ceiling scales with available
+        /// system memory (10,000 per GB, clamped between 1 and 16 GB). The cost model weighs
+        /// joins quadratically, so report-style queries with many joins are the most common
+        /// reason to set an explicit ceiling. A warning is logged when a query exceeds half
+        /// the effective ceiling.
+        /// </summary>
+        public int? MaxQueryComplexityCost
+        {
+            get => _maxQueryComplexityCost;
+            set
+            {
+                if (value is < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                        "MaxQueryComplexityCost must be at least 1, or null to scale with available memory.");
+                _maxQueryComplexityCost = value;
             }
         }
 
@@ -377,6 +459,10 @@ namespace nORM.Configuration
                 _providerMobilityMode = _providerMobilityMode,
                 _maxGroupJoinSize = _maxGroupJoinSize,
                 _maxRecursionDepth = _maxRecursionDepth,
+                _maxQueryJoinDepth = _maxQueryJoinDepth,
+                _maxQueryWhereConditions = _maxQueryWhereConditions,
+                _maxQueryParameterCount = _maxQueryParameterCount,
+                _maxQueryComplexityCost = _maxQueryComplexityCost,
                 TimeoutConfiguration = new AdaptiveTimeoutManager.TimeoutConfiguration
                 {
                     BaseTimeout = TimeoutConfiguration.BaseTimeout,
