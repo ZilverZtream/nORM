@@ -364,13 +364,10 @@ namespace nORM.Core
         /// LINQ semantics).
         ///
         /// Lowered to <c>!AnyAsync(!predicate)</c> -- the standard EF identity
-        /// <c>All(p) ≡ !Any(!p)</c>. The translator's direct <c>All</c> path emits the
-        /// predicate inside an EXISTS subquery but does not currently fold an outer
-        /// <c>Where</c>'s predicate into the same subquery, leaving the outer
-        /// predicate dangling against an outer SELECT that has no FROM clause and
-        /// crashing with "no such column" on composed <c>.Where(p1).AllAsync(p2)</c>
-        /// chains. The Any rewrite sidesteps the issue by reusing the well-tested
-        /// Where+Any pipeline; the same-shape sync <c>All</c> bug remains open.
+        /// <c>All(p) ≡ !Any(!p)</c> -- reusing the well-tested Where+Any pipeline.
+        /// The translator's direct sync <c>All</c> path folds an outer <c>Where</c>'s
+        /// predicates into the NOT EXISTS subquery itself (pinned by
+        /// <c>LinqAllWithOuterWhereSyncTests</c>), so both spellings agree.
         /// </summary>
         public static async Task<bool> AllAsync<T>(this IQueryable<T> source, Expression<Func<T, bool>> predicate, CancellationToken ct = default)
             where T : class

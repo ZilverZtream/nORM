@@ -723,6 +723,65 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
+    public async Task Container_terminals_after_append_include_the_reshaped_element()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var query = ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra);
+
+        var array = await query.ToArrayAsync();
+        Assert.Equal(new[] { 10, 20, 30, 999 }, array.Select(x => x.Value).ToArray());
+
+        var set = await query.ToHashSetAsync();
+        Assert.Equal(4, set.Count);
+        Assert.Contains(set, x => x.Value == 999);
+
+        var dict = await query.ToDictionaryAsync(x => x.Value);
+        Assert.Equal(4, dict.Count);
+        Assert.Equal("extra", dict[999].Name);
+    }
+
+    [Fact]
+    public async Task Group_by_after_append_groups_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 10 };
+        var groups = await ctx.Query<SeqTailItem>()
+            .OrderBy(x => x.Id)
+            .Append(extra)
+            .GroupBy(x => x.Value)
+            .ToListAsync();
+
+        // The appended duplicate value must land in the same group as the row.
+        Assert.Equal(3, groups.Count);
+        Assert.Equal(2, groups.Single(g => g.Key == 10).Count());
+    }
+
+    private static readonly Func<DbContext, int, Task<List<SeqTailItem>>> _compiledListAfterAppend =
+        Norm.CompileQuery((DbContext c, int minValue) =>
+            c.Query<SeqTailItem>()
+                .Where(x => x.Value >= minValue)
+                .OrderBy(x => x.Id)
+                .Append(new SeqTailItem { Name = "baked", Value = 999 }));
+
+    [Fact]
+    public async Task Compiled_query_with_reshape_tail_applies_the_transform()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var rows = await _compiledListAfterAppend(ctx, 15);
+        Assert.Equal(new[] { 20, 30, 999 }, rows.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
     public void Sync_aggregates_after_append_use_the_reshaped_sequence()
     {
         var (cn, ctx) = CreateContext(3); // values 10, 20, 30
