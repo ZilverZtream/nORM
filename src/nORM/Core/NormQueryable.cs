@@ -145,7 +145,13 @@ namespace nORM.Core
                 .GetMethods()
                 .Single(m => m.Name == nameof(Include) && m.IsGenericMethod);
             var generic = method.MakeGenericMethod(typeof(TProperty));
-            var expression = Expression.Call(Expression, generic, Expression.Quote(path));
+            // The source expression's static type after standard Queryable operators
+            // (Where/OrderBy/Take) is IQueryable<T>, not INormQueryable<T>; an instance
+            // call against it throws ArgumentException at expression-build time. Convert
+            // to the interface first — the translator unwraps the Convert when visiting.
+            var expression = Expression.Call(
+                Expression.Convert(Expression, typeof(INormQueryable<>).MakeGenericType(typeof(T))),
+                generic, Expression.Quote(path));
             return new NormIncludableQueryable<T, TProperty>(Provider, expression);
         }
 
@@ -222,7 +228,13 @@ namespace nORM.Core
                 .GetMethods()
                 .Single(m => m.Name == nameof(Include) && m.IsGenericMethod);
             var generic = method.MakeGenericMethod(typeof(TProperty));
-            var expression = Expression.Call(Expression, generic, Expression.Quote(path));
+            // The source expression's static type after standard Queryable operators
+            // (Where/OrderBy/Take) is IQueryable<T>, not INormQueryable<T>; an instance
+            // call against it throws ArgumentException at expression-build time. Convert
+            // to the interface first — the translator unwraps the Convert when visiting.
+            var expression = Expression.Call(
+                Expression.Convert(Expression, typeof(INormQueryable<>).MakeGenericType(typeof(T))),
+                generic, Expression.Quote(path));
             return new NormIncludableQueryableUnconstrained<T, TProperty>(Provider, expression);
         }
 
@@ -272,7 +284,13 @@ namespace nORM.Core
                 .GetMethods()
                 .Single(m => m.Name == nameof(INormQueryable<T>.Include) && m.IsGenericMethod);
             var generic = method.MakeGenericMethod(typeof(TProperty2));
-            var expression = Expression.Call(Expression, generic, Expression.Quote(path));
+            // The source expression's static type after standard Queryable operators
+            // (Where/OrderBy/Take) is IQueryable<T>, not INormQueryable<T>; an instance
+            // call against it throws ArgumentException at expression-build time. Convert
+            // to the interface first — the translator unwraps the Convert when visiting.
+            var expression = Expression.Call(
+                Expression.Convert(Expression, typeof(INormQueryable<>).MakeGenericType(typeof(T))),
+                generic, Expression.Quote(path));
             return new NormIncludableQueryableUnconstrained<T, TProperty2>(Provider, expression);
         }
 
@@ -329,7 +347,13 @@ namespace nORM.Core
                 .GetMethods()
                 .Single(m => m.Name == nameof(INormQueryable<T>.Include) && m.IsGenericMethod);
             var generic = method.MakeGenericMethod(typeof(TProperty2));
-            var expression = Expression.Call(Expression, generic, Expression.Quote(path));
+            // The source expression's static type after standard Queryable operators
+            // (Where/OrderBy/Take) is IQueryable<T>, not INormQueryable<T>; an instance
+            // call against it throws ArgumentException at expression-build time. Convert
+            // to the interface first — the translator unwraps the Convert when visiting.
+            var expression = Expression.Call(
+                Expression.Convert(Expression, typeof(INormQueryable<>).MakeGenericType(typeof(T))),
+                generic, Expression.Quote(path));
             return new NormIncludableQueryable<T, TProperty2>(Provider, expression);
         }
 

@@ -251,6 +251,35 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Contains(pairs, p => p.Id == 3 && p.OtherV == 30);
     }
 
+    [Fact]
+    public async Task Paging_after_windowed_filter_chain_pages_the_filtered_window()
+    {
+        // Window rows 1,2,3 (V = 50,40,30); Where(V < 45) keeps rows 2,3;
+        // Skip(1) then drops row 2 → only row 3 remains. A flat translation
+        // would combine OFFSET/LIMIT against the raw table.
+        var rows = (await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .Skip(1)
+            .ToListAsync())
+            .ToArray();
+
+        var row = Assert.Single(rows);
+        Assert.Equal(3, row.Id);
+
+        var taken = (await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .Take(1)
+            .ToListAsync())
+            .ToArray();
+
+        var first = Assert.Single(taken);
+        Assert.Equal(2, first.Id);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {
