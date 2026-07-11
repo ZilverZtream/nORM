@@ -60,25 +60,6 @@ namespace nORM.Scaffolding
                 primaryKeyColumnsByTable,
                 ConvertIndexInfos(indexes));
 
-        public static IReadOnlyList<ScaffoldPrimaryKey> BuildPrimaryKeyConfigurations(
-            IReadOnlyDictionary<string, string> entityByTable,
-            IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
-            IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
-            IReadOnlyDictionary<string, string> primaryKeyConstraintNamesByTable,
-            IReadOnlySet<string> skippedTableKeys)
-            => ConvertPrimaryKeyConfigurations(ScaffoldPrimaryKeyConfigurationBuilder.BuildPrimaryKeyConfigurations(
-                entityByTable,
-                columnPropertiesByTable,
-                primaryKeyColumnsByTable,
-                primaryKeyConstraintNamesByTable,
-                skippedTableKeys));
-
-        public static IReadOnlyList<ScaffoldPrimaryKey> ConvertPrimaryKeyConfigurations(
-            IReadOnlyList<ScaffoldPrimaryKeyConfigurationInfo> primaryKeys)
-            => primaryKeys
-                .Select(static key => new ScaffoldPrimaryKey(key.EntityName, key.PropertyNames.ToArray(), key.ConstraintName))
-                .ToArray();
-
         public static bool ReferencesUniqueIndex(
             IGrouping<string, ScaffoldForeignKey> foreignKeyGroup,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,

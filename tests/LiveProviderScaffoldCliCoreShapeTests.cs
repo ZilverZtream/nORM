@@ -391,12 +391,16 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.DoesNotContain("[ForeignKey(", childCode, StringComparison.Ordinal);
             Assert.Contains($"public {parentTable} {parentTable} {{ get; set; }} = default!;", childCode, StringComparison.Ordinal);
             Assert.Contains($"public List<{childTable}> {childTable}s {{ get; set; }} = new();", parentCode, StringComparison.Ordinal);
-            if (kind is ProviderKind.SqlServer or ProviderKind.Postgres)
+            if (kind is ProviderKind.SqlServer or ProviderKind.Postgres or ProviderKind.Sqlite)
             {
+                // These providers store the user-declared PK constraint name, and the
+                // scaffolder preserves explicit names in the generated HasKey call.
                 Assert.Contains($"mb.Entity<{parentTable}>().HasKey(e => new {{ e.TenantId, e.OrderNo }}, \"{parentPkName}\");", contextCode, StringComparison.Ordinal);
             }
             else
             {
+                // MySQL always reports the fixed name PRIMARY regardless of the declared
+                // constraint name, so the generated HasKey stays nameless.
                 Assert.Contains($"mb.Entity<{parentTable}>().HasKey(e => new {{ e.TenantId, e.OrderNo }});", contextCode, StringComparison.Ordinal);
                 Assert.DoesNotContain(parentPkName, contextCode, StringComparison.Ordinal);
             }

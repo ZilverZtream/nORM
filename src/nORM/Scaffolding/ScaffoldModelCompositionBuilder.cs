@@ -6,7 +6,10 @@ namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldModelCompositionBuilder
     {
-        public static ScaffoldModelComposition Build(ScaffoldModelDiscoveryResult discovery, bool noRelationships = false)
+        public static ScaffoldModelComposition Build(
+            ScaffoldModelDiscoveryResult discovery,
+            bool noRelationships = false,
+            bool suppressFixedPrimaryConstraintName = false)
         {
             var featureConfigurations = discovery.FeatureConfigurations;
             var manyToManyJoins = noRelationships
@@ -21,7 +24,8 @@ namespace nORM.Scaffolding
                 discovery.ColumnPropertiesByTable,
                 discovery.PrimaryKeyColumnsByTable,
                 discovery.PrimaryKeyConstraintNamesByTable,
-                manyToManyJoinTableKeys);
+                manyToManyJoinTableKeys,
+                suppressFixedPrimaryConstraintName);
             var defaultValueConfigurations = BuildDefaultValueConfigurations(discovery, featureConfigurations);
 
             RestoreGeneratedManyToManyUnsupportedFeatures(

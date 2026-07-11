@@ -12,12 +12,21 @@ namespace nORM.Scaffolding
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> columnPropertiesByTable,
             IReadOnlyDictionary<string, IReadOnlyList<string>> primaryKeyColumnsByTable,
             IReadOnlyDictionary<string, string> primaryKeyConstraintNamesByTable,
-            IReadOnlySet<string> skippedTableKeys)
+            IReadOnlySet<string> skippedTableKeys,
+            bool suppressFixedPrimaryConstraintName = false)
         {
             var keys = new List<ScaffoldPrimaryKeyConfigurationInfo>();
             foreach (var (tableKey, keyColumns) in primaryKeyColumnsByTable.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
                 primaryKeyConstraintNamesByTable.TryGetValue(tableKey, out var constraintName);
+                // MySQL primary keys are always named PRIMARY by the server; the name is
+                // preserved as discovery metadata but is not a user-chosen constraint name,
+                // so it must not surface in generated HasKey configurations.
+                if (suppressFixedPrimaryConstraintName
+                    && string.Equals(constraintName, "PRIMARY", StringComparison.OrdinalIgnoreCase))
+                {
+                    constraintName = null;
+                }
                 if ((keyColumns.Count <= 1 && string.IsNullOrWhiteSpace(constraintName))
                     || skippedTableKeys.Contains(tableKey)
                     || !entityByTable.TryGetValue(tableKey, out var entityName)
