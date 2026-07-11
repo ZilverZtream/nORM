@@ -409,22 +409,65 @@ namespace nORM.Query
                 }, elementType);
                 return source;
             }
+        }
 
-            private static bool HasParameterReference(Expression expression)
+        private static bool HasParameterReference(Expression expression)
+        {
+            var finder = new ParameterFinder();
+            finder.Visit(expression);
+            return finder.Found;
+        }
+
+        private static bool HasFreeParameterReference(Expression expression)
+        {
+            var finder = new FreeParameterFinder();
+            finder.Visit(expression);
+            return finder.Found;
+        }
+
+        /// <summary>
+        /// Detects parameter references not bound by a lambda inside the expression —
+        /// i.e. references to an OUTER query's row. Lambda-bound parameters (an inner
+        /// OrderBy's key selector) are legitimate parts of a self-contained queryable chain.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private sealed class FreeParameterFinder : ExpressionVisitor
+        {
+            private readonly HashSet<ParameterExpression> _bound = new();
+            public bool Found { get; private set; }
+
+            protected override Expression VisitLambda<TDelegate>(Expression<TDelegate> node)
             {
-                var finder = new ParameterFinder();
-                finder.Visit(expression);
-                return finder.Found;
+                var added = new List<ParameterExpression>();
+                foreach (var p in node.Parameters)
+                {
+                    if (_bound.Add(p))
+                        added.Add(p);
+                }
+                var result = base.VisitLambda(node);
+                foreach (var p in added)
+                    _bound.Remove(p);
+                return result;
             }
 
-            private sealed class ParameterFinder : ExpressionVisitor
+            protected override Expression VisitParameter(ParameterExpression node)
             {
-                public bool Found { get; private set; }
-                protected override Expression VisitParameter(ParameterExpression node)
-                {
+                if (!_bound.Contains(node))
                     Found = true;
-                    return node;
-                }
+                return node;
+            }
+        }
+
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private sealed class ParameterFinder : ExpressionVisitor
+        {
+            public bool Found { get; private set; }
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                Found = true;
+                return node;
             }
         }
 
@@ -441,25 +484,6 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                if (node.Arguments[1].Type is { } secondType
-                    && typeof(IQueryable).IsAssignableFrom(secondType)
-                    && !TryGetConstantValue(node.Arguments[1], out _))
-                {
-                    throw new NormUnsupportedFeatureException(
-                        "Zip over two database queries has no provider-mobile SQL translation (positional pairing " +
-                        "requires row numbering on both sides). Zip a query with a local collection, or materialize " +
-                        "both queries first and use LINQ-to-Objects Zip.");
-                }
-
-                if (!TryGetConstantValue(node.Arguments[1], out var secondObj)
-                    || secondObj is not System.Collections.IEnumerable secondSequence
-                    || secondObj is IQueryable)
-                {
-                    throw new NormUnsupportedFeatureException(
-                        "Zip requires a constant or captured local second sequence. Materialize the query first " +
-                        "(e.g. ToListAsync) and use LINQ-to-Objects Zip for other shapes.");
-                }
-
                 LambdaExpression? resultSelector = null;
                 if (node.Arguments.Count == 3)
                 {
@@ -468,30 +492,26 @@ namespace nORM.Query
                             "Zip requires a lambda result selector"));
                 }
 
+                if (typeof(IQueryable).IsAssignableFrom(node.Arguments[1].Type)
+                    || (TryGetConstantValue(node.Arguments[1], out var probe) && probe is IQueryable))
+                {
+                    return TranslateQueryZip(t, node, resultSelector);
+                }
+
+                if (!TryGetConstantValue(node.Arguments[1], out var secondObj)
+                    || secondObj is not System.Collections.IEnumerable secondSequence)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Zip requires a constant or captured local second sequence, or a second database query. " +
+                        "Materialize the query first (e.g. ToListAsync) and use LINQ-to-Objects Zip for other shapes.");
+                }
+
                 var source = t.Visit(node.Arguments[0]);
                 var firstType = t.CurrentPostMaterializeElementType ?? t._projection?.Body.Type ?? t._mapping.Type;
                 var genericArgs = node.Method.GetGenericArguments();
                 var secondElementType = genericArgs.Length >= 2 ? genericArgs[1] : typeof(object);
                 var second = secondSequence.Cast<object?>().ToArray();
-
-                Type resultType;
-                Func<object?, object?, object?> projector;
-                if (resultSelector != null)
-                {
-                    resultType = resultSelector.Body.Type;
-                    var firstArg = Expression.Parameter(typeof(object), "first");
-                    var secondArg = Expression.Parameter(typeof(object), "second");
-                    var body = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[0], Expression.Convert(firstArg, firstType)).Visit(resultSelector.Body)!;
-                    body = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[1], Expression.Convert(secondArg, secondElementType)).Visit(body)!;
-                    projector = Expression.Lambda<Func<object?, object?, object?>>(
-                        Expression.Convert(body, typeof(object)), firstArg, secondArg).Compile();
-                }
-                else
-                {
-                    resultType = typeof(ValueTuple<,>).MakeGenericType(firstType, secondElementType);
-                    var tupleCtor = resultType.GetConstructor(new[] { firstType, secondElementType })!;
-                    projector = (first, secondItem) => tupleCtor.Invoke(new[] { first, secondItem });
-                }
+                var (resultType, projector) = BuildZipProjector(resultSelector, firstType, secondElementType);
 
                 t.AppendPostMaterializeTransform((ctx, rows) =>
                 {
@@ -502,6 +522,90 @@ namespace nORM.Query
                     return output;
                 }, resultType);
                 return source;
+            }
+
+            /// <summary>
+            /// Zip over two database queries: the first source translates and executes
+            /// normally; the second ordered query executes through its own provider when
+            /// the transform runs, and the two materialized sequences pair positionally
+            /// with LINQ-to-Objects semantics (truncating to the shorter side). Both
+            /// sides must carry an explicit OrderBy/ThenBy chain — without one, database
+            /// row order is undefined and positional pairing would be nondeterministic.
+            /// Costs one round trip per side.
+            /// </summary>
+            private static Expression TranslateQueryZip(QueryTranslator t, MethodCallExpression node, LambdaExpression? resultSelector)
+            {
+                if (ExtractOrderByKeys(node.Arguments[0]).Count == 0)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Zip over two database queries requires the first source to have an explicit OrderBy/ThenBy chain so positional pairing is deterministic.");
+                }
+
+                // Queryable.Zip inlines the second queryable's expression tree, so the
+                // argument is usually the full operator chain (with its own bound lambda
+                // parameters), not a constant. Rebuild the queryable instance by
+                // evaluating the chain — only a FREE parameter (a row-derived query
+                // inside a correlated lambda) has no translation.
+                IQueryable secondQuery;
+                if (TryGetConstantValue(node.Arguments[1], out var secondConst) && secondConst is IQueryable direct)
+                {
+                    secondQuery = direct;
+                }
+                else if (!HasFreeParameterReference(node.Arguments[1]))
+                {
+                    secondQuery = (IQueryable)Expression.Lambda(node.Arguments[1]).Compile().DynamicInvoke()!;
+                }
+                else
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Zip requires the second database query to be built from captured state; a row-derived query has no translation.");
+                }
+
+                if (ExtractOrderByKeys(secondQuery.Expression).Count == 0)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Zip over two database queries requires the second source to have an explicit OrderBy/ThenBy chain so positional pairing is deterministic.");
+                }
+
+                var source = t.Visit(node.Arguments[0]);
+                var firstType = t.CurrentPostMaterializeElementType ?? t._projection?.Body.Type ?? t._mapping.Type;
+                var genericArgs = node.Method.GetGenericArguments();
+                var secondElementType = genericArgs.Length >= 2 ? genericArgs[1] : secondQuery.ElementType;
+                var (resultType, projector) = BuildZipProjector(resultSelector, firstType, secondElementType);
+                var capturedSecond = secondQuery;
+
+                t.AppendPostMaterializeTransform((ctx, rows) =>
+                {
+                    var second = new List<object?>();
+                    foreach (var item in (System.Collections.IEnumerable)capturedSecond)
+                        second.Add(item);
+                    var count = Math.Min(rows.Count, second.Count);
+                    var output = CreateRuntimeList(resultType, count);
+                    for (var i = 0; i < count; i++)
+                        output.Add(projector(rows[i], second[i]));
+                    return output;
+                }, resultType);
+                return source;
+            }
+
+            private static (Type ResultType, Func<object?, object?, object?> Projector) BuildZipProjector(
+                LambdaExpression? resultSelector, Type firstType, Type secondElementType)
+            {
+                if (resultSelector != null)
+                {
+                    var resultType = resultSelector.Body.Type;
+                    var firstArg = Expression.Parameter(typeof(object), "first");
+                    var secondArg = Expression.Parameter(typeof(object), "second");
+                    var body = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[0], Expression.Convert(firstArg, firstType)).Visit(resultSelector.Body)!;
+                    body = new nORM.Internal.ParameterReplacer(resultSelector.Parameters[1], Expression.Convert(secondArg, secondElementType)).Visit(body)!;
+                    var projector = Expression.Lambda<Func<object?, object?, object?>>(
+                        Expression.Convert(body, typeof(object)), firstArg, secondArg).Compile();
+                    return (resultType, projector);
+                }
+
+                var tupleType = typeof(ValueTuple<,>).MakeGenericType(firstType, secondElementType);
+                var tupleCtor = tupleType.GetConstructor(new[] { firstType, secondElementType })!;
+                return (tupleType, (first, secondItem) => tupleCtor.Invoke(new[] { first, secondItem }));
             }
         }
     }

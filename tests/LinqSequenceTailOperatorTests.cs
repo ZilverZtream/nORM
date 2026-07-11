@@ -275,15 +275,50 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
-    public void Zip_of_two_database_queries_throws_a_deterministic_unsupported_exception()
+    public void Zip_of_two_ordered_database_queries_pairs_positionally()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var second = ctx.Query<SeqTailItem>().OrderByDescending(x => x.Id);
+        var pairs = ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Zip(second).ToList();
+
+        Assert.Equal(3, pairs.Count);
+        Assert.Equal(new[] { (10, 30), (20, 20), (30, 10) },
+            pairs.Select(p => (p.First.Value, p.Second.Value)).ToArray());
+    }
+
+    [Fact]
+    public void Zip_of_two_ordered_database_queries_with_selector_truncates_to_the_shorter_side()
+    {
+        var (cn, ctx) = CreateContext(4); // values 10, 20, 30, 40
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var shorter = ctx.Query<SeqTailItem>().Where(x => x.Value > 20).OrderBy(x => x.Id);
+        var sums = ctx.Query<SeqTailItem>()
+            .OrderBy(x => x.Id)
+            .Zip(shorter, (a, b) => a.Value + b.Value)
+            .ToList();
+
+        Assert.Equal(new[] { 10 + 30, 20 + 40 }, sums.ToArray());
+    }
+
+    [Fact]
+    public void Zip_of_two_database_queries_requires_explicit_ordering_on_both_sides()
     {
         var (cn, ctx) = CreateContext(3);
         using var _cn = cn;
         using var _ctx = ctx;
 
-        var second = ctx.Query<SeqTailItem>().OrderBy(x => x.Id);
+        var ordered = ctx.Query<SeqTailItem>().OrderBy(x => x.Id);
+        var unordered = ctx.Query<SeqTailItem>();
+
         Assert.Throws<NormUnsupportedFeatureException>(
-            () => ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Zip(second).ToList());
+            () => unordered.Zip(ordered).ToList());
+        Assert.Throws<NormUnsupportedFeatureException>(
+            () => ordered.Zip(unordered).ToList());
     }
 
     // ── Terminal operators after a client-tail reshape must not lie ─────────
