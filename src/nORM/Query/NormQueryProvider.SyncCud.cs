@@ -141,6 +141,7 @@ namespace nORM.Query
         {
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
+            ThrowIfClientMaterializedCudShape(plan, "ExecuteDeleteAsync");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             EnsureWritableMapping(mapping, "ExecuteDeleteAsync");
@@ -165,6 +166,24 @@ namespace nORM.Query
             sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
             return affected;
+        }
+
+        /// <summary>
+        /// Client-materialized query shapes (sequence reshapes, streaming GroupBy,
+        /// group-join results, client scalar reductions) exist only after
+        /// materialization — no set-based DELETE/UPDATE can honor them. Emitting the
+        /// statement for the underlying rows would silently affect rows the reshaped
+        /// query never described (an unfiltered Append source deletes the whole table).
+        /// </summary>
+        private static void ThrowIfClientMaterializedCudShape(QueryPlan plan, string operation)
+        {
+            if (plan.PostMaterializeTransform != null || plan.GroupJoinInfo != null || plan.ClientScalar || plan.PostReverse)
+            {
+                throw new NormUnsupportedFeatureException(
+                    $"{operation} over a client-materialized query shape (Append, Prepend, Chunk, Zip, DefaultIfEmpty " +
+                    "with a default value, streaming GroupBy, group-join results, or tail paging) has no set-based SQL " +
+                    "equivalent. Express the target rows with Where(...) instead.");
+            }
         }
 
         private static void ValidateJoinedCudShape(BulkCudQueryShape? shape)
@@ -241,6 +260,7 @@ namespace nORM.Query
         {
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
+            ThrowIfClientMaterializedCudShape(plan, "ExecuteUpdateAsync");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             EnsureWritableMapping(mapping, "ExecuteUpdateAsync");
