@@ -145,7 +145,7 @@ namespace nORM.Providers
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
             var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
-            var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
+            var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetStagingSqlType(c, m)}"));
 
             var tempCreated = false;
             var updatedCount = 0;
@@ -304,6 +304,29 @@ namespace nORM.Providers
             ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
+        }
+
+        /// <summary>
+        /// Staging temp-table column type. Decimal columns honour the model's configured
+        /// precision/scale (HasPrecision) so bulk staging never rounds a value the
+        /// destination can hold — the old flat DECIMAL(18,2) silently truncated any
+        /// decimal with more than two fractional digits. Unconfigured decimals use a wide
+        /// DECIMAL(38,18) default instead of (18,2); configure HasPrecision to match the
+        /// destination column for exactness (no single SQL DECIMAL holds every .NET decimal).
+        /// </summary>
+        private static string GetStagingSqlType(Mapping.Column c, TableMapping m)
+        {
+            var underlying = Nullable.GetUnderlyingType(c.Prop.PropertyType) ?? c.Prop.PropertyType;
+            if (underlying == typeof(decimal))
+            {
+                if (m.FluentConfiguration?.Precisions is { } precisions
+                    && precisions.TryGetValue(c.Prop, out var pc))
+                {
+                    return $"DECIMAL({pc.Precision},{pc.Scale ?? 0})";
+                }
+                return "DECIMAL(38,18)";
+            }
+            return GetSqlType(c.Prop.PropertyType);
         }
 
         /// <summary>

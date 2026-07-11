@@ -92,7 +92,7 @@ namespace nORM.Providers
             var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
             if (nonKeyCols.Count == 0) return 0;
             var tempTableName = $"#BulkUpdate_{Guid.NewGuid():N}";
-            var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
+            var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetStagingSqlType(c, m)}"));
 
             var tempCreated = false;
             var updatedCount = 0;
@@ -209,7 +209,7 @@ namespace nORM.Providers
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"#BulkDelete_{Guid.NewGuid():N}";
-            var keyColDefs = string.Join(", ", m.KeyColumns.Select(c => $"{c.EscCol} {GetSqlType(c.Prop.PropertyType)}"));
+            var keyColDefs = string.Join(", ", m.KeyColumns.Select(c => $"{c.EscCol} {GetStagingSqlType(c, m)}"));
 
             var tempCreated = false;
             int deletedCount = 0;
@@ -306,6 +306,30 @@ namespace nORM.Providers
 
         internal static string BuildDropTempTableSql(string tempTableName)
             => $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}";
+
+        /// <summary>
+        /// Staging temp-table column type. For decimal columns this honours the model's
+        /// configured precision/scale (HasPrecision) so bulk staging never rounds a value
+        /// the destination column can hold — the old flat DECIMAL(18,2) silently truncated
+        /// any decimal with more than two fractional digits (money/rates). When precision
+        /// is not configured, a wide DECIMAL(38,18) default replaces (18,2); note that no
+        /// single SQL DECIMAL holds every .NET decimal (scale up to 28), so configuring
+        /// HasPrecision to match the destination column is the correct path for exactness.
+        /// </summary>
+        private static string GetStagingSqlType(Mapping.Column c, TableMapping m)
+        {
+            var underlying = Nullable.GetUnderlyingType(c.Prop.PropertyType) ?? c.Prop.PropertyType;
+            if (underlying == typeof(decimal))
+            {
+                if (m.FluentConfiguration?.Precisions is { } precisions
+                    && precisions.TryGetValue(c.Prop, out var pc))
+                {
+                    return $"DECIMAL({pc.Precision},{pc.Scale ?? 0})";
+                }
+                return "DECIMAL(38,18)";
+            }
+            return GetSqlType(c.Prop.PropertyType);
+        }
 
         private static string GetSqlType(Type t)
         {
