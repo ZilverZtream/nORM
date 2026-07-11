@@ -588,6 +588,16 @@ namespace nORM.Query
                 }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                 {
+                    // A raw streaming GroupBy defers its grouping transform to Generate();
+                    // install it now so ordering over the IGroupings routes to the
+                    // post-materialize order below instead of being silently dropped
+                    // (the group key has no SQL column once the GROUP BY is discarded).
+                    if (t._streamingGroupByKeySelector != null
+                        && keySelector.Parameters[0].Type.IsGenericType
+                        && keySelector.Parameters[0].Type.GetGenericTypeDefinition() == typeof(IGrouping<,>))
+                    {
+                        t.EnsurePendingStreamingGroupTransform();
+                    }
                     if (t.IsPostMaterializeTailMode
                         && t.CurrentPostMaterializeElementType == keySelector.Parameters[0].Type)
                     {

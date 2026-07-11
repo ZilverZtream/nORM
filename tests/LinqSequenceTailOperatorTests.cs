@@ -842,6 +842,25 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
+    public async Task Order_by_after_prepend_sorts_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 25 };
+        var query = ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra);
+
+        // The prepended element must participate in the ordering.
+        var sorted = await query.OrderByDescending(x => x.Value).ToListAsync();
+        Assert.Equal(new[] { 30, 25, 20, 10 }, sorted.Select(x => x.Value).ToArray());
+
+        // Ordering then a positional terminal composes over the reshaped rows.
+        var top = await query.OrderByDescending(x => x.Value).FirstAsync();
+        Assert.Equal(30, top.Value);
+    }
+
+    [Fact]
     public void Sync_aggregates_after_append_use_the_reshaped_sequence()
     {
         var (cn, ctx) = CreateContext(3); // values 10, 20, 30

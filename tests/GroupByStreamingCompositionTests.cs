@@ -103,6 +103,23 @@ public class GroupByStreamingCompositionTests
     }
 
     [Fact]
+    public void Order_by_key_after_raw_group_by_sorts_whole_groups()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var groups = ctx.Query<GbsItem>()
+            .OrderBy(x => x.Id)
+            .GroupBy(x => x.Category)
+            .OrderByDescending(g => g.Key)
+            .ToList();
+
+        Assert.Equal(new[] { "c", "b", "a" }, groups.Select(g => g.Key).ToArray());
+        Assert.Equal(2, groups[0].Count()); // 'c' group arrives complete
+    }
+
+    [Fact]
     public void Any_after_raw_group_by_reflects_group_existence()
     {
         var (cn, ctx) = CreateContext();
