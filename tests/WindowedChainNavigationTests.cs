@@ -36,6 +36,15 @@ public class WindowedChainNavigationTests
         [Key] public int Id { get; set; }
         public int ParentId { get; set; }
         public string Name { get; set; } = string.Empty;
+        public List<WcnToy> Toys { get; set; } = new();
+    }
+
+    [Table("WcnToy")]
+    private class WcnToy
+    {
+        [Key] public int Id { get; set; }
+        public int ChildId { get; set; }
+        public string Label { get; set; } = string.Empty;
     }
 
     private static (SqliteConnection Cn, DbContext Ctx) CreateContext()
@@ -60,7 +69,9 @@ public class WindowedChainNavigationTests
             {
                 mb.Entity<WcnParent>().HasKey(p => p.Id)
                     .HasMany(p => p.Children).WithOne().HasForeignKey(c => c.ParentId, p => p.Id);
-                mb.Entity<WcnChild>().HasKey(c => c.Id);
+                mb.Entity<WcnChild>().HasKey(c => c.Id)
+                    .HasMany(c => c.Toys).WithOne().HasForeignKey(t => t.ChildId, c => c.Id);
+                mb.Entity<WcnToy>().HasKey(t => t.Id);
             }
         };
         return (cn, new DbContext(cn, new SqliteProvider(), opts));
@@ -86,6 +97,37 @@ public class WindowedChainNavigationTests
         Assert.Equal(2, parents.Count);
         Assert.Equal(2, parents.Single(p => p.Id == 2).Children.Count);
         Assert.Single(parents.Single(p => p.Id == 3).Children);
+    }
+
+    [Fact]
+    public async Task Then_include_after_windowed_filter_chain_loads_the_second_level()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn;
+        await using var _ctx = ctx;
+
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE WcnToy (Id INTEGER PRIMARY KEY, ChildId INTEGER NOT NULL, Label TEXT NOT NULL);
+                INSERT INTO WcnToy VALUES (100,11,'t-c2a-1'),(101,11,'t-c2a-2'),(102,13,'t-c3a-1'),(103,14,'outside');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var parents = await ((INormQueryable<WcnParent>)ctx.Query<WcnParent>()
+            .OrderBy(p => p.Id)
+            .Take(3)
+            .Where(p => p.V < 45))
+            .Include(p => p.Children)
+            .ThenInclude(c => c.Toys)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        Assert.Equal(2, parents.Count);
+        var childWithToys = parents.Single(p => p.Id == 2).Children.Single(c => c.Id == 11);
+        Assert.Equal(2, childWithToys.Toys.Count);
+        Assert.Single(parents.Single(p => p.Id == 3).Children.Single(c => c.Id == 13).Toys);
     }
 
     [Fact]
