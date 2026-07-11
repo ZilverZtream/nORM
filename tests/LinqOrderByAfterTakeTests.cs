@@ -179,6 +179,45 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Equal(3, (await windowed.ElementAtAsync(1)).Id);
     }
 
+    [Fact]
+    public async Task Group_by_after_windowed_filter_chain_groups_only_the_window()
+    {
+        // OrderBy(Id).Take(3) → rows 1,2,3 (V = 50,40,30); Where(V < 45) keeps rows
+        // 2,3. Grouping by V % 20 must see only those two rows — a flat translation
+        // would emit GROUP BY ... LIMIT 3, which limits the GROUPS, not the input.
+        var groups = await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .GroupBy(r => r.V % 20)
+            .Select(g => new { g.Key, Count = g.Count(), Total = g.Sum(x => x.V) })
+            .ToListAsync();
+
+        // 40 → key 0; 30 → key 10.
+        Assert.Equal(2, groups.Count);
+        Assert.Equal(40, groups.Single(g => g.Key == 0).Total);
+        Assert.Equal(30, groups.Single(g => g.Key == 10).Total);
+    }
+
+    [Fact]
+    public async Task Reverse_after_windowed_filter_chain_reverses_only_the_window()
+    {
+        // Window rows 1,2,3; Where(V < 45) keeps 2,3; Reverse → [3,2]. A flat
+        // translation would flip the ORDER BY against the full table and take the
+        // bottom rows instead.
+        var rows = (await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .Reverse()
+            .ToListAsync())
+            .ToArray();
+
+        Assert.Equal(2, rows.Length);
+        Assert.Equal(3, rows[0].Id);
+        Assert.Equal(2, rows[1].Id);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {

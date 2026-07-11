@@ -66,11 +66,16 @@ namespace nORM.Query
             // GroupBy after a Take/Skip-windowed source - wrap the windowed source as a
             // derived table so GROUP BY aggregates only the LIMITed window, not the full
             // table. Sister of the post-Take/Skip fixes in 3040f49 / e0f1397 / 99a02ce /
-            // a1eb69e / bfc8180. Restricted to the immediate-source-is-Take/Skip case
-            // (same recursion-avoidance rationale as the WhereTranslator branch).
+            // a1eb69e / bfc8180, extended to any Take/Skip in the source spine: the
+            // sub-translation carries intervening operators (a post-window Where wraps
+            // again inside the sub-plan), while the flat path would translate the key
+            // against a fresh alias that the wrapped FROM never defines. Post-materialize
+            // tails keep their client grouping route below.
             string alias;
-            bool sourceIsWindowed = sourceQuery is MethodCallExpression directGbSrc
-                && directGbSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip);
+            bool sourceIsWindowed = SourceHasTakeOrSkip(sourceQuery)
+                && !SourceHasClientTailReshape(sourceQuery)
+                && !SourceHasGroupJoinResultTail(sourceQuery)
+                && !SourceHasRawGroupByResultTail(sourceQuery);
             if (sourceIsWindowed)
             {
                 var subPlanG = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapG);
