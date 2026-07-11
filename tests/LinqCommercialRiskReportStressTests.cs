@@ -89,6 +89,12 @@ public sealed class LinqCommercialRiskReportStressTests : IAsyncLifetime
 
         _ctx = new DbContext(_cn, new SqliteProvider(), new DbContextOptions
         {
+            // The report query joins a dozen sources; its estimated cost exceeds the
+            // memory-scaled admission ceiling on small machines, so pin explicit limits
+            // to keep the test deterministic across environments.
+            MaxQueryJoinDepth = 1_000,
+            MaxQueryWhereConditions = 10_000,
+            MaxQueryComplexityCost = 1_000_000,
             OnModelCreating = mb =>
             {
                 mb.Entity<CrrCustomer>().HasKey(x => x.Id).HasMany(x => x.Orders).WithOne().HasForeignKey(x => x.CustomerId, x => x.Id);

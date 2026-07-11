@@ -239,7 +239,9 @@ public partial class CliIntegrationTests
     [Fact]
     public void Scaffold_dotnet_ef_config_supplies_safety_defaults_with_cli_precedence()
     {
-        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_safety_" + Guid.NewGuid().ToString("N"));
+        // Built from the canonical temp root because the assertions compare
+        // CLI-process-reported absolute paths (symlink-resolved by the OS).
+        var tempRoot = Path.Combine(CanonicalTempPath, "norm_scaffold_ef_config_safety_" + Guid.NewGuid().ToString("N"));
         var configDir = Path.Combine(tempRoot, ".config");
         var workDir = Path.Combine(tempRoot, "Work");
         var projectDir = Path.Combine(tempRoot, "src", "App");
@@ -408,7 +410,9 @@ public partial class CliIntegrationTests
     [InlineData("scaffold \"Data Source=:memory:\" sqlite --bad", "Unrecognized scaffold argument(s): --bad")]
     public void Scaffold_dotnet_ef_config_json_default_applies_to_early_command_errors(string arguments, string expectedError)
     {
-        var tempRoot = Path.Combine(Path.GetTempPath(), "norm_scaffold_ef_config_json_early_error_" + Guid.NewGuid().ToString("N"));
+        // Built from the canonical temp root because the assertions compare
+        // CLI-process-reported absolute paths (symlink-resolved by the OS).
+        var tempRoot = Path.Combine(CanonicalTempPath, "norm_scaffold_ef_config_json_early_error_" + Guid.NewGuid().ToString("N"));
         var configDir = Path.Combine(tempRoot, ".config");
         var workDir = Path.Combine(tempRoot, "Work");
         var configuredOutput = "ConfiguredJsonErrors";

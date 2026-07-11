@@ -121,5 +121,34 @@ public partial class CliIntegrationTests
         }
     }
 
+    /// <summary>
+    /// The temp root with every symlinked ancestor resolved. On macOS the temp path
+    /// lives under /var, a symlink to /private/var; child processes report the
+    /// resolved form (getcwd canonicalizes), so tests that compare CLI-reported
+    /// absolute paths must build their expectations from the canonical root.
+    /// </summary>
+    private static readonly string CanonicalTempPath = ResolveSymlinkedAncestors(Path.GetTempPath());
+
+    private static string ResolveSymlinkedAncestors(string path)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full);
+        if (string.IsNullOrEmpty(root))
+            return full;
+
+        var current = root;
+        foreach (var segment in full[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if (!Directory.Exists(current) && !File.Exists(current))
+                continue;
+            var target = Directory.ResolveLinkTarget(current, returnFinalTarget: true);
+            if (target != null)
+                current = target.FullName;
+        }
+
+        return current;
+    }
+
     private sealed record CliResult(int ExitCode, string Stdout, string Stderr);
 }

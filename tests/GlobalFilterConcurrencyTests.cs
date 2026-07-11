@@ -66,9 +66,14 @@ public class GlobalFilterConcurrencyTests
     [Fact]
     public async Task AddGlobalFilter_ConcurrentWithQueryTranslation_NoException()
     {
+        // The writers accumulate up to 800 filters that all AND into every query's
+        // WHERE clause. Admission limits default to memory-scaled values, so pin them
+        // explicitly — this test exercises race-freedom, not query admission.
         var opts = new DbContextOptions
         {
-            OnModelCreating = mb => mb.Entity<GfcEntity>()
+            OnModelCreating = mb => mb.Entity<GfcEntity>(),
+            MaxQueryWhereConditions = int.MaxValue,
+            MaxQueryComplexityCost = int.MaxValue
         };
         var (cn, ctx, _) = BuildContext(opts);
         using var _cn = cn;
