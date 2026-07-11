@@ -11,9 +11,11 @@ namespace nORM.Query
     internal sealed partial class QueryTranslator
     {
         /// <summary>
-        /// Scalar SQL (COUNT/EXISTS/aggregate) computes over server rows and cannot see a
+        /// Scalar SQL (EXISTS/aggregate) computes over server rows and cannot see a
         /// pending client-tail reshape, so translators that emit scalar plans fail closed
         /// when one is pending instead of returning a value for the wrong sequence.
+        /// Count and LongCount instead reduce the reshaped rows client-side via
+        /// <see cref="TryAppendClientCountAggregate"/>.
         /// </summary>
         private static void ThrowIfClientTailReshapePending(QueryTranslator t, string methodName)
         {
@@ -24,6 +26,65 @@ namespace nORM.Query
                     "DefaultIfEmpty with a default value) would evaluate against server rows, not the reshaped " +
                     "sequence. Materialize the query first (e.g. ToListAsync) and evaluate in memory.");
             }
+        }
+
+        /// <summary>
+        /// When a client-tail reshape is pending, Count/LongCount reduce the reshaped
+        /// rows in memory instead of emitting a server COUNT that would ignore the
+        /// reshape. An optional predicate is compiled against the reshaped element type
+        /// and applied per row, matching LINQ-to-Objects semantics.
+        /// </summary>
+        private bool TryAppendClientCountAggregate(MethodCallExpression node)
+        {
+            if (_postMaterializeTransform == null)
+                return false;
+
+            Func<object?, bool>? predicate = null;
+            if (node.Arguments.Count > 1)
+            {
+                if (StripQuotes(node.Arguments[1]) is not LambdaExpression predicateLambda
+                    || predicateLambda.Parameters.Count != 1)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} over a client-materialized sequence supports only a one-argument predicate.");
+                }
+                var elementType = CurrentPostMaterializeElementType ?? predicateLambda.Parameters[0].Type;
+                var rowArg = Expression.Parameter(typeof(object), "row");
+                var typedRow = elementType.IsValueType
+                    ? (Expression)Expression.Convert(rowArg, elementType)
+                    : Expression.TypeAs(rowArg, elementType);
+                var body = new nORM.Internal.ParameterReplacer(predicateLambda.Parameters[0], typedRow).Visit(predicateLambda.Body)!;
+                predicate = Expression.Lambda<Func<object?, bool>>(body, rowArg).Compile();
+            }
+
+            // The plan must stay list-shaped: CountTranslator marks the query as an
+            // aggregate before visiting the source, which would make Generate() emit
+            // scalar COUNT(*) SQL and skip materialization entirely.
+            _isAggregate = false;
+            _methodName = string.Empty;
+
+            var isLong = node.Method.Name == nameof(Queryable.LongCount);
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var count = 0;
+                if (predicate == null)
+                {
+                    count = rows.Count;
+                }
+                else
+                {
+                    foreach (var row in rows)
+                    {
+                        if (predicate(row))
+                            count++;
+                    }
+                }
+                // Box each arm explicitly: a mixed long/int conditional promotes both
+                // arms to long, which would hand Count callers a boxed Int64.
+                return new List<object> { isLong ? (object)(long)count : count };
+            }, isLong ? typeof(long) : typeof(int));
+            _clientScalarResult = true;
+            return true;
         }
 
         /// <summary>

@@ -483,6 +483,12 @@ namespace nORM.Query
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
 
             object? result;
+            if (plan.ClientScalar)
+            {
+                // The post-materialize transform reduced the reshaped rows to a single
+                // boxed aggregate value; unwrap it as the query result.
+                return Task.FromResult((TResult)list[0]!);
+            }
             if (plan.SingleResult)
             {
                 result = plan.MethodName switch
@@ -524,6 +530,12 @@ namespace nORM.Query
             _ctx.Options.Logger?.LogQuery(plan.Sql, plan.Parameters, sw?.Elapsed ?? default, list.Count);
 
             object? result;
+            if (plan.ClientScalar)
+            {
+                // The post-materialize transform reduced the reshaped rows to a single
+                // boxed aggregate value; unwrap it as the query result.
+                return (TResult)list[0]!;
+            }
             if (plan.SingleResult)
             {
                 result = plan.MethodName switch

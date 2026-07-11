@@ -691,7 +691,12 @@ namespace nORM.Query
         private async Task<TResult> ExecutePooledListAsync<TResult>(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
             var capacity = plan.SingleResult ? 1 : (plan.Take ?? DefaultListCapacity);
-            var list = _executor.CreateListForType(plan.ElementType, capacity);
+            // Plans with a post-materialize transform read rows before the transform
+            // produces the final element type, so materialize into List<object> and let
+            // the transform build the typed result (mirrors QueryExecutor.MaterializeAsync).
+            var list = plan.PostMaterializeTransform != null
+                ? (System.Collections.IList)new List<object>(capacity)
+                : _executor.CreateListForType(plan.ElementType, capacity);
             var materializer = plan.SyncMaterializer;
 
             // Use interception-aware reader for correctness
@@ -716,6 +721,11 @@ namespace nORM.Query
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
             if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
 
+            if (plan.ClientScalar)
+            {
+                // The transform reduced the reshaped rows to a single boxed aggregate.
+                return (TResult)list[0]!;
+            }
             if (plan.SingleResult)
             {
                 return (TResult)HandleSingleResult(plan, list);

@@ -71,7 +71,13 @@ namespace nORM.Query
                     var list = _executor.Materialize(plan, cmd);
                     sw?.Stop();
                     _ctx.Options.Logger?.LogQuery(plan.Sql, GetParameterDictionary(), sw?.Elapsed ?? default, list.Count);
-                    if (plan.SingleResult)
+                    if (plan.ClientScalar)
+                    {
+                        // The post-materialize transform reduced the reshaped rows to a
+                        // single boxed aggregate value; unwrap it as the query result.
+                        result = list[0];
+                    }
+                    else if (plan.SingleResult)
                     {
                         result = plan.MethodName switch
                         {

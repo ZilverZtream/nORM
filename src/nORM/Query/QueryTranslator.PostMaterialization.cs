@@ -265,10 +265,15 @@ namespace nORM.Query
             }
             _postMaterializeOrderings.Add((keyReader, ascending));
 
+            // Capture the list reference locally: the transform closure runs after the
+            // translator is cleared for reuse, when the instance field is already null.
+            // Later ThenBy calls append to this same instance before plan generation.
+            var orderings = _postMaterializeOrderings;
+
             System.Collections.IList ApplyOrdering(System.Collections.IList rows)
             {
                 IOrderedEnumerable<object>? ordered = null;
-                foreach (var ordering in _postMaterializeOrderings!)
+                foreach (var ordering in orderings)
                 {
                     ordered = ordered == null
                         ? ordering.Ascending

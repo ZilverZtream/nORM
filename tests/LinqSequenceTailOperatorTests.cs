@@ -289,40 +289,61 @@ public class LinqSequenceTailOperatorTests
     // ── Terminal operators after a client-tail reshape must not lie ─────────
 
     [Fact]
-    public async Task Count_after_append_reflects_the_appended_element_or_fails_closed()
+    public async Task Count_after_append_reflects_the_appended_element()
     {
         var (cn, ctx) = CreateContext(3);
         using var _cn = cn;
         using var _ctx = ctx;
 
         var extra = new SeqTailItem { Name = "extra", Value = 999 };
-        try
-        {
-            var count = await ctx.Query<SeqTailItem>().Append(extra).CountAsync();
-            Assert.Equal(4, count);
-        }
-        catch (NormUnsupportedFeatureException)
-        {
-            // Failing closed is acceptable; silently returning 3 is not.
-        }
+        Assert.Equal(4, await ctx.Query<SeqTailItem>().Append(extra).CountAsync());
     }
 
     [Fact]
-    public async Task Count_after_chunk_reflects_chunk_cardinality_or_fails_closed()
+    public async Task Count_after_chunk_reflects_chunk_cardinality()
     {
         var (cn, ctx) = CreateContext(5);
         using var _cn = cn;
         using var _ctx = ctx;
 
-        try
-        {
-            var count = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Chunk(2).CountAsync();
-            Assert.Equal(3, count);
-        }
-        catch (NormUnsupportedFeatureException)
-        {
-            // Failing closed is acceptable; silently returning the row count is not.
-        }
+        Assert.Equal(3, await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Chunk(2).CountAsync());
+    }
+
+    [Fact]
+    public async Task Count_with_predicate_after_append_filters_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var count = await ctx.Query<SeqTailItem>().Append(extra).CountAsync(x => x.Value > 15);
+        Assert.Equal(3, count); // rows 20, 30 plus the appended 999
+
+        var sync = ctx.Query<SeqTailItem>().Append(extra).Count(x => x.Value > 15);
+        Assert.Equal(3, sync);
+    }
+
+    [Fact]
+    public async Task LongCount_after_prepend_counts_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(2);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 1 };
+        Assert.Equal(3L, await ctx.Query<SeqTailItem>().Prepend(extra).LongCountAsync());
+    }
+
+    [Fact]
+    public async Task Count_after_default_if_empty_with_value_counts_the_default_row()
+    {
+        var (cn, ctx) = CreateContext(0);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var fallback = new SeqTailItem { Name = "fallback", Value = 0 };
+        Assert.Equal(1, await ctx.Query<SeqTailItem>().DefaultIfEmpty(fallback).CountAsync());
     }
 
     [Fact]

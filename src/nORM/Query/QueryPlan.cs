@@ -101,7 +101,11 @@ namespace nORM.Query
         // is explicitly in-memory after a bounded/generated SQL source, such as
         // standalone DefaultIfEmpty. DistinctBy and the keyed set operators are
         // server-translated with ROW_NUMBER() and do not use this hook.
-        System.Func<DbContext, System.Collections.IList, System.Collections.IList>? PostMaterializeTransform = null
+        System.Func<DbContext, System.Collections.IList, System.Collections.IList>? PostMaterializeTransform = null,
+        // Client-side scalar aggregates (e.g. Count over a client-tail reshaped
+        // sequence) materialize rows, reduce them via PostMaterializeTransform to a
+        // single boxed value, and the executor unwraps that value as the result.
+        bool ClientScalar = false
     );
 
     internal sealed record BulkCudQueryShape(

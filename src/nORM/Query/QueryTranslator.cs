@@ -129,6 +129,10 @@ namespace nORM.Query
         private System.Func<DbContext, System.Collections.IList, System.Collections.IList>? _postMaterializeOrderPrefixTransform;
         private List<(System.Func<object, object> KeyReader, bool Ascending)>? _postMaterializeOrderings;
         private Type? _postMaterializeElementType;
+        // Set when a scalar aggregate is computed client-side over a client-tail
+        // reshaped sequence; the post-materialize transform reduces the rows to a
+        // single boxed value and the executor unwraps it as the query result.
+        private bool _clientScalarResult;
         // Stored by HandleGroupBy when a 2-arg GroupBy with no downstream result selector
         // is detected. Generate() inspects this after visiting the full expression tree: if
         // no projection was set (streaming case), _groupBy is cleared and a client-side

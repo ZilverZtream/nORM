@@ -451,7 +451,8 @@ namespace nORM.Query
                     M2MIncludes: _t._m2mIncludes.Count > 0 ? new List<M2MIncludePlan>(_t._m2mIncludes) : null,
                     BulkCudShape: bulkCudShape,
                     PostReverse: _t._postReverseResult,
-                    PostMaterializeTransform: _t._postMaterializeTransform
+                    PostMaterializeTransform: _t._postMaterializeTransform,
+                    ClientScalar: _t._clientScalarResult
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
