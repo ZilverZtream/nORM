@@ -65,8 +65,18 @@ public class DeeplyNestedQueryTranslationTests
 
         var ex = await Record.ExceptionAsync(() => query.CountAsync());
 
+        // Two complementary fences may fire depending on the platform's thread stack
+        // size: on small stacks (Windows 1MB, macOS workers 512KB) the per-node stack
+        // headroom guard throws "nested too deeply" during fingerprinting or
+        // translation; on large stacks (Linux 8MB) the walk completes and the WHERE
+        // admission limit rejects the query instead. Either way the contract is a
+        // catchable translation failure, never a process-killing StackOverflowException.
         Assert.NotNull(ex);
-        Assert.Contains("nested too deeply", ex!.Message, StringComparison.Ordinal);
+        Assert.Contains("Failed to translate LINQ query to SQL", ex!.Message, StringComparison.Ordinal);
+        Assert.True(
+            ex.Message.Contains("nested too deeply", StringComparison.Ordinal)
+            || ex.Message.Contains("exceeds maximum WHERE conditions", StringComparison.Ordinal),
+            $"Expected a stack-guard or admission-limit failure but got: {ex.Message}");
     }
 
     [Fact]
