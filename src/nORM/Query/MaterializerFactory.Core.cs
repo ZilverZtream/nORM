@@ -19,14 +19,43 @@ namespace nORM.Query
 {
     internal sealed partial class MaterializerFactory
     {
+        /// <summary>
+        /// Coerces a TPH discriminator value to the discriminator column's declared CLR
+        /// type so model-side keys (e.g. boxed int from a DiscriminatorValue attribute) and
+        /// provider-widened reader values (e.g. Int64 from SQLite INTEGER) compare equal.
+        /// Falls back to the raw value when no safe conversion exists.
+        /// </summary>
+        private static object NormalizeDiscriminator(object value, Type discType)
+        {
+            if (value is DBNull) return value;
+            var target = Nullable.GetUnderlyingType(discType) ?? discType;
+            if (value.GetType() == target) return value;
+            try
+            {
+                if (target.IsEnum) return Enum.ToObject(target, value);
+                return Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return value;
+            }
+        }
+
         private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false, int startOffset = 0)
         {
             if (!ignoreTph && mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0 && projection == null)
             {
                 var discIndex = startOffset + Array.IndexOf(mapping.Columns, mapping.DiscriminatorColumn);
                 var baseMat = CreateMaterializerInternal(mapping, targetType, null, true, startOffset);
+                // Normalize discriminator keys and the runtime value to the discriminator
+                // column's declared CLR type. Providers widen storage types (SQLite returns
+                // Int64 for INTEGER), so a boxed (long)1 from the reader would never match a
+                // key boxed as (int)1 from the model — every derived row then silently
+                // materialized as the base type. Coercing both sides to one type fixes it.
+                var discType = Nullable.GetUnderlyingType(mapping.DiscriminatorColumn.Prop.PropertyType)
+                    ?? mapping.DiscriminatorColumn.Prop.PropertyType;
                 var derivedMats = mapping.TphMappings.ToDictionary(
-                    kvp => kvp.Key,
+                    kvp => NormalizeDiscriminator(kvp.Key, discType),
                     kvp =>
                     {
                         var dmap = kvp.Value;
@@ -61,7 +90,8 @@ namespace nORM.Query
                 {
                     var disc = reader.GetValue(discIndex);
                     // reader.GetValue returns DBNull.Value (not null) for SQL NULL columns
-                    if (disc is not null and not DBNull && derivedMats.TryGetValue(disc, out var mat))
+                    if (disc is not null and not DBNull
+                        && derivedMats.TryGetValue(NormalizeDiscriminator(disc, discType), out var mat))
                         return mat(reader);
                     return baseMat(reader);
                 };
