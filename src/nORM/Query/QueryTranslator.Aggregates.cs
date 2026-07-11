@@ -265,6 +265,9 @@ namespace nORM.Query
             }
 
             Visit(sourceQuery);
+            // A pending client-tail reshape means the server aggregate would ignore
+            // the reshaped sequence. Fail closed instead of returning a wrong value.
+            ThrowIfClientTailReshapePending(this, node.Method.Name);
             _methodName = node.Method.Name;
 
             if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)

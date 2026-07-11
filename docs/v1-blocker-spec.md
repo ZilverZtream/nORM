@@ -447,6 +447,22 @@ Acceptance gate:
 - The LINQ support page contains no vague "full LINQ" implication and every
   common operator has an implemented or explicitly unsupported v1 decision.
 
+Current status:
+
+- This blocker is closed for the current working tree. Every operator in the
+  audit list is implemented and documented, and the final residue — `Chunk`,
+  `Append`, `Prepend`, and `Zip` — is now implemented as client-tail
+  post-materialization transforms over the unchanged server query
+  (`tests/LinqSequenceTailOperatorTests.cs`; rows in `docs/linq-support.md`).
+- `Zip` over two database queries keeps a deterministic
+  `NormUnsupportedFeatureException` because positional pairing of two result
+  sets has no provider-mobile SQL translation.
+- Server-scalar operators after a client-tail reshape fail closed instead of
+  evaluating against pre-reshape server rows, which also fixed a latent silent
+  wrong-count for `DefaultIfEmpty(value)` chains; plans that bake captured
+  runtime values now bypass the plan cache, fixing a latent cross-query
+  stale-capture replay.
+
 ### 14. Harden Terminal Operator Semantics
 
 Problem: Terminal operators are duplicated across normal, fast-path, compiled,
@@ -463,6 +479,19 @@ Work:
 Acceptance gate:
 
 - Terminal operators match LINQ semantics on every advertised execution path.
+
+Current status:
+
+- This blocker is closed for the current working tree.
+  `tests/TerminalOperatorPathParityMatrixTests.cs` is a single table-driven
+  matrix that runs 30 terminal-operator shapes (First/Single/Last and
+  OrDefault variants, ElementAt/OrDefault, Any, All, Count, LongCount, Sum,
+  Min, Max, Average including nullable forms, with ordered, filtered, and
+  paged sources) across empty, one-row, two-row, and multi-row datasets on
+  the synchronous provider path, the asynchronous extension path, and the
+  source-generated materializer path, comparing each result — or thrown
+  exception type — against LINQ-to-Objects on identical rows. All cases pass
+  with no path divergence.
 
 ### 15. Prove Scalar, Null, Boolean, Enum, and Conversion Parity
 

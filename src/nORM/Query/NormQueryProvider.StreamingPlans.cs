@@ -184,7 +184,19 @@ namespace nORM.Query
                     && (node.Method.Name == "ExceptBy"
                         || node.Method.Name == "IntersectBy"
                         || node.Method.Name == "UnionBy"
-                        || node.Method.Name == "SequenceEqual"))
+                        || node.Method.Name == "SequenceEqual"
+                        // These bake captured runtime values (an element, a local second
+                        // sequence, a default value, or a captured chunk size) into the
+                        // plan's post-materialization transform, which the fingerprint
+                        // cannot differentiate.
+                        || node.Method.Name == "Append"
+                        || node.Method.Name == "Prepend"
+                        || node.Method.Name == "Zip"
+                        || node.Method.Name == "Chunk"
+                        // Only the value-carrying overload bakes a captured default;
+                        // the parameterless form is the hot left-join building block
+                        // and stays cacheable.
+                        || (node.Method.Name == "DefaultIfEmpty" && node.Arguments.Count == 2)))
                 {
                     _found = true;
                     return node;

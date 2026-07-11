@@ -487,6 +487,10 @@ namespace nORM.Query
                     return TranslateAfterTakeSkipWindow(t, node);
                 }
                 var source = t.Visit(node.Arguments[0]);
+                // A pending client-tail reshape (Append/Prepend/Chunk/Zip/DefaultIfEmpty(value))
+                // changes the sequence AFTER materialization, so a server-side COUNT(*)
+                // would report the pre-reshape row count. Fail closed instead of lying.
+                ThrowIfClientTailReshapePending(t, node.Method.Name);
                 // Preserve _projection when DISTINCT is active so the COUNT(*) builder can
                 // wrap as `SELECT COUNT(*) FROM (SELECT DISTINCT <proj> FROM ...) AS T0` —
                 // otherwise nuke it so Count(x => predicate) doesn't try to project columns

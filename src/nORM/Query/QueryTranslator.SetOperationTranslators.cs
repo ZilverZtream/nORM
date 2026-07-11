@@ -288,7 +288,11 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                return t.HandleSetOperation(node);
+                var result = t.HandleSetOperation(node);
+                // EXISTS/IN SQL evaluates against server rows and would ignore a pending
+                // client-tail reshape (Append/Prepend/Chunk/Zip/DefaultIfEmpty(value)).
+                ThrowIfClientTailReshapePending(t, node.Method.Name);
+                return result;
             }
         }
 
