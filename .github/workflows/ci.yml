@@ -297,6 +297,14 @@ jobs:
       - name: Build
         run: dotnet build tests/ --no-restore --nologo -v quiet
 
+      # Unlike the mysql/postgres images, the mssql image has no env var to create a
+      # database at startup, so the test database must be created explicitly.
+      - name: Create test database
+        run: >
+          docker exec ${{ job.services.sqlserver.id }}
+          /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'NormTest!2024' -No
+          -Q "IF DB_ID('normtest') IS NULL CREATE DATABASE normtest"
+
       - name: Test (live SQL Server parity)
         shell: pwsh
         env:

@@ -75,6 +75,14 @@ jobs:
           if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
+      # Unlike the mysql/postgres images, the mssql image has no env var to create a
+      # database at startup, so the test database must be created explicitly.
+      - name: Create SQL Server test database
+        run: >
+          docker exec ${{ job.services.sqlserver.id }}
+          /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'NormTest!2024' -No
+          -Q "IF DB_ID('normtest') IS NULL CREATE DATABASE normtest"
+
       - name: Run live provider gate
         shell: pwsh
         env:
