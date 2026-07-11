@@ -67,3 +67,14 @@ These tests intentionally churn beyond cache capacity and assert entry counts,
 eviction counters, and latest-entry usability. They are count-based rather than
 timing-based so release evidence is stable across developer machines and CI
 agents.
+
+## Client-materialized shapes are never result-cached
+
+Result-cache keys derive from the generated SQL plus bound parameters.
+Client-tail transforms (Append/Prepend elements, compiled client filters,
+chunk sizes, Zip second sequences) bake captured values that reach neither,
+so two `Cacheable()` queries differing only in those values would share a
+key and replay each other's results. Plans carrying a post-materialize
+transform therefore ignore `Cacheable()` and always execute. Group-join
+results and tail-paging remain cacheable — their results are fully
+determined by SQL and parameters.
