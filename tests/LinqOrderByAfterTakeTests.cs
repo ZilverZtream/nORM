@@ -218,6 +218,39 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Equal(2, rows[1].Id);
     }
 
+    [Fact]
+    public async Task Select_projection_after_windowed_filter_chain_projects_the_window()
+    {
+        // Window rows 1,2,3; Where(V < 45) keeps rows 2,3 → projected V values [40,30].
+        var values = await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .Select(r => new { r.Id, Double = r.V * 2 })
+            .ToListAsync();
+
+        Assert.Equal(2, values.Count);
+        Assert.Equal(80, values.Single(x => x.Id == 2).Double);
+        Assert.Equal(60, values.Single(x => x.Id == 3).Double);
+    }
+
+    [Fact]
+    public async Task Join_after_windowed_filter_chain_joins_only_the_window()
+    {
+        // Joining the filtered window (rows 2,3) back against the full table by Id
+        // must produce exactly two pairs — a flat translation would join all five.
+        var pairs = await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .Join(_ctx.Query<OatRow>(), w => w.Id, o => o.Id, (w, o) => new { w.Id, OtherV = o.V })
+            .ToListAsync();
+
+        Assert.Equal(2, pairs.Count);
+        Assert.Contains(pairs, p => p.Id == 2 && p.OtherV == 40);
+        Assert.Contains(pairs, p => p.Id == 3 && p.OtherV == 30);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {

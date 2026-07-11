@@ -356,6 +356,28 @@ namespace nORM.Query
                 {
                     pendingProjection = t.ExpandProjection(pendingProjection);
 
+                    // A windowed derived-table wrap pre-fills _sql as
+                    // `SELECT * FROM (...) AS alias`, and Build() skips SELECT generation
+                    // for pre-filled SQL — the projection would never reach the statement
+                    // and the materializer would name-match computed members against the
+                    // wrap's raw columns, silently binding raw values. Rewrite the wrap's
+                    // SELECT list from the projection against the wrap alias.
+                    if (t._outerDerivedAlias != null && t._sql.Length > 0)
+                    {
+                        var wrappedSql = t._sql.ToString();
+                        if (wrappedSql.StartsWith("SELECT * FROM (", StringComparison.Ordinal))
+                        {
+                            var selectVisitor = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, t._outerDerivedAlias, ctx: t._ctx)
+                            {
+                                CoerceDecimalProjectionsToReal = t._coerceDecimalProjectionsToReal
+                            };
+                            var projSelect = selectVisitor.Translate(pendingProjection.Body);
+                            t._detectedCollections.AddRange(selectVisitor.DetectedCollections);
+                            t._sql.Clear();
+                            t._sql.Append("SELECT ").Append(projSelect).Append(wrappedSql.Substring("SELECT *".Length));
+                        }
+                    }
+
                     // Apply the projection after translating the source so source-side
                     // Where/OrderBy/Take/Skip lambdas are not expanded through the
                     // projected row shape. Downstream operators that run after Select
