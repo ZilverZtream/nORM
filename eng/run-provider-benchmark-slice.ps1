@@ -24,7 +24,22 @@ if ($SliceTimeoutMinutes -le 0) {
 
 function Get-SafeName {
     param([string]$Value)
-    return ($Value -replace '[^A-Za-z0-9_.-]', '_').Trim('_')
+    $safe = ($Value -replace '[^A-Za-z0-9_.-]', '_').Trim('_')
+    # Multi-pattern filters produce very long names; Windows' MAX_PATH (260) then
+    # breaks the report copy deep inside the slice directory. Truncate and append
+    # a short stable hash so distinct filters still get distinct directories.
+    if ($safe.Length -gt 80) {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $digest = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($safe))
+        }
+        finally {
+            $sha.Dispose()
+        }
+        $hash = -join ($digest[0..3] | ForEach-Object { $_.ToString('x2') })
+        $safe = $safe.Substring(0, 72) + '_' + $hash
+    }
+    return $safe
 }
 
 function Normalize-ProviderName {
