@@ -861,6 +861,42 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
+    public async Task Cacheable_reshaped_queries_with_different_captured_elements_do_not_share_results()
+    {
+        // Result-cache keys derive from SQL + parameters; a reshape's captured
+        // element reaches neither, so two Appends differing only in the element
+        // would replay each other's cached list. Transform-carrying plans must
+        // never be result-cached.
+        var cn = new SqliteConnection("Data Source=:memory:");
+        await cn.OpenAsync();
+        await using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE SeqTailItem (
+                    Id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name  TEXT    NOT NULL,
+                    Value INTEGER NOT NULL
+                );
+                INSERT INTO SeqTailItem (Name, Value) VALUES ('item1', 10);";
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new nORM.Configuration.DbContextOptions().UseInMemoryCache();
+        using var _cn = cn;
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        var first = new SeqTailItem { Name = "a", Value = 111 };
+        var second = new SeqTailItem { Name = "b", Value = 222 };
+
+        var withFirst = await ctx.Query<SeqTailItem>()
+            .Append(first).Cacheable(TimeSpan.FromMinutes(5)).ToListAsync();
+        Assert.Equal(new[] { 10, 111 }, withFirst.Select(x => x.Value).ToArray());
+
+        var withSecond = await ctx.Query<SeqTailItem>()
+            .Append(second).Cacheable(TimeSpan.FromMinutes(5)).ToListAsync();
+        Assert.Equal(new[] { 10, 222 }, withSecond.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
     public void Sync_aggregates_after_append_use_the_reshaped_sequence()
     {
         var (cn, ctx) = CreateContext(3); // values 10, 20, 30

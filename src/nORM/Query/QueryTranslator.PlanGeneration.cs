@@ -442,7 +442,12 @@ namespace nORM.Query
                     _t._tables.ToArray(),
                     _t._splitQuery,
                     _t._estimatedTimeout,
-                    _t._isCacheable,
+                    // Result-cache keys derive from SQL + parameters, but client-tail
+                    // transforms bake captured values (an appended element, a compiled
+                    // client filter, a chunk size) that never reach either — two queries
+                    // differing only in those values would share a key and replay each
+                    // other's results. Transform-carrying plans are never result-cached.
+                    _t._isCacheable && _t._postMaterializeTransform == null,
                     _t._cacheExpiration,
                     Take: _t._take,
                     DependentQueries: dependentQueries,
