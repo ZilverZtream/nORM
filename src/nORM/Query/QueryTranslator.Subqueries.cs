@@ -72,7 +72,18 @@ namespace nORM.Query
                 _isCacheable,
                 _cacheExpiration,
                 _asOfTimestamp,
-                _recursionDepth);
+                _recursionDepth,
+                _clientProjection,
+                _clientProjectionResultType,
+                _groupJoinResultSelector,
+                _groupByElementSelector,
+                _streamingGroupByKeySelector,
+                _postMaterializeTransform,
+                _postMaterializeElementType,
+                _postMaterializeOrderPrefixTransform,
+                _postMaterializeOrderings,
+                _postReverseResult,
+                _clientScalarResult);
         }
         private void RestoreContext(TranslationContextSnapshot snapshot)
         {
@@ -94,6 +105,17 @@ namespace nORM.Query
             _cacheExpiration = snapshot.CacheExpiration;
             _asOfTimestamp = snapshot.AsOfTimestamp;
             _recursionDepth = snapshot.RecursionDepth;
+            _clientProjection = snapshot.ClientProjection;
+            _clientProjectionResultType = snapshot.ClientProjectionResultType;
+            _groupJoinResultSelector = snapshot.GroupJoinResultSelector;
+            _groupByElementSelector = snapshot.GroupByElementSelector;
+            _streamingGroupByKeySelector = snapshot.StreamingGroupByKeySelector;
+            _postMaterializeTransform = snapshot.PostMaterializeTransform;
+            _postMaterializeElementType = snapshot.PostMaterializeElementType;
+            _postMaterializeOrderPrefixTransform = snapshot.PostMaterializeOrderPrefixTransform;
+            _postMaterializeOrderings = snapshot.PostMaterializeOrderings;
+            _postReverseResult = snapshot.PostReverseResult;
+            _clientScalarResult = snapshot.ClientScalarResult;
         }
         private QueryPlan TranslateInSubContext(Expression e, TableMapping mapping, int parameterIndex, int joinStart, int recursionDepth, out TableMapping resultingMapping)
         {
@@ -105,11 +127,23 @@ namespace nORM.Query
                 _includes = new List<IncludePlan>();
                 _projection = null;
                 _clientProjection = null;
+                _clientProjectionResultType = null;
                 _isAggregate = false;
                 _methodName = string.Empty;
                 _groupJoinInfo = null;
                 _groupJoinResultSelector = null;
                 _groupJoinExpansionSelector = null;
+                _groupByElementSelector = null;
+                _streamingGroupByKeySelector = null;
+                // Client-tail reshape state must NOT leak into a sub-context: a nested
+                // subquery or set-op arm translates against its own clean tail-state,
+                // and the outer's transform is reinstated by RestoreContext on exit.
+                _postMaterializeTransform = null;
+                _postMaterializeElementType = null;
+                _postMaterializeOrderPrefixTransform = null;
+                _postMaterializeOrderings = null;
+                _postReverseResult = false;
+                _clientScalarResult = false;
                 _joinCounter = joinStart;
                 _singleResult = false;
                 _noTracking = false;
@@ -155,7 +189,18 @@ namespace nORM.Query
                 bool isCacheable,
                 TimeSpan? cacheExpiration,
                 DateTime? asOfTimestamp,
-                int recursionDepth)
+                int recursionDepth,
+                Func<object, object>? clientProjection,
+                Type? clientProjectionResultType,
+                LambdaExpression? groupJoinResultSelector,
+                LambdaExpression? groupByElementSelector,
+                LambdaExpression? streamingGroupByKeySelector,
+                Func<DbContext, System.Collections.IList, System.Collections.IList>? postMaterializeTransform,
+                Type? postMaterializeElementType,
+                Func<DbContext, System.Collections.IList, System.Collections.IList>? postMaterializeOrderPrefixTransform,
+                List<(Func<object, object> KeyReader, bool Ascending)>? postMaterializeOrderings,
+                bool postReverseResult,
+                bool clientScalarResult)
             {
                 Clauses = clauses;
                 Includes = includes;
@@ -175,6 +220,17 @@ namespace nORM.Query
                 CacheExpiration = cacheExpiration;
                 AsOfTimestamp = asOfTimestamp;
                 RecursionDepth = recursionDepth;
+                ClientProjection = clientProjection;
+                ClientProjectionResultType = clientProjectionResultType;
+                GroupJoinResultSelector = groupJoinResultSelector;
+                GroupByElementSelector = groupByElementSelector;
+                StreamingGroupByKeySelector = streamingGroupByKeySelector;
+                PostMaterializeTransform = postMaterializeTransform;
+                PostMaterializeElementType = postMaterializeElementType;
+                PostMaterializeOrderPrefixTransform = postMaterializeOrderPrefixTransform;
+                PostMaterializeOrderings = postMaterializeOrderings;
+                PostReverseResult = postReverseResult;
+                ClientScalarResult = clientScalarResult;
             }
             public SqlBuilder Clauses { get; }
             public List<IncludePlan> Includes { get; }
@@ -194,6 +250,20 @@ namespace nORM.Query
             public TimeSpan? CacheExpiration { get; }
             public DateTime? AsOfTimestamp { get; }
             public int RecursionDepth { get; }
+            // Client-tail / post-materialize state. Omitting these let a reshape or
+            // client projection on the outer query leak into (or be lost across) the
+            // sub-context translation of a set-op arm or nested subquery.
+            public Func<object, object>? ClientProjection { get; }
+            public Type? ClientProjectionResultType { get; }
+            public LambdaExpression? GroupJoinResultSelector { get; }
+            public LambdaExpression? GroupByElementSelector { get; }
+            public LambdaExpression? StreamingGroupByKeySelector { get; }
+            public Func<DbContext, System.Collections.IList, System.Collections.IList>? PostMaterializeTransform { get; }
+            public Type? PostMaterializeElementType { get; }
+            public Func<DbContext, System.Collections.IList, System.Collections.IList>? PostMaterializeOrderPrefixTransform { get; }
+            public List<(Func<object, object> KeyReader, bool Ascending)>? PostMaterializeOrderings { get; }
+            public bool PostReverseResult { get; }
+            public bool ClientScalarResult { get; }
         }
     }
 }
