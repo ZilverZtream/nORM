@@ -44,6 +44,26 @@ namespace nORM.Query
                     "streaming. Use `await query.ToListAsync()` to materialize the fully-loaded set " +
                     "in one round-trip, or remove the Include and reissue the child query manually " +
                     "per principal if streaming is required.");
+            if (plan.PostMaterializeTransform != null || plan.PostReverse)
+            {
+                // Client-tail reshapes and tail paging operate on the COMPLETE materialized
+                // list — Append attaches after the final row, Reverse and TakeLast need every
+                // row — so row-by-row streaming would silently yield the pre-reshape rows.
+                // Materialize the reshaped list once (same memory profile as ToListAsync,
+                // and MaterializeAsync applies tracking, PostReverse and the transforms)
+                // and yield it, preserving correct sequence contents.
+                var buffered = await _executor.MaterializeAsync(plan, cmd, ct).ConfigureAwait(false);
+                var bufferedCount = 0;
+                foreach (var item in buffered)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    bufferedCount++;
+                    yield return (T)item!;
+                }
+                sw?.Stop();
+                _ctx.Options.Logger?.LogQuery(plan.Sql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, bufferedCount);
+                yield break;
+            }
             if (plan.GroupJoinInfo != null)
             {
                 await foreach (var item in _executor.StreamGroupJoinAsync<T>(plan, cmd, ct).ConfigureAwait(false))

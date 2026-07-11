@@ -690,6 +690,39 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
+    public async Task As_async_enumerable_after_append_streams_the_reshaped_sequence()
+    {
+        // Streaming must not silently yield the pre-reshape server rows.
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var seen = new List<int>();
+        await foreach (var item in ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra).AsAsyncEnumerable())
+            seen.Add(item.Value);
+
+        Assert.Equal(new[] { 10, 20, 30, 999 }, seen.ToArray());
+    }
+
+    [Fact]
+    public async Task As_async_enumerable_after_take_last_preserves_original_order()
+    {
+        // TakeLast plans flip the server ORDER BY and mark the plan for a final
+        // in-memory reverse; streaming must apply that reverse, not yield the
+        // reversed server order.
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var seen = new List<int>();
+        await foreach (var item in ctx.Query<SeqTailItem>().OrderBy(x => x.Id).TakeLast(2).AsAsyncEnumerable())
+            seen.Add(item.Value);
+
+        Assert.Equal(new[] { 20, 30 }, seen.ToArray());
+    }
+
+    [Fact]
     public void Sync_aggregates_after_append_use_the_reshaped_sequence()
     {
         var (cn, ctx) = CreateContext(3); // values 10, 20, 30
