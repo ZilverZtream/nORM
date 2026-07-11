@@ -369,8 +369,10 @@ INSERT INTO GfItem (IsActive, Name) VALUES (0, 'inactive');";
         thread.IsBackground = true;
         thread.Start();
 
-        // 5-second timeout catches deadlocks; successful fix completes in milliseconds.
-        var items = await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        // The timeout only distinguishes a deadlock (never completes) from success
+        // (milliseconds); it is generous because thread-pool starvation under full
+        // parallel suite load can delay the background thread well past seconds.
+        var items = await completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Single(items);
     }
 

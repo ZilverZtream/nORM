@@ -312,29 +312,15 @@ namespace nORM.Query
             var entityType = GetElementType(expression);
             if (_ctx.Options.GlobalFilters.Count > 0)
             {
-                foreach (var kvp in _ctx.Options.GlobalFilters)
+                var combined = CombineGlobalFilterPredicates(entityType);
+                if (combined != null)
                 {
-                    if (!kvp.Key.IsAssignableFrom(entityType)) continue;
-                    foreach (var filter in kvp.Value)
-                    {
-                        LambdaExpression lambda;
-                        if (filter.Parameters.Count == 2)
-                        {
-                            var replacer = new ParameterReplacer(filter.Parameters[0], Expression.Constant(_ctx));
-                            var body = replacer.Visit(filter.Body)!;
-                            lambda = Expression.Lambda(body, filter.Parameters[1]);
-                        }
-                        else
-                        {
-                            lambda = filter;
-                        }
-                        expression = Expression.Call(
-                            typeof(Queryable),
-                            nameof(Queryable.Where),
-                            new[] { entityType },
-                            expression,
-                            Expression.Quote(lambda));
-                    }
+                    expression = Expression.Call(
+                        typeof(Queryable),
+                        nameof(Queryable.Where),
+                        new[] { entityType },
+                        expression,
+                        Expression.Quote(combined));
                 }
             }
             if (_ctx.Options.TenantProvider != null)
@@ -355,6 +341,51 @@ namespace nORM.Query
                     Expression.Quote(lambda));
             }
             return expression;
+        }
+
+        /// <summary>
+        /// Rebinds every global filter applicable to <paramref name="entityType"/> onto one
+        /// shared parameter and ANDs the bodies as a balanced tree inside a single predicate.
+        /// One nested Where call per filter would make translation recursion depth linear in
+        /// the number of registered filters, which overflows the thread stack once dynamic
+        /// registration reaches the hundreds; a balanced tree keeps the depth logarithmic.
+        /// </summary>
+        private LambdaExpression? CombineGlobalFilterPredicates(Type entityType)
+        {
+            List<Expression>? bodies = null;
+            ParameterExpression? param = null;
+            foreach (var kvp in _ctx.Options.GlobalFilters)
+            {
+                if (!kvp.Key.IsAssignableFrom(entityType)) continue;
+                foreach (var filter in kvp.Value)
+                {
+                    param ??= Expression.Parameter(entityType, "gf");
+                    Expression body;
+                    if (filter.Parameters.Count == 2)
+                    {
+                        body = new ParameterReplacer(filter.Parameters[0], Expression.Constant(_ctx)).Visit(filter.Body)!;
+                        body = new ParameterReplacer(filter.Parameters[1], param).Visit(body)!;
+                    }
+                    else
+                    {
+                        body = new ParameterReplacer(filter.Parameters[0], param).Visit(filter.Body)!;
+                    }
+                    (bodies ??= new List<Expression>()).Add(body);
+                }
+            }
+            if (bodies == null)
+                return null;
+            return Expression.Lambda(BuildBalancedAnd(bodies, 0, bodies.Count), param!);
+        }
+
+        private static Expression BuildBalancedAnd(List<Expression> bodies, int start, int count)
+        {
+            if (count == 1)
+                return bodies[start];
+            var half = count / 2;
+            return Expression.AndAlso(
+                BuildBalancedAnd(bodies, start, half),
+                BuildBalancedAnd(bodies, start + half, count - half));
         }
         /// <summary>
         /// Cached version of GetElementType to avoid repeated reflection.

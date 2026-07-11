@@ -110,6 +110,13 @@ namespace nORM.Query
                 if (node == null)
                     return null;
 
+                // Fingerprinting walks the tree recursively before translation ever runs,
+                // so a deeply nested tree would overflow the stack here first. Fail with a
+                // catchable query exception instead of a process-killing StackOverflowException.
+                if (!System.Runtime.CompilerServices.RuntimeHelpers.TryEnsureSufficientExecutionStack())
+                    throw new nORM.Core.NormQueryException(string.Format(nORM.Core.ErrorMessages.QueryTranslationFailed,
+                        "Expression tree is nested too deeply to translate. Break the query into smaller operations."));
+
                 AppendInt((int)node.NodeType);
                 // Use TypeHandle (pointer-based identity) instead of FullName (UTF-8 encoding).
                 // TypeHandle.Value is unique per type within a process and costs 8 bytes vs 40-200 bytes

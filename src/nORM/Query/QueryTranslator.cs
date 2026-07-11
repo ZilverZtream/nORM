@@ -202,6 +202,20 @@ namespace nORM.Query
             return map;
         }
 
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(node))]
+        public override Expression? Visit(Expression? node)
+        {
+            // Translation recurses once per expression node with large frames (each
+            // operator's translator plus visitor plumbing). A deeply nested tree —
+            // thousands of chained operators — would otherwise end in an uncatchable
+            // StackOverflowException that kills the process; fail with a catchable
+            // query exception while headroom remains.
+            if (!System.Runtime.CompilerServices.RuntimeHelpers.TryEnsureSufficientExecutionStack())
+                throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed,
+                    "Expression tree is nested too deeply to translate. Break the query into smaller operations."));
+            return base.Visit(node);
+        }
+
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             _methodName = node.Method.Name;
