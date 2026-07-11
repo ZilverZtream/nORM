@@ -83,6 +83,43 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Equal(5, rows[2].Id);
     }
 
+    [Fact]
+    public async Task OrderBy_after_take_with_intervening_where_resorts_the_filtered_window()
+    {
+        // OrderBy(Id).Take(3) → rows 1,2,3 (V = 50,40,30); Where(V < 45) keeps rows
+        // 2,3; the outer OrderBy(V) re-sorts those → Ids [3,2]. The Take is no longer
+        // the immediate source of the outer OrderBy — the whole chain must ride
+        // inside the derived-table wrap.
+        var rows = (await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45)
+            .OrderBy(r => r.V)
+            .ToListAsync())
+            .ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.Equal(3, rows[0].Id);
+        Assert.Equal(2, rows[1].Id);
+    }
+
+    [Fact]
+    public async Task Then_by_after_windowed_resort_composes_without_rewrapping()
+    {
+        // The outer OrderBy wraps the window; ThenBy must extend that ordering, not
+        // wrap the window a second time.
+        var rows = (await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .OrderBy(r => r.V % 20)   // 50→10, 40→0, 30→10
+            .ThenBy(r => r.Id)
+            .ToListAsync())
+            .ToArray();
+        Assert.Equal(3, rows.Length);
+        Assert.Equal(2, rows[0].Id);  // V%20 == 0
+        Assert.Equal(1, rows[1].Id);  // V%20 == 10, lower Id first
+        Assert.Equal(3, rows[2].Id);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {

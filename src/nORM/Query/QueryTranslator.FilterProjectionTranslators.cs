@@ -529,11 +529,20 @@ namespace nORM.Query
                 // OrderBy after a Take/Skip-windowed source — wrap the windowed source
                 // as a derived table so the new ordering applies to the LIMITed window,
                 // not the full table. Sister of the WhereTranslator's windowed branch
-                // (commit a1eb69e). Restricted to the immediate-source-is-Take/Skip
-                // case for the same recursion-avoidance reason and routed through a
-                // helper to keep the common-path Translate stack-frame lean.
-                if (node.Arguments[0] is MethodCallExpression directOrderSrc
-                    && directOrderSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                // (commit a1eb69e), extended to any Take/Skip in the source spine — the
+                // helper sub-translates the whole source, so intervening operators
+                // (Where, Select, AsNoTracking) ride inside the derived table. Only a
+                // top-level OrderBy re-sorts; ThenBy composes with the existing ordering
+                // and must not re-wrap. Post-materialize tails (reshapes, group joins,
+                // raw GroupBy) are excluded — their ordering runs client-side over the
+                // assembled rows via the tail-mode branch below.
+                bool isTopLevelResort = node.Method.Name is nameof(Queryable.OrderBy)
+                                                         or nameof(Queryable.OrderByDescending);
+                if (isTopLevelResort
+                    && QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0])
+                    && !SourceHasClientTailReshape(node.Arguments[0])
+                    && !SourceHasGroupJoinResultTail(node.Arguments[0])
+                    && !SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     return TranslateAfterTakeSkipWindow(t, node);
                 }
