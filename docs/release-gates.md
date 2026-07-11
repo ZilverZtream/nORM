@@ -241,6 +241,14 @@ benchmark matrix. The provider matrix runs as provider-specific slices so each
 database has its own log and raw BenchmarkDotNet reports before the threshold
 gate evaluates the merged result set.
 
+By default the provider matrix runs only the benchmarks that
+`eng/benchmark-thresholds.json` actually consumes (targets plus baselines,
+derived at gate start so the set tracks rule changes). That roughly halves the
+matrix wall clock without weakening the enforced evidence. Pass
+`-FullBenchmarkMatrix` to run the complete `ProviderMatrixBenchmarks` class
+when broader informational coverage is wanted, or set
+`-ProviderMatrixBenchmarkFilter` explicitly to override both.
+
 ```powershell
 .\eng\v1-release-gate.ps1 -Mode rc -MinLiveProviders 3 -StressIterations 20
 ```

@@ -134,14 +134,18 @@ function Invoke-BenchmarkSlice {
     $runnerPath = [System.IO.Path]::ChangeExtension($LogPath, '.runner.ps1')
     Remove-Item -LiteralPath $LogPath, $errPath, $exitCodePath, $argumentsPath, $runnerPath -Force -ErrorAction SilentlyContinue
 
+    # A single filter entry may carry multiple space-separated BenchmarkDotNet glob
+    # patterns (e.g. a threshold-derived method list); each becomes its own --filter
+    # pattern argument so the union runs in one benchmark session per provider.
+    $filterPatterns = @($Filter -split '\s+' | Where-Object { $_ })
     $arguments = @(
         'run',
         '-c', $Configuration,
         '--',
         '--provider-matrix',
         '--provider', $Provider,
-        '--filter', $Filter
-    )
+        '--filter'
+    ) + $filterPatterns
     $arguments | ConvertTo-Json | Set-Content -LiteralPath $argumentsPath -Encoding UTF8
 
     @'

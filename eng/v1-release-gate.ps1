@@ -6,7 +6,8 @@ param(
     [int]$MinLiveProviders = $(if ($env:NORM_MIN_LIVE_PROVIDERS) { [int]$env:NORM_MIN_LIVE_PROVIDERS } else { 0 }),
     [switch]$SkipBenchmark,
     [switch]$SkipProviderMatrixBenchmark,
-    [string]$ProviderMatrixBenchmarkFilter = '*ProviderMatrixBenchmarks*',
+    [switch]$FullBenchmarkMatrix,
+    [string]$ProviderMatrixBenchmarkFilter = '',
     [int]$ProviderMatrixSliceTimeoutMinutes = $(if ($env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES) { [int]$env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES } else { 90 }),
     [int]$BenchmarkStepTimeoutMinutes = $(if ($env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES } else { 45 }),
     [int]$TestStepTimeoutMinutes = $(if ($env:NORM_TEST_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_TIMEOUT_MINUTES } else { 45 }),
@@ -16,6 +17,27 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+
+# The benchmark thresholds only consume specific target/baseline methods, so the
+# default provider-matrix filter is derived from eng/benchmark-thresholds.json and
+# stays in sync with rule changes. The full 54-benchmark class takes roughly twice
+# as long per provider and is opt-in via -FullBenchmarkMatrix; an explicit
+# -ProviderMatrixBenchmarkFilter value always wins.
+if (-not $ProviderMatrixBenchmarkFilter) {
+    if ($FullBenchmarkMatrix) {
+        $ProviderMatrixBenchmarkFilter = '*ProviderMatrixBenchmarks*'
+    }
+    else {
+        $thresholdRules = (Get-Content (Join-Path $PSScriptRoot 'benchmark-thresholds.json') -Raw | ConvertFrom-Json).rules
+        $thresholdMethods = @($thresholdRules | ForEach-Object { @($_.targetMethods) + @($_.baselineMethods) }) |
+            Where-Object { $_ } | Sort-Object -Unique
+        if ($thresholdMethods.Count -eq 0) {
+            throw 'Deriving the provider-matrix benchmark filter found no threshold methods; fix eng/benchmark-thresholds.json or pass -FullBenchmarkMatrix.'
+        }
+        $ProviderMatrixBenchmarkFilter = (@($thresholdMethods | ForEach-Object { "*ProviderMatrixBenchmarks.$_" }) -join ' ')
+        Write-Host "Provider-matrix benchmark filter derived from thresholds ($($thresholdMethods.Count) methods); pass -FullBenchmarkMatrix for the complete class."
+    }
+}
 
 $solutionPath = Join-Path $root 'nORM.sln'
 $testsProjectPath = Join-Path (Join-Path $root 'tests') 'nORM.Tests.csproj'
