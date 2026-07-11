@@ -53,6 +53,7 @@ v1.0 contract:
 | Member | Status | Tested by | Documented in |
 |---|---|---|---|
 | `nORM.Core.Norm.CompileTerminalQuery<TContext, TParam, TResult>(...)` | Stable | `CompiledTerminalQueryTests` | `README.md` compiled queries section |
+| `nORM.Configuration.DbContextOptions.MaxQueryJoinDepth` / `MaxQueryWhereConditions` / `MaxQueryParameterCount` / `MaxQueryComplexityCost` (nullable int overrides for memory-scaled query admission limits) | Stable | `QueryComplexityLimitConfigurationTests` | `docs/production-operations.md` Query Admission Limits section |
 | `nORM.Mapping.RenameColumnAttribute` | Stable | `MigrationRenameTests`, `MigrationRenameDocContractTests` | `README.md` migration section |
 | `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
 | `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)` / `IsFixedLength(bool)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |

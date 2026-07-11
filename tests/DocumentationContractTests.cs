@@ -647,7 +647,7 @@ public class DocumentationContractTests
         Assert.Contains("Rebuild benchmark evidence", map, StringComparison.Ordinal);
         Assert.Contains("| 40 | Run and publish a real RC release gate | Verified |", map, StringComparison.Ordinal);
         Assert.Contains("fresh benchmark-enabled RC gate from the intended release commit passed", map, StringComparison.Ordinal);
-        Assert.Contains("ffcf7ba01b1c84a259b1b9cbb7d1cd3cc87cdca9", map, StringComparison.Ordinal);
+        Assert.Contains("8941c442ba427e2375439a48998744be2b7ed417", map, StringComparison.Ordinal);
         Assert.Contains("Benchmark skipped: False", map, StringComparison.Ordinal);
         Assert.Contains("release tag must point at the evidence commit", map, StringComparison.Ordinal);
         Assert.Contains("Closure Rule", map, StringComparison.Ordinal);

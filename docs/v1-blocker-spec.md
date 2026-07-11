@@ -207,7 +207,7 @@ Acceptance gate:
 Current status:
 
 - This blocker is closed for the current working tree. The 2026-07-11 RC gate
-  ran from clean commit `ffcf7ba0` with SQL Server, PostgreSQL, MySQL, and
+  ran from clean commit `8941c442` (superseding `ffcf7ba0`) with SQL Server, PostgreSQL, MySQL, and
   SQLite configured: the live provider gate passed 2,154/2,154 in both the
   first and second passes, with benchmarks enabled
   (`Benchmark skipped: False`) and the manifest written to
@@ -1019,7 +1019,7 @@ Current status:
 - This blocker is closed for the current working tree. On 2026-07-11 the RC
   gate ran the full BenchmarkDotNet provider matrix (SQLite, SQL Server,
   PostgreSQL, MySQL — 54 benchmarks per provider) from clean commit
-  `ffcf7ba0` with `Benchmark skipped: False`; raw reports live under
+  `8941c442` (superseding `ffcf7ba0`) with `Benchmark skipped: False`; raw reports live under
   `BenchmarkDotNet.Artifacts/provider-slices/20260711-081723/` and the
   evidence manifest under `artifacts/v1-rc/`. Spot-check against the June
   evidence: SQLite `Query_Simple_nORM` 21.47 vs 21.30 µs, and
