@@ -27,6 +27,18 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Distinct after a reshape runs in memory over the reshaped rows with
+                // LINQ-to-Objects equality (an appended duplicate must dedup too), so
+                // SQL DISTINCT — which sees only server rows — must not be set.
+                if (SourceHasClientTailReshape(node.Arguments[0]))
+                {
+                    var reshapedSource = t.Visit(node.Arguments[0]);
+                    if (t.TryAppendClientSequenceOperator(node))
+                        return reshapedSource;
+                    ThrowIfClientTailReshapePending(t, node.Method.Name);
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                }
                 // Distinct after a Take/Skip-windowed source — wrap as derived table so
                 // DISTINCT runs over only the windowed rows. Sister of the post-Take/Skip
                 // family fixes. Includes the common `Take(N).Select(proj).Distinct()`
@@ -89,6 +101,11 @@ namespace nORM.Query
                     return TranslateAfterTakeSkipWindow(t, node);
                 }
                 var revSource = t.Visit(node.Arguments[0]);
+                // Reverse after a reshape must reverse the reshaped sequence (a prepended
+                // element becomes the last one), not flip the server ORDER BY — the
+                // transform runs after materialization and would keep its position.
+                if (t._postMaterializeTransform != null && t.TryAppendClientSequenceOperator(node))
+                    return revSource;
                 if (t._orderBy.Count > 0)
                 {
                     for (int i = 0; i < t._orderBy.Count; i++)

@@ -232,6 +232,12 @@ namespace nORM.Query
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
             var sourceQuery = node.Arguments[0];
 
+            // A reshape anywhere in the spine (including below a Take/Skip window)
+            // must divert to in-memory evaluation before the windowed derived-table
+            // wrap builds aggregate SQL against pre-reshape rows.
+            if (TryTranslateReshapedScalarTerminal(this, node) is { } reshapedAgg)
+                return reshapedAgg;
+
             // Sum/Min/Max/Average over a Take/Skip-windowed source - wrap the source
             // as a derived table and emit the aggregate against the wrap alias.
             // Sister of the post-Take/Skip family.

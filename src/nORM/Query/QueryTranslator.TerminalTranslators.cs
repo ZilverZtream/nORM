@@ -59,6 +59,10 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // A reshaped source shifts positions (Prepend moves every index by one),
+                // so the server-side OFFSET/LIMIT must not run — index in memory instead.
+                if (TryTranslateReshapedScalarTerminal(t, node) is { } reshapedEa)
+                    return reshapedEa;
                 if (node.Arguments[0] is MethodCallExpression eaWinSrc
                     && eaWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
                 {
@@ -117,6 +121,11 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // A reshaped source invalidates the server-side LIMIT shortcut (Chunk
+                // regroups rows, a predicate must also test the appended element), so
+                // evaluate the terminal in memory over the reshaped rows.
+                if (TryTranslateReshapedScalarTerminal(t, node) is { } reshapedFs)
+                    return reshapedFs;
                 // First/Single with predicate over a Take/Skip-windowed source — the
                 // predicate must evaluate only against the windowed rows. The default
                 // path appends WHERE pred to _where and the SQL pipeline emits
@@ -262,6 +271,11 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // A reshaped source changes what "last" means (Append puts its element
+                // at the end), so the reversed-ORDER-BY LIMIT 1 shortcut must not run —
+                // evaluate in memory over the reshaped rows.
+                if (TryTranslateReshapedScalarTerminal(t, node) is { } reshapedLast)
+                    return reshapedLast;
                 // Last with predicate over a Take/Skip-windowed source — the predicate
                 // must evaluate only against the windowed rows, and "last" must be the
                 // last row of the window matching pred (not the last of the full table).
@@ -396,6 +410,11 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // A reshaped source's extremum can be the appended/prepended element,
+                // which the server-side ORDER BY key LIMIT 1 never sees — evaluate in
+                // memory over the reshaped rows.
+                if (TryTranslateReshapedScalarTerminal(t, node) is { } reshapedMb)
+                    return reshapedMb;
                 // Save terminal method name before visiting source — source chain overwrites _methodName.
                 var terminalName = t._methodName; // "MinBy" or "MaxBy"
                 var ascending = terminalName == "MinBy";
@@ -478,6 +497,19 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isAggregate = true;
+                // A reshape anywhere in the spine (including below a Take/Skip window)
+                // must divert before the windowed COUNT(*) wrap — the sub-plan translation
+                // would handle the window client-side, leaving the wrap counting a
+                // sub-SELECT that no longer carries the LIMIT.
+                if (SourceHasClientTailReshape(node.Arguments[0]))
+                {
+                    var reshapedSource = t.Visit(node.Arguments[0]);
+                    if (t.TryAppendClientCountAggregate(node))
+                        return reshapedSource;
+                    ThrowIfClientTailReshapePending(t, node.Method.Name);
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                }
                 // Count after Take/Skip-windowed source — count only the windowed rows.
                 // Sister of the post-Take/Skip family (3040f49 / e0f1397 / 99a02ce /
                 // a1eb69e / bfc8180 / d6de693 / e0529a0).

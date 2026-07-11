@@ -32,7 +32,7 @@ MySQL evidence before they are treated as release-green.
 | `Chunk` | `tests/LinqSequenceTailOperatorTests.cs` |
 | `Append`, `Prepend` | `tests/LinqSequenceTailOperatorTests.cs` |
 | `Zip` | `tests/LinqSequenceTailOperatorTests.cs` |
-| Scalar operators after `Append`/`Prepend`/`Chunk`/`Zip`/`DefaultIfEmpty(value)` | `tests/LinqSequenceTailOperatorTests.cs` |
+| Operators after `Append`/`Prepend`/`Chunk`/`Zip`/`DefaultIfEmpty(value)` | `tests/LinqSequenceTailOperatorTests.cs` |
 | `Count`, `LongCount`, `Any`, `All` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryExecutorCoverageTests.cs` |
 | Navigation aggregates: `parent.Children.Any(...)`, `.All(...)`, `.Count()`, `.LongCount()` | `tests/LinqNavigationAggregateTests.cs`, `tests/LinqCompiledQueryExpandedParityTests.cs`, `tests/LinqMultiHopNavAggregateInProjectionTests.cs`, `tests/LiveProviderNavigationAggregateParityTests.cs` |
 | `Sum`, `Average`, `Min`, `Max` | `tests/AggregateOperatorTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqGroupAggregateComputedSelectorTests.cs`, `tests/LinqGroupMultiAggregateTests.cs` |

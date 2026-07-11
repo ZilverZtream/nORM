@@ -347,22 +347,211 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
-    public async Task First_after_prepend_returns_the_prepended_element_or_fails_closed()
+    public async Task First_after_prepend_returns_the_prepended_element()
     {
         var (cn, ctx) = CreateContext(3);
         using var _cn = cn;
         using var _ctx = ctx;
 
         var extra = new SeqTailItem { Name = "extra", Value = 999 };
-        try
-        {
-            var first = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra).FirstAsync();
-            Assert.Equal(999, first.Value);
-        }
-        catch (NormUnsupportedFeatureException)
-        {
-            // Failing closed is acceptable; silently returning the first row is not.
-        }
+        var first = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra).FirstAsync();
+        Assert.Equal(999, first.Value);
+    }
+
+    // ── Positional terminals after a client-tail reshape evaluate in memory ──
+
+    [Fact]
+    public async Task First_after_chunk_returns_the_complete_first_chunk()
+    {
+        // A server LIMIT 1 shortcut would truncate the rows BEFORE chunking,
+        // yielding a one-element chunk instead of the full first chunk.
+        var (cn, ctx) = CreateContext(5); // values 10..50
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var first = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Chunk(2).FirstAsync();
+
+        Assert.Equal(new[] { 10, 20 }, first.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public void Last_with_predicate_after_append_can_return_the_appended_element()
+    {
+        // The reversed-ORDER-BY LIMIT 1 shortcut picks the last SERVER row matching
+        // the predicate; the appended element comes after every server row.
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 5 };
+        var last = ctx.Query<SeqTailItem>().Append(extra).Last(x => x.Value < 25);
+
+        Assert.Equal(5, last.Value);
+    }
+
+    [Fact]
+    public async Task Last_after_append_returns_the_appended_element()
+    {
+        var (cn, ctx) = CreateContext(3);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var last = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra).LastAsync();
+
+        Assert.Equal(999, last.Value);
+    }
+
+    [Fact]
+    public async Task Element_at_after_prepend_accounts_for_the_shifted_index()
+    {
+        // Prepend shifts every index by one; a server OFFSET would be off by one.
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var query = ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra);
+
+        Assert.Equal(999, (await query.ElementAtAsync(0)).Value);
+        Assert.Equal(10, (await query.ElementAtAsync(1)).Value);
+        Assert.Equal(30, (await query.ElementAtAsync(3)).Value);
+    }
+
+    [Fact]
+    public void Min_by_and_max_by_after_reshape_consider_the_reshaped_element()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var high = new SeqTailItem { Name = "high", Value = 999 };
+        Assert.Equal(999, ctx.Query<SeqTailItem>().Append(high).MaxBy(x => x.Value)!.Value);
+
+        var low = new SeqTailItem { Name = "low", Value = -5 };
+        Assert.Equal(-5, ctx.Query<SeqTailItem>().Prepend(low).MinBy(x => x.Value)!.Value);
+    }
+
+    [Fact]
+    public async Task Single_after_append_applies_linq_cardinality_rules_to_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(1);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+
+        // One server row plus the appended element is two elements.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ctx.Query<SeqTailItem>().Append(extra).SingleAsync());
+
+        // An empty source plus the appended element is exactly one.
+        var (cn2, ctx2) = CreateContext(0);
+        using var _cn2 = cn2;
+        using var _ctx2 = ctx2;
+        var single = await ctx2.Query<SeqTailItem>().Append(extra).SingleAsync();
+        Assert.Equal(999, single.Value);
+    }
+
+    // ── Sequence operators after a client-tail reshape evaluate in memory ────
+
+    [Fact]
+    public async Task Take_and_skip_after_reshape_page_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+
+        // A server OFFSET would drop a real row and keep the prepended element.
+        var skipped = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra).Skip(1).ToListAsync();
+        Assert.Equal(new[] { 10, 20, 30 }, skipped.Select(x => x.Value).ToArray());
+
+        // A captured (non-literal) count must also page client-side.
+        var count = 2;
+        var taken = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra).Take(count).ToListAsync();
+        Assert.Equal(new[] { 10, 20 }, taken.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public async Task Take_last_and_skip_last_after_append_count_from_the_reshaped_end()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+
+        var lastTwo = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra).TakeLast(2).ToListAsync();
+        Assert.Equal(new[] { 30, 999 }, lastTwo.Select(x => x.Value).ToArray());
+
+        var withoutLast = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra).SkipLast(1).ToListAsync();
+        Assert.Equal(new[] { 10, 20, 30 }, withoutLast.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public async Task Take_while_and_skip_while_after_prepend_start_from_the_prepended_element()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 5 };
+        var query = ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra);
+
+        var head = await query.TakeWhile(x => x.Value < 15).ToListAsync();
+        Assert.Equal(new[] { 5, 10 }, head.Select(x => x.Value).ToArray());
+
+        var tail = await query.SkipWhile(x => x.Value < 15).ToListAsync();
+        Assert.Equal(new[] { 20, 30 }, tail.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public void Distinct_after_append_dedups_against_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var values = ctx.Query<SeqTailItem>()
+            .OrderBy(x => x.Id)
+            .Select(x => x.Value)
+            .Append(10)
+            .Distinct()
+            .ToList();
+
+        Assert.Equal(3, values.Count);
+        Assert.Equal(new[] { 10, 20, 30 }, values.OrderBy(v => v).ToArray());
+    }
+
+    [Fact]
+    public async Task Reverse_after_prepend_moves_the_prepended_element_to_the_end()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var reversed = await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Prepend(extra).Reverse().ToListAsync();
+
+        Assert.Equal(new[] { 30, 20, 10, 999 }, reversed.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public async Task Aggregates_after_take_after_reshape_compose_client_side()
+    {
+        // The windowed COUNT/SUM derived-table wraps must divert: the Take after the
+        // reshape pages the reshaped rows client-side, so no LIMIT reaches the SQL.
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var query = ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Append(extra).Take(2);
+
+        Assert.Equal(2, await query.CountAsync());
+        Assert.Equal(30, await query.SumAsync(x => x.Value));
     }
 
     // ── Scalar aggregates after a client-tail reshape evaluate in memory ─────

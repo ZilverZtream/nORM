@@ -170,6 +170,57 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// When a client-tail reshape is pending, sequence operators (Take, Skip,
+        /// TakeLast, SkipLast, TakeWhile, SkipWhile, Distinct, Reverse, ElementAt-style
+        /// paging inputs) run in memory over the reshaped rows via the matching
+        /// <see cref="Enumerable"/> operator. Argument expressions compile into the
+        /// transform, so captured locals are read at execution time.
+        /// </summary>
+        private bool TryAppendClientSequenceOperator(MethodCallExpression node)
+        {
+            if (_postMaterializeTransform == null)
+                return false;
+
+            var enumerableMethod = FindEnumerableEquivalent(node.Method);
+            if (enumerableMethod == null)
+                return false;
+
+            var resultElementType = GetSequenceElementType(node.Type);
+            var sourceType = node.Arguments[0].Type;
+            var elementType = sourceType.IsGenericType
+                ? sourceType.GetGenericArguments()[0]
+                : CurrentPostMaterializeElementType ?? typeof(object);
+
+            var rowsParam = Expression.Parameter(typeof(System.Collections.IList), "rows");
+            var args = new Expression[node.Arguments.Count];
+            args[0] = Expression.Call(typeof(Enumerable), nameof(Enumerable.Cast), new[] { elementType }, rowsParam);
+            for (var i = 1; i < node.Arguments.Count; i++)
+                args[i] = StripQuotes(node.Arguments[i]);
+
+            Expression call;
+            try
+            {
+                call = Expression.Call(enumerableMethod, args);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+
+            var evaluator = Expression.Lambda<Func<System.Collections.IList, System.Collections.IEnumerable>>(
+                Expression.Convert(call, typeof(System.Collections.IEnumerable)), rowsParam).Compile();
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var output = CreateRuntimeList(resultElementType, rows.Count);
+                foreach (var item in evaluator(rows))
+                    output.Add(item);
+                return output;
+            }, resultElementType);
+            return true;
+        }
+
+        /// <summary>
         /// Resolves the <see cref="Enumerable"/> overload mirroring a <see cref="Queryable"/>
         /// aggregate: same name and generic arguments, with IQueryable sources becoming
         /// IEnumerable and quoted lambdas becoming delegates.
@@ -199,7 +250,9 @@ namespace nORM.Query
                 var eParams = closed.GetParameters();
                 if (eParams.Length != qParams.Length)
                     continue;
-                var match = closed.ReturnType == queryableMethod.ReturnType;
+                // Normalize the return type too: sequence operators return IQueryable<T>
+                // on the Queryable side and IEnumerable<T> on the Enumerable side.
+                var match = NormalizeQueryableParameter(queryableMethod.ReturnType) == closed.ReturnType;
                 for (var i = 0; match && i < qParams.Length; i++)
                     match = NormalizeQueryableParameter(qParams[i].ParameterType) == eParams[i].ParameterType;
                 if (match)
@@ -218,6 +271,28 @@ namespace nORM.Query
             if (definition == typeof(IQueryable<>))
                 return typeof(IEnumerable<>).MakeGenericType(type.GetGenericArguments());
             return type;
+        }
+
+        /// <summary>
+        /// Early divert for scalar terminals (First/Single/Last/ElementAt/MinBy/MaxBy,
+        /// Any/All/Contains, aggregates) whose source spine contains a client-tail
+        /// reshape: translate the source as the row plan and evaluate the terminal in
+        /// memory. Returns null when the spine has no reshape (normal SQL path applies).
+        /// The check must run BEFORE the terminal mutates translation state (LIMIT,
+        /// ORDER BY flips, EXISTS SQL) — those server-side shapes evaluate against
+        /// pre-reshape rows. Once the source is visited, falling through to SQL
+        /// generation is never valid, so resolver failure fails closed.
+        /// </summary>
+        private static Expression? TryTranslateReshapedScalarTerminal(QueryTranslator t, MethodCallExpression node)
+        {
+            if (!SourceHasClientTailReshape(node.Arguments[0]))
+                return null;
+            var source = t.Visit(node.Arguments[0]);
+            if (t.TryAppendClientScalarAggregate(node))
+                return source;
+            ThrowIfClientTailReshapePending(t, node.Method.Name);
+            throw new NormUnsupportedFeatureException(
+                $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
         }
 
         /// <summary>
