@@ -365,8 +365,11 @@ public sealed partial class LiveProviderScaffoldingParityTests
                     $"CREATE TRIGGER {provider.Escape(ProviderOwnedBridgeTrigger)} BEFORE INSERT ON {join} FOR EACH ROW EXECUTE FUNCTION {function}()");
                 break;
             case ProviderKind.MySql:
+                // No-op self-assignment: MySqlConnector client-side parses @name tokens as
+                // command parameters unless AllowUserVariables=true, so the trigger body
+                // must avoid session user variables to run on any connection string.
                 await ExecuteAsync(connection,
-                    $"CREATE TRIGGER {provider.Escape(ProviderOwnedBridgeTrigger)} BEFORE INSERT ON {join} FOR EACH ROW SET @norm_provider_owned_bridge = 1");
+                    $"CREATE TRIGGER {provider.Escape(ProviderOwnedBridgeTrigger)} BEFORE INSERT ON {join} FOR EACH ROW SET NEW.{authorId} = NEW.{authorId}");
                 break;
             case ProviderKind.Sqlite:
                 await ExecuteAsync(connection, $$"""

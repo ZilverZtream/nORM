@@ -70,8 +70,11 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                     $"CREATE TRIGGER {provider.Escape(triggerName)} BEFORE INSERT ON {authorBook} FOR EACH ROW EXECUTE FUNCTION {provider.Escape(functionName)}()");
                 break;
             case ProviderKind.MySql:
+                // No-op self-assignment: MySqlConnector client-side parses @name tokens as
+                // command parameters unless AllowUserVariables=true, so the trigger body
+                // must avoid session user variables to run on any connection string.
                 Execute(connection,
-                    $"CREATE TRIGGER {provider.Escape(triggerName)} BEFORE INSERT ON {authorBook} FOR EACH ROW SET @norm_provider_owned_bridge = 1");
+                    $"CREATE TRIGGER {provider.Escape(triggerName)} BEFORE INSERT ON {authorBook} FOR EACH ROW SET NEW.{authorId} = NEW.{authorId}");
                 break;
             case ProviderKind.Sqlite:
                 Execute(connection, $$"""
