@@ -444,6 +444,109 @@ namespace nORM.Internal
             };
         }
 
+        /// <summary>
+        /// Compiles a query whose body ends in a terminal operator (<c>First</c>,
+        /// <c>Single</c>, <c>Count</c>, <c>Any</c>, <c>Sum</c>, …) into a reusable
+        /// delegate returning the terminal result. The expression translates once per
+        /// context shape and executes through the pooled compiled-command path, so the
+        /// terminal semantics (empty-sequence exceptions, Single cardinality checks,
+        /// scalar coercions) match the non-compiled runtime exactly.
+        /// </summary>
+        public static Func<TContext, TParam, Task<TResult>> CompileTerminalQuery<TContext, TParam, TResult>(
+            Expression<Func<TContext, TParam, TResult>> queryExpression)
+            where TContext : DbContext
+        {
+            ExpressionUtils.ValidateExpression(queryExpression);
+            var body = queryExpression.Body;
+            while (body is UnaryExpression { NodeType: ExpressionType.Convert } unary)
+                body = unary.Operand;
+            if (typeof(IQueryable).IsAssignableFrom(body.Type))
+            {
+                throw new NormUsageException(
+                    "This CompileQuery overload compiles a terminal result (First, Single, Count, Any, Sum, …). " +
+                    "For sequence results, return the IQueryable directly and use the List-returning overload.");
+            }
+            if (body is not MethodCallExpression)
+            {
+                throw new NormUsageException(
+                    "CompileQuery requires the expression body to be a query chain ending in a terminal operator, " +
+                    "e.g. (ctx, id) => ctx.Query<User>().First(u => u.Id == id).");
+            }
+
+            var timeout = ExpressionUtils.GetCompilationTimeout(queryExpression);
+            using var cts = new CancellationTokenSource(timeout);
+            _compileSemaphore.Wait();
+            try
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                return CompileTerminalQueryInternal<TContext, TParam, TResult>(queryExpression);
+            }
+            finally
+            {
+                _compileSemaphore.Release();
+            }
+        }
+
+        private static Func<TContext, TParam, Task<TResult>> CompileTerminalQueryInternal<TContext, TParam, TResult>(
+            Expression<Func<TContext, TParam, TResult>> queryExpression)
+            where TContext : DbContext
+        {
+            // Same per-context-shape plan cache and pooled command state as the
+            // List-returning overload; see CompileQueryInternal for the invariants.
+            var plansByCtx = new ConcurrentLruCache<string, (QueryPlan Plan, IReadOnlyList<string> ParamNames, HashSet<string> CompiledParamSet, KeyValuePair<string, object>[]? FixedParams, CompiledParameterValueSource[] ValueSources)>(PlanCacheCapacity);
+            var stateByCtx = new System.Runtime.CompilerServices.ConditionalWeakTable<DbContext, CompiledQueryContextState>();
+            DbContext? fastCtxOwner = null;
+            CompiledQueryContextState? fastCtxState = null;
+            var expressionKeyCanChange = HasClosureValues(queryExpression.Body);
+
+            return (ctx, value) =>
+            {
+                CompiledQueryContextState contextState;
+                if (ReferenceEquals(fastCtxOwner, ctx) && fastCtxState != null)
+                {
+                    contextState = fastCtxState;
+                }
+                else
+                {
+                    contextState = stateByCtx.GetOrCreateValue(ctx);
+                    fastCtxOwner = ctx;
+                    fastCtxState = contextState;
+                }
+
+                var expressionKey = expressionKeyCanChange ? GetFilterKey(queryExpression) : null;
+                var (ctxKey, state) = ResolveContextPlanState(ctx, contextState, expressionKey);
+
+                var capturedCtx = ctx;
+                var capturedExpr = queryExpression;
+                var invEntry = plansByCtx.GetOrAdd(ctxKey, __ =>
+                {
+                    var ctxParam = capturedExpr.Parameters[0];
+                    var planBody = new ParameterReplacer(ctxParam, Expression.Constant(capturedCtx)).Visit(capturedExpr.Body)!;
+                    planBody = new QueryCallEvaluator().Visit(planBody)!;
+                    var p = capturedCtx.GetQueryProvider().GetPlan(planBody, out var filtered, out _);
+                    var paramSet = new HashSet<string>(p.CompiledParameters, StringComparer.Ordinal);
+                    KeyValuePair<string, object>[]? fixedParams = null;
+                    if (paramSet.Count > 0)
+                    {
+                        var fpList = new List<KeyValuePair<string, object>>();
+                        foreach (var kvp in p.Parameters)
+                        {
+                            if (!paramSet.Contains(kvp.Key))
+                                fpList.Add(kvp);
+                        }
+                        fixedParams = fpList.ToArray();
+                    }
+                    var valueSources = BuildCompiledParameterValueSources(
+                        filtered, capturedExpr.Parameters[1], p.CompiledParameters.Count);
+                    return (p, p.CompiledParameters, paramSet, fixedParams, valueSources);
+                });
+
+                var args = BuildCompiledParameterValues(invEntry.ValueSources, value, invEntry.ParamNames);
+                return ctx.GetQueryProvider().ExecuteCompiledPooledAsync<TResult>(
+                    invEntry.Plan, args, invEntry.FixedParams, state, default);
+            };
+        }
+
         private static void ApplyPreparedParameterSizeHints(DbCommand cmd)
         {
             foreach (DbParameter parameter in cmd.Parameters)

@@ -52,6 +52,7 @@ v1.0 contract:
 
 | Member | Status | Tested by | Documented in |
 |---|---|---|---|
+| `nORM.Core.Norm.CompileTerminalQuery<TContext, TParam, TResult>(...)` | Stable | `CompiledTerminalQueryTests` | `README.md` compiled queries section |
 | `nORM.Mapping.RenameColumnAttribute` | Stable | `MigrationRenameTests`, `MigrationRenameDocContractTests` | `README.md` migration section |
 | `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasMaxLength(int)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |
 | `nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode(bool)` / `IsFixedLength(bool)` | Stable | `SchemaSnapshotTests` | `docs/scaffolding.md` |

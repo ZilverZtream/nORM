@@ -218,6 +218,13 @@ var getActiveUsers = Norm.CompileQuery<MyContext, DateTime, User>(
     (ctx, since) => ctx.Query<User>()
         .Where(u => u.CreatedAt > since)
 );
+
+// Compiled terminal queries return the terminal result directly
+// (First/Single/Count/Any/Sum/... with LINQ-identical semantics)
+var getUserById = Norm.CompileTerminalQuery(
+    (MyContext ctx, int id) => ctx.Query<User>().First(u => u.Id == id));
+var countSince = Norm.CompileTerminalQuery(
+    (MyContext ctx, DateTime since) => ctx.Query<User>().Count(u => u.CreatedAt > since));
 ```
 
 ### CRUD Operations
