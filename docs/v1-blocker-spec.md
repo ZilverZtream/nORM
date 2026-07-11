@@ -337,6 +337,17 @@ Acceptance gate:
 - Generated API docs are reproducible and mechanically checked against the
   shipped assembly.
 
+Current status:
+
+- This blocker is closed for the current working tree. The generated docs are
+  now mechanically checked against the shipped assembly in both directions:
+  `Every_exported_public_type_has_a_generated_api_doc_page` fails when any
+  exported public type lacks a `docs/api/*.yml` page (currently zero
+  exclusions), and `Generated_api_docs_do_not_reference_removed_public_types`
+  fails when a page documents a type that no longer exists. Regeneration is
+  documented in `docs/api/README.md` (`docfx metadata docfx.json`); drift in
+  either direction fails the Fast test category.
+
 ### 9. Finalize Package Architecture
 
 Problem: `nORM` ships core ORM code, provider dialects, SQL Server and SQLite

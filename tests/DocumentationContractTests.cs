@@ -110,6 +110,28 @@ public class DocumentationContractTests
     }
 
     [Fact]
+    public void Every_exported_public_type_has_a_generated_api_doc_page()
+    {
+        var root = FindRepositoryRoot();
+        var apiDirectory = Path.Combine(root, "docs", "api");
+        var missing = new System.Collections.Generic.List<string>();
+
+        foreach (var type in typeof(DbContext).Assembly.GetExportedTypes())
+        {
+            // DocFX encodes each generic segment's arity as a -N suffix in place
+            // (EntityTypeBuilder`1+PropertyBuilder`1 -> EntityTypeBuilder-1.PropertyBuilder-1).
+            var docFxName = Regex.Replace((type.FullName ?? type.Name).Replace('+', '.'), @"`(\d+)", "-$1");
+
+            if (!File.Exists(Path.Combine(apiDirectory, docFxName + ".yml")))
+                missing.Add($"{type.FullName} (expected docs/api/{docFxName}.yml)");
+        }
+
+        Assert.True(missing.Count == 0,
+            "Exported public types without a generated API doc page — regenerate with `docfx metadata docfx.json` (see docs/api/README.md):\n"
+            + string.Join("\n", missing));
+    }
+
+    [Fact]
     public void Generated_api_docs_do_not_reference_removed_public_types()
     {
         var root = FindRepositoryRoot();
