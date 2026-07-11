@@ -138,6 +138,47 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Equal(2, row.Id);
     }
 
+    [Fact]
+    public async Task Terminals_after_windowed_filter_chains_see_only_the_window()
+    {
+        // OrderBy(Id).Take(3) → rows 1,2,3 (V = 50,40,30); Where(V < 45) keeps
+        // rows 2,3. Every terminal must operate on that filtered window — a flat
+        // translation would count/aggregate the full table (5 rows, V includes 999).
+        var windowed = _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45);
+
+        var failures = new System.Collections.Generic.List<string>();
+        async Task Probe(string name, Func<Task> check)
+        {
+            try { await check(); }
+            catch (Exception ex) { failures.Add($"{name}: {ex.Message}"); }
+        }
+        await Probe("Count", async () => Assert.Equal(2, await windowed.CountAsync()));
+        await Probe("Sum", async () => Assert.Equal(70, await windowed.SumAsync(r => r.V)));
+        await Probe("Max", async () => Assert.Equal(40, await windowed.MaxAsync(r => r.V)));
+        await Probe("Any", async () => Assert.True(await windowed.AnyAsync()));
+        await Probe("OrderBy.First", async () =>
+        {
+            var first = await windowed.OrderBy(r => r.V).FirstAsync();
+            Assert.Equal(3, first.Id); // V=30 sorts first within the window
+        });
+        Assert.True(failures.Count == 0, string.Join(" | ", failures));
+    }
+
+    [Fact]
+    public async Task Element_at_after_windowed_filter_chain_indexes_the_window()
+    {
+        var windowed = _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V < 45);
+
+        Assert.Equal(2, (await windowed.ElementAtAsync(0)).Id);
+        Assert.Equal(3, (await windowed.ElementAtAsync(1)).Id);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {

@@ -240,9 +240,12 @@ namespace nORM.Query
 
             // Sum/Min/Max/Average over a Take/Skip-windowed source - wrap the source
             // as a derived table and emit the aggregate against the wrap alias.
-            // Sister of the post-Take/Skip family.
-            if (sourceQuery is MethodCallExpression aggWinSrc
-                && aggWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+            // Sister of the post-Take/Skip family, extended to any Take/Skip in the
+            // source spine: the sub-translation carries intervening operators (a Where
+            // after the window wraps again inside the sub-plan), while the flat path
+            // below would rebuild the SELECT against the raw table and dangle the
+            // derived alias. Post-materialize tails already diverted above.
+            if (SourceHasTakeOrSkip(sourceQuery))
             {
                 var subPlanA = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapA);
                 _mapping = subMapA;
