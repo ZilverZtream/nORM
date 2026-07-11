@@ -206,11 +206,12 @@ Acceptance gate:
 
 Current status:
 
-- Local `live` mode now has real SQL Server, PostgreSQL, MySQL, and SQLite
-  correctness evidence: 1,925/1,925 live provider tests passed with
-  `-MinLiveProviders 3`.
-- This is not final RC evidence because the working tree is dirty and
-  benchmarks were skipped.
+- This blocker is closed for the current working tree. The 2026-07-11 RC gate
+  ran from clean commit `ffcf7ba0` with SQL Server, PostgreSQL, MySQL, and
+  SQLite configured: the live provider gate passed 2,154/2,154 in both the
+  first and second passes, with benchmarks enabled
+  (`Benchmark skipped: False`) and the manifest written to
+  `artifacts/v1-rc/`.
 
 ### 5. Validate Provider Capability Floors
 
@@ -1013,6 +1014,18 @@ Acceptance gate:
 - Every public performance claim maps to raw BenchmarkDotNet output from the
   release commit.
 
+Current status:
+
+- This blocker is closed for the current working tree. On 2026-07-11 the RC
+  gate ran the full BenchmarkDotNet provider matrix (SQLite, SQL Server,
+  PostgreSQL, MySQL — 54 benchmarks per provider) from clean commit
+  `ffcf7ba0` with `Benchmark skipped: False`; raw reports live under
+  `BenchmarkDotNet.Artifacts/provider-slices/20260711-081723/` and the
+  evidence manifest under `artifacts/v1-rc/`. Spot-check against the June
+  evidence: SQLite `Query_Simple_nORM` 21.47 vs 21.30 µs, and
+  `Insert_Single_nORM` 61.99 µs remains the fastest single insert among
+  nORM, EF Core, Dapper, and raw ADO.
+
 ### 40. Make Benchmark Thresholds and Claims Release-Grade
 
 Problem: Threshold scripts exist, but skipped benchmarks still allow release
@@ -1029,6 +1042,14 @@ Acceptance gate:
 
 - Performance regressions block release automation, and skipped benchmarks
   block performance claims.
+
+Current status:
+
+- This blocker is closed for the current working tree. The 2026-07-11 RC gate
+  enforced `eng/benchmark-thresholds.json` against the fresh provider-matrix
+  reports and passed every rule. The checker now throws instead of passing
+  vacuously when no provider rows are found, so skipped or missing benchmark
+  evidence fails the gate rather than silently allowing claims.
 
 ## Suggested Execution Order
 
