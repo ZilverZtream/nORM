@@ -320,13 +320,32 @@ namespace nORM.Query
                 var resultElementType = GetElementType(expression);
                 var sourceElementType = GetElementType(queryCall.Arguments[0]);
 
-                if (resultElementType != sourceElementType || !_ctx.IsMapped(resultElementType))
+                // Recurse into EVERY IQueryable-typed argument, not just the source.
+                // Join/GroupJoin carry the inner (joined-to) sequence at Arguments[1];
+                // without this, global filters (soft-delete, tenant) on the inner entity
+                // are silently dropped and the inner table leaks unfiltered rows into the
+                // join result. The source (index 0) is only recursed when the call is a
+                // projection/transformation (preserving the original element-type guard);
+                // an entity-root source falls through to the base case below so its own
+                // filter is applied there exactly once.
+                Expression[]? rewritten = null;
+                for (int i = 0; i < queryCall.Arguments.Count; i++)
                 {
-                    var filteredSource = ApplyGlobalFilters(queryCall.Arguments[0]);
-                    var args = queryCall.Arguments.ToArray();
-                    args[0] = filteredSource;
-                    return queryCall.Update(queryCall.Object, args);
+                    var arg = queryCall.Arguments[i];
+                    bool recurse = i == 0
+                        ? (resultElementType != sourceElementType || !_ctx.IsMapped(resultElementType))
+                        : typeof(IQueryable).IsAssignableFrom(arg.Type);
+                    if (!recurse)
+                        continue;
+                    var filtered = ApplyGlobalFilters(arg);
+                    if (!ReferenceEquals(filtered, arg))
+                    {
+                        rewritten ??= queryCall.Arguments.ToArray();
+                        rewritten[i] = filtered;
+                    }
                 }
+                if (rewritten != null)
+                    return queryCall.Update(queryCall.Object, rewritten);
             }
 
             var entityType = GetElementType(expression);
