@@ -1,0 +1,92 @@
+name: Nightly Live Gate
+
+# The full live-provider gate against real MySQL, PostgreSQL, and SQL Server
+# service containers, every night. This is the regression fence between weekly
+# RC gates: a provider-behavior break lands in tomorrow's red run instead of
+# surfacing weeks later during a release attempt.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
+
+jobs:
+  live:
+    name: Live Provider Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: normtest
+          MYSQL_DATABASE: normtest
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: normtest
+          POSTGRES_DB: normtest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "NormTest!2024"
+          MSSQL_PID: "Developer"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'NormTest!2024' -Q 'SELECT 1' -No"
+          --health-interval=15s
+          --health-timeout=10s
+          --health-retries=12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Validate .NET SDK
+        shell: pwsh
+        run: |
+          $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
+          $actual = dotnet --version
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
+          if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
+
+      - name: Run live provider gate
+        shell: pwsh
+        env:
+          NORM_TEST_MYSQL: "Server=127.0.0.1;Port=3306;Database=normtest;User=root;Password=normtest;AllowPublicKeyRetrieval=True"
+          NORM_TEST_POSTGRES: "Host=127.0.0.1;Port=5432;Database=normtest;Username=postgres;Password=normtest"
+          NORM_TEST_SQLSERVER: "Server=127.0.0.1,1433;Database=normtest;User Id=sa;Password=NormTest!2024;TrustServerCertificate=True"
+        run: ./eng/v1-release-gate.ps1 -Mode live -MinLiveProviders 3 -SkipBenchmark
+
+      - name: Upload live gate test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-live-test-results
+          path: "tests/TestResults/**/*.trx"
+          retention-days: 14

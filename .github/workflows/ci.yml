@@ -34,7 +34,10 @@ jobs:
         run: |
           $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
           $actual = dotnet --version
-          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
@@ -82,7 +85,10 @@ jobs:
         run: |
           $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
           $actual = dotnet --version
-          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Run quick release gate
@@ -144,7 +150,10 @@ jobs:
         run: |
           $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
           $actual = dotnet --version
-          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
@@ -211,7 +220,10 @@ jobs:
         run: |
           $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
           $actual = dotnet --version
-          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
@@ -271,7 +283,10 @@ jobs:
         run: |
           $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
           $actual = dotnet --version
-          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies

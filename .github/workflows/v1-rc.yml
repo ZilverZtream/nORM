@@ -8,9 +8,9 @@ on:
         required: true
         default: "20"
       provider_matrix_filter:
-        description: BenchmarkDotNet provider-matrix filter
-        required: true
-        default: "*ProviderMatrixBenchmarks*"
+        description: BenchmarkDotNet provider-matrix filter (empty derives the threshold-consumed set; pass *ProviderMatrixBenchmarks* for the full class)
+        required: false
+        default: ""
       skip_benchmark:
         description: Skip benchmark steps for non-performance validation
         type: boolean
@@ -81,7 +81,10 @@ jobs:
         run: |
           $expected = (Get-Content global.json | ConvertFrom-Json).sdk.version
           $actual = dotnet --version
-          if ($actual -ne $expected) { throw "Expected .NET SDK $expected from global.json but found $actual." }
+          $expectedBand = ($expected -split '\.')[0..1] -join '.'
+          $actualBand = ($actual -split '\.')[0..1] -join '.'
+          if ($actualBand -ne $expectedBand) { throw "Expected a .NET SDK from the $expectedBand band (global.json pins $expected) but found $actual." }
+          if ([version]$actual -lt [version]$expected) { throw "Expected .NET SDK $expected or newer per global.json rollForward, but found $actual." }
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Run RC release gate
@@ -94,15 +97,18 @@ jobs:
           $stressIterations = "${{ github.event.inputs.stress_iterations }}"
           if (-not $stressIterations) { $stressIterations = "20" }
 
-          $providerMatrixFilter = "${{ github.event.inputs.provider_matrix_filter }}"
-          if (-not $providerMatrixFilter) { $providerMatrixFilter = "*ProviderMatrixBenchmarks*" }
-
           $arguments = @(
             '-Mode', 'rc',
             '-MinLiveProviders', '3',
-            '-StressIterations', $stressIterations,
-            '-ProviderMatrixBenchmarkFilter', $providerMatrixFilter
+            '-StressIterations', $stressIterations
           )
+
+          # An empty filter lets the gate derive the threshold-consumed benchmark set,
+          # which roughly halves the matrix wall clock without weakening the evidence.
+          $providerMatrixFilter = "${{ github.event.inputs.provider_matrix_filter }}"
+          if ($providerMatrixFilter) {
+            $arguments += @('-ProviderMatrixBenchmarkFilter', $providerMatrixFilter)
+          }
 
           if ("${{ github.event.inputs.skip_benchmark }}" -eq "true") {
             $arguments += '-SkipBenchmark'
