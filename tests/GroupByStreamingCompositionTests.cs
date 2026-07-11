@@ -85,6 +85,24 @@ public class GroupByStreamingCompositionTests
     }
 
     [Fact]
+    public void Aggregates_with_selectors_after_raw_group_by_reduce_over_groups()
+    {
+        var (cn, ctx) = CreateContext();
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var grouped = ctx.Query<GbsItem>().OrderBy(x => x.Id).GroupBy(x => x.Category);
+
+        // Group sizes are 2, 1, 2 — only group-level evaluation produces these.
+        Assert.Equal(5, grouped.Sum(g => g.Count()));
+        Assert.Equal(2, grouped.Max(g => g.Count()));
+        Assert.Equal(1, grouped.Min(g => g.Count()));
+        Assert.Equal(2, grouped.Count(g => g.Count() == 2));
+        Assert.True(grouped.Any(g => g.Key == "b"));
+        Assert.False(grouped.All(g => g.Count() == 2));
+    }
+
+    [Fact]
     public void Any_after_raw_group_by_reflects_group_existence()
     {
         var (cn, ctx) = CreateContext();
