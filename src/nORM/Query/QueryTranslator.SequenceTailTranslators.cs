@@ -88,6 +88,167 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Filters the reshaped rows in memory with the given predicate, preserving the
+        /// element type so further tail operators and aggregates compose. Used by Where
+        /// when a client-tail reshape is pending — a SQL WHERE would only filter server
+        /// rows and let reshaped elements bypass the predicate.
+        /// </summary>
+        private void AppendClientTailFilter(LambdaExpression predicateLambda)
+        {
+            var elementType = CurrentPostMaterializeElementType ?? predicateLambda.Parameters[0].Type;
+            var rowArg = Expression.Parameter(typeof(object), "row");
+            var typedRow = elementType.IsValueType
+                ? (Expression)Expression.Convert(rowArg, elementType)
+                : Expression.TypeAs(rowArg, elementType);
+            var body = new nORM.Internal.ParameterReplacer(predicateLambda.Parameters[0], typedRow).Visit(predicateLambda.Body)!;
+            var predicate = Expression.Lambda<Func<object?, bool>>(body, rowArg).Compile();
+
+            AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var output = CreateRuntimeList(elementType, rows.Count);
+                foreach (var row in rows)
+                {
+                    if (predicate(row))
+                        output.Add(row);
+                }
+                return output;
+            }, elementType);
+        }
+
+        /// <summary>
+        /// When a client-tail reshape is pending, scalar aggregates and quantifiers
+        /// (Sum, Min, Max, Average, Any, All, Contains) evaluate in memory over the
+        /// reshaped rows via the matching <see cref="Enumerable"/> operator, which
+        /// gives exact LINQ-to-Objects semantics including empty-sequence behavior.
+        /// Selector and predicate lambdas are compiled as-is: after a reshape they are
+        /// already typed against the reshaped element type.
+        /// </summary>
+        private bool TryAppendClientScalarAggregate(MethodCallExpression node)
+        {
+            if (_postMaterializeTransform == null)
+                return false;
+
+            var enumerableMethod = FindEnumerableEquivalent(node.Method);
+            if (enumerableMethod == null)
+                return false;
+
+            var sourceType = node.Arguments[0].Type;
+            var elementType = sourceType.IsGenericType
+                ? sourceType.GetGenericArguments()[0]
+                : CurrentPostMaterializeElementType ?? typeof(object);
+
+            var rowsParam = Expression.Parameter(typeof(System.Collections.IList), "rows");
+            var args = new Expression[node.Arguments.Count];
+            args[0] = Expression.Call(typeof(Enumerable), nameof(Enumerable.Cast), new[] { elementType }, rowsParam);
+            for (var i = 1; i < node.Arguments.Count; i++)
+                args[i] = StripQuotes(node.Arguments[i]);
+
+            Expression call;
+            try
+            {
+                call = Expression.Call(enumerableMethod, args);
+            }
+            catch (ArgumentException)
+            {
+                // Overload shape the resolver matched structurally but the expression
+                // factory rejects (e.g. an untypeable argument) — fail closed upstream.
+                return false;
+            }
+
+            var evaluator = Expression.Lambda<Func<System.Collections.IList, object?>>(
+                Expression.Convert(call, typeof(object)), rowsParam).Compile();
+
+            // The plan must stay list-shaped: aggregate translators mark the query as a
+            // scalar aggregate, which would make Generate() emit aggregate SQL and skip
+            // materialization of the rows the client evaluation needs.
+            _isAggregate = false;
+            _methodName = string.Empty;
+
+            AppendPostMaterializeTransform((ctx, rows) => new List<object?> { evaluator(rows) }, node.Type);
+            _clientScalarResult = true;
+            return true;
+        }
+
+        /// <summary>
+        /// Resolves the <see cref="Enumerable"/> overload mirroring a <see cref="Queryable"/>
+        /// aggregate: same name and generic arguments, with IQueryable sources becoming
+        /// IEnumerable and quoted lambdas becoming delegates.
+        /// </summary>
+        private static System.Reflection.MethodInfo? FindEnumerableEquivalent(System.Reflection.MethodInfo queryableMethod)
+        {
+            if (queryableMethod.DeclaringType != typeof(Queryable))
+                return null;
+            var genericArgs = queryableMethod.IsGenericMethod ? queryableMethod.GetGenericArguments() : Type.EmptyTypes;
+            var qParams = queryableMethod.GetParameters();
+            foreach (var candidate in typeof(Enumerable).GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+            {
+                if (candidate.Name != queryableMethod.Name)
+                    continue;
+                var candidateArity = candidate.IsGenericMethod ? candidate.GetGenericArguments().Length : 0;
+                if (candidateArity != genericArgs.Length)
+                    continue;
+                System.Reflection.MethodInfo closed;
+                try
+                {
+                    closed = candidate.IsGenericMethod ? candidate.MakeGenericMethod(genericArgs) : candidate;
+                }
+                catch (ArgumentException)
+                {
+                    continue;
+                }
+                var eParams = closed.GetParameters();
+                if (eParams.Length != qParams.Length)
+                    continue;
+                var match = closed.ReturnType == queryableMethod.ReturnType;
+                for (var i = 0; match && i < qParams.Length; i++)
+                    match = NormalizeQueryableParameter(qParams[i].ParameterType) == eParams[i].ParameterType;
+                if (match)
+                    return closed;
+            }
+            return null;
+        }
+
+        private static Type NormalizeQueryableParameter(Type type)
+        {
+            if (!type.IsGenericType)
+                return type;
+            var definition = type.GetGenericTypeDefinition();
+            if (definition == typeof(Expression<>))
+                return type.GetGenericArguments()[0];
+            if (definition == typeof(IQueryable<>))
+                return typeof(IEnumerable<>).MakeGenericType(type.GetGenericArguments());
+            return type;
+        }
+
+        /// <summary>
+        /// Syntactic scan of a source's operator spine for the client-tail reshape
+        /// operators. Set-predicate translators (Any/All/Contains) build EXISTS SQL via
+        /// sub-context translation, so they must divert to client evaluation before any
+        /// SQL is emitted — the pending-transform field is only populated during the walk.
+        /// </summary>
+        private static bool SourceHasClientTailReshape(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case nameof(Queryable.Append):
+                    case nameof(Queryable.Prepend):
+                    case nameof(Queryable.Chunk):
+                    case nameof(Queryable.Zip):
+                        return true;
+                    case nameof(Queryable.DefaultIfEmpty) when mce.Arguments.Count == 2:
+                        return true;
+                }
+                if (mce.Arguments.Count == 0)
+                    break;
+                current = mce.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Implements <c>Chunk(size)</c> as a post-materialization transform: the source
         /// query executes server-side unchanged and the materialized rows are grouped
         /// into arrays of <c>size</c> elements in result order, matching

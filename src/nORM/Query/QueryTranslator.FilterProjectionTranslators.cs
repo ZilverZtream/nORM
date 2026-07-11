@@ -115,6 +115,21 @@ namespace nORM.Query
                 }
 
                 var source = wrappedSetOp ? node.Arguments[0] : t.Visit(node.Arguments[0]);
+                // Where after a client-tail reshape (Append/Prepend/Chunk/Zip/
+                // DefaultIfEmpty(value)) must filter the reshaped sequence, not the server
+                // rows — a SQL WHERE would let the reshaped element bypass the predicate.
+                // This is also the path AnyAsync(pred)/AllAsync(pred) lower through.
+                if (t._postMaterializeTransform != null)
+                {
+                    if (QueryTranslator.StripQuotes(node.Arguments[1]) is not LambdaExpression clientPredicate
+                        || clientPredicate.Parameters.Count != 1)
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            "Where after a client-materialized sequence operator supports only a one-argument predicate.");
+                    }
+                    t.AppendClientTailFilter(clientPredicate);
+                    return source;
+                }
                 if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(

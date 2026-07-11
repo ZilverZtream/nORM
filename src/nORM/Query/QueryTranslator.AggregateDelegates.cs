@@ -75,9 +75,23 @@ namespace nORM.Query
             /// <returns>The translated expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // A client-tail reshaped source must divert before any NOT EXISTS SQL is
+                // built: translate the source as the row plan and evaluate All in memory.
+                // The source has been visited at this point, so falling through to SQL
+                // generation is never valid — fail closed if client evaluation is impossible.
+                if (SourceHasClientTailReshape(node.Arguments[0]))
+                {
+                    var source = t.Visit(node.Arguments[0]);
+                    if (t.TryAppendClientScalarAggregate(node))
+                        return source;
+                    ThrowIfClientTailReshapePending(t, node.Method.Name);
+                    throw new NormUnsupportedFeatureException(
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                }
                 var result = t.HandleAllOperation(node);
                 // NOT EXISTS SQL evaluates against server rows and would ignore a pending
-                // client-tail reshape (Append/Prepend/Chunk/Zip/DefaultIfEmpty(value)).
+                // client-tail reshape hidden deeper than the operator spine (e.g. inside
+                // a joined sub-source).
                 ThrowIfClientTailReshapePending(t, node.Method.Name);
                 return result;
             }

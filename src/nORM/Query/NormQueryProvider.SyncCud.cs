@@ -74,8 +74,12 @@ namespace nORM.Query
                     if (plan.ClientScalar)
                     {
                         // The post-materialize transform reduced the reshaped rows to a
-                        // single boxed aggregate value; unwrap it as the query result.
-                        result = list[0];
+                        // single boxed aggregate value; unwrap it as the query result,
+                        // coercing numeric mismatches like the server scalar path.
+                        var clientScalar = list[0];
+                        result = clientScalar is TResult typedScalar
+                            ? typedScalar
+                            : ConvertScalarResult<TResult>(clientScalar!);
                     }
                     else if (plan.SingleResult)
                     {

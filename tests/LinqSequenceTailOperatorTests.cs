@@ -364,4 +364,156 @@ public class LinqSequenceTailOperatorTests
             // Failing closed is acceptable; silently returning the first row is not.
         }
     }
+
+    // ── Scalar aggregates after a client-tail reshape evaluate in memory ─────
+
+    [Fact]
+    public async Task Sum_after_append_includes_the_appended_element()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var sum = await ctx.Query<SeqTailItem>().Append(extra).SumAsync(x => x.Value);
+
+        Assert.Equal(10 + 20 + 30 + 999, sum);
+    }
+
+    [Fact]
+    public async Task Min_and_max_after_prepend_see_the_prepended_element()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var low = new SeqTailItem { Name = "low", Value = -5 };
+        Assert.Equal(-5, await ctx.Query<SeqTailItem>().Prepend(low).MinAsync(x => x.Value));
+
+        var high = new SeqTailItem { Name = "high", Value = 999 };
+        Assert.Equal(999, await ctx.Query<SeqTailItem>().Prepend(high).MaxAsync(x => x.Value));
+    }
+
+    [Fact]
+    public async Task Average_after_append_matches_linq_to_objects()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 40 };
+        var average = await ctx.Query<SeqTailItem>().Append(extra).AverageAsync(x => x.Value);
+
+        Assert.Equal(25.0, average);
+    }
+
+    [Fact]
+    public async Task Min_after_default_if_empty_returns_the_default_value_on_empty_source()
+    {
+        var (cn, ctx) = CreateContext(0);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var fallback = new SeqTailItem { Name = "fallback", Value = 42 };
+        var min = await ctx.Query<SeqTailItem>().DefaultIfEmpty(fallback).MinAsync(x => x.Value);
+
+        Assert.Equal(42, min);
+    }
+
+    [Fact]
+    public async Task Any_after_append_sees_only_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+
+        // The appended element is the only one matching the predicate.
+        Assert.True(await ctx.Query<SeqTailItem>().Append(extra).AnyAsync(x => x.Value > 100));
+        Assert.False(await ctx.Query<SeqTailItem>().Append(extra).AnyAsync(x => x.Value > 1000));
+
+        // An empty source with an appended element is non-empty.
+        var (cn2, ctx2) = CreateContext(0);
+        using var _cn2 = cn2;
+        using var _ctx2 = ctx2;
+        Assert.True(await ctx2.Query<SeqTailItem>().Append(extra).AnyAsync());
+    }
+
+    [Fact]
+    public async Task All_after_prepend_is_falsified_by_the_prepended_element()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var outlier = new SeqTailItem { Name = "outlier", Value = -1 };
+        Assert.False(await ctx.Query<SeqTailItem>().Prepend(outlier).AllAsync(x => x.Value > 0));
+        Assert.True(await ctx.Query<SeqTailItem>().Prepend(outlier).AllAsync(x => x.Value > -10));
+    }
+
+    [Fact]
+    public async Task Any_after_chunk_reflects_chunk_cardinality()
+    {
+        var (cn, ctx) = CreateContext(5);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        Assert.True(await ctx.Query<SeqTailItem>().OrderBy(x => x.Id).Chunk(2).AnyAsync());
+
+        var (cn2, ctx2) = CreateContext(0);
+        using var _cn2 = cn2;
+        using var _ctx2 = ctx2;
+        Assert.False(await ctx2.Query<SeqTailItem>().OrderBy(x => x.Id).Chunk(2).AnyAsync());
+    }
+
+    [Fact]
+    public async Task Where_after_append_filters_the_reshaped_sequence_client_side()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+
+        // The appended element must pass through the same predicate as the rows.
+        var kept = await ctx.Query<SeqTailItem>().Append(extra).Where(x => x.Value > 15).ToListAsync();
+        Assert.Equal(new[] { 20, 30, 999 }, kept.Select(x => x.Value).ToArray());
+
+        var dropped = await ctx.Query<SeqTailItem>().Append(extra).Where(x => x.Value < 100).ToListAsync();
+        Assert.Equal(new[] { 10, 20, 30 }, dropped.Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public async Task Default_if_empty_after_append_sees_the_already_reshaped_sequence()
+    {
+        // Reshape transforms compose in operator order: Append runs first, so the
+        // sequence DefaultIfEmpty inspects is non-empty and no default is inserted.
+        var (cn, ctx) = CreateContext(0);
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var rows = await ctx.Query<SeqTailItem>().Append(extra).DefaultIfEmpty().ToListAsync();
+
+        var row = Assert.Single(rows);
+        Assert.Equal(999, row!.Value);
+    }
+
+    [Fact]
+    public void Sync_aggregates_after_append_use_the_reshaped_sequence()
+    {
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 40 };
+        var query = ctx.Query<SeqTailItem>().Append(extra);
+
+        Assert.Equal(100, query.Sum(x => x.Value));
+        Assert.Equal(40, query.Max(x => x.Value));
+        Assert.Equal(25.0, query.Average(x => x.Value));
+        Assert.True(query.Any(x => x.Value == 40));
+        Assert.False(query.All(x => x.Value < 40));
+    }
 }

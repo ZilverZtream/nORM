@@ -355,9 +355,14 @@ namespace nORM.Query
                     return output;
                 }
 
-                t._postMaterializeTransform = ApplyDefault;
-                t._postMaterializeElementType = elementType;
-                return t.Visit(node.Arguments[0]);
+                // Visit the source FIRST, then append. Setting the transform before the
+                // source walk gives inner translators (Where's client-tail filter branch,
+                // scalar aggregates) a false positive on "reshape pending", and an inner
+                // reshape like Append would compose in the wrong order — DefaultIfEmpty
+                // is the outer operator, so it must see the already-reshaped rows.
+                var source = t.Visit(node.Arguments[0]);
+                t.AppendPostMaterializeTransform(ApplyDefault, elementType);
+                return source;
             }
         }
 

@@ -264,9 +264,12 @@ namespace nORM.Query
                 return node;
             }
 
-            Visit(sourceQuery);
+            var visitedSource = Visit(sourceQuery);
             // A pending client-tail reshape means the server aggregate would ignore
-            // the reshaped sequence. Fail closed instead of returning a wrong value.
+            // the reshaped sequence: evaluate the aggregate in memory over the
+            // reshaped rows, and fail closed only when no Enumerable equivalent exists.
+            if (TryAppendClientScalarAggregate(node))
+                return visitedSource;
             ThrowIfClientTailReshapePending(this, node.Method.Name);
             _methodName = node.Method.Name;
 

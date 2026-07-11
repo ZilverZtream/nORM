@@ -723,8 +723,12 @@ namespace nORM.Query
 
             if (plan.ClientScalar)
             {
-                // The transform reduced the reshaped rows to a single boxed aggregate.
-                return (TResult)list[0]!;
+                // The transform reduced the reshaped rows to a single boxed aggregate;
+                // coerce numeric mismatches like the server scalar path.
+                var clientScalar = list[0];
+                return clientScalar is TResult typedScalar
+                    ? typedScalar
+                    : ConvertScalarResult<TResult>(clientScalar!);
             }
             if (plan.SingleResult)
             {

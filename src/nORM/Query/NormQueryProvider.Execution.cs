@@ -486,8 +486,14 @@ namespace nORM.Query
             if (plan.ClientScalar)
             {
                 // The post-materialize transform reduced the reshaped rows to a single
-                // boxed aggregate value; unwrap it as the query result.
-                return Task.FromResult((TResult)list[0]!);
+                // boxed aggregate value; unwrap it as the query result. Coerce numeric
+                // mismatches like the server scalar path does — nORM's typed aggregate
+                // wrappers can declare a narrower result than the LINQ operator computes
+                // (e.g. AverageAsync over ints declares int while Average yields double).
+                var clientScalar = list[0];
+                return Task.FromResult(clientScalar is TResult typedScalar
+                    ? typedScalar
+                    : ConvertScalarResult<TResult>(clientScalar!));
             }
             if (plan.SingleResult)
             {
@@ -533,8 +539,12 @@ namespace nORM.Query
             if (plan.ClientScalar)
             {
                 // The post-materialize transform reduced the reshaped rows to a single
-                // boxed aggregate value; unwrap it as the query result.
-                return (TResult)list[0]!;
+                // boxed aggregate value; unwrap it as the query result, coercing numeric
+                // mismatches like the server scalar path (see ExecuteListPlanSyncWrapped).
+                var clientScalar = list[0];
+                return clientScalar is TResult typedScalar
+                    ? typedScalar
+                    : ConvertScalarResult<TResult>(clientScalar!);
             }
             if (plan.SingleResult)
             {
