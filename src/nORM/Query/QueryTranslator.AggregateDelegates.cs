@@ -80,7 +80,9 @@ namespace nORM.Query
                 // evaluate All in memory. The source has been visited at this point, so
                 // falling through to SQL generation is never valid — fail closed if
                 // client evaluation is impossible.
-                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
+                if (SourceHasClientTailReshape(node.Arguments[0])
+                    || SourceHasGroupJoinResultTail(node.Arguments[0])
+                    || SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     var source = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientScalarAggregate(node))

@@ -34,10 +34,12 @@ namespace nORM.Query
                     t.AppendPostMaterializeTake(clientTake);
                     return source;
                 }
-                // Non-literal count in tail mode (reshape or group-join result): a server
-                // LIMIT would truncate pre-reshape rows or a group's children, so run
-                // Take in memory over the assembled sequence.
-                if (t.IsPostMaterializeTailMode && t.TryAppendClientSequenceOperator(node))
+                // Non-literal count in tail mode (reshape, group-join, or raw GroupBy
+                // result): a server LIMIT would truncate pre-reshape rows or a group's
+                // children, so run Take in memory over the assembled sequence. The Try
+                // method self-gates on tail mode and installs a pending raw-GroupBy
+                // grouping transform first.
+                if (t.TryAppendClientSequenceOperator(node))
                     return source;
 
                 if (t.TryBindPagingParameter(node.Arguments[1], out var tName))
@@ -72,8 +74,9 @@ namespace nORM.Query
                 var source = t.Visit(node.Arguments[0]);
                 // Skip in tail mode must drop assembled elements, not server rows — a
                 // server OFFSET would let a prepended element bypass the skip, or
-                // truncate a group-join parent's children mid-group.
-                if (t.IsPostMaterializeTailMode && t.TryAppendClientSequenceOperator(node))
+                // truncate a group's elements mid-group. The Try method self-gates on
+                // tail mode and installs a pending raw-GroupBy grouping transform first.
+                if (t.TryAppendClientSequenceOperator(node))
                     return source;
                 // Take-then-Skip is algebraically equivalent to Skip(m).Take(n-m): both
                 // return rows in the half-open range [m, n). Rewrite by shrinking the
@@ -154,7 +157,9 @@ namespace nORM.Query
                 // neither the ordering requirement nor the window-function SQL applies.
                 // Once the source is visited, falling through to SQL generation is
                 // never valid.
-                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
+                if (SourceHasClientTailReshape(node.Arguments[0])
+                    || SourceHasGroupJoinResultTail(node.Arguments[0])
+                    || SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     var reshapedSource = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientSequenceOperator(node))
@@ -313,8 +318,9 @@ namespace nORM.Query
             // TakeLast/SkipLast in tail mode must count from the end of the assembled
             // sequence (an appended element IS the last one; a group is one element),
             // so the flip-order-and-page SQL shortcut must not run — evaluate in
-            // memory instead.
-            if (t.IsPostMaterializeTailMode && t.TryAppendClientSequenceOperator(node))
+            // memory instead. The Try method self-gates on tail mode and installs a
+            // pending raw-GroupBy grouping transform first.
+            if (t.TryAppendClientSequenceOperator(node))
                 return source;
 
             // Reject existing _take/_skip composition for now -- combining tail-paging

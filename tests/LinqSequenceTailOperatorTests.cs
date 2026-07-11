@@ -817,6 +817,31 @@ public class LinqSequenceTailOperatorTests
     }
 
     [Fact]
+    public void Set_operations_after_reshape_do_not_silently_drop_the_reshaped_element()
+    {
+        // A SQL set-op over the server rows cannot see the appended element; the
+        // composition must either include it correctly or fail closed — silently
+        // losing it is never acceptable.
+        var (cn, ctx) = CreateContext(3); // values 10, 20, 30
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        var extra = new SeqTailItem { Name = "extra", Value = 999 };
+        var second = ctx.Query<SeqTailItem>().Where(x => x.Value > 20);
+
+        try
+        {
+            var combined = ctx.Query<SeqTailItem>().Append(extra).Concat(second).ToList();
+            Assert.Contains(combined, x => x.Value == 999);
+            Assert.Equal(5, combined.Count); // 3 rows + appended + 1 concat row
+        }
+        catch (NormUnsupportedFeatureException)
+        {
+            // Failing closed is acceptable; silently dropping the element is not.
+        }
+    }
+
+    [Fact]
     public void Sync_aggregates_after_append_use_the_reshaped_sequence()
     {
         var (cn, ctx) = CreateContext(3); // values 10, 20, 30

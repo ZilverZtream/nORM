@@ -145,6 +145,10 @@ namespace nORM.Query
             }
 
             _postMaterializeTransform = Transform;
+            // Mark tail mode with the grouped element type so downstream client
+            // evaluation (terminals and sequence operators over the IGroupings)
+            // sees the correct element shape.
+            _postMaterializeElementType = groupingType;
         }
     }
 }

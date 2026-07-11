@@ -31,7 +31,9 @@ namespace nORM.Query
                 // assembled rows with LINQ-to-Objects equality (an appended duplicate
                 // must dedup too; group-join results only exist after grouping), so SQL
                 // DISTINCT — which sees only flat server rows — must not be set.
-                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
+                if (SourceHasClientTailReshape(node.Arguments[0])
+                    || SourceHasGroupJoinResultTail(node.Arguments[0])
+                    || SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     var reshapedSource = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientSequenceOperator(node))
@@ -104,9 +106,14 @@ namespace nORM.Query
                 var revSource = t.Visit(node.Arguments[0]);
                 // Reverse after a reshape must reverse the reshaped sequence (a prepended
                 // element becomes the last one), not flip the server ORDER BY — the
-                // transform runs after materialization and would keep its position.
-                if (t._postMaterializeTransform != null && t.TryAppendClientSequenceOperator(node))
-                    return revSource;
+                // transform runs after materialization and would keep its position. The
+                // Try method self-gates on tail mode and installs a pending raw-GroupBy
+                // grouping transform first.
+                if (t._postMaterializeTransform != null || t._streamingGroupByKeySelector != null)
+                {
+                    if (t.TryAppendClientSequenceOperator(node))
+                        return revSource;
+                }
                 if (t._orderBy.Count > 0)
                 {
                     for (int i = 0; i < t._orderBy.Count; i++)
@@ -164,6 +171,46 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Concat with a client-tail reshape in either arm: the left arm translates and
+        /// executes normally (carrying its reshape transform); the right arm's query
+        /// executes through its own provider when the transform runs, and its rows are
+        /// attached after the left arm's — exact LINQ Concat semantics, one round trip
+        /// per arm.
+        /// </summary>
+        private static Expression TranslateClientConcat(QueryTranslator t, MethodCallExpression node)
+        {
+            IQueryable secondQuery;
+            if (TryGetConstantValue(node.Arguments[1], out var secondConst) && secondConst is IQueryable direct)
+            {
+                secondQuery = direct;
+            }
+            else if (!HasFreeParameterReference(node.Arguments[1]))
+            {
+                secondQuery = (IQueryable)Expression.Lambda(node.Arguments[1]).Compile().DynamicInvoke()!;
+            }
+            else
+            {
+                throw new NormUnsupportedFeatureException(
+                    "Concat requires the second sequence to be built from captured state; a row-derived query has no translation.");
+            }
+
+            var source = t.Visit(node.Arguments[0]);
+            var elementType = node.Type.GetGenericArguments()[0];
+            var capturedSecond = secondQuery;
+
+            t.AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var output = CreateRuntimeList(elementType, rows.Count);
+                foreach (var row in rows)
+                    output.Add(row);
+                foreach (var item in (System.Collections.IEnumerable)capturedSecond)
+                    output.Add(item);
+                return output;
+            }, elementType);
+            return source;
+        }
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class SetOperationTranslator : IMethodCallTranslator
@@ -177,6 +224,27 @@ namespace nORM.Query
             /// <returns>The original method call expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // A client-tail reshape in either arm never reaches the set-op SQL — the
+                // reshaped element exists only after materialization, so the SQL set-op
+                // would silently drop it. Concat has exact client semantics (no dedup):
+                // translate the left arm as the row plan and attach the right arm's rows
+                // in the transform. Union/Intersect/Except fail closed: their dedup
+                // compares column VALUES in SQL but object references in CLR, so client
+                // evaluation would silently change semantics for untracked results.
+                bool leftReshaped = SourceHasClientTailReshape(node.Arguments[0]);
+                bool rightReshaped = SourceHasClientTailReshape(node.Arguments[1]);
+                if (leftReshaped || rightReshaped)
+                {
+                    if (node.Method.Name != nameof(Queryable.Concat))
+                    {
+                        throw new NormUnsupportedFeatureException(
+                            $"{node.Method.Name} with a client-materialized sequence operator (Append, Prepend, Chunk, Zip, " +
+                            "DefaultIfEmpty with a default value) in either arm is not supported: SQL set semantics dedup by " +
+                            "column values while in-memory dedup compares references. Materialize both sequences first " +
+                            $"(e.g. ToListAsync) and use LINQ-to-Objects {node.Method.Name}.");
+                    }
+                    return TranslateClientConcat(t, node);
+                }
                 // SQL parsers reject ORDER BY / LIMIT / OFFSET on a bare set-op arm.
                 // SQLite is strictest ("ORDER BY clause should come after UNION ALL
                 // not before"); SqlServer and Postgres tolerate some forms but the
@@ -306,12 +374,27 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // A client-tail reshaped or group-join-result source must divert before
-                // any EXISTS/IN SQL is built: translate the source as the row plan and
-                // evaluate the quantifier in memory. The source has been visited at this
-                // point, so falling through to SQL generation is never valid — fail
-                // closed if client evaluation is impossible.
-                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
+                // Any() directly over a raw streaming GroupBy: a group exists exactly
+                // when a row exists, so the quantifier collapses to Any() over the
+                // ungrouped rows and stays fully server-side.
+                if (node.Method.Name == nameof(Queryable.Any)
+                    && node.Arguments.Count == 1
+                    && node.Arguments[0] is MethodCallExpression gbAny
+                    && IsRawStreamingGroupByShape(gbAny))
+                {
+                    var rowElementType = gbAny.Arguments[0].Type.GetGenericArguments()[0];
+                    var rewritten = Expression.Call(typeof(Queryable), nameof(Queryable.Any),
+                        new[] { rowElementType }, gbAny.Arguments[0]);
+                    return t.Visit(rewritten);
+                }
+                // A client-tail reshaped, group-join-result, or raw-GroupBy source must
+                // divert before any EXISTS/IN SQL is built: translate the source as the
+                // row plan and evaluate the quantifier in memory. The source has been
+                // visited at this point, so falling through to SQL generation is never
+                // valid — fail closed if client evaluation is impossible.
+                if (SourceHasClientTailReshape(node.Arguments[0])
+                    || SourceHasGroupJoinResultTail(node.Arguments[0])
+                    || SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     var source = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientScalarAggregate(node))

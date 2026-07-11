@@ -497,13 +497,40 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 t._isAggregate = true;
+                // Count directly over a raw streaming GroupBy counts GROUPS — one per
+                // distinct key, including a null-key group — which is exactly
+                // Select(key).Distinct().Count() and stays fully server-side. (COUNT
+                // over the flat rows would count rows; COUNT(DISTINCT key) would drop
+                // the null-key group.)
+                if (node.Arguments.Count == 1
+                    && node.Arguments[0] is MethodCallExpression gbDirect
+                    && IsRawStreamingGroupByShape(gbDirect)
+                    && StripQuotes(gbDirect.Arguments[1]) is LambdaExpression gbKeyLambda)
+                {
+                    // Ordering never affects group membership, and a dangling ORDER BY
+                    // column breaks the DISTINCT derived-table wrap — strip the top run
+                    // of ordering operators feeding the GroupBy. Orderings below a
+                    // Take/Skip stay (they decide which rows the window keeps).
+                    var gbSource = StripLeadingOrderings(gbDirect.Arguments[0]);
+                    var srcElementType = gbSource.Type.GetGenericArguments()[0];
+                    var keyType = gbKeyLambda.Body.Type;
+                    var keyProjection = Expression.Call(typeof(Queryable), nameof(Queryable.Select),
+                        new[] { srcElementType, keyType }, gbSource, gbDirect.Arguments[1]);
+                    var distinctKeys = Expression.Call(typeof(Queryable), nameof(Queryable.Distinct),
+                        new[] { keyType }, keyProjection);
+                    var rewritten = Expression.Call(typeof(Queryable), node.Method.Name,
+                        new[] { keyType }, distinctKeys);
+                    return t.Visit(rewritten);
+                }
                 // A reshape anywhere in the spine (including below a Take/Skip window)
                 // must divert before the windowed COUNT(*) wrap — the sub-plan translation
                 // would handle the window client-side, leaving the wrap counting a
-                // sub-SELECT that no longer carries the LIMIT. A group-join result tail
-                // must divert too: COUNT(*) over the flat joined rows counts children,
-                // not groups.
-                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
+                // sub-SELECT that no longer carries the LIMIT. Group-join and raw-GroupBy
+                // result tails must divert too: COUNT(*) over the flat rows counts
+                // children or rows, not groups.
+                if (SourceHasClientTailReshape(node.Arguments[0])
+                    || SourceHasGroupJoinResultTail(node.Arguments[0])
+                    || SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     var reshapedSource = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientCountAggregate(node))

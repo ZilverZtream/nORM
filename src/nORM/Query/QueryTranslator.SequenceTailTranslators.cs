@@ -34,8 +34,32 @@ namespace nORM.Query
         /// reshape. An optional predicate is compiled against the reshaped element type
         /// and applied per row, matching LINQ-to-Objects semantics.
         /// </summary>
+        /// <summary>
+        /// Raw streaming GroupBy defers installing its client grouping transform until
+        /// Generate() so aggregate-projection shapes can keep SQL GROUP BY. Terminals
+        /// and sequence operators that divert to client evaluation need the transform
+        /// installed NOW — their rows must already be IGroupings when the client
+        /// operator runs. Mirrors the Generate()-time condition, except _isAggregate,
+        /// which the diverting terminal itself set.
+        /// </summary>
+        private void EnsurePendingStreamingGroupTransform()
+        {
+            if (_streamingGroupByKeySelector == null
+                || _postMaterializeTransform != null
+                || _groupBy.Count == 0
+                || _sql.Length > 0
+                || _projection != null
+                || _windowedGroupBySubSql != null
+                || _having.Length > 0)
+                return;
+            _groupBy.Clear();
+            InstallGroupingTransform(_streamingGroupByKeySelector, _groupByElementSelector);
+            _streamingGroupByKeySelector = null;
+        }
+
         private bool TryAppendClientCountAggregate(MethodCallExpression node)
         {
+            EnsurePendingStreamingGroupTransform();
             // Applies in any post-materialize tail mode: a pending reshape transform, or
             // a group-join result shape whose rows are assembled after materialization.
             if (!IsPostMaterializeTailMode)
@@ -127,6 +151,7 @@ namespace nORM.Query
         /// </summary>
         private bool TryAppendClientScalarAggregate(MethodCallExpression node)
         {
+            EnsurePendingStreamingGroupTransform();
             // Applies in any post-materialize tail mode: a pending reshape transform, or
             // a group-join result shape whose rows are assembled after materialization.
             if (!IsPostMaterializeTailMode)
@@ -182,6 +207,7 @@ namespace nORM.Query
         /// </summary>
         private bool TryAppendClientSequenceOperator(MethodCallExpression node)
         {
+            EnsurePendingStreamingGroupTransform();
             // Applies in any post-materialize tail mode: a pending reshape transform, or
             // a group-join result shape whose rows are assembled after materialization.
             if (!IsPostMaterializeTailMode)
@@ -291,7 +317,9 @@ namespace nORM.Query
         /// </summary>
         private static Expression? TryTranslateReshapedScalarTerminal(QueryTranslator t, MethodCallExpression node)
         {
-            if (!SourceHasClientTailReshape(node.Arguments[0]) && !SourceHasGroupJoinResultTail(node.Arguments[0]))
+            if (!SourceHasClientTailReshape(node.Arguments[0])
+                && !SourceHasGroupJoinResultTail(node.Arguments[0])
+                && !SourceHasRawGroupByResultTail(node.Arguments[0]))
                 return null;
             var source = t.Visit(node.Arguments[0]);
             if (t.TryAppendClientScalarAggregate(node))
@@ -310,6 +338,66 @@ namespace nORM.Query
         /// sequence operators over these sources must divert to client evaluation
         /// BEFORE emitting any server-side shape.
         /// </summary>
+        /// <summary>
+        /// Detects a source spine ending in a raw streaming GroupBy — key-only (or key +
+        /// one-parameter element selector) with no downstream projection, which yields
+        /// IGrouping elements grouped client-side. Server-side COUNT/LIMIT/OFFSET on the
+        /// flat rows would count rows instead of groups or truncate a group's elements.
+        /// A Select/SelectMany above the GroupBy means the projection path applies and
+        /// SQL GROUP BY handles it.
+        /// </summary>
+        private static bool SourceHasRawGroupByResultTail(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case nameof(Queryable.GroupBy):
+                        return IsRawStreamingGroupByShape(mce);
+                    case nameof(Queryable.Select):
+                    case nameof(Queryable.SelectMany):
+                        return false;
+                }
+                if (mce.Arguments.Count == 0)
+                    break;
+                current = mce.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Removes the top run of OrderBy/OrderByDescending/ThenBy/ThenByDescending
+        /// calls from a source spine. Safe only where ordering cannot change results —
+        /// e.g. rows feeding a group-membership computation.
+        /// </summary>
+        private static Expression StripLeadingOrderings(Expression source)
+        {
+            while (source is MethodCallExpression mce
+                && mce.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                    or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending)
+                && mce.Arguments.Count > 0)
+            {
+                source = mce.Arguments[0];
+            }
+            return source;
+        }
+
+        /// <summary>
+        /// Key-only GroupBy, or key + one-parameter element selector — the shapes that
+        /// stream IGroupings. Result-selector shapes translate to SQL GROUP BY.
+        /// </summary>
+        private static bool IsRawStreamingGroupByShape(MethodCallExpression groupBy)
+        {
+            if (groupBy.Method.Name != nameof(Queryable.GroupBy))
+                return false;
+            if (groupBy.Arguments.Count == 2)
+                return true;
+            return groupBy.Arguments.Count == 3
+                && StripQuotes(groupBy.Arguments[2]) is LambdaExpression third
+                && third.Parameters.Count == 1;
+        }
+
         private static bool SourceHasGroupJoinResultTail(Expression source)
         {
             var current = source;
