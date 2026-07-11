@@ -39,7 +39,11 @@ public partial class CliIntegrationTests
             return arguments;
         }
 
-        return arguments + " --disable-build-servers";
+        // GeneratePackageOnBuild on the referenced nORM project makes every spawned
+        // build re-pack nORM.<version>.nupkg into the same output path; two CLI tests
+        // building concurrently then collide on the file lock. The tests never need
+        // packages — the release gate packs explicitly.
+        return arguments + " --disable-build-servers -p:GeneratePackageOnBuild=false";
     }
 
     private static CliResult RunProcess(string fileName, string arguments, string workingDirectory)
