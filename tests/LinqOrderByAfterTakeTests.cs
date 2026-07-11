@@ -280,6 +280,27 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Equal(2, first.Id);
     }
 
+    private static readonly Func<DbContext, int, Task<System.Collections.Generic.List<OatRow>>> _compiledWindowedFilter =
+        Norm.CompileQuery((DbContext c, int min) => c.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V >= min));
+
+    [Fact]
+    public async Task Compiled_windowed_filter_chain_binds_parameters_across_the_wrap_boundary()
+    {
+        // The compiled parameter lives in the OUTER predicate while the window's
+        // paging is translated inside the sub-plan; the parameter extractor must
+        // bind the closure value across the wrap, and different arguments must not
+        // replay each other's plans.
+        var atLeast35 = await _compiledWindowedFilter(_ctx, 35);
+        Assert.Equal(new[] { 1, 2 }, atLeast35.Select(r => r.Id).OrderBy(i => i).ToArray());
+
+        var atLeast45 = await _compiledWindowedFilter(_ctx, 45);
+        var only = Assert.Single(atLeast45);
+        Assert.Equal(1, only.Id);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {
