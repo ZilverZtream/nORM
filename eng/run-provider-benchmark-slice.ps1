@@ -173,7 +173,10 @@ finally {
 exit $exitCode
 '@ | Set-Content -LiteralPath $runnerPath -Encoding UTF8
 
-    $process = Start-Process -FilePath 'powershell' `
+    # Launch the same PowerShell engine that is running this script so the runner
+    # works on Windows PowerShell and on pwsh under Linux/macOS CI.
+    $powerShellHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $process = Start-Process -FilePath $powerShellHost `
         -ArgumentList (@(
             '-NoProfile',
             '-ExecutionPolicy', 'Bypass',

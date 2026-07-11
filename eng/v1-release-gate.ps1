@@ -233,8 +233,12 @@ exit $exitCode
 
         Write-Host "Test step timeout: $TestStepTimeoutMinutes minute(s)"
         Write-Host "Test hang timeout: $TestStepHangTimeoutMinutes minute(s)"
+        # Launch the same PowerShell engine that is running this script so the
+        # runner works on Windows PowerShell and on pwsh under Linux/macOS CI,
+        # where no executable named 'powershell' exists.
+        $powerShellHost = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
         $startProcessArgs = @{
-            FilePath = 'powershell'
+            FilePath = $powerShellHost
             ArgumentList = @(
                 '-NoProfile',
                 '-ExecutionPolicy', 'Bypass',

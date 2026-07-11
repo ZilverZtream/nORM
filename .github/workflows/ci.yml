@@ -41,14 +41,16 @@ jobs:
           if ($actual -match '(preview|rc|alpha|beta)') { throw "Preview .NET SDK is not allowed for v1 release gates: $actual." }
 
       - name: Restore dependencies
-        run: dotnet restore tests/
+        run: dotnet restore nORM.sln
 
+      # The full solution builds in Release because the CLI and scaffolding tests
+      # execute the Release-built dotnet-norm binaries from src/.
       - name: Build
-        run: dotnet build tests/ --no-restore --nologo -v quiet
+        run: dotnet build nORM.sln --no-restore -c Release --nologo -v quiet
 
       - name: Test
         run: >
-          dotnet test tests/ --no-build --nologo
+          dotnet test tests/ --no-build -c Release --nologo
           --logger "trx;LogFileName=test-results.trx"
           --logger "console;verbosity=normal"
 
