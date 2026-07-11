@@ -23,7 +23,7 @@ MySQL evidence before they are treated as release-green.
 | `Select` with custom client logic | `tests/ClientEvaluationPolicyTests.cs`, `tests/QueryExecutorExtendedCoverageTests.cs`, `tests/LinqClientProjectionTests.cs`, `tests/LiveProviderClientEvaluationParityTests.cs` |
 | `OrderBy`, `ThenBy` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
-| `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderSkipTakeParityTests.cs` |
+| `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderSkipTakeParityTests.cs`, `tests/LinqWhereAfterTakeTests.cs`, `tests/LinqOrderByAfterTakeTests.cs` (operators after windows, any spine shape), `tests/LiveProviderWindowedChainParityTests.cs` (windowed-chain wraps on all providers) |
 | `TakeWhile` / `SkipWhile` | `tests/LinqTakeSkipWhileProviderMobileTests.cs`, `tests/LiveProviderTakeSkipWhileParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
 | `SequenceEqual` | `tests/LinqSequenceEqualProviderMobileTests.cs`, `tests/LiveProviderSequenceEqualParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
 | `Distinct` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryComplexityTests.cs`, `tests/LinqGuidAndDistinctTests.cs` |
