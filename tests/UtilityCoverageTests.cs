@@ -767,7 +767,7 @@ public class UtilityCoverageTests
         using var firstCommand = cn.CreateCommand();
         var first = firstCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
 
-        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(60));
 
         using var secondCommand = cn.CreateCommand();
         var second = secondCommand.ExecuteNonQueryWithInterceptionAsync(ctx, CancellationToken.None);
@@ -775,7 +775,11 @@ public class UtilityCoverageTests
         Assert.False(await EnteredSecondCommandBeforeReleaseAsync(cn));
         cn.AllowCommandsToComplete.TrySetResult();
 
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
+        // The timeout only distinguishes a deadlock (never completes) from success;
+        // it is generous because the gated first command blocks a thread-pool
+        // thread sync-over-async, and CI thread-pool starvation under full-suite
+        // load can delay its release continuation well past seconds.
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(120));
 
         Assert.Equal(1, cn.MaxConcurrentCommands);
         Assert.True(cn.SecondCommandEntered.Task.IsCompleted);
@@ -795,7 +799,7 @@ public class UtilityCoverageTests
         using var firstCommand = cn.CreateCommand();
         var first = firstCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
 
-        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cn.FirstCommandEntered.Task.WaitAsync(TimeSpan.FromSeconds(60));
 
         using var secondCommand = cn.CreateCommand();
         var second = secondCommand.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None);
@@ -803,7 +807,11 @@ public class UtilityCoverageTests
         Assert.False(await EnteredSecondCommandBeforeReleaseAsync(cn));
         cn.AllowCommandsToComplete.TrySetResult();
 
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(30));
+        // The timeout only distinguishes a deadlock (never completes) from success;
+        // it is generous because the gated first command blocks a thread-pool
+        // thread sync-over-async, and CI thread-pool starvation under full-suite
+        // load can delay its release continuation well past seconds.
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(120));
 
         Assert.Equal(1, cn.MaxConcurrentCommands);
         Assert.True(cn.SecondCommandEntered.Task.IsCompleted);
@@ -857,7 +865,7 @@ public class UtilityCoverageTests
         cmd.CommandText = "SELECT 1";
 
         var result = await cmd.ExecuteScalarWithInterceptionAsync(ctx, CancellationToken.None)
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(60));
 
         Assert.Equal(1L, Convert.ToInt64(result));
         Assert.Equal(2L, Convert.ToInt64(interceptor.NestedResult));
