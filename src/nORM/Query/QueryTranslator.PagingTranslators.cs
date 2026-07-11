@@ -34,9 +34,10 @@ namespace nORM.Query
                     t.AppendPostMaterializeTake(clientTake);
                     return source;
                 }
-                // Non-literal count after a reshape: a server LIMIT would truncate
-                // pre-reshape rows, so run Take in memory over the reshaped sequence.
-                if (t._postMaterializeTransform != null && t.TryAppendClientSequenceOperator(node))
+                // Non-literal count in tail mode (reshape or group-join result): a server
+                // LIMIT would truncate pre-reshape rows or a group's children, so run
+                // Take in memory over the assembled sequence.
+                if (t.IsPostMaterializeTailMode && t.TryAppendClientSequenceOperator(node))
                     return source;
 
                 if (t.TryBindPagingParameter(node.Arguments[1], out var tName))
@@ -69,9 +70,10 @@ namespace nORM.Query
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
                 var source = t.Visit(node.Arguments[0]);
-                // Skip after a reshape must drop reshaped elements, not server rows —
-                // a server OFFSET would let a prepended element bypass the skip.
-                if (t._postMaterializeTransform != null && t.TryAppendClientSequenceOperator(node))
+                // Skip in tail mode must drop assembled elements, not server rows — a
+                // server OFFSET would let a prepended element bypass the skip, or
+                // truncate a group-join parent's children mid-group.
+                if (t.IsPostMaterializeTailMode && t.TryAppendClientSequenceOperator(node))
                     return source;
                 // Take-then-Skip is algebraically equivalent to Skip(m).Take(n-m): both
                 // return rows in the half-open range [m, n). Rewrite by shrinking the
@@ -147,11 +149,12 @@ namespace nORM.Query
         {
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // A reshaped source evaluates TakeWhile/SkipWhile in memory over the
-                // reshaped rows (already in result order), so neither the ordering
-                // requirement nor the window-function SQL applies. Once the source is
-                // visited, falling through to SQL generation is never valid.
-                if (SourceHasClientTailReshape(node.Arguments[0]))
+                // A reshaped or group-join-result source evaluates TakeWhile/SkipWhile
+                // in memory over the assembled rows (already in result order), so
+                // neither the ordering requirement nor the window-function SQL applies.
+                // Once the source is visited, falling through to SQL generation is
+                // never valid.
+                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
                 {
                     var reshapedSource = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientSequenceOperator(node))
@@ -307,10 +310,11 @@ namespace nORM.Query
             // Walk the source first so any upstream OrderBy populates _orderBy.
             var source = t.Visit(node.Arguments[0]);
 
-            // TakeLast/SkipLast after a reshape must count from the end of the reshaped
-            // sequence (an appended element IS the last one), so the flip-order-and-page
-            // SQL shortcut must not run — evaluate in memory instead.
-            if (t._postMaterializeTransform != null && t.TryAppendClientSequenceOperator(node))
+            // TakeLast/SkipLast in tail mode must count from the end of the assembled
+            // sequence (an appended element IS the last one; a group is one element),
+            // so the flip-order-and-page SQL shortcut must not run — evaluate in
+            // memory instead.
+            if (t.IsPostMaterializeTailMode && t.TryAppendClientSequenceOperator(node))
                 return source;
 
             // Reject existing _take/_skip composition for now -- combining tail-paging

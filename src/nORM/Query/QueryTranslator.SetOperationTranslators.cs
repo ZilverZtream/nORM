@@ -27,10 +27,11 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // Distinct after a reshape runs in memory over the reshaped rows with
-                // LINQ-to-Objects equality (an appended duplicate must dedup too), so
-                // SQL DISTINCT — which sees only server rows — must not be set.
-                if (SourceHasClientTailReshape(node.Arguments[0]))
+                // Distinct after a reshape or group-join result runs in memory over the
+                // assembled rows with LINQ-to-Objects equality (an appended duplicate
+                // must dedup too; group-join results only exist after grouping), so SQL
+                // DISTINCT — which sees only flat server rows — must not be set.
+                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
                 {
                     var reshapedSource = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientSequenceOperator(node))
@@ -305,12 +306,12 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // A client-tail reshaped source must divert before any EXISTS/IN SQL is
-                // built: translate the source as the row plan and evaluate the quantifier
-                // in memory. The source has been visited at this point, so falling through
-                // to SQL generation is never valid — fail closed if client evaluation is
-                // impossible.
-                if (SourceHasClientTailReshape(node.Arguments[0]))
+                // A client-tail reshaped or group-join-result source must divert before
+                // any EXISTS/IN SQL is built: translate the source as the row plan and
+                // evaluate the quantifier in memory. The source has been visited at this
+                // point, so falling through to SQL generation is never valid — fail
+                // closed if client evaluation is impossible.
+                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
                 {
                     var source = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientScalarAggregate(node))

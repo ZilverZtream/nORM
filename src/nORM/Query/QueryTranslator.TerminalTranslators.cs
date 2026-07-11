@@ -500,8 +500,10 @@ namespace nORM.Query
                 // A reshape anywhere in the spine (including below a Take/Skip window)
                 // must divert before the windowed COUNT(*) wrap — the sub-plan translation
                 // would handle the window client-side, leaving the wrap counting a
-                // sub-SELECT that no longer carries the LIMIT.
-                if (SourceHasClientTailReshape(node.Arguments[0]))
+                // sub-SELECT that no longer carries the LIMIT. A group-join result tail
+                // must divert too: COUNT(*) over the flat joined rows counts children,
+                // not groups.
+                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
                 {
                     var reshapedSource = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientCountAggregate(node))

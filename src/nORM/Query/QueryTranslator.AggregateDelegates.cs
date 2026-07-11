@@ -75,11 +75,12 @@ namespace nORM.Query
             /// <returns>The translated expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                // A client-tail reshaped source must divert before any NOT EXISTS SQL is
-                // built: translate the source as the row plan and evaluate All in memory.
-                // The source has been visited at this point, so falling through to SQL
-                // generation is never valid — fail closed if client evaluation is impossible.
-                if (SourceHasClientTailReshape(node.Arguments[0]))
+                // A client-tail reshaped or group-join-result source must divert before
+                // any NOT EXISTS SQL is built: translate the source as the row plan and
+                // evaluate All in memory. The source has been visited at this point, so
+                // falling through to SQL generation is never valid — fail closed if
+                // client evaluation is impossible.
+                if (SourceHasClientTailReshape(node.Arguments[0]) || SourceHasGroupJoinResultTail(node.Arguments[0]))
                 {
                     var source = t.Visit(node.Arguments[0]);
                     if (t.TryAppendClientScalarAggregate(node))

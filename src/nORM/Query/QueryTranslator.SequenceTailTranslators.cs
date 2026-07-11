@@ -36,7 +36,9 @@ namespace nORM.Query
         /// </summary>
         private bool TryAppendClientCountAggregate(MethodCallExpression node)
         {
-            if (_postMaterializeTransform == null)
+            // Applies in any post-materialize tail mode: a pending reshape transform, or
+            // a group-join result shape whose rows are assembled after materialization.
+            if (!IsPostMaterializeTailMode)
                 return false;
 
             Func<object?, bool>? predicate = null;
@@ -125,7 +127,9 @@ namespace nORM.Query
         /// </summary>
         private bool TryAppendClientScalarAggregate(MethodCallExpression node)
         {
-            if (_postMaterializeTransform == null)
+            // Applies in any post-materialize tail mode: a pending reshape transform, or
+            // a group-join result shape whose rows are assembled after materialization.
+            if (!IsPostMaterializeTailMode)
                 return false;
 
             var enumerableMethod = FindEnumerableEquivalent(node.Method);
@@ -178,7 +182,9 @@ namespace nORM.Query
         /// </summary>
         private bool TryAppendClientSequenceOperator(MethodCallExpression node)
         {
-            if (_postMaterializeTransform == null)
+            // Applies in any post-materialize tail mode: a pending reshape transform, or
+            // a group-join result shape whose rows are assembled after materialization.
+            if (!IsPostMaterializeTailMode)
                 return false;
 
             var enumerableMethod = FindEnumerableEquivalent(node.Method);
@@ -285,7 +291,7 @@ namespace nORM.Query
         /// </summary>
         private static Expression? TryTranslateReshapedScalarTerminal(QueryTranslator t, MethodCallExpression node)
         {
-            if (!SourceHasClientTailReshape(node.Arguments[0]))
+            if (!SourceHasClientTailReshape(node.Arguments[0]) && !SourceHasGroupJoinResultTail(node.Arguments[0]))
                 return null;
             var source = t.Visit(node.Arguments[0]);
             if (t.TryAppendClientScalarAggregate(node))
@@ -293,6 +299,34 @@ namespace nORM.Query
             ThrowIfClientTailReshapePending(t, node.Method.Name);
             throw new NormUnsupportedFeatureException(
                 $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+        }
+
+        /// <summary>
+        /// Detects a source spine ending in a group-join RESULT shape (GroupJoin whose
+        /// groups survive into the output, not the GroupJoin+SelectMany flattening that
+        /// translates fully to SQL joins). Group-join results are assembled after
+        /// materialization, so server-side LIMIT/OFFSET/DISTINCT on the flat joined
+        /// rows would truncate or dedup a parent's children mid-group — terminals and
+        /// sequence operators over these sources must divert to client evaluation
+        /// BEFORE emitting any server-side shape.
+        /// </summary>
+        private static bool SourceHasGroupJoinResultTail(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case nameof(Queryable.SelectMany):
+                        return false; // flattened group join — translates to SQL joins
+                    case nameof(Queryable.GroupJoin):
+                        return true;
+                }
+                if (mce.Arguments.Count == 0)
+                    break;
+                current = mce.Arguments[0];
+            }
+            return false;
         }
 
         /// <summary>
