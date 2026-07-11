@@ -165,6 +165,10 @@ namespace nORM.Query
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
+            // Set-based DELETE persists changes just like SaveChanges and the Bulk* ops,
+            // so the result cache for this table must be invalidated or Cacheable() queries
+            // keep replaying rows this delete removed.
+            _ctx.Options.CacheProvider?.InvalidateTag(mapping.TableName);
             return affected;
         }
 
@@ -297,6 +301,9 @@ namespace nORM.Query
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, allParams, sw?.Elapsed ?? default, affected);
+            // Set-based UPDATE persists changes; invalidate the result cache for this table
+            // so Cacheable() queries do not keep returning pre-update values.
+            _ctx.Options.CacheProvider?.InvalidateTag(mapping.TableName);
             return affected;
         }
 
