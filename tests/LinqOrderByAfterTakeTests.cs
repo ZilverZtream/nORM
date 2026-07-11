@@ -120,6 +120,24 @@ public class LinqOrderByAfterTakeTests : IAsyncLifetime
         Assert.Equal(3, rows[2].Id);
     }
 
+    [Fact]
+    public async Task Where_after_take_with_intervening_select_filters_the_window()
+    {
+        // OrderBy(Id).Take(3) → rows 1,2,3 (V = 50,40,30); the pass-through
+        // AsNoTracking between the window and the Where means the window is no
+        // longer the immediate source — the whole chain must ride inside the
+        // derived-table wrap so the predicate filters only the windowed rows.
+        var rows = (await _ctx.Query<OatRow>()
+            .OrderBy(r => r.Id)
+            .Take(3)
+            .Where(r => r.V >= 40)
+            .Where(r => r.V <= 45)
+            .ToListAsync())
+            .ToArray();
+        var row = Assert.Single(rows);
+        Assert.Equal(2, row.Id);
+    }
+
     [Table("OatRow")]
     public sealed class OatRow
     {

@@ -83,13 +83,19 @@ namespace nORM.Query
             {
                 // Where after a Take/Skip-windowed source — wrap as derived table so the
                 // predicate filters inside the window. Sister of the post-Take/Skip fixes
-                // in 3040f49 / e0f1397 / 99a02ce. Restricted to the case where the
-                // IMMEDIATE source is a Take/Skip MethodCall — peeling further would
-                // recurse into ourselves on nested Where chains. Routed to a helper so
-                // the common-path Translate stays stack-frame lean (matters under deep
-                // global-filter chaining; see GlobalFilterConcurrencyTests).
-                if (node.Arguments[0] is MethodCallExpression directSrc
-                    && directSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                // in 3040f49 / e0f1397 / 99a02ce, extended to any Take/Skip in the source
+                // spine: the helper sub-translates the whole source, so intervening
+                // operators ride inside the derived table and nested Where chains
+                // terminate because each sub-translation strictly shrinks the spine.
+                // Post-materialize tails (reshapes, group joins, raw GroupBy) are
+                // excluded — their filtering runs client-side over assembled rows.
+                // Routed to a helper so the common-path Translate stays stack-frame
+                // lean (matters under deep global-filter chaining; see
+                // GlobalFilterConcurrencyTests).
+                if (QueryTranslator.SourceHasTakeOrSkip(node.Arguments[0])
+                    && !SourceHasClientTailReshape(node.Arguments[0])
+                    && !SourceHasGroupJoinResultTail(node.Arguments[0])
+                    && !SourceHasRawGroupByResultTail(node.Arguments[0]))
                 {
                     return TranslateAfterTakeSkipWindow(t, node);
                 }
@@ -130,19 +136,17 @@ namespace nORM.Query
                     t.AppendClientTailFilter(clientPredicate);
                     return source;
                 }
+                // Backstop: a windowed source normally routes through the derived-table
+                // wrap above (any Take/Skip visible in the source spine). Reaching this
+                // point means paging state exists without a syntactically detectable
+                // window — appending the WHERE onto the flat query would filter the full
+                // table before the window applies, so fail closed.
                 if ((t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "Where applied after Take or Skip would silently filter the full table — the " +
-                        "translator appends the WHERE onto a flat query, so " +
-                        "`q.OrderBy(Id).Take(3).Where(r => r.Active)` emits `WHERE Active = 1 LIMIT 3` " +
-                        "which filters every row first then takes 3 surviving rows, instead of taking " +
-                        "the first 3 rows and filtering inside that window. SQL needs a subquery wrap " +
-                        "(`SELECT * FROM (… LIMIT n) WHERE p`) that nORM doesn't yet emit. " +
-                        "Workarounds: " +
-                        "(1) Move the Where BEFORE the Take if you want filter-then-window: " +
-                        "`q.Where(r => r.Active).OrderBy(Id).Take(3)`. " +
-                        "(2) Materialize the window first and filter client-side: " +
+                        "Where applied after a Take/Skip window that is not syntactically visible in the query spine " +
+                        "would silently filter the full table before the window applies. Materialize the window first " +
+                        "and filter client-side: " +
                         "`var top = await q.OrderBy(Id).Take(3).ToListAsync(); var filtered = top.Where(r => r.Active).ToList();`");
                 }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
@@ -576,24 +580,20 @@ namespace nORM.Query
                 // share the OrderByTranslator dispatch but legitimately add to _orderBy
                 // before Take applies — only the top-level OrderBy/OrderByDescending
                 // after Take/Skip is wrong.)
+                // Backstop: a windowed source normally routes through the derived-table
+                // wrap above (any Take/Skip visible in the source spine). Reaching this
+                // point means paging state exists without a syntactically detectable
+                // window — appending the new ORDER BY onto the flat list would sort the
+                // full table before the window applies, so fail closed.
                 bool isTopLevelOrder = node.Method.Name is nameof(Queryable.OrderBy)
                                                         or nameof(Queryable.OrderByDescending);
                 if (isTopLevelOrder && (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null) && !t._takeSetByTerminal)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "OrderBy applied after Take or Skip would silently produce wrong rows — the " +
-                        "translator currently appends the new ORDER BY onto a flat list, so " +
-                        "`OrderByDescending(Score).Take(3).OrderBy(Name)` emits `ORDER BY Score DESC, Name ASC LIMIT 3` " +
-                        "which sorts the FULL table by both keys then limits, rather than first taking the " +
-                        "top-3 by Score and resorting those 3 by Name. SQL needs a subquery wrap " +
-                        "(`SELECT * FROM (… ORDER BY a LIMIT n) ORDER BY b`) that nORM doesn't yet emit. " +
-                        "Workarounds: " +
-                        "(1) Materialize the windowed result first and resort client-side: " +
-                        "`var top = await q.OrderByDescending(Score).Take(3).ToListAsync(); var sorted = top.OrderBy(x => x.Name).ToList();` " +
-                        "(2) If you only need a stable secondary ordering, use ThenBy: " +
-                        "`q.OrderByDescending(Score).ThenBy(Name).Take(3)` — sorts and limits in one pass " +
-                        "(this is a DIFFERENT operation: it picks top-3 by (Score DESC, Name ASC) jointly, " +
-                        "not top-3 by Score then resort).");
+                        "OrderBy applied after a Take/Skip window that is not syntactically visible in the query spine " +
+                        "would silently sort the full table before the window applies. Materialize the window first " +
+                        "and resort client-side: " +
+                        "`var top = await q.OrderByDescending(Score).Take(3).ToListAsync(); var sorted = top.OrderBy(x => x.Name).ToList();`");
                 }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                 {
