@@ -164,6 +164,24 @@ namespace nORM.Providers
         public override string NormalizeDateTimeOffsetForCompare(string sql)
             => GetDateTimeOffsetUtcEpochMicrosecondsSql(sql);
 
+        /// <summary>
+        /// Renders the offset-suffixed DateTimeOffset text as canonical UTC text so same-instant
+        /// values written at different offsets produce IDENTICAL group keys. strftime performs
+        /// the offset conversion; the fraction is stripped first (MaxValue's '.9999999' would
+        /// otherwise roll strftime past year 9999 into NULL) and re-appended verbatim — sub-second
+        /// digits are offset-invariant since offsets have whole-minute granularity. The '+00:00'
+        /// suffix keeps the selected key parseable as a DateTimeOffset.
+        /// </summary>
+        internal override string CanonicalizeDateTimeOffsetGroupKey(string sql)
+        {
+            var secondsPrecision = DateTimeOffsetSecondsPrecisionText(sql, out var fractionalTail, out var fractionalLength);
+            // Zero-pad the fraction to 7 digits so '.5' and '.500' (same instant) render identically.
+            return $"(strftime('%Y-%m-%d %H:%M:%S', {secondsPrecision}) || '.' || " +
+                   $"CASE WHEN substr({sql}, 20, 1) = '.' " +
+                   $"THEN substr(substr({fractionalTail}, 1, {fractionalLength}) || '0000000', 1, 7) ELSE '0000000' END" +
+                   $" || '+00:00')";
+        }
+
         // SQLite's LIKE folds ASCII case regardless of collation, so a case-sensitive (ordinal)
         // Contains/StartsWith/EndsWith cannot be expressed with LIKE. instr / substr / '=' are all
         // byte-exact (case-sensitive), so bypass LIKE for the default (non-ignoreCase) match to

@@ -193,6 +193,17 @@ namespace nORM.Providers
         internal virtual string AverageAggregateOperand(string sql, Type operandClrType) => sql;
 
         /// <summary>
+        /// Rewrites a DateTimeOffset GROUP BY key so same-instant values recorded at different
+        /// offsets land in ONE group, matching .NET's instant-based DateTimeOffset equality.
+        /// The result must be BOTH a valid grouping expression and a materializable
+        /// DateTimeOffset text (it doubles as the selected key), so SQLite canonicalizes to
+        /// UTC-rendered text rather than an epoch number. Null means the provider's native
+        /// type already groups by instant (SQL Server datetimeoffset, PostgreSQL timestamptz,
+        /// MySQL's UTC-normalized DATETIME).
+        /// </summary>
+        internal virtual string? CanonicalizeDateTimeOffsetGroupKey(string sql) => null;
+
+        /// <summary>
         /// True when ORDER BY must emit an explicit null-rank for NULLABLE keys to match C#'s
         /// "null is smallest" ordering (nulls first ascending, last descending). PostgreSQL
         /// defaults to the opposite (NULLS LAST asc / NULLS FIRST desc); the other providers

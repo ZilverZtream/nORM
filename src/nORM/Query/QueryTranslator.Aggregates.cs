@@ -174,6 +174,13 @@ namespace nORM.Query
                     var partType = Nullable.GetUnderlyingType(compositeKey.Arguments[i].Type) ?? compositeKey.Arguments[i].Type;
                     if (partType == typeof(decimal))
                         partSql = _provider.NormalizeDecimalForCompare(partSql);
+                    // .NET DateTimeOffset equality is instant-based; canonicalize the key so
+                    // same-instant values at different offsets group together (SQLite TEXT
+                    // storage would otherwise split them). The canonical text doubles as the
+                    // selected key, so assigning BEFORE the adds covers clause and select alike.
+                    if (partType == typeof(DateTimeOffset)
+                        && _provider.CanonicalizeDateTimeOffsetGroupKey(partSql) is { } canonicalPart)
+                        partSql = canonicalPart;
                     parts.Add(partSql);
                     _groupBy.Add(partSql);
                     // C# groups string keys ordinally; on CI-collation providers (MySQL,
@@ -219,6 +226,10 @@ namespace nORM.Query
                     var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
                     if (keyType == typeof(decimal))
                         groupBySql = _provider.NormalizeDecimalForCompare(groupBySql);
+                    // Instant-based DateTimeOffset grouping (see the composite-key path above).
+                    if (keyType == typeof(DateTimeOffset)
+                        && _provider.CanonicalizeDateTimeOffsetGroupKey(groupBySql) is { } canonicalKey)
+                        groupBySql = canonicalKey;
                     _groupBy.Add(groupBySql);
                     // Ordinal string grouping on CI-collation providers: extra binary key (see
                     // the composite-key path above for the rationale and the extras-list note).
