@@ -322,6 +322,10 @@ namespace nORM.Core
                 var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
                 if (newId != null && newId != DBNull.Value)
                     map.SetPrimaryKey(entity, newId);
+                // The active-record Insert/Update/DeleteAsync writes persist changes just like
+                // SaveChanges, ExecuteUpdate/Delete and the Bulk* ops, so the result cache for this
+                // table must be invalidated or Cacheable() queries keep replaying pre-write rows.
+                Options.CacheProvider?.InvalidateTag(map.TableName);
                 return 1;
             }
 
@@ -339,6 +343,8 @@ namespace nORM.Core
                     throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             }
 
+            // Invalidate after a confirmed write (mirrors SaveChanges/ExecuteUpdate-Delete/Bulk).
+            Options.CacheProvider?.InvalidateTag(map.TableName);
             return recordsAffected;
         }
 

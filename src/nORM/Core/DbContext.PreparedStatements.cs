@@ -257,11 +257,27 @@ namespace nORM.Core
                     && _context.Options.CommandInterceptors.Count == 0)
                 {
                     ct.ThrowIfCancellationRequested();
-                    return Task.FromResult(_command.ExecuteNonQuery());
+                    var affected = _command.ExecuteNonQuery();
+                    InvalidateResultCache();
+                    return Task.FromResult(affected);
                 }
 
-                return _command.ExecuteNonQueryWithInterceptionAsync(_context, ct);
+                return ExecuteNonQueryThenInvalidateAsync(ct);
             }
+
+            private async Task<int> ExecuteNonQueryThenInvalidateAsync(CancellationToken ct)
+            {
+                var affected = await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
+                InvalidateResultCache();
+                return affected;
+            }
+
+            // The prepared active-record insert persists rows just like SaveChanges/Bulk*, so the
+            // result cache for this table must be invalidated or Cacheable() queries keep serving a
+            // pre-insert snapshot. No-op (single null check) when no cache provider is configured,
+            // which is the default and benchmarked path.
+            private void InvalidateResultCache()
+                => _context.Options.CacheProvider?.InvalidateTag(_mapping.TableName);
 
             private static void AssignPreparedValue(DbParameter parameter, object? value)
             {
@@ -322,6 +338,7 @@ namespace nORM.Core
                         var commandGeneratedIdSync = _context.RawProvider.GetCommandGeneratedKey(_command, _mapping);
                         if (commandGeneratedIdSync != null && commandGeneratedIdSync != DBNull.Value)
                             _mapping.SetPrimaryKey(entity, commandGeneratedIdSync);
+                        InvalidateResultCache();
                         return recordsAffectedSync;
                     }
 
@@ -329,6 +346,7 @@ namespace nORM.Core
                     var commandGeneratedId = _context.RawProvider.GetCommandGeneratedKey(_command, _mapping);
                     if (commandGeneratedId != null && commandGeneratedId != DBNull.Value)
                         _mapping.SetPrimaryKey(entity, commandGeneratedId);
+                    InvalidateResultCache();
                     return recordsAffected;
                 }
 
@@ -339,12 +357,14 @@ namespace nORM.Core
                     var newIdSync = _command.ExecuteScalar();
                     if (newIdSync != null && newIdSync != DBNull.Value)
                         _mapping.SetPrimaryKey(entity, newIdSync);
+                    InvalidateResultCache();
                     return 1;
                 }
 
                 var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
                 if (newId != null && newId != DBNull.Value)
                     _mapping.SetPrimaryKey(entity, newId);
+                InvalidateResultCache();
                 return 1;
             }
 
