@@ -153,7 +153,6 @@ CREATE TABLE {historyTable} (
             var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
             var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
             var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
-            var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
             var functionName = Escape(mapping.TableName + "_TemporalFunction");
 
             return $@"
@@ -165,18 +164,12 @@ BEGIN
         VALUES (v_now, '9999-12-31', 'I', {newColumns});
     ELSIF (TG_OP = 'UPDATE') THEN
         UPDATE {history} SET ""__ValidTo"" = v_now
-        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition}
-          AND NOT EXISTS (
-             SELECT 1 FROM {history} h2 WHERE h2.""__ValidFrom"" = v_now AND {keyConditionH2}
-          );
+        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition};
         INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
         VALUES (v_now, '9999-12-31', 'U', {newColumns});
     ELSIF (TG_OP = 'DELETE') THEN
         UPDATE {history} SET ""__ValidTo"" = v_now
-        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition}
-          AND NOT EXISTS (
-             SELECT 1 FROM {history} h2 WHERE h2.""__ValidFrom"" = v_now AND {keyConditionH2}
-          );
+        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition};
         INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
         VALUES (v_now, v_now, 'D', {oldColumns});
     END IF;
