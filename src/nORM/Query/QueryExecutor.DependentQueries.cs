@@ -415,5 +415,12 @@ namespace nORM.Query
         /// </summary>
         internal Task LoadOwnedCollectionsAsync(IList owners, TableMapping ownerMap, CancellationToken ct)
             => _ctx.LoadOwnedCollectionsAsync(owners, ownerMap, ct);
+
+        /// <summary>
+        /// Synchronous owned-collection load used by the sync materialize path (which is deliberately
+        /// free of GetAwaiter().GetResult()). Delegates to DbContext.
+        /// </summary>
+        internal void LoadOwnedCollections(IList owners, TableMapping ownerMap)
+            => _ctx.LoadOwnedCollections(owners, ownerMap);
     }
 }

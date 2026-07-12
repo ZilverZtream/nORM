@@ -446,6 +446,15 @@ namespace nORM.Query
                     ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking);
                 }
 
+                // Load owned collections (OwnsMany) for all materialized entities — symmetric with the async
+                // path, via a truly synchronous loader (no GetAwaiter().GetResult()). Without this a
+                // sync-loaded owner has an EMPTY owned navigation, so a later scalar edit + SaveChanges
+                // DELETE-then-reinserts owned children from that empty nav and permanently loses them.
+                if (entityMap != null && entityMap.OwnedCollections.Count > 0 && list.Count > 0)
+                {
+                    LoadOwnedCollections(list, entityMap);
+                }
+
                 if (plan.PostReverse) ReverseListInPlace(list);
                 if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
                 return list;

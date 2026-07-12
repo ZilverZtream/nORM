@@ -175,117 +175,168 @@ namespace nORM.Core
 
             foreach (var ownedMap in ownerMap.OwnedCollections)
             {
-                // Resolve which owner key column this FK references (composite-key aware).
-                var pkCol = ResolveOwnerKeyColumnForOwnedFk(ownerMap.KeyColumns, ownedMap.ForeignKeyColumn, ownerMap.Type.Name);
-
-                // Build PK ? owner lookup keyed by the FK-referenced key column value.
-                var ownerByPk = new Dictionary<object, object>(owners.Count);
-                foreach (var owner in owners)
+                var prep = PrepareOwnedCollectionLoad(ownedMap, owners, ownerMap);
+                if (prep == null) continue;
+                var (cmd, ownerByPk, pkCol, fkOrdinal) = prep.Value;
+                try
                 {
-                    if (owner == null) continue;
-                    var pk = pkCol.Getter(owner);
-                    if (pk != null && !ownerByPk.ContainsKey(pk))
-                        ownerByPk[pk] = owner;
+                    await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                    while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                        MaterializeAndAssignOwnedRow(reader, ownedMap, pkCol, ownerByPk, fkOrdinal);
                 }
-                if (ownerByPk.Count == 0) continue;
-                // SELECT owned cols + fk_col FROM child_table WHERE fk_col IN (@p0, @p1, ...)
-                var pks = ownerByPk.Keys.ToArray();
-                var sqlBuilder = new StringBuilder();
-                sqlBuilder.Append("SELECT ");
-                for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+                finally
                 {
-                    if (ci > 0) sqlBuilder.Append(", ");
-                    sqlBuilder.Append(ownedMap.Columns[ci].EscCol);
-                }
-                if (ownedMap.Columns.Length > 0) sqlBuilder.Append(", ");
-                sqlBuilder.Append(ownedMap.EscForeignKeyColumn);
-                sqlBuilder.Append(" FROM ").Append(ownedMap.EscTable)
-                          .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
-                for (int pi = 0; pi < pks.Length; pi++)
-                {
-                    if (pi > 0) sqlBuilder.Append(", ");
-                    sqlBuilder.Append(_p.ParamPrefix).Append("lpk").Append(pi);
-                }
-                sqlBuilder.Append(')');
-
-                // X1: Scope SELECT to current tenant when multi-tenancy is configured
-                // on the owned child table, preventing cross-tenant data leakage.
-                Column? ownedTenantColLoad = null;
-                if (Options.TenantProvider != null)
-                    ownedTenantColLoad = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName)
-                        ?? throw new NormConfigurationException(
-                            $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' " +
-                            $"does not map tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned loads.");
-                if (ownedTenantColLoad != null)
-                    sqlBuilder.Append(" AND ").Append(ownedTenantColLoad.EscCol)
-                              .Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
-                var querySql = sqlBuilder.ToString();
-
-                await using var cmd = CreateCommand();
-                cmd.CommandText = querySql;
-                cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
-                for (int i = 0; i < pks.Length; i++)
-                {
-                    var p = cmd.CreateParameter();
-                    p.ParameterName = _p.ParamPrefix + "lpk" + i;
-                    p.Value = pks[i];
-                    cmd.Parameters.Add(p);
-                }
-                if (ownedTenantColLoad != null)
-                {
-                    var tp = cmd.CreateParameter();
-                    tp.ParameterName = _p.ParamPrefix + "tenantId";
-                    tp.Value = GetRequiredTenantId(ownedTenantColLoad, ownedMap.OwnedType, "owned collection load");
-                    cmd.Parameters.Add(tp);
-                }
-
-                // Initialize empty collections on all owners first
-                foreach (var owner in owners)
-                {
-                    if (owner == null) continue;
-                    var existing = ownedMap.CollectionGetter(owner);
-                    if (existing == null)
-                        ownedMap.CollectionSetter(owner, Activator.CreateInstance(typeof(List<>).MakeGenericType(ownedMap.OwnedType)));
-                }
-
-                int fkOrdinal = ownedMap.Columns.Length; // FK is the last column in our SELECT
-                await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-                while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                {
-                    // Materialize owned item
-                    var item = Activator.CreateInstance(ownedMap.OwnedType)!;
-                    for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
-                    {
-                        var col = ownedMap.Columns[ci];
-                        if (reader.IsDBNull(ci)) continue;
-                        var raw = reader.GetValue(ci);
-                        object? converted;
-                        if (col.Converter != null)
-                            converted = col.Converter.ConvertFromProvider(raw);
-                        else
-                            converted = ConvertSimple(raw, col.Prop.PropertyType);
-                        col.Setter(item, converted);
-                    }
-
-                    // Read FK and assign to owner.
-                    // Type coercion fallback: ADO.NET providers may return the FK value in a different
-                    // numeric type than the CLR PK property (e.g. SQLite returns Int64 for all integers
-                    // while the PK property may be Int32). The initial TryGetValue uses the raw provider
-                    // type for a zero-allocation fast path; on miss, ConvertSimple coerces to the PK
-                    // property type so the dictionary lookup succeeds across type-width mismatches.
-                    if (reader.IsDBNull(fkOrdinal)) continue;
-                    var fkVal = reader.GetValue(fkOrdinal);
-                    if (!ownerByPk.TryGetValue(fkVal, out var ownerEntity))
-                    {
-                        fkVal = ConvertSimple(fkVal, pkCol.Prop.PropertyType)!;
-                        if (fkVal == null || !ownerByPk.TryGetValue(fkVal, out ownerEntity)) continue;
-                    }
-
-                    var col2 = ownedMap.CollectionGetter(ownerEntity);
-                    if (col2 is System.Collections.IList list)
-                        list.Add(item);
+                    await cmd.DisposeAsync().ConfigureAwait(false);
                 }
             }
+        }
+
+        /// <summary>
+        /// Synchronous twin of <see cref="LoadOwnedCollectionsAsync"/>. The sync query materialize path is
+        /// deliberately free of <c>GetAwaiter().GetResult()</c>, so owned-collection loading needs its own
+        /// truly synchronous path. Without loading owned collections on the sync path, a sync-loaded owner
+        /// has an empty owned navigation and a later scalar edit + SaveChanges deletes all its owned
+        /// children (SaveOwnedCollectionsAsync delete-then-reinserts from that empty nav).
+        /// </summary>
+        internal void LoadOwnedCollections(System.Collections.IList owners, TableMapping ownerMap)
+        {
+            if (ownerMap.KeyColumns.Length == 0 || owners.Count == 0) return;
+
+            foreach (var ownedMap in ownerMap.OwnedCollections)
+            {
+                var prep = PrepareOwnedCollectionLoad(ownedMap, owners, ownerMap);
+                if (prep == null) continue;
+                var (cmd, ownerByPk, pkCol, fkOrdinal) = prep.Value;
+                using (cmd)
+                {
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                        MaterializeAndAssignOwnedRow(reader, ownedMap, pkCol, ownerByPk, fkOrdinal);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds the IN-query command that loads one owned collection for the given owners (tenant-scoped
+        /// when multi-tenancy is configured), seeds each owner's collection to an empty list, and returns
+        /// the command plus the lookup needed to assign rows. Returns <c>null</c> when no owner has a
+        /// resolvable key. Shared by the sync and async loaders.
+        /// </summary>
+        private (DbCommand Cmd, Dictionary<object, object> OwnerByPk, Column PkCol, int FkOrdinal)? PrepareOwnedCollectionLoad(
+            OwnedCollectionMapping ownedMap, System.Collections.IList owners, TableMapping ownerMap)
+        {
+            // Resolve which owner key column this FK references (composite-key aware).
+            var pkCol = ResolveOwnerKeyColumnForOwnedFk(ownerMap.KeyColumns, ownedMap.ForeignKeyColumn, ownerMap.Type.Name);
+
+            // Build PK -> owner lookup keyed by the FK-referenced key column value.
+            var ownerByPk = new Dictionary<object, object>(owners.Count);
+            foreach (var owner in owners)
+            {
+                if (owner == null) continue;
+                var pk = pkCol.Getter(owner);
+                if (pk != null && !ownerByPk.ContainsKey(pk))
+                    ownerByPk[pk] = owner;
+            }
+            if (ownerByPk.Count == 0) return null;
+
+            // SELECT owned cols + fk_col FROM child_table WHERE fk_col IN (@p0, @p1, ...)
+            var pks = ownerByPk.Keys.ToArray();
+            var sqlBuilder = new StringBuilder();
+            sqlBuilder.Append("SELECT ");
+            for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+            {
+                if (ci > 0) sqlBuilder.Append(", ");
+                sqlBuilder.Append(ownedMap.Columns[ci].EscCol);
+            }
+            if (ownedMap.Columns.Length > 0) sqlBuilder.Append(", ");
+            sqlBuilder.Append(ownedMap.EscForeignKeyColumn);
+            sqlBuilder.Append(" FROM ").Append(ownedMap.EscTable)
+                      .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
+            for (int pi = 0; pi < pks.Length; pi++)
+            {
+                if (pi > 0) sqlBuilder.Append(", ");
+                sqlBuilder.Append(_p.ParamPrefix).Append("lpk").Append(pi);
+            }
+            sqlBuilder.Append(')');
+
+            // X1: Scope SELECT to current tenant when multi-tenancy is configured
+            // on the owned child table, preventing cross-tenant data leakage.
+            Column? ownedTenantColLoad = null;
+            if (Options.TenantProvider != null)
+                ownedTenantColLoad = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName)
+                    ?? throw new NormConfigurationException(
+                        $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' " +
+                        $"does not map tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned loads.");
+            if (ownedTenantColLoad != null)
+                sqlBuilder.Append(" AND ").Append(ownedTenantColLoad.EscCol)
+                          .Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
+
+            var cmd = CreateCommand();
+            cmd.CommandText = sqlBuilder.ToString();
+            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
+            for (int i = 0; i < pks.Length; i++)
+            {
+                var p = cmd.CreateParameter();
+                p.ParameterName = _p.ParamPrefix + "lpk" + i;
+                p.Value = pks[i];
+                cmd.Parameters.Add(p);
+            }
+            if (ownedTenantColLoad != null)
+            {
+                var tp = cmd.CreateParameter();
+                tp.ParameterName = _p.ParamPrefix + "tenantId";
+                tp.Value = GetRequiredTenantId(ownedTenantColLoad, ownedMap.OwnedType, "owned collection load");
+                cmd.Parameters.Add(tp);
+            }
+
+            // Reset each owner's collection to a fresh empty list before loading so the load is
+            // idempotent — calling it again (e.g. the query pipeline auto-loads and the caller then
+            // explicitly reloads) REPLACES the children instead of appending duplicates.
+            foreach (var owner in owners)
+            {
+                if (owner == null) continue;
+                ownedMap.CollectionSetter(owner, Activator.CreateInstance(typeof(List<>).MakeGenericType(ownedMap.OwnedType)));
+            }
+
+            int fkOrdinal = ownedMap.Columns.Length; // FK is the last column in our SELECT
+            return (cmd, ownerByPk, pkCol, fkOrdinal);
+        }
+
+        /// <summary>
+        /// Materializes one owned-collection row from the reader and appends it to its owner's collection.
+        /// Shared by the sync and async loaders; skips a row whose FK does not resolve to a loaded owner.
+        /// </summary>
+        private void MaterializeAndAssignOwnedRow(
+            DbDataReader reader, OwnedCollectionMapping ownedMap, Column pkCol, Dictionary<object, object> ownerByPk, int fkOrdinal)
+        {
+            var item = Activator.CreateInstance(ownedMap.OwnedType)!;
+            for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+            {
+                var col = ownedMap.Columns[ci];
+                if (reader.IsDBNull(ci)) continue;
+                var raw = reader.GetValue(ci);
+                object? converted;
+                if (col.Converter != null)
+                    converted = col.Converter.ConvertFromProvider(raw);
+                else
+                    converted = ConvertSimple(raw, col.Prop.PropertyType);
+                col.Setter(item, converted);
+            }
+
+            // Read FK and assign to owner. Type coercion fallback: ADO.NET providers may return the FK
+            // value in a different numeric type than the CLR PK property (e.g. SQLite returns Int64 for
+            // all integers while the PK property may be Int32); coerce on the dictionary-lookup miss.
+            if (reader.IsDBNull(fkOrdinal)) return;
+            var fkVal = reader.GetValue(fkOrdinal);
+            if (!ownerByPk.TryGetValue(fkVal, out var ownerEntity))
+            {
+                fkVal = ConvertSimple(fkVal, pkCol.Prop.PropertyType)!;
+                if (fkVal == null || !ownerByPk.TryGetValue(fkVal, out ownerEntity)) return;
+            }
+
+            var col2 = ownedMap.CollectionGetter(ownerEntity);
+            if (col2 is System.Collections.IList list)
+                list.Add(item);
         }
 
         /// <summary>Converts a DB value to the target CLR type using safe fallback logic.</summary>
