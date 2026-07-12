@@ -279,7 +279,8 @@ namespace nORM.Providers
             var batchSize = Math.Min(ctx.Options.BulkBatchSize, 1000);
             if (MaxParameters != int.MaxValue)
             {
-                var paramsPerEntity = Math.Max(1, keyColumns.Count);
+                // Reserve one extra parameter per row for the concurrency token when present.
+                var paramsPerEntity = Math.Max(1, keyColumns.Count + (m.TimestampColumn != null ? 1 : 0));
                 var maxBatchByParams = Math.Max(1, (MaxParameters - 10) / paramsPerEntity);
                 batchSize = Math.Min(batchSize, maxBatchByParams);
             }
@@ -301,9 +302,11 @@ namespace nORM.Providers
                     var paramIndex = 0;
 
                     string whereClause;
+                    var timestampCol = m.TimestampColumn;
 
-                    if (keyColumns.Count == 1)
+                    if (timestampCol == null && keyColumns.Count == 1)
                     {
+                        // Fast IN path: no concurrency token to match.
                         var keyCol = keyColumns[0];
                         for (int j = 0; j < batch.Count; j++)
                         {
@@ -315,16 +318,27 @@ namespace nORM.Providers
                     }
                     else
                     {
+                        // Per-row (keys [AND token]) OR-conditions. Including the
+                        // concurrency token means a row whose token another writer has
+                        // bumped is skipped, not destroyed — matching the bulk-update
+                        // contract (stale rows skipped, reduced count returned).
                         var orConditions = new List<string>();
                         for (int j = 0; j < batch.Count; j++)
                         {
-                            var keyValues = keyColumns.Select(c =>
+                            var conds = new List<string>();
+                            foreach (var c in keyColumns)
                             {
                                 var pName = $"{ParamPrefix}p{paramIndex++}";
                                 cmd.AddParam(pName, c.Getter(batch[j]));
-                                return $"{c.EscCol} = {pName}";
-                            });
-                            orConditions.Add($"({string.Join(" AND ", keyValues)})");
+                                conds.Add($"{c.EscCol} = {pName}");
+                            }
+                            if (timestampCol != null)
+                            {
+                                var tpName = $"{ParamPrefix}p{paramIndex++}";
+                                cmd.AddParam(tpName, timestampCol.Getter(batch[j]));
+                                conds.Add($"({timestampCol.EscCol} = {tpName} OR ({timestampCol.EscCol} IS NULL AND {tpName} IS NULL))");
+                            }
+                            orConditions.Add($"({string.Join(" AND ", conds)})");
                         }
                         whereClause = string.Join(" OR ", orConditions);
                     }
