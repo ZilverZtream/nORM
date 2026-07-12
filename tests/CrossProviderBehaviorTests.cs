@@ -306,7 +306,10 @@ public class CrossProviderBehaviorTests
         await ctx.SaveChangesAsync();
 
         var items = ctx.Query<G50Item>().Where(x => x.Value > 2).ToList();
-        var occItems = ctx.Query<G50OccItem>().Where(x => x.Payload.Contains("3")).ToList();
+        // Equality rather than Contains: this test exercises plan-cache collision across entity
+        // types, and equality SQL runs under every provider dialect on the SQLite test backend
+        // (MySQL's case-sensitive Contains emits LIKE BINARY, which SQLite cannot execute).
+        var occItems = ctx.Query<G50OccItem>().Where(x => x.Payload == "occ3").ToList();
 
         Assert.Equal(3, items.Count);   // items 3, 4, 5
         Assert.Single(occItems); // occ3 only
@@ -1045,8 +1048,24 @@ public class CrossProviderBehaviorTests
         ctx.Add(new PPMItem { Id = 3, Name = "alphabet", Score = 3, Active = false });
         await ctx.SaveChangesAsync();
 
-        var results = ctx.Query<PPMItem>().Where(x => x.Name.Contains("alpha")).ToList();
-        Assert.Equal(2, results.Count);
+        var query = ctx.Query<PPMItem>().Where(x => x.Name.Contains("alpha"));
+        if (RequiresProviderNativeCaseSensitiveLike(kind))
+            AssertCaseSensitiveLikeShape(query.ToString());
+        else
+            Assert.Equal(2, query.ToList().Count);
+    }
+
+    // MySQL (LIKE BINARY) and SQL Server (COLLATE ...BIN2) force a case-sensitive LIKE with syntax a
+    // SQLite backend cannot execute, so on this SQLite-executed parity harness we assert the
+    // case-sensitive marker is emitted and leave end-to-end filtering to the live provider suite.
+    // SQLite (instr) and PostgreSQL (LIKE is already case-sensitive) run directly.
+    private static bool RequiresProviderNativeCaseSensitiveLike(string kind) => kind is "mysql" or "sqlserver";
+
+    private static void AssertCaseSensitiveLikeShape(string? sql)
+    {
+        Assert.NotNull(sql);
+        Assert.True(sql!.Contains("BINARY") || sql.Contains("COLLATE"),
+            $"expected a case-sensitive LIKE marker (BINARY/COLLATE) in: {sql}");
     }
 
     [Theory]
@@ -1063,8 +1082,11 @@ public class CrossProviderBehaviorTests
         ctx.Add(new PPMItem { Id = 3, Name = "alphabet", Score = 3, Active = false });
         await ctx.SaveChangesAsync();
 
-        var results = ctx.Query<PPMItem>().Where(x => x.Name.StartsWith("alph")).ToList();
-        Assert.Equal(2, results.Count);
+        var query = ctx.Query<PPMItem>().Where(x => x.Name.StartsWith("alph"));
+        if (RequiresProviderNativeCaseSensitiveLike(kind))
+            AssertCaseSensitiveLikeShape(query.ToString());
+        else
+            Assert.Equal(2, query.ToList().Count);
     }
 
     [Theory]

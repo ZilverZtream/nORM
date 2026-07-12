@@ -130,13 +130,18 @@ public class QueryTranslatorProviderSmokeTests
 
     [Theory]
     [MemberData(nameof(AllProviders))]
-    public void Provider_StringContains_GeneratesLikeSql(object provider, string _)
+    public void Provider_StringContains_GeneratesContainmentSql(object provider, string _)
     {
         var dbProvider = (nORM.Providers.DatabaseProvider)provider;
         using var cn = new SqliteConnection("Data Source=:memory:");
         using var ctx = new DbContext(cn, dbProvider);
         var sql = ctx.Query<GateSimple>().Where(e => e.Name!.Contains("test")).ToString();
-        Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
+        // Contains must be case-sensitive (ordinal), like .NET. SQLite's LIKE folds ASCII case, so
+        // it uses instr(); the other providers keep a (binary-collated) LIKE.
+        if (dbProvider is SqliteProvider)
+            Assert.Contains("instr", sql, StringComparison.OrdinalIgnoreCase);
+        else
+            Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -1278,8 +1283,10 @@ public class CacheAndMultiTenantIsolationTests
         var injection = "'; DROP TABLE Users; --";
         var sql = ctx.Query<GateSE>().Where(e => e.Name!.Contains(injection)).ToString();
 
+        // The injection payload must be bound as a parameter, never inlined into the SQL text.
         Assert.DoesNotContain("DROP TABLE", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
+        // Case-sensitive Contains lowers to instr() on SQLite (its LIKE folds ASCII case).
+        Assert.Contains("instr", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Multi-tenant isolation: compiled query with tenant filter stays isolated ─

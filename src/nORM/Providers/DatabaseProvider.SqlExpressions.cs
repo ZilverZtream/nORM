@@ -19,6 +19,14 @@ using nORM.Configuration;
 
 namespace nORM.Providers
 {
+    /// <summary>Which ordinal (case-sensitive) string-match a predicate is testing.</summary>
+    internal enum OrdinalStringMatch
+    {
+        Contains,
+        StartsWith,
+        EndsWith
+    }
+
     public abstract partial class DatabaseProvider
     {
         /// <summary>
@@ -134,6 +142,24 @@ namespace nORM.Providers
         /// disagreed with both WHERE and LINQ.
         /// </summary>
         public virtual string NormalizeDateTimeOffsetForCompare(string sql) => sql;
+
+        /// <summary>
+        /// True when this provider's default <c>LIKE</c> cannot be forced case-sensitive with a
+        /// collation modifier and the ordinal string-match path must instead bypass <c>LIKE</c>
+        /// entirely (see <see cref="GetOrdinalStringMatchSql"/>). Only SQLite sets this: its
+        /// <c>LIKE</c> folds ASCII case irrespective of collation. Default is false.
+        /// </summary>
+        internal virtual bool UsesOrdinalStringMatchBypass => false;
+
+        /// <summary>
+        /// Builds a case-sensitive (ordinal) Contains/StartsWith/EndsWith predicate WITHOUT
+        /// <c>LIKE</c>, for providers where <see cref="UsesOrdinalStringMatchBypass"/> is true.
+        /// <paramref name="patternSql"/> is the raw pattern SQL (a bound parameter or literal) with
+        /// no wildcards or escaping. Only called when the bypass flag is set.
+        /// </summary>
+        internal virtual string GetOrdinalStringMatchSql(string columnSql, string patternSql, OrdinalStringMatch kind)
+            => throw new NotSupportedException(
+                $"Provider '{GetType().Name}' does not implement ordinal string-match bypass.");
 
         /// <summary>
         /// Builds a SQL predicate fragment that is TRUE when <paramref name="colSql"/> is

@@ -582,7 +582,35 @@ namespace nORM.Query
             bool ignoreCase)
         {
             var lhs = visitor.GetSql(target);
-            if (ignoreCase) lhs = $"LOWER({lhs})";
+            if (ignoreCase)
+            {
+                // Case-insensitive: fold both sides to lower-case and use a plain LIKE. Correct on
+                // every provider (a case-insensitive LIKE over already-lowered text stays
+                // case-insensitive), so no binary-collation forcing here.
+                lhs = $"LOWER({lhs})";
+            }
+            else
+            {
+                // Ordinal (case-sensitive) match, matching .NET's default string.Contains/StartsWith/
+                // EndsWith. SQLite's LIKE folds ASCII case irrespective of collation, so bypass LIKE
+                // entirely to a byte-exact instr/substr construct. The other providers reuse
+                // ForceCaseSensitiveStringComparison — the same hook string equality uses — to make
+                // the LIKE operand binary (MySQL `BINARY col`, SQL Server `COLLATE ..._BIN2`;
+                // PostgreSQL's LIKE is already case-sensitive so its identity default is correct).
+                if (visitor._provider.UsesOrdinalStringMatchBypass)
+                {
+                    var patternSql = visitor.GetSql(patternExpr);
+                    var kind = op switch
+                    {
+                        LikeOperation.StartsWith => nORM.Providers.OrdinalStringMatch.StartsWith,
+                        LikeOperation.EndsWith => nORM.Providers.OrdinalStringMatch.EndsWith,
+                        _ => nORM.Providers.OrdinalStringMatch.Contains
+                    };
+                    visitor._sql.Append(visitor._provider.GetOrdinalStringMatchSql(lhs, patternSql, kind));
+                    return;
+                }
+                lhs = visitor._provider.ForceCaseSensitiveStringComparison(lhs);
+            }
             visitor._sql.Append(lhs).Append(" LIKE ");
             var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
             if (TryGetConstantValue(patternExpr, out var raw) && raw is string s)

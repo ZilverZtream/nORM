@@ -762,6 +762,7 @@ M:nORM.Providers.DatabaseProvider.LiveColumnInfo.Equals(nORM.Providers.DatabaseP
 M:nORM.Providers.DatabaseProvider.LiveColumnInfo.GetHashCode():System.Int32
 M:nORM.Providers.DatabaseProvider.LiveColumnInfo.ToString():System.String
 M:nORM.Providers.DatabaseProvider.NormalizeDateTimeForCompare(System.String):System.String
+M:nORM.Providers.DatabaseProvider.NormalizeDateTimeOffsetForCompare(System.String):System.String
 M:nORM.Providers.DatabaseProvider.NormalizeDecimalForCompare(System.String):System.String
 M:nORM.Providers.DatabaseProvider.NormalizeTimeSpanForCompare(System.String):System.String
 M:nORM.Providers.DatabaseProvider.NullSafeEqual(System.String,System.String):System.String
@@ -1007,6 +1008,7 @@ M:nORM.Providers.SqliteProvider.IntrospectTableColumnsAsync(System.Data.Common.D
 M:nORM.Providers.SqliteProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Providers.SqliteProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
 M:nORM.Providers.SqliteProvider.NormalizeDateTimeForCompare(System.String):System.String
+M:nORM.Providers.SqliteProvider.NormalizeDateTimeOffsetForCompare(System.String):System.String
 M:nORM.Providers.SqliteProvider.NormalizeDecimalForCompare(System.String):System.String
 M:nORM.Providers.SqliteProvider.NormalizeTimeSpanForCompare(System.String):System.String
 M:nORM.Providers.SqliteProvider.NullSafeEqual(System.String,System.String):System.String
@@ -1325,6 +1327,7 @@ P:nORM.Mapping.OwnedCollectionMapping.OwnedType:System.Type
 P:nORM.Mapping.OwnedCollectionMapping.SchemaName:System.String
 P:nORM.Mapping.OwnedCollectionMapping.TableName:System.String
 P:nORM.Mapping.RenameColumnAttribute.OldName:System.String
+P:nORM.Mapping.TableMapping.ClientManagedConcurrencyToken:System.Boolean
 P:nORM.Mapping.TableMapping.Columns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableMapping.ColumnsByName:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.Column}
 P:nORM.Mapping.TableMapping.ConverterFingerprint:System.Int32

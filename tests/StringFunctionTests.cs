@@ -43,7 +43,9 @@ public class StringFunctionTests : TestBase
 
         if (provider is SqliteProvider)
         {
-            Assert.Contains("||", sql);
+            // SQLite's LIKE folds ASCII case, so a case-sensitive Contains lowers to instr()
+            // (byte-exact) rather than a LIKE-with-concat pattern.
+            Assert.Contains("instr", sql, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("CONCAT(", sql);
         }
         else
@@ -66,7 +68,8 @@ public class StringFunctionTests : TestBase
 
         if (provider is SqliteProvider)
         {
-            Assert.Contains("||", sql);
+            // Case-sensitive StartsWith lowers to a byte-exact substr() prefix compare on SQLite.
+            Assert.Contains("substr", sql, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("CONCAT(", sql);
         }
         else
@@ -89,7 +92,8 @@ public class StringFunctionTests : TestBase
 
         if (provider is SqliteProvider)
         {
-            Assert.Contains("||", sql);
+            // Case-sensitive EndsWith lowers to a byte-exact substr() suffix compare on SQLite.
+            Assert.Contains("substr", sql, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("CONCAT(", sql);
         }
         else

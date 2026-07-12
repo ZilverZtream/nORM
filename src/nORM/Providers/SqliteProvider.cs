@@ -164,6 +164,25 @@ namespace nORM.Providers
         public override string NormalizeDateTimeOffsetForCompare(string sql)
             => GetDateTimeOffsetUtcEpochMicrosecondsSql(sql);
 
+        // SQLite's LIKE folds ASCII case regardless of collation, so a case-sensitive (ordinal)
+        // Contains/StartsWith/EndsWith cannot be expressed with LIKE. instr / substr / '=' are all
+        // byte-exact (case-sensitive), so bypass LIKE for the default (non-ignoreCase) match to
+        // mirror .NET's ordinal string.Contains/StartsWith/EndsWith.
+        internal override bool UsesOrdinalStringMatchBypass => true;
+
+        internal override string GetOrdinalStringMatchSql(string columnSql, string patternSql, OrdinalStringMatch kind)
+            => kind switch
+            {
+                // An empty pattern matches every (non-null) row in .NET; guard so it does here too.
+                OrdinalStringMatch.Contains
+                    => $"(length({patternSql}) = 0 OR instr({columnSql}, {patternSql}) > 0)",
+                OrdinalStringMatch.StartsWith
+                    => $"(substr({columnSql}, 1, length({patternSql})) = {patternSql})",
+                OrdinalStringMatch.EndsWith
+                    => $"(length({patternSql}) = 0 OR substr({columnSql}, -length({patternSql})) = {patternSql})",
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+
         /// <summary>
         /// SQLite uses <c>printf('%.Nf', col)</c> to produce a fixed-decimal text
         /// matching .NET's <c>ToString("F{digits}")</c>.

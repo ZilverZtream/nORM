@@ -139,38 +139,33 @@ public class SqlTranslationTests : TestBase
     // ─── String method translations ───────────────────────────────────────
 
     [Fact]
-    public void Where_StartsWith_GeneratesLikeWithTrailingPercent()
+    public void Where_StartsWith_GeneratesCaseSensitivePrefixMatch()
     {
         var (sql, parameters, _) = Translate<TranslationEntity>(q => q.Where(x => x.Name.StartsWith("Al")));
-        Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
-        // Parameter should contain "Al%"
+        // SQLite's LIKE folds ASCII case, so StartsWith lowers to a byte-exact substr prefix
+        // compare instead. The search text binds verbatim (no wildcards) as a single parameter.
+        Assert.Contains("substr", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Single(parameters);
-        var paramVal = parameters.Values.First().ToString()!;
-        Assert.StartsWith("Al", paramVal);
-        Assert.EndsWith("%", paramVal);
+        Assert.Equal("Al", parameters.Values.First().ToString());
     }
 
     [Fact]
-    public void Where_Contains_String_GeneratesLikeWithBothPercents()
+    public void Where_Contains_GeneratesCaseSensitiveSubstringMatch()
     {
         var (sql, parameters, _) = Translate<TranslationEntity>(q => q.Where(x => x.Name.Contains("li")));
-        Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
+        // Case-sensitive Contains lowers to instr() on SQLite; the needle binds verbatim.
+        Assert.Contains("instr", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Single(parameters);
-        var paramVal = parameters.Values.First().ToString()!;
-        Assert.StartsWith("%", paramVal);
-        Assert.EndsWith("%", paramVal);
-        Assert.Contains("li", paramVal);
+        Assert.Equal("li", parameters.Values.First().ToString());
     }
 
     [Fact]
-    public void Where_EndsWith_GeneratesLikeWithLeadingPercent()
+    public void Where_EndsWith_GeneratesCaseSensitiveSuffixMatch()
     {
         var (sql, parameters, _) = Translate<TranslationEntity>(q => q.Where(x => x.Name.EndsWith("ce")));
-        Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("substr", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Single(parameters);
-        var paramVal = parameters.Values.First().ToString()!;
-        Assert.StartsWith("%", paramVal);
-        Assert.EndsWith("ce", paramVal);
+        Assert.Equal("ce", parameters.Values.First().ToString());
     }
 
     // ─── OrderBy translations ──────────────────────────────────────────────

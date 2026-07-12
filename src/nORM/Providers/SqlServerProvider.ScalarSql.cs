@@ -194,6 +194,7 @@ namespace nORM.Providers
                 .Replace("^", esc + "^");
         }
 
+
         /// <summary>
         /// DATEDIFF_BIG(MICROSECOND) preserves sub-second deltas while avoiding
         /// DATEDIFF(SECOND)'s integer truncation. Divide by 1,000,000.0 so Total*
