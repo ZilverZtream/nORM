@@ -156,6 +156,15 @@ namespace nORM.Providers
             => TimeSpanColumnTotalSecondsSql(sql);
 
         /// <summary>
+        /// SQLite stores DateTimeOffset as offset-suffixed TEXT, so lexical ORDER BY sorts by the
+        /// wall-clock text rather than the UTC instant and mis-orders values recorded at different
+        /// offsets. Convert to the UTC epoch (microsecond precision, MaxValue-safe) so the sort
+        /// matches DateTimeOffset's instant comparison — the same conversion the WHERE path uses.
+        /// </summary>
+        public override string NormalizeDateTimeOffsetForCompare(string sql)
+            => GetDateTimeOffsetUtcEpochMicrosecondsSql(sql);
+
+        /// <summary>
         /// SQLite uses <c>printf('%.Nf', col)</c> to produce a fixed-decimal text
         /// matching .NET's <c>ToString("F{digits}")</c>.
         /// </summary>
@@ -254,22 +263,41 @@ namespace nORM.Providers
                 : $"strftime('%Y-%m-%d %H:%M:%S', {dtoSql}, '{(totalSec >= 0 ? "+" : "-")}{System.Math.Abs(totalSec)} seconds')";
         }
 
+        // SQLite stores DateTimeOffset as text `yyyy-MM-dd HH:mm:ss[.fffffff][±HH:MM|Z]`.
+        // strftime('%s', …) must be handed the whole-second datetime WITH its offset but WITHOUT
+        // the fractional part: feeding the raw '.9999999' makes SQLite round 23:59:59 up past year
+        // 9999 for DateTimeOffset.MaxValue and return NULL, which silently corrupts equality (NULL =
+        // NULL is never true) and ORDER BY (NULL sorts first). The fraction is added back separately
+        // by callers that need sub-second precision.
+        private static string DateTimeOffsetSecondsPrecisionText(string dtoSql, out string fractionalTail, out string fractionalLength)
+        {
+            fractionalTail = $"substr({dtoSql}, 21)";
+            fractionalLength =
+                $"(CASE WHEN instr({fractionalTail}, '+') > 0 THEN instr({fractionalTail}, '+') - 1 " +
+                $"WHEN instr({fractionalTail}, '-') > 0 THEN instr({fractionalTail}, '-') - 1 " +
+                $"WHEN instr({fractionalTail}, 'Z') > 0 THEN instr({fractionalTail}, 'Z') - 1 " +
+                $"ELSE length({fractionalTail}) END)";
+            // When a fraction is present (position 20 is '.'), rebuild `date+time` (positions 1-19)
+            // concatenated with the offset suffix that follows the fraction; otherwise the stored
+            // text is already fraction-free.
+            return $"(CASE WHEN substr({dtoSql}, 20, 1) = '.' " +
+                   $"THEN substr({dtoSql}, 1, 19) || substr({dtoSql}, 21 + {fractionalLength}) ELSE {dtoSql} END)";
+        }
+
         /// <inheritdoc/>
         public override string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
-            => $"CAST(strftime('%s', {dtoSql}) AS INTEGER)";
+        {
+            var secondsPrecision = DateTimeOffsetSecondsPrecisionText(dtoSql, out _, out _);
+            return $"CAST(strftime('%s', {secondsPrecision}) AS INTEGER)";
+        }
 
         internal override string GetDateTimeOffsetUtcEpochMillisecondsSql(string dtoSql)
             => $"CAST(ROUND((julianday({dtoSql}) - 2440587.5) * 86400000.0) AS INTEGER)";
 
         internal override string GetDateTimeOffsetUtcEpochMicrosecondsSql(string dtoSql)
         {
-            var fractionalTail = $"substr({dtoSql}, 21)";
-            var fractionalLength =
-                $"CASE WHEN instr({fractionalTail}, '+') > 0 THEN instr({fractionalTail}, '+') - 1 " +
-                $"WHEN instr({fractionalTail}, '-') > 0 THEN instr({fractionalTail}, '-') - 1 " +
-                $"WHEN instr({fractionalTail}, 'Z') > 0 THEN instr({fractionalTail}, 'Z') - 1 " +
-                $"ELSE length({fractionalTail}) END";
-            return $"((CAST(strftime('%s', {dtoSql}) AS INTEGER) * 1000000) + " +
+            var secondsPrecision = DateTimeOffsetSecondsPrecisionText(dtoSql, out var fractionalTail, out var fractionalLength);
+            return $"((CAST(strftime('%s', {secondsPrecision}) AS INTEGER) * 1000000) + " +
                    $"CAST(CASE WHEN substr({dtoSql}, 20, 1) = '.' " +
                    $"THEN substr(substr({fractionalTail}, 1, {fractionalLength}) || '000000', 1, 6) ELSE '0' END AS INTEGER))";
         }

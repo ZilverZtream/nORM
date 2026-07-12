@@ -123,6 +123,19 @@ namespace nORM.Providers
         public virtual string NormalizeTimeSpanForCompare(string sql) => sql;
 
         /// <summary>
+        /// Wraps a SQL operand (a DateTimeOffset column/expression) so ORDER BY / DISTINCT / GROUP BY
+        /// sort by the UTC instant, matching <see cref="DateTimeOffset"/>'s instant-based comparison
+        /// in LINQ. SQL Server (native <c>datetimeoffset</c>), PostgreSQL (<c>timestamptz</c>) and
+        /// MySQL (nORM stores a <c>DATETIME(6)</c> pre-normalised to UTC) already order by instant,
+        /// so the default is identity — which also keeps any index on the column usable. SQLite
+        /// stores DateTimeOffset as offset-suffixed TEXT, whose lexical order is NOT instant order
+        /// when offsets differ, so SqliteProvider overrides to convert to the UTC epoch. The WHERE
+        /// path already normalises DateTimeOffset comparisons; without this the ORDER BY silently
+        /// disagreed with both WHERE and LINQ.
+        /// </summary>
+        public virtual string NormalizeDateTimeOffsetForCompare(string sql) => sql;
+
+        /// <summary>
         /// Builds a SQL predicate fragment that is TRUE when <paramref name="colSql"/> is
         /// NULL or an empty string. The default <c>(col IS NULL OR col = '')</c> works on
         /// every provider except SQL Server, where trailing spaces are insignificant in

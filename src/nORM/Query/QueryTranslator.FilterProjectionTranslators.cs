@@ -737,11 +737,18 @@ namespace nORM.Query
                     // key with NormalizeTimeSpanForCompare so the sort is numeric — the exact fix the
                     // WHERE path already applies in ETSV.VisitBinary. Providers with a native TIME/
                     // INTERVAL type return identity from the hook.
+                    // DateTimeOffset stores as offset-suffixed TEXT on SQLite; lex ORDER BY sorts by
+                    // wall-clock text, not UTC instant, so mixed-offset rows mis-sort. Route through
+                    // NormalizeDateTimeOffsetForCompare (identity on providers whose native type
+                    // already sorts by instant). Plain DateTime is deliberately NOT coerced: its
+                    // fixed-width offset-free text already sorts chronologically, and wrapping it in
+                    // datetime() would overflow on DateTime.MaxValue's .9999999 fraction.
                     string CoerceOrderKey(string sql, Type keyType)
                     {
                         var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
                         if (u == typeof(decimal)) return t._provider.NormalizeDecimalForCompare(sql);
                         if (u == typeof(TimeSpan)) return t._provider.NormalizeTimeSpanForCompare(sql);
+                        if (u == typeof(DateTimeOffset)) return t._provider.NormalizeDateTimeOffsetForCompare(sql);
                         return sql;
                     }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
