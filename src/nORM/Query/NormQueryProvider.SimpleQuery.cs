@@ -185,7 +185,14 @@ namespace nORM.Query
                         else
                         {
                             var paramName = _ctx.RawProvider.ParamPrefix + "p0";
-                            whereClause = $" WHERE {column.EscCol} = {paramName}";
+                            // C# string/char equality is ordinal; CI-collation providers (MySQL,
+                            // SQL Server) need the sargable ordinal wrap here too, or this fast
+                            // path would match different rows than the full translator.
+                            var colClrType = Nullable.GetUnderlyingType(me.Type) ?? me.Type;
+                            whereClause = (colClrType == typeof(string) || colClrType == typeof(char))
+                                          && _ctx.RawProvider.DefaultStringEqualityIsCaseInsensitive
+                                ? $" WHERE {_ctx.RawProvider.OrdinalStringEqualSql(column.EscCol, paramName)}"
+                                : $" WHERE {column.EscCol} = {paramName}";
                             parameters = new Dictionary<string, object>(1) { [paramName] = value };
                         }
                     }

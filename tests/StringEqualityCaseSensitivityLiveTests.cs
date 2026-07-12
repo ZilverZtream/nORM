@@ -140,6 +140,17 @@ public class StringEqualityCaseSensitivityLiveTests
     [InlineData("mysql")]
     [InlineData("postgres")]
     [InlineData("sqlserver")]
+    public void Bare_where_equality_is_ordinal_on_live_server(string kind)
+    {
+        // No Select/OrderBy after the Where: this shape can take the SIMPLE-QUERY fast path,
+        // which must apply the same ordinal wrap as the full translator.
+        RunParity(kind, q => q.Where(x => x.Name == "abc").ToList().Select(x => x.Id).OrderBy(i => i).ToList());
+    }
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
     public void Closure_equality_is_ordinal_on_live_server(string kind)
     {
         var name = "abc";

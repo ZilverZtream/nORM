@@ -306,10 +306,10 @@ public class CrossProviderBehaviorTests
         await ctx.SaveChangesAsync();
 
         var items = ctx.Query<G50Item>().Where(x => x.Value > 2).ToList();
-        // Equality rather than Contains: this test exercises plan-cache collision across entity
-        // types, and equality SQL runs under every provider dialect on the SQLite test backend
-        // (MySQL's case-sensitive Contains emits LIKE BINARY, which SQLite cannot execute).
-        var occItems = ctx.Query<G50OccItem>().Where(x => x.Payload == "occ3").ToList();
+        // A NON-string predicate: this test exercises plan-cache collision across entity
+        // types, and string equality now wraps in provider-native ordinal forms the SQLite
+        // test backend cannot execute.
+        var occItems = ctx.Query<G50OccItem>().Where(x => x.Id == 3).ToList();
 
         Assert.Equal(3, items.Count);   // items 3, 4, 5
         Assert.Single(occItems); // occ3 only
@@ -898,7 +898,16 @@ public class CrossProviderBehaviorTests
             ctx.Add(new PPMItem { Id = i, Name = $"item{i}", Score = i * 10, Active = false });
         await ctx.SaveChangesAsync();
 
-        var results = ctx.Query<PPMItem>().Where(x => x.Name == "item3").ToList();
+        var query = ctx.Query<PPMItem>().Where(x => x.Name == "item3");
+        if (RequiresProviderNativeCaseSensitiveLike(kind))
+        {
+            // String equality wraps in the MySQL / SQL Server ordinal form (BINARY / COLLATE),
+            // which the SQLite backend cannot execute; assert the marker and leave execution
+            // to the live suite (Bare_where_equality_is_ordinal_on_live_server).
+            AssertCaseSensitiveLikeShape(query.ToString());
+            return;
+        }
+        var results = query.ToList();
         Assert.Single(results);
         Assert.Equal("item3", results[0].Name);
     }
