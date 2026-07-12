@@ -175,4 +175,56 @@ public class DateTimeFractionalAddLiveTests
     public void AddTicks_on_live_server(string kind)
         // 7500000 ticks = 750ms -- on the microsecond grid everywhere.
         => RunParity(kind, q => q.OrderBy(x => x.Id).Select(x => x.Stamp.AddTicks(7500000)).ToList());
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
+    public void AddMonths_clamps_day_overflow_on_live_server(string kind)
+    {
+        // C# clamps Jan 31 + 1 month to the end of February; the servers' native
+        // calendar arithmetic does the same -- pinned here so a translation change
+        // can never regress to a normalize-forward form.
+        var (factory, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+
+        var idCol = kind switch
+        {
+            "mysql" => "Id INT PRIMARY KEY AUTO_INCREMENT",
+            "postgres" => "\"Id\" SERIAL PRIMARY KEY",
+            _ => "Id INT IDENTITY PRIMARY KEY",
+        };
+        var stampCol = kind switch
+        {
+            "mysql" => "Stamp DATETIME(6) NOT NULL",
+            "postgres" => "\"Stamp\" TIMESTAMP NOT NULL",
+            _ => "Stamp DATETIME2 NOT NULL",
+        };
+        var insertCols = kind == "postgres" ? "(\"Stamp\")" : "(Stamp)";
+        var table = kind == "postgres" ? "\"FracAddParity_Test\"" : "FracAddParity_Test";
+
+        Exec(factory!, $"DROP TABLE IF EXISTS {table}");
+        Exec(factory!, $"CREATE TABLE {table} ({idCol}, {stampCol})");
+        Exec(factory!, $"INSERT INTO {table} {insertCols} VALUES ('2020-01-31 10:20:30'),('2020-02-29 23:59:59')");
+        try
+        {
+            using var ctx = new DbContext(factory!(), provider!);
+            var reference = new[]
+            {
+                new Row { Id = 1, Stamp = new DateTime(2020, 1, 31, 10, 20, 30) },
+                new Row { Id = 2, Stamp = new DateTime(2020, 2, 29, 23, 59, 59) },
+            };
+            var expectedMonths = reference.AsQueryable().OrderBy(x => x.Id).Select(x => x.Stamp.AddMonths(1)).ToList();
+            var actualMonths = ctx.Query<Row>().OrderBy(x => x.Id).Select(x => x.Stamp.AddMonths(1)).ToList();
+            Assert.Equal(expectedMonths, actualMonths);
+
+            var expectedYears = reference.AsQueryable().OrderBy(x => x.Id).Select(x => x.Stamp.AddYears(1)).ToList();
+            var actualYears = ctx.Query<Row>().OrderBy(x => x.Id).Select(x => x.Stamp.AddYears(1)).ToList();
+            Assert.Equal(expectedYears, actualYears);
+        }
+        finally
+        {
+            Exec(factory!, $"DROP TABLE IF EXISTS {table}");
+        }
+    }
 }

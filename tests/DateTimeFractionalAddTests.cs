@@ -100,4 +100,54 @@ public class DateTimeFractionalAddTests
         var cutoff = new DateTime(2020, 1, 2, 18, 0, 0);
         AssertParity(q => q.Where(e => e.Stamp.AddDays(1.5) > cutoff).OrderBy(e => e.Id).Select(e => e.Stamp).ToList());
     }
+
+    // ---- Calendar-add day-overflow clamping -------------------------------------
+    // C# AddMonths/AddYears clamp the day to the target month's length (Jan 31 +
+    // 1 month = Feb 29 in a leap year); SQLite's 'months'/'years' modifiers
+    // normalize the overflowed day forward into the next month (Feb 31 -> Mar 2).
+
+    private static void AssertClampParity(DateTime stamp, Func<IQueryable<Event>, System.Collections.Generic.List<DateTime>> query)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        using var _ = cn;
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE FracAdd_Event (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Stamp TEXT NOT NULL
+                );
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        ctx.Add(new Event { Stamp = stamp });
+        ctx.SaveChangesAsync().GetAwaiter().GetResult();
+
+        var reference = new[] { new Event { Id = 1, Stamp = stamp } };
+        var expected = query(reference.AsQueryable());
+        var actual = query(ctx.Query<Event>());
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void AddMonths_clamps_january_31_to_end_of_february()
+        => AssertClampParity(new DateTime(2020, 1, 31, 10, 20, 30),
+            q => q.Select(e => e.Stamp.AddMonths(1)).ToList());
+
+    [Fact]
+    public void AddMonths_clamps_and_preserves_subsecond_fraction()
+        => AssertClampParity(new DateTime(2021, 8, 31, 1, 2, 3).AddMilliseconds(250),
+            q => q.Select(e => e.Stamp.AddMonths(-6)).ToList());
+
+    [Fact]
+    public void AddYears_clamps_leap_day_to_february_28()
+        => AssertClampParity(new DateTime(2020, 2, 29, 23, 59, 59),
+            q => q.Select(e => e.Stamp.AddYears(1)).ToList());
+
+    [Fact]
+    public void AddMonths_without_overflow_is_unchanged()
+        => AssertClampParity(new DateTime(2020, 1, 15, 8, 0, 0),
+            q => q.Select(e => e.Stamp.AddMonths(1)).ToList());
 }

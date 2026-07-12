@@ -32,11 +32,24 @@ namespace nORM.Providers
         /// Calendar-unit add (months/years) that keeps the original sub-second
         /// fraction: datetime() renders whole seconds only, so re-append the
         /// input's fractional tail (unchanged by calendar arithmetic), trimmed
-        /// to the Microsoft.Data.Sqlite serialization.
+        /// to the Microsoft.Data.Sqlite serialization. Also clamps day-of-month
+        /// overflow the way .NET does: SQLite's 'months'/'years' modifiers
+        /// normalize 'Feb 31' forward into March, while C# AddMonths/AddYears
+        /// clamp to the last day of the intended month. A rolled-over result
+        /// always has a SMALLER day-of-month than the source (1..3 vs 29..31),
+        /// so that comparison detects overflow without false positives; backing
+        /// up to 'start of month, -1 day' lands on the intended month's last
+        /// day, and the time-of-day is carried over from the rolled result.
         /// </summary>
         private static string CalendarAddPreservingFraction(string dateTimeSql, string modifierSql)
-            => $"(datetime({dateTimeSql}, {modifierSql}) || RTRIM(RTRIM('.' || printf('%07d', " +
-               $"(CASE WHEN length({dateTimeSql}) > 20 THEN CAST(substr({dateTimeSql} || '0000000', 21, 7) AS INTEGER) ELSE 0 END)), '0'), '.'))";
+        {
+            var basePart = $"datetime({dateTimeSql}, {modifierSql})";
+            var clamped = $"(CASE WHEN CAST(strftime('%d', {basePart}) AS INTEGER) < CAST(strftime('%d', {dateTimeSql}) AS INTEGER) " +
+                          $"THEN date({basePart}, 'start of month', '-1 day') || ' ' || substr({basePart}, 12) " +
+                          $"ELSE {basePart} END)";
+            return $"({clamped} || RTRIM(RTRIM('.' || printf('%07d', " +
+                   $"(CASE WHEN length({dateTimeSql}) > 20 THEN CAST(substr({dateTimeSql} || '0000000', 21, 7) AS INTEGER) ELSE 0 END)), '0'), '.'))";
+        }
 
         private static string? TryTranslateDateTimeFunction(string name, Type declaringType, string[] args)
         {
