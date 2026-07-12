@@ -179,7 +179,9 @@ namespace nORM.Query
             for (var i = 0; i < parameters.Length; i++)
             {
                 var paramType = parameters[i].ParameterType;
-                var readValue = GetOptimizedReaderCall(reader, paramType, i + startOffset);
+                var readValue = columns[i].Converter != null
+                    ? BuildConverterReadExpression(reader, columns[i].Converter!, paramType, i + startOffset)
+                    : GetOptimizedReaderCall(reader, paramType, i + startOffset);
                 if (CanSkipDbNullCheck(parameters[i], arguments[i], columns[i]))
                 {
                     args[i] = readValue;

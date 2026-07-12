@@ -100,7 +100,10 @@ namespace nORM.Query
             // Handle simple scalar types directly
             if (IsSimpleType(targetType))
             {
-                var getter = CreateReaderGetter(targetType, 0, startOffset);
+                var scalarConverter = projection != null
+                    ? TryResolveProjectedColumnConverter(mapping, projection.Body)
+                    : null;
+                var getter = CreateReaderGetter(targetType, 0, startOffset, scalarConverter);
                 // Only build a default factory for value types (used when DB returns NULL for non-nullable value type)
                 // Reference types (e.g., string) use null! directly.
                 Func<object>? defaultFactory = null;
@@ -264,7 +267,7 @@ namespace nORM.Query
                 }
 
                 var fallbackCols = columns;
-                var getters = fallbackCols.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i, startOffset)).ToArray();
+                var getters = fallbackCols.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, i, startOffset, c.Converter)).ToArray();
                 return reader =>
                 {
                     var entity = parameterlessCtorDelegate();
@@ -300,7 +303,8 @@ namespace nORM.Query
             var ctor = GetCachedConstructor(targetType, columns);
             var ctorParams = ctor.GetParameters();
             var ctorDelegate = _constructorDelegates.GetOrAdd(targetType, _ => CreateConstructorDelegate(ctor));
-            var paramGetters = ctorParams.Select((p, i) => CreateReaderGetter(p.ParameterType, i, startOffset)).ToArray();
+            var paramGetters = ctorParams.Select((p, i) =>
+                CreateReaderGetter(p.ParameterType, i, startOffset, i < columns.Length ? columns[i].Converter : null)).ToArray();
 
             return reader =>
             {

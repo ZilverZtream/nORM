@@ -55,7 +55,17 @@ namespace nORM.Query
                         {
                             continue;
                         }
-                        cols.Add(new Column(dtoProp, mapping.Provider, null));
+                        var dtoCol = new Column(dtoProp, mapping.Provider, null);
+                        // Carry the source column's value converter onto the projected column so the
+                        // materializer applies ConvertFromProvider — the Column(PropertyInfo,...) ctor
+                        // leaves Converter null, which would silently project the raw stored value.
+                        if (ma.Expression is MemberExpression srcMember
+                            && mapping.TryGetColumnForMemberAccess(srcMember, out var srcCol)
+                            && srcCol.Converter != null)
+                        {
+                            dtoCol.Converter = srcCol.Converter;
+                        }
+                        cols.Add(dtoCol);
                     }
                 }
                 return cols.ToArray();

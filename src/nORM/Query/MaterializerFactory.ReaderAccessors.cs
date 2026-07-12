@@ -19,12 +19,61 @@ namespace nORM.Query
 {
     internal sealed partial class MaterializerFactory
     {
-        private static Func<DbDataReader, object> CreateReaderGetter(Type type, int index, int startOffset)
+        private static Func<DbDataReader, object> CreateReaderGetter(Type type, int index, int startOffset, IValueConverter? converter = null)
         {
+            if (converter != null)
+            {
+                // Read the raw provider value and run the column's converter, mirroring the entity
+                // materializer's converter path. Without this a projected converter column returns
+                // the stored representation (e.g. the enum's mapped string) instead of the model
+                // value — a wrong result, or a crash when the target type differs (int vs string).
+                // Callers guard IsDBNull before invoking the getter; ConvertFromProvider also maps
+                // DBNull to null defensively.
+                var ord = index + startOffset;
+                return reader => converter.ConvertFromProvider(reader.GetValue(ord))!;
+            }
             var readerParam = Expression.Parameter(typeof(DbDataReader), "reader");
             var valueExpr = GetOptimizedReaderCall(readerParam, type, index + startOffset);
             var body = Expression.Convert(valueExpr, typeof(object));
             return Expression.Lambda<Func<DbDataReader, object>>(body, readerParam).Compile();
+        }
+
+        private static readonly MethodInfo _convertFromProviderMethod =
+            typeof(IValueConverter).GetMethod(nameof(IValueConverter.ConvertFromProvider))!;
+        private static readonly MethodInfo _readerGetValueMethod =
+            typeof(DbDataReader).GetMethod(nameof(DbDataReader.GetValue), new[] { typeof(int) })!;
+        private static readonly MethodInfo _readerIsDbNullMethod =
+            typeof(DbDataReader).GetMethod(nameof(DbDataReader.IsDBNull), new[] { typeof(int) })!;
+
+        /// <summary>
+        /// Builds a read expression that runs a projected column's value converter:
+        /// <c>reader.IsDBNull(i) ? default : (targetType)converter.ConvertFromProvider(reader.GetValue(i))</c>.
+        /// Used by the expression-tree projection materializers (anonymous / nested) so a converter
+        /// column projects its model value rather than the raw stored representation. The IsDBNull
+        /// guard keeps a null column from unboxing into a non-nullable target (and lets the structural
+        /// validation pass, which feeds DBNull to every column).
+        /// </summary>
+        private static Expression BuildConverterReadExpression(ParameterExpression reader, IValueConverter converter, Type targetType, int ordinal)
+        {
+            var ordConst = Expression.Constant(ordinal);
+            var raw = Expression.Call(reader, _readerGetValueMethod, ordConst);
+            var converted = Expression.Call(Expression.Constant(converter), _convertFromProviderMethod, raw);
+            var read = Expression.Convert(converted, targetType);
+            var isDbNull = Expression.Call(reader, _readerIsDbNullMethod, ordConst);
+            return Expression.Condition(isDbNull, Expression.Default(targetType), read);
+        }
+
+        /// <summary>
+        /// Resolves the value converter of the column a scalar projection body reads, if any, so the
+        /// scalar-projection path (<c>Select(p =&gt; p.ConvertedColumn)</c>) applies ConvertFromProvider.
+        /// </summary>
+        private static IValueConverter? TryResolveProjectedColumnConverter(TableMapping mapping, Expression body)
+        {
+            while (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                body = u.Operand;
+            if (body is MemberExpression m && mapping.TryGetColumnForMemberAccess(m, out var col))
+                return col.Converter;
+            return null;
         }
 
         private static Func<DbDataReader, object> CreateOptimizedMaterializer(Column[] columns, Type targetType, int startOffset)
