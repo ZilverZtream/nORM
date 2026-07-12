@@ -417,7 +417,8 @@ namespace nORM.Query
     Func<Expression, string>? translateProjectionExpression = null,
     Func<string, string>? escapeProjectionAlias = null,
     nORM.Providers.DatabaseProvider? provider = null,
-    Type? keyClrType = null)
+    Type? keyClrType = null,
+    string? onSqlOverride = null)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
@@ -491,7 +492,7 @@ namespace nORM.Query
                 joinSql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
             }
             joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
-            joinSql.Append("ON ").Append(BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType));
+            joinSql.Append("ON ").Append(onSqlOverride ?? BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType));
             if (!string.IsNullOrEmpty(additionalOnConditions))
                 joinSql.Append(" AND ").Append(additionalOnConditions);
             if (!string.IsNullOrEmpty(orderBy))

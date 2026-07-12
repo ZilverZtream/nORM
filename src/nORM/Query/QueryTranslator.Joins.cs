@@ -90,9 +90,45 @@ namespace nORM.Query
             var sqlOuterKeySelector = ExpandProjection(effectiveOuterKeySelector);
             if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
                 _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
+            // Composite (anonymous-type) join keys — `l => new { l.A, l.B }` — must emit one
+            // equality per member ANDed together (the generic visitor would mash the members
+            // into invalid SQL). Each string member gets the ordinal wrap like scalar keys.
+            string? compositeOnSql = null;
+            if (sqlOuterKeySelector.Body is NewExpression outerCompositeKey
+                && StripQuotes(node.Arguments[3]) is LambdaExpression innerKeyLambdaForComposite
+                && ExpandProjection(innerKeyLambdaForComposite).Body is NewExpression innerCompositeKey
+                && outerCompositeKey.Arguments.Count == innerCompositeKey.Arguments.Count
+                && outerCompositeKey.Arguments.Count > 0)
+            {
+                var onParts = new List<string>(outerCompositeKey.Arguments.Count);
+                for (int ci = 0; ci < outerCompositeKey.Arguments.Count; ci++)
+                {
+                    var vctxCo = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    var coVisitor = FastExpressionVisitorPool.Get(in vctxCo);
+                    var outerMemberSql = coVisitor.Translate(outerCompositeKey.Arguments[ci]);
+                    foreach (var kvp in coVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(coVisitor);
+
+                    var innerLambda = ExpandProjection(innerKeyLambdaForComposite);
+                    if (!_correlatedParams.ContainsKey(innerLambda.Parameters[0]))
+                        _correlatedParams[innerLambda.Parameters[0]] = (innerMapping, innerAlias);
+                    var vctxCi = new VisitorContext(_ctx, innerMapping, _provider, innerLambda.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    var ciVisitor = FastExpressionVisitorPool.Get(in vctxCi);
+                    var innerMemberSql = ciVisitor.Translate(((NewExpression)innerLambda.Body).Arguments[ci]);
+                    foreach (var kvp in ciVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(ciVisitor);
+
+                    onParts.Add(JoinBuilder.BuildOnEquality(
+                        outerMemberSql, innerMemberSql, _provider, outerCompositeKey.Arguments[ci].Type));
+                }
+                compositeOnSql = string.Join(" AND ", onParts);
+            }
+
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
-            var outerKeySql = outerKeyVisitor.Translate(sqlOuterKeySelector.Body);
+            var outerKeySql = compositeOnSql != null ? "1" : outerKeyVisitor.Translate(sqlOuterKeySelector.Body);
             // Use AddLiteralParameter (see HandleGroupBy / OrderByTranslator): inline constants
             // in a key selector (e.g. COALESCE fallback) must not be re-flagged in
             // _compiledParams or BindPlanParameters treats them as runtime closures and skips
@@ -133,7 +169,8 @@ namespace nORM.Query
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,
                 provider: _provider,
-                keyClrType: sqlOuterKeySelector.Body.Type);
+                keyClrType: sqlOuterKeySelector.Body.Type,
+                onSqlOverride: compositeOnSql);
             return node;
         }
         // Walks the inner query expression chain and extracts any WHERE predicates,
