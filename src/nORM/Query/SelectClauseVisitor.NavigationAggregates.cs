@@ -321,16 +321,27 @@ namespace nORM.Query
                 var colName = colAttr?.Name ?? me.Member.Name;
                 return $"{depAlias}.{_provider.Escape(colName)}";
             }
-            // Constant or closure-captured value → literal-ize. The projection-subquery
-            // emit doesn't have access to the parameter manager here, so inline as a SQL
-            // literal — only handles simple ints, doubles, strings, bools. Anything else
-            // falls through to the throw.
+            // Inline constants are plan-cache-safe literals (the constant's identity is part of
+            // the expression fingerprint).
             if (expr is ConstantExpression ce)
                 return FormatLiteral(ce.Value);
             if (expr is UnaryExpression { NodeType: ExpressionType.Convert } u && u.Operand is ConstantExpression ce2)
                 return FormatLiteral(ce2.Value);
+            // CLOSURE captures must NOT literal-ize: plans are cached by fingerprint, so a baked
+            // value would freeze the first run's filter into every later run. Emit a compiled
+            // parameter through the shared channel when available (same contract as the main
+            // projection closures); fall back to the literal only for channel-less fragment uses.
             if (expr is MemberExpression closureMe && QueryTranslator.TryGetConstantValue(closureMe, out var closureVal))
+            {
+                if (SharedParams != null && SharedCompiledParams != null)
+                {
+                    var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
+                    SharedParams[paramName] = DBNull.Value;
+                    SharedCompiledParams.Add(paramName);
+                    return paramName;
+                }
                 return FormatLiteral(closureVal);
+            }
             throw new InvalidOperationException(
                 $"Navigation filter side '{expr}' isn't a simple member access or constant — only `c.X op constant` is supported in a projection subquery.");
         }

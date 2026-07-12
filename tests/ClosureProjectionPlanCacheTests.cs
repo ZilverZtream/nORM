@@ -63,6 +63,10 @@ public class ClosureProjectionPlanCacheTests
         ctx.Add(new Row { Amount = 10 });
         await ctx.SaveChangesAsync();
 
+        // Batched inserts need not preserve Add order — compute expectations from the
+        // materialized rows so the assertions are order-robust.
+        var rows = ctx.Query<Row>().OrderBy(r => r.Id).ToList();
+
         List<bool> Run(int threshold)
         {
             var t = threshold; // closure capture
@@ -71,7 +75,7 @@ public class ClosureProjectionPlanCacheTests
                 .ToList().Select(x => x.Big).ToList();
         }
 
-        Assert.Equal(new[] { false, true }, Run(7));   // 5>7 false, 10>7 true
-        Assert.Equal(new[] { true, true }, Run(3));    // 5>3 true, 10>3 true — must NOT reuse 7
+        Assert.Equal(rows.Select(r => r.Amount > 7).ToList(), Run(7));
+        Assert.Equal(rows.Select(r => r.Amount > 3).ToList(), Run(3)); // must NOT reuse the 7 filter
     }
 }
