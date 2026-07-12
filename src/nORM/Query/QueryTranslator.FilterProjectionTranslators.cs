@@ -732,23 +732,30 @@ namespace nORM.Query
                     // ETSV.VisitBinary CAST fix (8d795f4).
                     // Route via provider hook: SqliteProvider wraps decimal with
                     // CAST AS REAL, other providers keep identity (native DECIMAL).
-                    string CoerceDecimalKey(string sql, Type keyType)
+                    // TimeSpan columns store as canonical 'c' TEXT; lex ORDER BY mis-sorts multi-day
+                    // durations ('10.00:00:00' < '9.23:59:59' lexically, but 10 days > 9d23h). Wrap the
+                    // key with NormalizeTimeSpanForCompare so the sort is numeric — the exact fix the
+                    // WHERE path already applies in ETSV.VisitBinary. Providers with a native TIME/
+                    // INTERVAL type return identity from the hook.
+                    string CoerceOrderKey(string sql, Type keyType)
                     {
                         var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
-                        return u == typeof(decimal) ? t._provider.NormalizeDecimalForCompare(sql) : sql;
+                        if (u == typeof(decimal)) return t._provider.NormalizeDecimalForCompare(sql);
+                        if (u == typeof(TimeSpan)) return t._provider.NormalizeTimeSpanForCompare(sql);
+                        return sql;
                     }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                     {
                         foreach (var member in newKey.Arguments)
                         {
                             var memberSql = visitor.Translate(member);
-                            t._orderBy.Add((CoerceDecimalKey(memberSql, member.Type), ascending));
+                            t._orderBy.Add((CoerceOrderKey(memberSql, member.Type), ascending));
                         }
                     }
                     else
                     {
                         var sql = visitor.Translate(keySelector.Body);
-                        t._orderBy.Add((CoerceDecimalKey(sql, keySelector.Body.Type), ascending));
+                        t._orderBy.Add((CoerceOrderKey(sql, keySelector.Body.Type), ascending));
                     }
                     // Merge any parameters the visitor allocated (e.g. for COALESCE fallback
                     // constants in `OrderBy(r => r.Col ?? int.MaxValue)`) back into the outer
