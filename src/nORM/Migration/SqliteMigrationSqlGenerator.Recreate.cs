@@ -98,21 +98,6 @@ namespace nORM.Migration
         }
 
         /// <summary>
-        /// Generates the SQLite table-recreation DDL sequence for changed columns.
-        /// Emits full schema including PRIMARY KEY, UNIQUE, and CREATE INDEX constraints.
-        /// </summary>
-        private static void AddRecreate(
-            List<string> stmts,
-            TableSchema table,
-            Dictionary<string, ColumnSchema> overrides,
-            IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)> explicitIndexes,
-            IReadOnlyList<ExpressionIndexSchema> expressionIndexes)
-        {
-            var cols = table.Columns.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
-            RecreateTable(stmts, table, cols, null, explicitIndexes: explicitIndexes, expressionIndexes: expressionIndexes);
-        }
-
-        /// <summary>
         /// Emits the SQLite table-recreation DDL sequence (CREATE temp, INSERT, DROP, RENAME)
         /// WITHOUT PRAGMA statements. The caller is responsible for setting needsUpFkPragma/needsDownFkPragma
         /// which causes PRAGMA foreign_keys=off/on to be emitted in the pre/post-transaction segments.
@@ -125,7 +110,9 @@ namespace nORM.Migration
             IReadOnlyList<CheckConstraintSchema>? checks = null,
             IReadOnlyList<(string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql)>? explicitIndexes = null,
             IReadOnlyList<ExpressionIndexSchema>? expressionIndexes = null,
-            IReadOnlySet<string>? addedColumnNames = null)
+            IReadOnlySet<string>? addedColumnNames = null,
+            IReadOnlyDictionary<string, string>? sourceColumnByTarget = null,
+            bool restoreFill = false)
         {
             if (overrides != null)
                 cols = cols.Select(c => overrides.TryGetValue(c.Name, out var ov) ? ov : c).ToList();
@@ -138,9 +125,14 @@ namespace nORM.Migration
                     continue;
 
                 insertColumns.Add(Esc(col.Name));
+                // A renamed column reads from its source name in the old table; addedColumnNames
+                // reads a literal default because the column does not exist in the source at all.
+                var sourceName = sourceColumnByTarget != null && sourceColumnByTarget.TryGetValue(col.Name, out var src)
+                    ? src
+                    : col.Name;
                 selectExpressions.Add(addedColumnNames?.Contains(col.Name) == true
-                    ? GetAddedColumnInsertExpression(table, col)
-                    : Esc(col.Name));
+                    ? (restoreFill ? GetRestoredColumnInsertExpression(col) : GetAddedColumnInsertExpression(table, col))
+                    : Esc(sourceName));
             }
             if (cols.Count > 0 && insertColumns.Count == 0)
                 throw new NotSupportedException($"Cannot recreate table '{table.Name}' because all retained columns are computed/generated columns.");
@@ -191,6 +183,245 @@ namespace nORM.Migration
                 stmts.Add(BuildExpressionIndexSql(table, expressionIndex));
         }
 
+        private static bool NameEquals(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The new-snapshot <see cref="TableSchema"/> for a table, carried by every diff category
+        /// except <see cref="SchemaDiff.DroppedColumns"/> (which, per <see cref="SchemaDiffer"/>,
+        /// references the OLD table). Returns <c>null</c> when a table is recreated ONLY because of
+        /// dropped columns, in which case the new schema is reconstructed from the old table.
+        /// </summary>
+        private static TableSchema? TryResolveNewTable(SchemaDiff diff, string tableName)
+        {
+            foreach (var (t, _, _) in diff.AlteredColumns) if (NameEquals(t.Name, tableName)) return t;
+            foreach (var (t, _) in diff.AddedColumns) if (NameEquals(t.Name, tableName)) return t;
+            foreach (var (t, _) in diff.AddedForeignKeys) if (NameEquals(t.Name, tableName)) return t;
+            foreach (var (t, _) in diff.DroppedForeignKeys) if (NameEquals(t.Name, tableName)) return t;
+            foreach (var (t, _) in diff.AddedCheckConstraints) if (NameEquals(t.Name, tableName)) return t;
+            foreach (var (t, _) in diff.DroppedCheckConstraints) if (NameEquals(t.Name, tableName)) return t;
+            foreach (var (t, _, _) in diff.RenamedColumns) if (NameEquals(t.Name, tableName)) return t;
+            return null;
+        }
+
+        /// <summary>The old-snapshot <see cref="TableSchema"/>, available when the table has dropped columns.</summary>
+        private static TableSchema? TryResolveOldTable(SchemaDiff diff, string tableName)
+        {
+            foreach (var (t, _) in diff.DroppedColumns) if (NameEquals(t.Name, tableName)) return t;
+            return null;
+        }
+
+        private static TableSchema CopyTable(string name, IEnumerable<ColumnSchema> cols,
+            IEnumerable<ForeignKeySchema> fks, IEnumerable<CheckConstraintSchema> checks,
+            IEnumerable<ExpressionIndexSchema> expressionIndexes)
+        {
+            var t = new TableSchema { Name = name };
+            t.Columns.AddRange(cols);
+            t.ForeignKeys.AddRange(fks);
+            t.CheckConstraints.AddRange(checks);
+            t.ExpressionIndexes.AddRange(expressionIndexes);
+            return t;
+        }
+
+        /// <summary>
+        /// The base table instance for schema reconstruction: the new-snapshot table when available,
+        /// otherwise the old-snapshot table (dropped-column-only recreation). All deltas are then
+        /// applied explicitly so the result is correct regardless of which snapshot the base reflects
+        /// (real diffs and manually-constructed test diffs both work).
+        /// </summary>
+        private static TableSchema ResolveBaseTable(SchemaDiff diff, string tableName)
+            => TryResolveNewTable(diff, tableName)
+               ?? TryResolveOldTable(diff, tableName)
+               ?? throw new InvalidOperationException($"No schema source for recreated table '{tableName}'.");
+
+        private static List<ForeignKeySchema> MergeForeignKeys(IEnumerable<ForeignKeySchema> baseFks,
+            IEnumerable<string> removeNames, IEnumerable<ForeignKeySchema> add)
+        {
+            var remove = removeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var result = new List<ForeignKeySchema>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var fk in baseFks)
+                if (!remove.Contains(fk.ConstraintName) && seen.Add(fk.ConstraintName))
+                    result.Add(fk);
+            foreach (var fk in add)
+                if (!remove.Contains(fk.ConstraintName) && seen.Add(fk.ConstraintName))
+                    result.Add(fk);
+            return result;
+        }
+
+        private static List<CheckConstraintSchema> MergeChecks(IEnumerable<CheckConstraintSchema> baseChecks,
+            IEnumerable<string> removeNames, IEnumerable<CheckConstraintSchema> add)
+        {
+            var remove = removeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var result = new List<CheckConstraintSchema>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var ck in baseChecks)
+                if (!remove.Contains(ck.ConstraintName) && seen.Add(ck.ConstraintName))
+                    result.Add(ck);
+            foreach (var ck in add)
+                if (!remove.Contains(ck.ConstraintName) && seen.Add(ck.ConstraintName))
+                    result.Add(ck);
+            return result;
+        }
+
+        /// <summary>
+        /// Builds the complete post-migration (new) schema for a recreated table by applying every
+        /// change to the base table: drop the dropped columns/FKs/checks, add the added ones, and force
+        /// altered columns to their new definition. Deltas are applied idempotently so the result is
+        /// correct whether the base already reflects them (real diffs) or not (manual test diffs).
+        /// </summary>
+        private static TableSchema BuildNewSchema(SchemaDiff diff, string tableName)
+        {
+            var baseTable = ResolveBaseTable(diff, tableName);
+            var droppedNames = diff.DroppedColumns.Where(x => NameEquals(x.Table.Name, tableName))
+                .Select(x => x.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var alteredNew = diff.AlteredColumns.Where(x => NameEquals(x.Table.Name, tableName))
+                .ToDictionary(x => x.NewColumn.Name, x => x.NewColumn, StringComparer.OrdinalIgnoreCase);
+            var added = diff.AddedColumns.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.Column).ToList();
+
+            var cols = new List<ColumnSchema>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in baseTable.Columns)
+            {
+                if (droppedNames.Contains(c.Name) || !seen.Add(c.Name))
+                    continue;
+                cols.Add(alteredNew.TryGetValue(c.Name, out var nc) ? nc : c);
+            }
+            foreach (var a in added)
+                if (seen.Add(a.Name))
+                    cols.Add(a);
+
+            var fks = MergeForeignKeys(baseTable.ForeignKeys,
+                diff.DroppedForeignKeys.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.ForeignKey.ConstraintName),
+                diff.AddedForeignKeys.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.ForeignKey));
+            var checks = MergeChecks(baseTable.CheckConstraints,
+                diff.DroppedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint.ConstraintName),
+                diff.AddedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint));
+
+            return CopyTable(baseTable.Name, cols, fks, checks, baseTable.ExpressionIndexes);
+        }
+
+        /// <summary>
+        /// Builds the complete pre-migration (old) schema for a recreated table by reverting every
+        /// change: altered columns to their old definition, added columns removed, dropped columns
+        /// restored, renamed columns back to their old name, and the pre-migration FK/CHECK sets.
+        /// Applied idempotently so it is correct for both real and manually-constructed diffs.
+        /// </summary>
+        private static TableSchema BuildOldSchema(SchemaDiff diff, string tableName)
+        {
+            var baseTable = ResolveBaseTable(diff, tableName);
+            var alteredOld = diff.AlteredColumns.Where(x => NameEquals(x.Table.Name, tableName))
+                .ToDictionary(x => x.NewColumn.Name, x => x.OldColumn, StringComparer.OrdinalIgnoreCase);
+            var addedNames = diff.AddedColumns.Where(x => NameEquals(x.Table.Name, tableName))
+                .Select(x => x.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var renamedOldByNew = diff.RenamedColumns.Where(x => NameEquals(x.Table.Name, tableName))
+                .ToDictionary(x => x.NewColumn.Name, x => x.OldColumnName, StringComparer.OrdinalIgnoreCase);
+            var dropped = diff.DroppedColumns.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.Column).ToList();
+
+            var cols = new List<ColumnSchema>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in baseTable.Columns)
+            {
+                if (addedNames.Contains(c.Name))
+                    continue; // added by the migration; did not exist before
+                ColumnSchema col;
+                if (alteredOld.TryGetValue(c.Name, out var oldCol))
+                    col = oldCol; // revert to the pre-alter definition
+                else if (renamedOldByNew.TryGetValue(c.Name, out var oldName))
+                {
+                    col = c.Clone();
+                    col.Name = oldName; // revert to the pre-rename name
+                }
+                else
+                    col = c;
+                if (seen.Add(col.Name))
+                    cols.Add(col);
+            }
+            foreach (var d in dropped)
+                if (seen.Add(d.Name))
+                    cols.Add(d); // restore columns the migration dropped
+
+            var fks = MergeForeignKeys(baseTable.ForeignKeys,
+                diff.AddedForeignKeys.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.ForeignKey.ConstraintName),
+                diff.DroppedForeignKeys.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.ForeignKey));
+            var checks = MergeChecks(baseTable.CheckConstraints,
+                diff.AddedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint.ConstraintName),
+                diff.DroppedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint));
+
+            return CopyTable(baseTable.Name, cols, fks, checks, Array.Empty<ExpressionIndexSchema>());
+        }
+
+        /// <summary>
+        /// Emits a single Up table-recreation that applies every recreate-requiring change to a table
+        /// at once (altered columns, added/dropped columns, added/dropped FKs and CHECK constraints).
+        /// Doing it once — rather than once per change — prevents the per-change recreations from
+        /// clobbering one another (most damagingly on the Down path).
+        /// </summary>
+        private static void EmitUpRecreate(List<string> up, SchemaDiff diff, string tableName)
+        {
+            var newSchema = BuildNewSchema(diff, tableName);
+
+            // Columns the migration adds do not exist in the source table, so the INSERT ... SELECT
+            // fills them with a literal default rather than reading a non-existent column.
+            var addedColumnNames = diff.AddedColumns
+                .Where(x => NameEquals(x.Table.Name, tableName))
+                .Select(x => x.Column.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // A renamed column is stored under its NEW name in the new table but read from its OLD name
+            // in the pre-recreate source table.
+            var sourceByTarget = diff.RenamedColumns
+                .Where(x => NameEquals(x.Table.Name, tableName))
+                .ToDictionary(x => x.NewColumn.Name, x => x.OldColumnName, StringComparer.OrdinalIgnoreCase);
+
+            RecreateTable(
+                up,
+                newSchema,
+                newSchema.Columns.ToList(),
+                overrides: null,
+                fks: newSchema.ForeignKeys,
+                checks: newSchema.CheckConstraints,
+                explicitIndexes: GetExplicitIndexesForUp(newSchema, diff),
+                expressionIndexes: GetExpressionIndexesForUp(newSchema, diff),
+                addedColumnNames: addedColumnNames.Count > 0 ? addedColumnNames : null,
+                sourceColumnByTarget: sourceByTarget.Count > 0 ? sourceByTarget : null);
+        }
+
+        /// <summary>
+        /// Emits a single Down table-recreation that reverts every recreate-requiring change to a
+        /// table at once, restoring the complete pre-migration schema.
+        /// </summary>
+        private static void EmitDownRecreate(List<string> down, SchemaDiff diff, string tableName)
+        {
+            // The index resolvers derive the Down index set from the NEW schema baseline (they revert
+            // added/dropped index changes), so both directions pass the new schema to them.
+            var newSchema = BuildNewSchema(diff, tableName);
+            var oldSchema = BuildOldSchema(diff, tableName);
+
+            // Columns the migration dropped are absent from the current (post-Up) table, so fill them.
+            var fillNames = diff.DroppedColumns
+                .Where(x => NameEquals(x.Table.Name, tableName))
+                .Select(x => x.Column.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // The old-named target reads from the column's NEW name in the current table.
+            var sourceByTarget = diff.RenamedColumns
+                .Where(x => NameEquals(x.Table.Name, tableName))
+                .ToDictionary(x => x.OldColumnName, x => x.NewColumn.Name, StringComparer.OrdinalIgnoreCase);
+
+            RecreateTable(
+                down,
+                oldSchema,
+                oldSchema.Columns.ToList(),
+                overrides: null,
+                fks: oldSchema.ForeignKeys,
+                checks: oldSchema.CheckConstraints,
+                explicitIndexes: GetExplicitIndexesForDown(newSchema, diff),
+                expressionIndexes: GetExpressionIndexesForDown(newSchema, diff),
+                addedColumnNames: fillNames.Count > 0 ? fillNames : null,
+                sourceColumnByTarget: sourceByTarget.Count > 0 ? sourceByTarget : null,
+                restoreFill: true);
+        }
+
         private static string GetAddedColumnInsertExpression(TableSchema table, ColumnSchema column)
         {
             var defaultValue = column.DefaultValue;
@@ -201,6 +432,26 @@ namespace nORM.Migration
 
             throw new InvalidOperationException(
                 $"Cannot recreate table '{table.Name}' with added column '{column.Name}' because it is NOT NULL and has no DefaultValue.");
+        }
+
+        /// <summary>
+        /// Insert expression for a column being RESTORED on the Down path after it was dropped. The
+        /// original data is gone, so a NOT NULL column with no default falls back to a type-appropriate
+        /// zero rather than throwing - otherwise the rollback would be unrunnable. Prefers the column's
+        /// own default and uses NULL for nullable columns.
+        /// </summary>
+        private static string GetRestoredColumnInsertExpression(ColumnSchema column)
+        {
+            if (!string.IsNullOrEmpty(column.DefaultValue))
+                return DefaultValueValidator.Validate(column.DefaultValue)!;
+            if (column.IsNullable)
+                return "NULL";
+            return GetSqlType(column) switch
+            {
+                "TEXT" => "''",
+                "BLOB" => "x''",
+                _ => "0" // INTEGER, NUMERIC, REAL
+            };
         }
     }
 }

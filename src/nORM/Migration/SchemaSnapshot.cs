@@ -167,6 +167,12 @@ namespace nORM.Migration
         public string? ComputedColumnSql { get; set; }
         /// <summary>True when a computed/generated column should be physically stored where supported.</summary>
         public bool IsStoredComputedColumn { get; set; }
+
+        /// <summary>
+        /// Shallow copy of this column. Used when a table recreation needs the same column under a
+        /// different <see cref="Name"/> (e.g. reverting a renamed column on the Down path).
+        /// </summary>
+        internal ColumnSchema Clone() => (ColumnSchema)MemberwiseClone();
     }
 
     /// <summary>

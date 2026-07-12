@@ -212,81 +212,62 @@ namespace nORM.Migration
                 down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
             }
 
-            foreach (var group in diff.AddedColumns.GroupBy(x => x.Table))
+            // FK referential actions must be validated before any DDL is emitted.
+            foreach (var (_, addedFk) in diff.AddedForeignKeys)
             {
-                var table = group.Key;
-                var addedColumnNames = group.Select(g => g.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var addedColumns = group.Select(static g => g.Column).ToArray();
-                var recreateForAdd = addedColumns.Any(RequiresRecreateForAddedColumn);
-
-                foreach (var column in addedColumns)
-                {
-                    // NOT NULL column without a DefaultValue cannot be added to a populated table.
-                    if (!IsComputedColumn(column) && !column.IsNullable && column.DefaultValue == null)
-                        throw new InvalidOperationException(
-                            $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
-                            "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
-                }
-
-                if (recreateForAdd)
-                {
-                    RecreateTable(
-                        up,
-                        table,
-                        table.Columns.ToList(),
-                        null,
-                        explicitIndexes: GetExplicitIndexesForUp(table, diff),
-                        expressionIndexes: GetExpressionIndexesForUp(table, diff),
-                        addedColumnNames: addedColumnNames);
-                    needsUpFkPragma = true;
-                }
-                else
-                {
-                    foreach (var column in addedColumns)
-                    {
-                        if (IsComputedColumn(column))
-                        {
-                            up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
-                            continue;
-                        }
-
-                        var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
-                        var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
-                        up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
-                    }
-                    foreach (var column in addedColumns.Where(IsImplicitUniqueColumn))
-                        up.Add(BuildImplicitUniqueIndexSql(table, column));
-                }
-
-                // Down: undo the ADD COLUMN by recreating the table without those columns.
-                // MG-2: RecreateTable no longer emits PRAGMA inline.
-                var remainingColumns = table.Columns
-                    .Where(c => !addedColumnNames.Contains(c.Name))
-                    .ToList();
-                if (remainingColumns.Count > 0)
-                {
-                    RecreateTable(
-                        down,
-                        table,
-                        remainingColumns,
-                        null,
-                        explicitIndexes: GetExplicitIndexesForDown(table, diff),
-                        expressionIndexes: GetExpressionIndexesForDown(table, diff));
-                    needsDownFkPragma = true;
-                }
+                ValidateFkAction(addedFk.OnDelete, addedFk.ConstraintName);
+                ValidateFkAction(addedFk.OnUpdate, addedFk.ConstraintName);
             }
 
-            // G2: SQLite does not support ALTER COLUMN; use the standard table-recreation workaround.
-            foreach (var group in diff.AlteredColumns.GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            // A NOT NULL added column without a DefaultValue cannot be materialized on a populated
+            // table by either ADD COLUMN or the recreate INSERT ... SELECT. Fail fast with a clear error.
+            foreach (var (table, column) in diff.AddedColumns)
             {
-                var table         = diff.AlteredColumns.First(x => string.Equals(x.Table.Name, group.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                var alteredMap    = group.ToDictionary(x => x.NewColumn.Name, x => x.NewColumn, StringComparer.OrdinalIgnoreCase);
-                var oldAlteredMap = group.ToDictionary(x => x.OldColumn.Name, x => x.OldColumn, StringComparer.OrdinalIgnoreCase);
+                if (!IsComputedColumn(column) && !column.IsNullable && column.DefaultValue == null)
+                    throw new InvalidOperationException(
+                        $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
+                        "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
+            }
 
-                AddRecreate(up,   table, alteredMap, GetExplicitIndexesForUp(table, diff), GetExpressionIndexesForUp(table, diff));
-                AddRecreate(down, table, oldAlteredMap, GetExplicitIndexesForDown(table, diff), GetExpressionIndexesForDown(table, diff));
+            // SQLite cannot ALTER COLUMN, DROP COLUMN, or ALTER a constraint in place, so those changes
+            // use the table-recreation workaround (CREATE temp, INSERT ... SELECT, DROP, RENAME). A single
+            // migration can touch one table through several such changes at once; recreate each affected
+            // table EXACTLY ONCE per direction with the complete target schema. Emitting a separate
+            // recreate per change makes the recreations clobber one another - most damagingly on Down,
+            // where each rebuild reverted only its own dimension and reset the others, silently corrupting
+            // the rollback.
+            foreach (var tableName in upRecreatedTables)
+            {
+                EmitUpRecreate(up, diff, tableName);
                 needsUpFkPragma = true;
+            }
+            foreach (var tableName in downRecreatedTables)
+            {
+                EmitDownRecreate(down, diff, tableName);
                 needsDownFkPragma = true;
+            }
+
+            // Added columns on tables NOT recreated in Up use a plain ALTER TABLE ADD COLUMN. When the
+            // table is recreated for another reason the added columns are folded into that Up recreate
+            // (via addedColumnNames); their Down removal is always handled by the consolidated Down recreate.
+            foreach (var group in diff.AddedColumns.GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var table = group.First().Table;
+                if (upRecreatedTables.Contains(table.Name))
+                    continue;
+                foreach (var (_, column) in group)
+                {
+                    if (IsComputedColumn(column))
+                    {
+                        up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
+                        continue;
+                    }
+
+                    var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}");
+                }
+                foreach (var (_, column) in group.Where(g => IsImplicitUniqueColumn(g.Column)))
+                    up.Add(BuildImplicitUniqueIndexSql(table, column));
             }
 
             // SD-8: Generate DROP TABLE for tables removed in the new snapshot
@@ -296,134 +277,30 @@ namespace nORM.Migration
                 AddCreateTableWithIndexes(down, table);
             }
 
-            // SD-8: Generate DROP COLUMN for columns removed in the new snapshot.
-            // SQLite does not support ALTER TABLE ... DROP COLUMN before version 3.35.0,
-            // so we use the table-recreation workaround for broad compatibility.
+            // Dropped columns on tables NOT recreated in Down are restored with ALTER TABLE ADD COLUMN.
+            // Their Up removal is always handled by the consolidated Up recreate; when the table is also
+            // recreated in Down (e.g. a dropped PK column, or another altered column on the same table),
+            // the restore is folded into that Down recreate instead.
             foreach (var group in diff.DroppedColumns.GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var newTable = diff.DroppedColumns.First(x => string.Equals(x.Table.Name, group.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                var droppedColNames = group.Select(g => g.Column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var droppedCols = group.Select(g => g.Column).ToList();
-
-                // The columns remaining in the new table (without the dropped ones)
-                var remainingCols = newTable.Columns
-                    .Where(c => !droppedColNames.Contains(c.Name))
-                    .ToList();
-
-                // Up: recreate table without dropped columns — use RecreateTable for full constraint preservation
-                // MG-2: RecreateTable no longer emits PRAGMA inline.
-                RecreateTable(
-                    up,
-                    newTable,
-                    remainingCols,
-                    null,
-                    explicitIndexes: GetExplicitIndexesForUp(newTable, diff),
-                    expressionIndexes: GetExpressionIndexesForUp(newTable, diff));
-                needsUpFkPragma = true;
-
-                // Down: add the dropped columns back (SQLite ADD COLUMN is forward-compatible)
-                // C: include DefaultValue so NOT NULL columns can be restored to populated tables.
-                if (droppedCols.Any(RequiresRecreateForAddedColumn))
-                {
-                    RecreateTable(
-                        down,
-                        newTable,
-                        newTable.Columns.ToList(),
-                        null,
-                        explicitIndexes: GetExplicitIndexesForDown(newTable, diff),
-                        expressionIndexes: GetExpressionIndexesForDown(newTable, diff),
-                        addedColumnNames: droppedColNames);
-                    needsDownFkPragma = true;
+                var table = group.First().Table;
+                if (downRecreatedTables.Contains(table.Name))
                     continue;
-                }
-
-                foreach (var droppedCol in droppedCols)
+                foreach (var (_, droppedCol) in group)
                 {
                     if (IsComputedColumn(droppedCol))
                     {
-                        down.Add($"ALTER TABLE {EscTable(newTable.Name)} ADD COLUMN {BuildComputedColumnDefinition(droppedCol)}");
+                        down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(droppedCol)}");
                         continue;
                     }
 
                     var restoreDefault = !string.IsNullOrEmpty(droppedCol.DefaultValue)
                         ? $" DEFAULT {DefaultValueValidator.Validate(droppedCol.DefaultValue)}"
                         : "";
-                    var colDef = $"{Esc(droppedCol.Name)} {GetSqlType(droppedCol)}{FormatCollation(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
-                    down.Add($"ALTER TABLE {EscTable(newTable.Name)} ADD COLUMN {colDef}");
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(droppedCol.Name)} {GetSqlType(droppedCol)}{FormatCollation(droppedCol)} {(droppedCol.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}");
                 }
-                foreach (var droppedCol in droppedCols.Where(IsImplicitUniqueColumn))
-                    down.Add(BuildImplicitUniqueIndexSql(newTable, droppedCol));
-            }
-
-            // MG-1: FK constraint changes on existing SQLite tables require table recreation.
-            // Group by table name so each table is recreated only once even if multiple FKs change.
-            foreach (var tableGroup in diff.AddedForeignKeys
-                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                // M1/X1: Validate FK actions for each newly added FK before any DDL is emitted.
-                foreach (var (_, addedFk) in tableGroup)
-                {
-                    ValidateFkAction(addedFk.OnDelete, addedFk.ConstraintName);
-                    ValidateFkAction(addedFk.OnUpdate, addedFk.ConstraintName);
-                }
-
-                var table = diff.AddedForeignKeys
-                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                // Up: recreate with the new FK set (table.ForeignKeys reflects post-diff state)
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, explicitIndexes: GetExplicitIndexesForUp(table, diff), expressionIndexes: GetExpressionIndexesForUp(table, diff));
-                // Down: recreate without the newly added FKs
-                var addedNames = tableGroup.Select(x => x.ForeignKey.ConstraintName)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var oldFks = table.ForeignKeys
-                    .Where(fk => !addedNames.Contains(fk.ConstraintName)).ToList();
-                RecreateTable(down, table, table.Columns, null, oldFks, explicitIndexes: GetExplicitIndexesForDown(table, diff), expressionIndexes: GetExpressionIndexesForDown(table, diff));
-                needsUpFkPragma = true;
-                needsDownFkPragma = true;
-            }
-
-            foreach (var tableGroup in diff.DroppedForeignKeys
-                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                var table = diff.DroppedForeignKeys
-                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                var droppedFks = tableGroup.Select(x => x.ForeignKey).ToList();
-                // Up: recreate without the dropped FKs (table.ForeignKeys already excludes them)
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, explicitIndexes: GetExplicitIndexesForUp(table, diff), expressionIndexes: GetExpressionIndexesForUp(table, diff));
-                // Down: recreate with the dropped FKs restored
-                var restoredFks = table.ForeignKeys.Concat(droppedFks).ToList();
-                RecreateTable(down, table, table.Columns, null, restoredFks, explicitIndexes: GetExplicitIndexesForDown(table, diff), expressionIndexes: GetExpressionIndexesForDown(table, diff));
-                needsUpFkPragma = true;
-                needsDownFkPragma = true;
-            }
-
-            // SQLite cannot ALTER CHECK constraints directly. Recreate the table with
-            // the post-diff or pre-diff constraint set, preserving data and indexes.
-            foreach (var tableGroup in diff.AddedCheckConstraints
-                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                var table = diff.AddedCheckConstraints
-                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints, GetExplicitIndexesForUp(table, diff), GetExpressionIndexesForUp(table, diff));
-                var addedNames = tableGroup.Select(x => x.CheckConstraint.ConstraintName)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var oldChecks = table.CheckConstraints
-                    .Where(check => !addedNames.Contains(check.ConstraintName)).ToList();
-                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, oldChecks, GetExplicitIndexesForDown(table, diff), GetExpressionIndexesForDown(table, diff));
-                needsUpFkPragma = true;
-                needsDownFkPragma = true;
-            }
-
-            foreach (var tableGroup in diff.DroppedCheckConstraints
-                .GroupBy(x => x.Table.Name, StringComparer.OrdinalIgnoreCase))
-            {
-                var table = diff.DroppedCheckConstraints
-                    .First(x => string.Equals(x.Table.Name, tableGroup.Key, StringComparison.OrdinalIgnoreCase)).Table;
-                var droppedChecks = tableGroup.Select(x => x.CheckConstraint).ToList();
-                RecreateTable(up, table, table.Columns, null, table.ForeignKeys, table.CheckConstraints, GetExplicitIndexesForUp(table, diff), GetExpressionIndexesForUp(table, diff));
-                var restoredChecks = table.CheckConstraints.Concat(droppedChecks).ToList();
-                RecreateTable(down, table, table.Columns, null, table.ForeignKeys, restoredChecks, GetExplicitIndexesForDown(table, diff), GetExpressionIndexesForDown(table, diff));
-                needsUpFkPragma = true;
-                needsDownFkPragma = true;
+                foreach (var (_, droppedCol) in group.Where(g => IsImplicitUniqueColumn(g.Column)))
+                    down.Add(BuildImplicitUniqueIndexSql(table, droppedCol));
             }
 
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
@@ -490,12 +367,17 @@ namespace nORM.Migration
                     down.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
             }
 
-            // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new.
+            // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new. When the
+            // table is recreated in a given direction the rename is folded into that recreate's
+            // INSERT ... SELECT (old->new on Up, new->old on Down); emitting a standalone RENAME then
+            // would target a column the recreate already renamed and fail. Only rename here for the
+            // direction(s) where the table is not recreated.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
             {
-                up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
-                // Down: rename back
-                down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+                if (!upRecreatedTables.Contains(table.Name))
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+                if (!downRecreatedTables.Contains(table.Name))
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
             }
 
             // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can

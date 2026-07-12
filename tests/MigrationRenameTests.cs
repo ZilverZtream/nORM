@@ -247,9 +247,19 @@ public class MigrationRenameTests
         Assert.Empty(diff.DroppedColumns);
         Assert.Empty(diff.AddedColumns);
 
-        // Verify SQLite DDL
+        // Verify SQLite DDL. The old snapshot's hand-built Id differs from the builder's Id
+        // (identity/unique/index-name), so the table is also recreated. When a table is recreated
+        // the rename is folded into the recreate's INSERT ... SELECT (reading the old "TotalCost"
+        // into the new "TotalAmount") instead of a standalone ALTER ... RENAME COLUMN, which would
+        // fail against the already-rebuilt table. Accept either mechanism.
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
-        Assert.Contains(sql.Up, s => s.Contains("RENAME COLUMN") && s.Contains("TotalCost") && s.Contains("TotalAmount"));
+        var standaloneRename = sql.Up.Any(s =>
+            s.Contains("RENAME COLUMN") && s.Contains("TotalCost") && s.Contains("TotalAmount"));
+        var foldedIntoRecreate = sql.Up.Any(s =>
+            s.StartsWith("INSERT INTO", StringComparison.Ordinal)
+            && s.Contains("\"TotalAmount\"") && s.Contains("\"TotalCost\""));
+        Assert.True(standaloneRename || foldedIntoRecreate,
+            "The [RenameColumn] rename must be applied either as a standalone RENAME COLUMN or folded into the recreate's INSERT ... SELECT.");
     }
 
     // ─── Helper ───────────────────────────────────────────────────────────
