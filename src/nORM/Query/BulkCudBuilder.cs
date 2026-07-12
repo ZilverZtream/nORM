@@ -538,6 +538,11 @@ namespace nORM.Query
                         throw new NormUnsupportedFeatureException(
                             $"Aggregate '{navAgg.Method.Name}' over '{navAggMember.Member.Name}' requires a mapped-column selector.");
                     var operand = RenderDependentOperand(selector.Body, selector.Parameters[0], dependent, depAlias);
+                    // C# Average over ints is a double; SQL Server's AVG(int) truncates to int,
+                    // so its provider hook casts integral operands to FLOAT (identity elsewhere) —
+                    // the same hook every other aggregate emit path uses.
+                    if (func == "AVG")
+                        operand = _ctx.RawProvider.AverageAggregateOperand(operand, selector.Body.Type);
                     agg = $"{func}({operand})";
                     // Enumerable.Sum returns 0 for an empty sequence; SQL SUM yields NULL. Coalesce
                     // so the persisted value matches LINQ semantics (Count already yields 0).

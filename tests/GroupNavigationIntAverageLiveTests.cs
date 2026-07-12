@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
 using System.Linq;
+using System.Threading.Tasks;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -167,6 +168,67 @@ public class GroupNavigationIntAverageLiveTests
             // silently drop it; an untranslated navigation aggregate would throw.
             var rows = ctx.Query<Parent>().Where(p => p.Kids.Average(k => k.Amount) > 1.4).ToList();
             Assert.Single(rows);
+        }
+        finally
+        {
+            Exec(factory!, $"DROP TABLE IF EXISTS {tk}");
+            Exec(factory!, $"DROP TABLE IF EXISTS {tp}");
+        }
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("GnAvgPT_Test")]
+    private class ParentWithTotal
+    {
+        [System.ComponentModel.DataAnnotations.Key,
+         System.ComponentModel.DataAnnotations.Schema.DatabaseGenerated(System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public double Total { get; set; }
+        public List<KidT> KidTs { get; set; } = new();
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("GnAvgKT_Test")]
+    private class KidT
+    {
+        [System.ComponentModel.DataAnnotations.Key,
+         System.ComponentModel.DataAnnotations.Schema.DatabaseGenerated(System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+        public int ParentWithTotalId { get; set; }
+        public int Amount { get; set; }
+    }
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
+    public async Task ExecuteUpdate_navigation_int_average_is_fractional(string kind)
+    {
+        var (factory, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+        var q = kind == "postgres" ? "\"" : "";
+        var tp = $"{q}GnAvgPT_Test{q}";
+        var tk = $"{q}GnAvgKT_Test{q}";
+        var idCol = kind switch
+        {
+            "mysql" => "Id INT PRIMARY KEY AUTO_INCREMENT",
+            "postgres" => "\"Id\" SERIAL PRIMARY KEY",
+            _ => "Id INT IDENTITY PRIMARY KEY",
+        };
+        string C(string n, string t2) => kind == "postgres" ? $"\"{n}\" {t2}" : $"{n} {t2}";
+        Exec(factory!, $"DROP TABLE IF EXISTS {tk}");
+        Exec(factory!, $"DROP TABLE IF EXISTS {tp}");
+        Exec(factory!, $"CREATE TABLE {tp} ({idCol}, {C("Total", "FLOAT NOT NULL")})");
+        Exec(factory!, $"CREATE TABLE {tk} ({idCol}, {C("ParentWithTotalId", "INT NOT NULL")}, {C("Amount", "INT NOT NULL")})");
+        Exec(factory!, $"INSERT INTO {tp} {(kind == "postgres" ? "(\"Total\")" : "(Total)")} VALUES (0)");
+        Exec(factory!, $"INSERT INTO {tk} {(kind == "postgres" ? "(\"ParentWithTotalId\", \"Amount\")" : "(ParentWithTotalId, Amount)")} VALUES (1,1),(1,2)");
+        try
+        {
+            using var ctx = new DbContext(factory!(), provider!);
+            // SetProperty writing a navigation Average: kids 1,2 -> C# average 1.5; a truncating
+            // AVG(int) would persist 1.
+            await ctx.Query<ParentWithTotal>()
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Total, x => x.KidTs.Average(k => k.Amount)));
+            var total = ctx.Query<ParentWithTotal>().Select(x => x.Total).ToList().Single();
+            Assert.Equal(1.5, total, 3);
         }
         finally
         {
