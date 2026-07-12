@@ -458,6 +458,8 @@ namespace nORM.Core
             {
                 Interlocked.Exchange(ref _currentTransaction, null);
                 Volatile.Write(ref _currentContextTransaction, null);
+                // Savepoint key snapshots are scoped to the transaction that owned them.
+                _savepointKeySnapshots?.Clear();
             }
         }
 

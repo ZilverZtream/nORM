@@ -49,13 +49,23 @@ namespace nORM.Core
             return CreateSavepointCoreAsync(transaction, name, ct);
         }
 
-        internal Task CreateSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        // Per-savepoint snapshot of the DB-generated key values of Added entities at the moment the
+        // savepoint was created, keyed by entity reference. Used to reset keys stamped by inserts that
+        // happen after the savepoint so a rollback-to-savepoint leaves those entities re-insertable.
+        private Dictionary<string, Dictionary<object, object?[]>>? _savepointKeySnapshots;
+
+        internal async Task CreateSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)
                 throw new NormUsageException("No active transaction.");
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
-            return _p.CreateSavepointAsync(transaction, name, ct);
+            await _p.CreateSavepointAsync(transaction, name, ct).ConfigureAwait(false);
+            // Snapshot AFTER the savepoint exists so a later rollback to it can restore the exact
+            // in-memory key state. Overwrites any prior snapshot for the same name (matching the SQL
+            // semantics of re-declaring a savepoint).
+            (_savepointKeySnapshots ??= new Dictionary<string, Dictionary<object, object?[]>>(StringComparer.Ordinal))[name]
+                = SnapshotAddedGeneratedKeys();
         }
 
         /// <summary>
@@ -74,13 +84,108 @@ namespace nORM.Core
             return RollbackToSavepointCoreAsync(transaction, name, ct);
         }
 
-        internal Task RollbackToSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        internal async Task RollbackToSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)
                 throw new NormUsageException("No active transaction.");
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
-            return _p.RollbackToSavepointAsync(transaction, name, ct);
+            await _p.RollbackToSavepointAsync(transaction, name, ct).ConfigureAwait(false);
+            // The rollback discarded every row inserted since the savepoint. Reset the DB-generated
+            // keys those inserts stamped so the entities (still Added, because a caller-owned
+            // transaction skips AcceptChanges) are re-inserted on the next SaveChanges instead of being
+            // silently dropped by the "skip already-inserted" guard.
+            if (_savepointKeySnapshots != null && _savepointKeySnapshots.TryGetValue(name, out var snapshot))
+                RestoreRolledBackGeneratedKeys(snapshot);
+        }
+
+        /// <summary>
+        /// Captures the current DB-generated key values of every Added entity, keyed by entity
+        /// reference, so a subsequent rollback can tell which keys were stamped afterwards.
+        /// </summary>
+        private Dictionary<object, object?[]> SnapshotAddedGeneratedKeys()
+        {
+            var snapshot = new Dictionary<object, object?[]>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State == EntityState.Added && entry.Entity is { } e && HasDbGeneratedKey(entry.Mapping.KeyColumns))
+                {
+                    var m = entry.Mapping;
+                    var keys = new object?[m.KeyColumns.Length];
+                    for (int i = 0; i < m.KeyColumns.Length; i++)
+                        keys[i] = m.KeyColumns[i].Getter(e);
+                    snapshot[e] = keys;
+                }
+            }
+            return snapshot;
+        }
+
+        /// <summary>
+        /// After a rollback that undid inserts, resets the DB-generated keys those inserts stamped:
+        /// entities present at snapshot time are restored to their snapshot key; entities added after
+        /// the snapshot have their generated key columns reset to default (non-generated composite-key
+        /// parts are preserved). Uses <see cref="ChangeTracker.RollbackGeneratedKeyAssignment"/> so the
+        /// stale key-based identity-map index is dropped too.
+        /// </summary>
+        private void RestoreRolledBackGeneratedKeys(Dictionary<object, object?[]> snapshot)
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State != EntityState.Added || entry.Entity is not { } e)
+                    continue;
+                var m = entry.Mapping;
+                if (!HasDbGeneratedKey(m.KeyColumns))
+                    continue;
+
+                if (snapshot.TryGetValue(e, out var snapKeys))
+                {
+                    var changed = false;
+                    for (int i = 0; i < m.KeyColumns.Length; i++)
+                    {
+                        if (!Equals(m.KeyColumns[i].Getter(e), snapKeys[i]))
+                        {
+                            changed = true;
+                            break;
+                        }
+                    }
+                    if (changed)
+                        ChangeTracker.RollbackGeneratedKeyAssignment(e, m, snapKeys);
+                }
+                else if (!IsDefaultDbGeneratedKey(e, m))
+                {
+                    ChangeTracker.RollbackGeneratedKeyAssignment(e, m, DefaultDbGeneratedKeyValues(m, e));
+                }
+            }
+        }
+
+        private static object?[] DefaultDbGeneratedKeyValues(TableMapping map, object entity)
+        {
+            var vals = new object?[map.KeyColumns.Length];
+            for (int i = 0; i < map.KeyColumns.Length; i++)
+            {
+                var col = map.KeyColumns[i];
+                if (!col.IsDbGenerated)
+                {
+                    vals[i] = col.Getter(entity); // preserve a user-set non-generated composite-key part
+                    continue;
+                }
+                var underlying = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+                vals[i] = underlying == typeof(Guid)
+                    ? Guid.Empty
+                    : Type.GetTypeCode(underlying) switch
+                    {
+                        TypeCode.Int32 => 0,
+                        TypeCode.Int64 => 0L,
+                        TypeCode.Int16 => (short)0,
+                        TypeCode.Byte => (byte)0,
+                        TypeCode.SByte => (sbyte)0,
+                        TypeCode.UInt16 => (ushort)0,
+                        TypeCode.UInt32 => 0u,
+                        TypeCode.UInt64 => 0ul,
+                        _ => null
+                    };
+            }
+            return vals;
         }
         #endregion
     }
