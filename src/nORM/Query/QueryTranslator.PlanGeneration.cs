@@ -105,6 +105,7 @@ namespace nORM.Query
                     && _t._having.Length == 0)
                 {
                     _t._groupBy.Clear();
+                    _t._groupByOrdinalExtras.Clear();
                     _t.InstallGroupingTransform(_t._streamingGroupByKeySelector, _t._groupByElementSelector);
                 }
 
@@ -380,7 +381,25 @@ namespace nORM.Query
                         {
                             select = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
                         }
-                        var distinct = _t._isDistinct ? "DISTINCT " : string.Empty;
+                        var emitDistinctKeyword = _t._isDistinct;
+                        // C# Distinct() on strings is ordinal, but DISTINCT on CI-collation
+                        // providers (MySQL, SQL Server) folds case and silently collapses "abc"
+                        // and "ABC" into one value. For a scalar string projection, rewrite as
+                        // GROUP BY (value, binary-value): grouping by the composite is exactly
+                        // byte-wise distinctness, while the SELECT keeps returning the plain
+                        // string (BINARY value alone would materialize as raw bytes on MySQL).
+                        if (emitDistinctKeyword
+                            && _t._provider.DefaultStringEqualityIsCaseInsensitive
+                            && _t._groupBy.Count == 0
+                            && _t._projection != null
+                            && _t._projection.Body.Type == typeof(string)
+                            && !select.Contains(" AS ", StringComparison.Ordinal))
+                        {
+                            _t._groupBy.Add(select);
+                            _t._groupByOrdinalExtras.Add(_t._provider.ForceCaseSensitiveStringComparison(select));
+                            emitDistinctKeyword = false;
+                        }
+                        var distinct = emitDistinctKeyword ? "DISTINCT " : string.Empty;
                         var prefix = PooledStringBuilder.Rent();
                         try
                         {
@@ -399,7 +418,14 @@ namespace nORM.Query
                     _t._sql.AppendFragment(" WHERE ").Append(_t._where.ToSqlString());
                 }
                 if (_t._groupBy.Count > 0)
+                {
                     _t._sql.AppendFragment(" GROUP BY ").Append(PooledStringBuilder.Join(_t._groupBy));
+                    // Ordinal string grouping on CI-collation providers: the binary key forms are
+                    // appended to the CLAUSE only, so the SELECT-side key resolution (which also
+                    // reads _groupBy) keeps returning plain strings.
+                    if (_t._groupByOrdinalExtras.Count > 0)
+                        _t._sql.AppendFragment(", ").Append(PooledStringBuilder.Join(_t._groupByOrdinalExtras));
+                }
                 if (_t._having.Length > 0)
                     _t._sql.AppendFragment(" HAVING ").Append(_t._having.ToSqlString());
                 if (_t._orderBy.Count > 0)

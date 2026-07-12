@@ -15,6 +15,12 @@ namespace nORM.Query
         public OptimizedSqlBuilder Having { get; } = new();
         public List<(string col, bool asc)> OrderBy { get; } = new();
         public List<string> GroupBy { get; } = new();
+        // Extra grouping expressions appended ONLY to the emitted GROUP BY clause — never to the
+        // SELECT-side key resolution that also reads GroupBy (RegisterGroupingKey). Used for
+        // ordinal string grouping on CI-collation providers: GROUP BY key, BINARY key groups
+        // byte-wise while the projection keeps selecting the plain key (a selected BINARY key
+        // would materialize as raw bytes and shift the positional materializer).
+        public List<string> GroupByOrdinalExtras { get; } = new();
         public List<WindowFunctionInfo> WindowFunctions { get; } = new();
         public int? Take { get; set; }
         public int? Skip { get; set; }

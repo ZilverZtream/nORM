@@ -143,9 +143,17 @@ namespace nORM.Query
                 innerKeySql,
                 orderBy: null,
                 distinct: _isDistinct,
-                outerFromOverride: gjOuterFromOverride);
+                outerFromOverride: gjOuterFromOverride,
+                provider: _provider,
+                keyClrType: sqlOuterKeySelector.Body.Type);
             // Insert outer-key sort at the front of _orderBy so it is always first.
             _orderBy.Insert(0, (outerKeySql, true));
+            // Ordinal string keys on CI-collation providers: CI ordering leaves case variants
+            // ("abc"/"ABC") interleaved within a tie, which would split the client-side group
+            // segmentation. Order by the binary key second so byte-equal rows stay contiguous.
+            if ((Nullable.GetUnderlyingType(sqlOuterKeySelector.Body.Type) ?? sqlOuterKeySelector.Body.Type) == typeof(string)
+                && _provider.DefaultStringEqualityIsCaseInsensitive)
+                _orderBy.Insert(1, (_provider.ForceCaseSensitiveStringComparison(outerKeySql), true));
             var outerType = runtimeResultSelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
             var resultType = runtimeResultSelector.Body.Type;

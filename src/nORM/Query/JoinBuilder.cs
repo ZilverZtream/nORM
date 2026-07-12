@@ -61,6 +61,23 @@ namespace nORM.Query
     [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal static class JoinBuilder
     {
+        /// <summary>
+        /// Composes the join's key-equality condition. C# joins string keys ordinally, so on
+        /// providers whose default collation folds case (MySQL, SQL Server) a string-keyed join
+        /// emits the sargable ordinal form — the plain <c>=</c> keeps hash/merge join
+        /// eligibility, the binary term filters the case variants exactly. Callers that do not
+        /// supply the provider/key type keep the plain equality.
+        /// </summary>
+        internal static string BuildOnEquality(
+            string outerKeySql, string innerKeySql,
+            nORM.Providers.DatabaseProvider? provider = null, Type? keyClrType = null)
+        {
+            var t = keyClrType == null ? null : Nullable.GetUnderlyingType(keyClrType) ?? keyClrType;
+            return provider != null && t == typeof(string) && provider.DefaultStringEqualityIsCaseInsensitive
+                ? provider.OrdinalStringEqualSql(outerKeySql, innerKeySql)
+                : $"{outerKeySql} = {innerKeySql}";
+        }
+
         public static string BuildJoinClause(
             LambdaExpression? projection,
             TableMapping outerMapping,
@@ -70,7 +87,9 @@ namespace nORM.Query
             string joinType,
             string outerKeySql,
             string innerKeySql,
-            string? orderBy = null)
+            string? orderBy = null,
+            nORM.Providers.DatabaseProvider? provider = null,
+            Type? keyClrType = null)
         {
             using var joinSql = new OptimizedSqlBuilder(256);
 
@@ -103,7 +122,7 @@ namespace nORM.Query
 
             joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
             joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
-            joinSql.Append($"ON {outerKeySql} = {innerKeySql}");
+            joinSql.Append($"ON {BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType)}");
             if (orderBy != null)
                 joinSql.Append($" ORDER BY {orderBy}");
 
@@ -396,7 +415,9 @@ namespace nORM.Query
     string? outerFromOverride = null,
     string? additionalOnConditions = null,
     Func<Expression, string>? translateProjectionExpression = null,
-    Func<string, string>? escapeProjectionAlias = null)
+    Func<string, string>? escapeProjectionAlias = null,
+    nORM.Providers.DatabaseProvider? provider = null,
+    Type? keyClrType = null)
         {
             // Pre-reserve space to minimize buffer growth
             var estimatedSize = 200 + outerMapping.Columns.Length * 25 + innerMapping.Columns.Length * 25;
@@ -470,7 +491,7 @@ namespace nORM.Query
                 joinSql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
             }
             joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
-            joinSql.Append("ON ").Append(outerKeySql).Append(" = ").Append(innerKeySql);
+            joinSql.Append("ON ").Append(BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType));
             if (!string.IsNullOrEmpty(additionalOnConditions))
                 joinSql.Append(" AND ").Append(additionalOnConditions);
             if (!string.IsNullOrEmpty(orderBy))

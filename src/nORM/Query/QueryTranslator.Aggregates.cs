@@ -171,6 +171,15 @@ namespace nORM.Query
                         partSql = _provider.NormalizeDecimalForCompare(partSql);
                     parts.Add(partSql);
                     _groupBy.Add(partSql);
+                    // C# groups string keys ordinally; on CI-collation providers (MySQL,
+                    // SQL Server) add the binary form as an EXTRA grouping key — the composite
+                    // (key, binary-key) is exactly as fine as byte-wise grouping, the SELECT side
+                    // keeps returning the plain string, and ONLY_FULL_GROUP_BY stays satisfied.
+                    // Goes into GroupByOrdinalExtras, NOT _groupBy: _groupBy also feeds the
+                    // SELECT-side key resolution, where the binary form would materialize as
+                    // raw bytes and shift the positional materializer.
+                    if (partType == typeof(string) && _provider.DefaultStringEqualityIsCaseInsensitive)
+                        _groupByOrdinalExtras.Add(_provider.ForceCaseSensitiveStringComparison(partSql));
                     var memberName = compositeKey.Members?[i]?.Name ?? $"Item{i + 1}";
                     _compositeKeyMemberSql[memberName] = partSql;
                 }
@@ -206,6 +215,10 @@ namespace nORM.Query
                     if (keyType == typeof(decimal))
                         groupBySql = _provider.NormalizeDecimalForCompare(groupBySql);
                     _groupBy.Add(groupBySql);
+                    // Ordinal string grouping on CI-collation providers: extra binary key (see
+                    // the composite-key path above for the rationale and the extras-list note).
+                    if (keyType == typeof(string) && _provider.DefaultStringEqualityIsCaseInsensitive)
+                        _groupByOrdinalExtras.Add(_provider.ForceCaseSensitiveStringComparison(groupBySql));
                 }
             }
 

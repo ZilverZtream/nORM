@@ -88,7 +88,9 @@ namespace nORM.Query
                 innerKeySql,
                 distinct: _isDistinct,
                 translateProjectionExpression: TranslateJoinProjectionExpression,
-                escapeProjectionAlias: _provider.Escape);
+                escapeProjectionAlias: _provider.Escape,
+                provider: _provider,
+                keyClrType: outerKeySel.Body.Type);
         }
 
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]

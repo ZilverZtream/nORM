@@ -53,6 +53,7 @@ namespace nORM.Query
                 || _having.Length > 0)
                 return;
             _groupBy.Clear();
+            _groupByOrdinalExtras.Clear();
             InstallGroupingTransform(_streamingGroupByKeySelector, _groupByElementSelector);
             _streamingGroupByKeySelector = null;
         }

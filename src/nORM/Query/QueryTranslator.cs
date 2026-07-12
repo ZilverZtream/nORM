@@ -161,6 +161,7 @@ namespace nORM.Query
         private OptimizedSqlBuilder _having => _clauses.Having;
         private List<(string col, bool asc)> _orderBy => _clauses.OrderBy;
         private List<string> _groupBy => _clauses.GroupBy;
+        private List<string> _groupByOrdinalExtras => _clauses.GroupByOrdinalExtras;
         private int? _take { get => _clauses.Take; set => _clauses.Take = value; }
         private int? _skip { get => _clauses.Skip; set => _clauses.Skip = value; }
         private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }

@@ -131,7 +131,9 @@ namespace nORM.Query
                 outerFromOverride: outerFromOverride,
                 additionalOnConditions: additionalOnSql,
                 translateProjectionExpression: TranslateJoinProjectionExpression,
-                escapeProjectionAlias: _provider.Escape);
+                escapeProjectionAlias: _provider.Escape,
+                provider: _provider,
+                keyClrType: sqlOuterKeySelector.Body.Type);
             return node;
         }
         // Walks the inner query expression chain and extracts any WHERE predicates,
