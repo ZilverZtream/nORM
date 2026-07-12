@@ -247,7 +247,7 @@ namespace nORM.Query
                         _sql.Append("''");
                         return node;
                     }
-                    var concatSql = parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next));
+                    var concatSql = parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next));
                     _sql.Append(concatSql);
                     return node;
                 }
@@ -270,7 +270,7 @@ namespace nORM.Query
                 }
                 var concatSql = parts.Count == 1
                     ? parts[0]
-                    : parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next));
+                    : parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next));
                 _sql.Append(concatSql);
                 return node;
             }

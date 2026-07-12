@@ -75,6 +75,19 @@ namespace nORM.Providers
         public virtual string GetConcatSql(string left, string right) => $"CONCAT({left}, {right})";
 
         /// <summary>
+        /// Concatenation with C# <see cref="string.Concat(string?, string?)"/> null semantics:
+        /// a NULL operand contributes an empty string instead of nulling the whole result
+        /// (<c>null + "!"</c> is <c>"!"</c> in C#, never null). The ANSI CONCAT default
+        /// already ignores NULLs on SQL Server and PostgreSQL; providers whose concatenation
+        /// propagates NULL (SQLite <c>||</c>, MySQL CONCAT) override with per-operand
+        /// COALESCE. Used for user-level string concatenation (<c>+</c>, string.Concat,
+        /// string.Join, string.Format); LIKE-pattern composition keeps
+        /// <see cref="GetConcatSql"/> — there a NULL pattern must stay NULL, because
+        /// COALESCE would turn it into <c>'%%'</c> and match every row.
+        /// </summary>
+        public virtual string GetNullSafeConcatSql(string left, string right) => GetConcatSql(left, right);
+
+        /// <summary>
         /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation -
         /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
         /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native

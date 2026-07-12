@@ -43,6 +43,14 @@ namespace nORM.Providers
         /// <inheritdoc />
         public override string ForceCaseSensitiveStringComparison(string sql) => $"BINARY {sql}";
 
+        /// <summary>
+        /// MySQL's CONCAT propagates NULL (unlike SQL Server's and PostgreSQL's, which
+        /// ignore NULL operands); COALESCE each operand so a NULL contributes an empty
+        /// string, matching C# string concatenation.
+        /// </summary>
+        public override string GetNullSafeConcatSql(string left, string right)
+            => $"CONCAT(COALESCE({left}, ''), COALESCE({right}, ''))";
+
         /// <summary>MySQL rejects <c>DEFAULT VALUES</c>; an all-default row is <c>INSERT INTO t () VALUES ()</c>.</summary>
         public override string DefaultValuesInsertClause => "() VALUES ()";
 

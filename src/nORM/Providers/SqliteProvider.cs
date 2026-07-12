@@ -119,6 +119,13 @@ namespace nORM.Providers
         /// </summary>
         public override string GetConcatSql(string left, string right) => $"({left} || {right})";
 
+        /// <summary>
+        /// SQLite's <c>||</c> propagates NULL; COALESCE each operand so a NULL
+        /// contributes an empty string, matching C# string concatenation.
+        /// </summary>
+        public override string GetNullSafeConcatSql(string left, string right)
+            => $"(COALESCE({left}, '') || COALESCE({right}, ''))";
+
         /// <summary>SQLite TEXT affinity is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 

@@ -732,6 +732,7 @@ M:nORM.Providers.DatabaseProvider.GetInsertColumns(nORM.Mapping.TableMapping):nO
 M:nORM.Providers.DatabaseProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetIntCastSql(System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.GetLikeEscapeSql(System.String):System.String
+M:nORM.Providers.DatabaseProvider.GetNullSafeConcatSql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetProviderNativeTemporalAsOfFromClause(nORM.Mapping.TableMapping,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetRealCastSql(System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.GetRegexMatchIgnoreCaseSql(System.String,System.String):System.String
@@ -815,6 +816,7 @@ M:nORM.Providers.MySqlProvider.GetDateTimeOffsetWithOffsetSql(System.String,Syst
 M:nORM.Providers.MySqlProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.MySqlProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetIntCastSql(System.String,System.Boolean):System.String
+M:nORM.Providers.MySqlProvider.GetNullSafeConcatSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetRegexMatchIgnoreCaseSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetRegexMatchSql(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.GetRegexReplaceIgnoreCaseSql(System.String,System.String,System.String):System.String
@@ -993,6 +995,7 @@ M:nORM.Providers.SqliteProvider.GetDateTimeOffsetUtcEpochSecondsSql(System.Strin
 M:nORM.Providers.SqliteProvider.GetDateTimeOffsetWithOffsetSql(System.String,System.TimeSpan):System.String
 M:nORM.Providers.SqliteProvider.GetIdentityRetrievalString(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.SqliteProvider.GetInsertOrIgnoreSql(System.String,System.String,System.String,System.String,System.String):System.String
+M:nORM.Providers.SqliteProvider.GetNullSafeConcatSql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetRealCastSql(System.String,System.Boolean):System.String
 M:nORM.Providers.SqliteProvider.GetRegexMatchSql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetRegexReplaceSql(System.String,System.String,System.String):System.String

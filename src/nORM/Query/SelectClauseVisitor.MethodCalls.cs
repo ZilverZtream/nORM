@@ -135,7 +135,7 @@ namespace nORM.Query
                 }
                 if (concatParts.Count == 0) { sb.Append("''"); return node; }
                 if (concatParts.Count == 1) { sb.Append(concatParts[0]); return node; }
-                sb.Append(concatParts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next)));
+                sb.Append(concatParts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next)));
                 return node;
             }
 
@@ -168,7 +168,7 @@ namespace nORM.Query
                     if (i > 0) parts.Add(sepLit);
                     parts.Add(TranslateProjectionArg(joinArr.Expressions[i]));
                 }
-                sb.Append(parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next)));
+                sb.Append(parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next)));
                 return node;
             }
 
@@ -449,7 +449,7 @@ namespace nORM.Query
                         }
                     }
                     if (parts.Count == 0) { sb.Append("''"); return node; }
-                    sb.Append(parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next)));
+                    sb.Append(parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next)));
                     return node;
                 }
             }

@@ -203,7 +203,7 @@ namespace nORM.Query
             {
                 var concatLeftSql = GetSql(node.Left);
                 var concatRightSql = GetSql(node.Right);
-                _sql.Append(_provider.GetConcatSql(concatLeftSql, concatRightSql));
+                _sql.Append(_provider.GetNullSafeConcatSql(concatLeftSql, concatRightSql));
                 return node;
             }
 

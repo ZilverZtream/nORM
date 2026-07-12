@@ -86,7 +86,7 @@ namespace nORM.Query
                 Visit(node.Right);
                 var rightSql = sb.ToString(rightStart, sb.Length - rightStart);
                 sb.Length = rightStart;
-                sb.Append(_provider.GetConcatSql(leftSql, rightSql));
+                sb.Append(_provider.GetNullSafeConcatSql(leftSql, rightSql));
                 return node;
             }
             // DateTime + TimeSpan COLUMN (rhs is not a foldable constant --

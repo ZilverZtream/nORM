@@ -164,7 +164,7 @@ namespace nORM.Query
                     if (i > 0) parts.Add(sepLit);
                     parts.Add(GetSql(joinArr.Expressions[i]));
                 }
-                var joined = parts.Aggregate((acc, next) => _provider.GetConcatSql(acc, next));
+                var joined = parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next));
                 _sql.Append(joined);
                 return true;
             }

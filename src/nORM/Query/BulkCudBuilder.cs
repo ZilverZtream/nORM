@@ -392,7 +392,7 @@ namespace nORM.Query
                             && be.Left.Type == typeof(string)
                             && be.Right.Type == typeof(string))
                         {
-                            return _ctx.RawProvider.GetConcatSql(Render(be.Left), Render(be.Right));
+                            return _ctx.RawProvider.GetNullSafeConcatSql(Render(be.Left), Render(be.Right));
                         }
                         // Null-coalesce: `??` lowers to BinaryExpression(Coalesce). Emit COALESCE.
                         if (be.NodeType == ExpressionType.Coalesce)
