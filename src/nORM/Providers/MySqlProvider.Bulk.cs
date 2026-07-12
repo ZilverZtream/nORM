@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using nORM.Query;
 using System.Threading;
 using System.Threading.Tasks;
@@ -159,8 +160,7 @@ namespace nORM.Providers
                 }
                 tempCreated = true;
 
-                var tempMapping = new TableMapping(m.Type, this, ctx, null) { EscTable = tempTableName };
-                await BulkInsertAsync(ctx, tempMapping, entities, ct).ConfigureAwait(false);
+                await StageForBulkUpdateAsync(ctx, m, tempTableName, entities, ct).ConfigureAwait(false);
 
                 var setClause = string.Join(", ", nonKeyCols.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}"));
                 var joinConditions = m.KeyColumns.Select(c => $"T1.{c.EscCol} = T2.{c.EscCol}").ToList();
@@ -220,6 +220,46 @@ namespace nORM.Providers
 
         internal static string BuildBulkUpdateDropTempTableSql(string tempTableName)
             => $"DROP TEMPORARY TABLE IF EXISTS {tempTableName}";
+
+        /// <summary>
+        /// Stages rows into the bulk-UPDATE temp table INCLUDING key columns — even a DB-generated
+        /// identity key — so the UPDATE ... JOIN correlates the target to the staging table on the key.
+        /// The shared bulk-insert path excludes DB-generated columns (correct for a real insert, where
+        /// the DB assigns them); reusing it here left the staged key NULL, so the join matched nothing
+        /// and every update was silently discarded.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk staging reflects over entity members; trimming may remove the required members.")]
+        private async Task StageForBulkUpdateAsync<T>(DbContext ctx, TableMapping m, string tempTable, IEnumerable<T> entities, CancellationToken ct) where T : class
+        {
+            var cols = m.Columns.Where(c => !c.IsDbGenerated || c.IsKey).ToList();
+            var list = entities.ToList();
+            if (list.Count == 0 || cols.Count == 0) return;
+
+            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+            var batchSize = Math.Max(1, Math.Min(list.Count, (MaxParameters - 10) / cols.Count));
+            for (int start = 0; start < list.Count; start += batchSize)
+            {
+                var count = Math.Min(batchSize, list.Count - start);
+                var sb = new StringBuilder();
+                sb.Append("INSERT INTO ").Append(tempTable).Append(" (").Append(colNames).Append(") VALUES ");
+                await using var cmd = ctx.CreateCommand();
+                cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
+                var pIndex = 0;
+                for (int i = 0; i < count; i++)
+                {
+                    sb.Append(i > 0 ? ",(" : "(");
+                    for (int j = 0; j < cols.Count; j++)
+                    {
+                        var pName = $"{ParamPrefix}s{pIndex++}";
+                        cmd.AddParam(pName, cols[j].Getter(list[start + i]));
+                        sb.Append(j > 0 ? "," : string.Empty).Append(pName);
+                    }
+                    sb.Append(')');
+                }
+                cmd.CommandText = sb.ToString();
+                await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
+            }
+        }
 
         /// <summary>
         /// Deletes multiple records using MySQL-optimized WHERE IN clauses for efficient bulk deletes.
