@@ -59,7 +59,7 @@ namespace nORM.Query
                     lambda = t.ExpandProjection(lambda);
                     var lp = lambda.Parameters[0];
                     t._correlatedParams[lp] = (subMapW, winAliasW);
-                    var vctxW = new VisitorContext(t._ctx, subMapW, t._provider, lp, winAliasW, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var vctxW = new VisitorContext(t._ctx, subMapW, t._provider, lp, winAliasW, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxW);
                     var predSql = visitor.Translate(lambda.Body);
                     foreach (var kvp in visitor.GetParameters())
@@ -173,7 +173,7 @@ namespace nORM.Query
                     // paramIndexStart = t._params.Count so that this predicate's visitor
                     // does not reuse @p0/@p1 names already allocated by preceding predicates
                     // (e.g. inner Where's compiled param and global-filter constant colliding).
-                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     if (isGrouping)
                     {
@@ -530,7 +530,7 @@ namespace nORM.Query
                     keySel = t.ExpandProjection(keySel);
                     var kp = keySel.Parameters[0];
                     t._correlatedParams[kp] = (subMapO, winAliasO);
-                    var vctxO = new VisitorContext(t._ctx, subMapO, t._provider, kp, winAliasO, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var vctxO = new VisitorContext(t._ctx, subMapO, t._provider, kp, winAliasO, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxO);
                     var keySql = visitor.Translate(keySel.Body);
                     foreach (var kvp in visitor.GetParameters())
@@ -659,7 +659,7 @@ namespace nORM.Query
                         info = (t._mapping, alias);
                         t._correlatedParams[param] = info;
                     }
-                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                    var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     // Mirror the WhereTranslator grouping setup so that
                     // `GroupBy(k).Select(g => new {Cat=g.Key, ...}).OrderBy(x => x.Cat)` works:

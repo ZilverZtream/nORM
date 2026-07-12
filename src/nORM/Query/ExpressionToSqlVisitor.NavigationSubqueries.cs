@@ -50,7 +50,7 @@ namespace nORM.Query
             var subCtx = new VisitorContext(
                 _ctx, childMapping, _provider,
                 selectorLambda.Parameters[0], subAlias,
-                _parameterMappings, _compiledParams, _paramMap, _recursionDepth + 1, _paramIndex);
+                _parameterMappings, _compiledParams, _paramConverters, _paramMap, _recursionDepth + 1, _paramIndex);
             subVisitor.Initialize(in subCtx);
             subVisitor.UseSharedParameterDictionary(_paramSink);
             var selectorSql = subVisitor.Translate(selectorLambda.Body);

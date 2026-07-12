@@ -20,6 +20,9 @@ internal readonly struct VisitorContext
     public readonly string TableAlias;
     public readonly Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? Correlated;
     public readonly List<string>? CompiledParams;
+    // Shared converter map (keyed by compiled-parameter name) for closure values compared against a
+    // value-converter column, so every sub-visitor records into the translator's single map.
+    public readonly Dictionary<string, IValueConverter>? ParamConverters;
     public readonly Dictionary<ParameterExpression, string>? ParamMap;
     // Outer translator's recursion depth so BuildExists/BuildIn can pass depth+1.
     public readonly int RecursionDepth;
@@ -36,6 +39,7 @@ internal readonly struct VisitorContext
         string tableAlias,
         Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated,
         List<string>? compiledParams,
+        Dictionary<string, IValueConverter>? paramConverters,
         Dictionary<ParameterExpression, string>? paramMap,
         int recursionDepth = 0,
         int paramIndexStart = 0)
@@ -47,6 +51,7 @@ internal readonly struct VisitorContext
         TableAlias = tableAlias;
         Correlated = correlated;
         CompiledParams = compiledParams;
+        ParamConverters = paramConverters;
         ParamMap = paramMap;
         RecursionDepth = recursionDepth;
         ParamIndexStart = paramIndexStart;

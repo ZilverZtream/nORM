@@ -457,7 +457,10 @@ namespace nORM.Query
                     BulkCudShape: bulkCudShape,
                     PostReverse: _t._postReverseResult,
                     PostMaterializeTransform: _t._postMaterializeTransform,
-                    ClientScalar: _t._clientScalarResult
+                    ClientScalar: _t._clientScalarResult,
+                    ParameterConverters: _t._paramConverters.Count > 0
+                        ? new Dictionary<string, nORM.Mapping.IValueConverter>(_t._paramConverters)
+                        : null
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

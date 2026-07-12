@@ -108,7 +108,7 @@ namespace nORM.Query
                 string alias)
             {
                 t._correlatedParams[parameter] = (mapping, alias);
-                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var sql = visitor.Translate(expression);
                 foreach (var kvp in visitor.GetParameters())
@@ -296,7 +296,7 @@ namespace nORM.Query
             private static string BuildUnionSql(QueryTranslator t, ParameterExpression parameter, Expression expression, TableMapping mapping, string alias)
             {
                 t._correlatedParams[parameter] = (mapping, alias);
-                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                var vctx = new VisitorContext(t._ctx, mapping, t._provider, parameter, alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var sql = visitor.Translate(expression);
                 foreach (var kvp in visitor.GetParameters())

@@ -45,7 +45,7 @@ namespace nORM.Query
 
             if (!_correlatedParams.ContainsKey(outerKeySel.Parameters[0]))
                 _correlatedParams[outerKeySel.Parameters[0]] = (outerMapping, outerAlias);
-            var vctxOuter = new VisitorContext(_ctx, outerMapping, _provider, outerKeySel.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctxOuter = new VisitorContext(_ctx, outerMapping, _provider, outerKeySel.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
             var outerKeySql = outerKeyVisitor.Translate(outerKeySel.Body);
             // See HandleJoin: AddLiteralParameter for inline-constant key fragments.
@@ -55,7 +55,7 @@ namespace nORM.Query
 
             if (!_correlatedParams.ContainsKey(innerKeySel.Parameters[0]))
                 _correlatedParams[innerKeySel.Parameters[0]] = (innerMapping, innerAlias);
-            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySel.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySel.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
             var innerKeySql = innerKeyVisitor.Translate(innerKeySel.Body);
             foreach (var kvp in innerKeyVisitor.GetParameters())

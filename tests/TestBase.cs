@@ -17,7 +17,7 @@ public abstract class TestBase
         var getMapping = typeof(DbContext).GetMethod("GetMapping", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         var mapping = getMapping.Invoke(ctx, new object[] { typeof(T) });
         var visitorType = typeof(DbContext).Assembly.GetType("nORM.Query.ExpressionToSqlVisitor", true)!;
-        var visitor = Activator.CreateInstance(visitorType, ctx, mapping, ctx.Provider, expr.Parameters[0], provider.Escape("T0"), null, null, null)!;
+        var visitor = Activator.CreateInstance(visitorType, ctx, mapping, ctx.Provider, expr.Parameters[0], provider.Escape("T0"), null, null, null, null)!;
         var sql = (string)visitorType.GetMethod("Translate")!.Invoke(visitor, new object[] { expr.Body })!;
         var rawParameters = (Dictionary<string, object>)visitorType.GetMethod("GetParameters")!.Invoke(visitor, null)!;
         // Strip "_unused" placeholder slots -- these are alignment artifacts

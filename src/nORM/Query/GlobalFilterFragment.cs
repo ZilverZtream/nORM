@@ -36,7 +36,7 @@ namespace nORM.Query
                 return null;
 
             var vctx = new VisitorContext(ctx, map, ctx.RawProvider, combined.Parameters[0], qualifier,
-                correlated: null, compiledParams: null, paramMap: null,
+                correlated: null, compiledParams: null, paramConverters: null, paramMap: null,
                 recursionDepth: 0, paramIndexStart: cmd.Parameters.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             try

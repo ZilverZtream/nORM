@@ -190,7 +190,7 @@ namespace nORM.Query
                                     {
                                         if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                                             _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                                        var subVctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                                        var subVctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                                         var subVisitor = FastExpressionVisitorPool.Get(in subVctx);
                                         var subSql = subVisitor.Translate(subArg);
                                         var b = PooledStringBuilder.Rent();
@@ -230,7 +230,7 @@ namespace nORM.Query
                             {
                                 if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
                                     _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
-                                var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                                var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 string sql;
                                 try
@@ -438,7 +438,7 @@ namespace nORM.Query
         private string TranslateAgainstSubAlias(Expression body, ParameterExpression param, string subAlias)
         {
             var local = new Dictionary<ParameterExpression, (nORM.Mapping.TableMapping Mapping, string Alias)> { [param] = (_mapping, subAlias) };
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, subAlias, local, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, subAlias, local, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var sql = visitor.Translate(body);
             foreach (var kvp in visitor.GetParameters())
@@ -536,7 +536,7 @@ namespace nORM.Query
         {
             if (!_correlatedParams.ContainsKey(predicate.Parameters[0]))
                 _correlatedParams[predicate.Parameters[0]] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, predicate.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, predicate.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var sql = visitor.Translate(predicate.Body);
             foreach (var kvp in visitor.GetParameters())
@@ -593,7 +593,7 @@ namespace nORM.Query
                     || aggGroupParam.Type.GetGenericTypeDefinition() == typeof(IEnumerable<>))
                 && StripQuotes(aggInner.Arguments[1]) is LambdaExpression aggLambda)
             {
-                var vctxAgg = new VisitorContext(_ctx, _mapping, _provider, aggLambda.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                var vctxAgg = new VisitorContext(_ctx, _mapping, _provider, aggLambda.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                 var aggVisitor = FastExpressionVisitorPool.Get(in vctxAgg);
                 var memberSql = aggVisitor.Translate(aggLambda.Body);
                 foreach (var kvp in aggVisitor.GetParameters())
@@ -724,7 +724,7 @@ namespace nORM.Query
             if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
                 _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
 
-            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
             var columnSql = visitor.Translate(selector.Body);
             foreach (var kvp in visitor.GetParameters())

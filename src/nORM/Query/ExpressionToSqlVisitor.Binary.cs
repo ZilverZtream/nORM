@@ -619,19 +619,14 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Emits <c>(column &lt;op&gt; @p)</c> for a comparison between a value-converter column and an
-        /// inline constant, binding the converter's provider representation of the constant. Returns
-        /// false (falling through to the normal comparison paths) when neither/both sides are a
-        /// converter column, when the value is not an inline constant, or when the value is a literal
-        /// null (the IS NULL path handles null and needs no conversion).
+        /// Emits <c>(column &lt;op&gt; @p)</c> for a comparison between a value-converter column and a
+        /// bindable value, binding the converter's provider representation. An inline constant is
+        /// converted and baked; a closure-captured value is emitted as a compiled parameter whose
+        /// converter is recorded so it is applied to the extractor-supplied value at execution time
+        /// (a fingerprint-cached plan is reused across differing captures and cannot bake it). Returns
+        /// false when neither/both sides are a converter column, when the value is not a simple
+        /// bindable value, or when it is a literal null (the IS NULL path handles null).
         /// </summary>
-        /// <remarks>
-        /// Only inline constants are handled here. A closure-captured value compared to a converter
-        /// column still binds unconverted through the normal path — that requires converting the
-        /// value at execution time (the plan is fingerprint-cached across differing captured values)
-        /// and is tracked separately. Non-enum converter columns compared to a captured value are
-        /// already covered by the fast path, which extracts and converts the value eagerly.
-        /// </remarks>
         private bool TryEmitConvertedColumnConstantComparison(BinaryExpression node)
         {
             if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual
@@ -648,15 +643,21 @@ namespace nORM.Query
             var valueSide = leftIsColumn ? node.Right : node.Left;
             var column = leftIsColumn ? leftColumn : rightColumn;
 
-            // Only inline constants are handled; anything else (a closure capture, another column)
-            // declines before anything is written to the SQL buffer.
-            if (StripConvert(valueSide) is not ConstantExpression { Value: { } rawValue })
-                return false;
+            // Classify the value side before writing anything so an unhandled shape declines cleanly.
+            var stripped = StripConvert(valueSide);
+            var isInlineConstant = stripped is ConstantExpression;
+            if (isInlineConstant)
+            {
+                if (((ConstantExpression)stripped).Value == null)
+                    return false; // literal null -> IS NULL path
+            }
+            else if (!TryGetConstantValue(valueSide, out _))
+            {
+                return false; // not a simple constant/closure value (e.g. another column)
+            }
 
             // Normalize to `column <op> value` — flip the operator when the column is on the right.
             var op = leftIsColumn ? node.NodeType : FlipComparison(node.NodeType);
-            var converted = column.Converter!.ConvertToProvider(rawValue);
-            var convertedType = converted?.GetType() ?? column.Converter!.ProviderType;
 
             _sql.Append('(');
             if (op == ExpressionType.NotEqual && column.IsNullable)
@@ -665,7 +666,7 @@ namespace nORM.Query
                 // included (SQL `NULL <> @p` is UNKNOWN, i.e. excluded).
                 var columnSql = GetSql(memberSide);
                 _sql.Append(columnSql).Append(" IS NULL OR ").Append(columnSql).Append(" <> ");
-                AppendConstant(converted, convertedType);
+                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant);
             }
             else
             {
@@ -680,10 +681,30 @@ namespace nORM.Query
                     ExpressionType.LessThanOrEqual => " <= ",
                     _ => throw new InvalidOperationException()
                 });
-                AppendConstant(converted, convertedType);
+                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant);
             }
             _sql.Append(')');
             return true;
+        }
+
+        private void EmitConvertedValueOperand(Expression strippedValue, nORM.Mapping.IValueConverter converter, bool isInlineConstant)
+        {
+            if (isInlineConstant)
+            {
+                var raw = ((ConstantExpression)strippedValue).Value;
+                var converted = converter.ConvertToProvider(raw);
+                AppendConstant(converted, converted?.GetType() ?? converter.ProviderType);
+                return;
+            }
+
+            // Closure-captured value: emit a compiled parameter (mirroring the closure branch in
+            // VisitMember so the ParameterValueExtractor's positional value aligns) and record the
+            // converter so the plan applies it to the extracted value at execution time.
+            var paramName = $"{_provider.ParamPrefix}cp{_compiledParams.Count}";
+            _params[paramName] = DBNull.Value;
+            _compiledParams.Add(paramName);
+            _paramConverters[paramName] = converter;
+            _sql.Append(paramName);
         }
 
         private static Expression StripConvert(Expression expr)

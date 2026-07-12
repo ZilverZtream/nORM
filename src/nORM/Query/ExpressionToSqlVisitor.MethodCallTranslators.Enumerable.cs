@@ -80,7 +80,7 @@ namespace nORM.Query
                                 // pooled inner visitor would otherwise overwrite the outer
                                 // parameter value in _params. Reclaim _paramIndex after the
                                 // sub-translate so subsequent outer params keep their own slots.
-                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap, _recursionDepth, _paramIndex);
+                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, countSelector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _paramIndex);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var predSql = visitor.Translate(countSelector.Body);
                                 foreach (var kvp in visitor.GetParameters())
@@ -126,7 +126,7 @@ namespace nORM.Query
                                 // Same paramIndex offset pattern as the Count branch above: prevent
                                 // the inner selector's @p0 from overwriting an outer-scope @p0 in
                                 // _params under chains like Where(g => g.Sum(x => x.Amount > N) > M).
-                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramMap, _recursionDepth, _paramIndex);
+                                var vctx = new VisitorContext(_ctx, info.Mapping, _provider, selector.Parameters[0], info.Alias, _parameterMappings, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _paramIndex);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                                 var colSql = visitor.Translate(selector.Body);
                                 foreach (var kvp in visitor.GetParameters())

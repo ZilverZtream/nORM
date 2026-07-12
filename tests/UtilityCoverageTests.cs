@@ -335,7 +335,7 @@ public class UtilityCoverageTests
         using var ctx = new DbContext(cn, new SqliteProvider());
         var mapping = ctx.GetMapping(typeof(UctGadget));
         var param = System.Linq.Expressions.Expression.Parameter(typeof(UctGadget), "g");
-        var vc = new VisitorContext(ctx, mapping, new SqliteProvider(), param, "g", null, null, null);
+        var vc = new VisitorContext(ctx, mapping, new SqliteProvider(), param, "g", null, null, null, null);
         var visitor = FastExpressionVisitorPool.Get(in vc);
         Assert.NotNull(visitor);
         FastExpressionVisitorPool.Return(visitor);

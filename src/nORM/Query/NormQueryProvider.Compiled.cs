@@ -343,7 +343,7 @@ namespace nORM.Query
             for (int i = 0; i < count; i++)
             {
                 if (IsUnusedCompiledParameter(compiledParams[i])) continue;
-                cmd.AddOptimizedParam(compiledParams[i], parameterValues[i] ?? DBNull.Value);
+                cmd.AddOptimizedParam(compiledParams[i], ApplyCompiledParamConverter(plan, compiledParams[i], parameterValues[i]) ?? DBNull.Value);
             }
         }
 
@@ -387,7 +387,7 @@ namespace nORM.Query
                 cmd = CreateAndPreparePooledCommand(plan, parameterValues, fixedParams, state);
 
             // Only update compiled parameter values - fixed params are already set
-            UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
+            UpdateCompiledParameterValues(cmd, plan, parameterValues, state.FixedParamCount);
             cmd.Transaction = _ctx.CurrentTransaction;
 
             // Inline materialization - command returned to pool after use
@@ -423,7 +423,7 @@ namespace nORM.Query
             // Q1 fix: reuse pooled prepared command to avoid repeated allocations; create new if pool is empty
             if (!state.CommandPool.TryDequeue(out var cmd))
                 cmd = CreateAndPreparePooledCommand(plan, parameterValues, fixedParams, state);
-            UpdateCompiledParameterValues(cmd, plan.CompiledParameters, parameterValues, state.FixedParamCount);
+            UpdateCompiledParameterValues(cmd, plan, parameterValues, state.FixedParamCount);
             cmd.Transaction = _ctx.CurrentTransaction;
             try
             {
@@ -510,9 +510,10 @@ namespace nORM.Query
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void UpdateCompiledParameterValues(
-            DbCommand cmd, IReadOnlyList<string> compiledParams,
+            DbCommand cmd, QueryPlan plan,
             object?[] parameterValues, int fixedParamCount)
         {
+            var compiledParams = plan.CompiledParameters;
             var count = Math.Min(compiledParams.Count, parameterValues.Length);
             // P1 fix: call AssignValue (not direct .Value assignment) so that DbType and Size
             // are reset when the value is null, preventing stale metadata carry-over.
@@ -521,7 +522,7 @@ namespace nORM.Query
             {
                 if (IsUnusedCompiledParameter(compiledParams[i])) continue;
                 var parameter = cmd.Parameters[slot++];
-                ParameterAssign.AssignValue(parameter, parameterValues[i]);
+                ParameterAssign.AssignValue(parameter, ApplyCompiledParamConverter(plan, compiledParams[i], parameterValues[i]));
                 ApplyPreparedParameterSizeHint(cmd, parameter);
             }
         }

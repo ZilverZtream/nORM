@@ -105,7 +105,11 @@ namespace nORM.Query
         // Client-side scalar aggregates (e.g. Count over a client-tail reshaped
         // sequence) materialize rows, reduce them via PostMaterializeTransform to a
         // single boxed value, and the executor unwraps that value as the result.
-        bool ClientScalar = false
+        bool ClientScalar = false,
+        // Value converters keyed by compiled-parameter name, for closure values compared against a
+        // value-converter column. Applied to the extractor-supplied value before binding so the
+        // predicate compares against the provider representation. Null/empty for almost all queries.
+        IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? ParameterConverters = null
     );
 
     internal sealed record BulkCudQueryShape(

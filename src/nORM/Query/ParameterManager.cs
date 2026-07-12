@@ -19,6 +19,10 @@ namespace nORM.Query
         public IDictionary<string, object> Parameters { get; set; } = new Dictionary<string, object>();
         public List<string> CompiledParameters { get; set; } = new();
         public Dictionary<ParameterExpression, string> ParameterMap { get; set; } = new();
+        // Value converters keyed by compiled-parameter name, for closure values compared against a
+        // value-converter column. Applied to the extracted value at execution time. Empty for the
+        // vast majority of queries.
+        public Dictionary<string, nORM.Mapping.IValueConverter> CompiledParameterConverters { get; set; } = new();
 
         private int _index;
 
@@ -35,6 +39,7 @@ namespace nORM.Query
             Parameters.Clear();
             CompiledParameters.Clear();
             ParameterMap.Clear();
+            CompiledParameterConverters.Clear();
             Volatile.Write(ref _index, 0);
         }
     }

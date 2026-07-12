@@ -26,6 +26,12 @@ namespace nORM.Query
         private string _tableAlias = string.Empty;
         private OptimizedSqlBuilder _sql = null!;
         private readonly Dictionary<string, object> _params = new();
+        // Value converters keyed by the compiled-parameter name of a closure value compared against a
+        // value-converter column. Shared (like _compiledParams) with the owning translator so the
+        // plan can apply them to the extractor-supplied value at execution time — a fingerprint-cached
+        // plan is reused across differing captured values and cannot bake the conversion.
+        private readonly Dictionary<string, nORM.Mapping.IValueConverter> _ownedParamConverters = new();
+        private Dictionary<string, nORM.Mapping.IValueConverter> _paramConverters = null!;
         // Parameter sink (can be redirected to a shared dictionary)
         private Dictionary<string, object> _paramSink = null!;
         private int _paramIndex = 0;
@@ -122,9 +128,10 @@ namespace nORM.Query
                                       ParameterExpression parameter, string tableAlias,
                                       Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>? correlated = null,
                                       List<string>? compiledParams = null,
-                                      Dictionary<ParameterExpression, string>? paramMap = null)
+                                      Dictionary<ParameterExpression, string>? paramMap = null,
+                                      Dictionary<string, nORM.Mapping.IValueConverter>? paramConverters = null)
         {
-            var context = new VisitorContext(ctx ?? throw new ArgumentNullException(nameof(ctx)), mapping ?? throw new ArgumentNullException(nameof(mapping)), provider ?? throw new ArgumentNullException(nameof(provider)), parameter ?? throw new ArgumentNullException(nameof(parameter)), tableAlias ?? throw new ArgumentNullException(nameof(tableAlias)), correlated, compiledParams, paramMap);
+            var context = new VisitorContext(ctx ?? throw new ArgumentNullException(nameof(ctx)), mapping ?? throw new ArgumentNullException(nameof(mapping)), provider ?? throw new ArgumentNullException(nameof(provider)), parameter ?? throw new ArgumentNullException(nameof(parameter)), tableAlias ?? throw new ArgumentNullException(nameof(tableAlias)), correlated, compiledParams, paramConverters, paramMap);
             Initialize(in context);
         }
         /// <summary>
@@ -152,6 +159,9 @@ namespace nORM.Query
             _compiledParams = context.CompiledParams ?? _ownedCompiledParams;
             if (context.CompiledParams == null)
                 _ownedCompiledParams.Clear();
+            _paramConverters = context.ParamConverters ?? _ownedParamConverters;
+            if (context.ParamConverters == null)
+                _ownedParamConverters.Clear();
             _paramMap = context.ParamMap ?? _ownedParamMap;
             if (context.ParamMap == null)
                 _ownedParamMap.Clear();
@@ -190,6 +200,8 @@ namespace nORM.Query
             _constParamMap.Clear();
             _memberParamMap.Clear();
             _groupingKeys.Clear();
+            _ownedParamConverters.Clear();
+            _paramConverters = null!;
         }
         /// <summary>
         /// Releases resources by resetting the visitor's state. The instance can be reused after
@@ -288,6 +300,7 @@ namespace nORM.Query
             _memberParamMap.Clear();
             _ownedCompiledParams.Clear();
             _ownedParamMap.Clear();
+            _ownedParamConverters.Clear();
         }
     }
 }

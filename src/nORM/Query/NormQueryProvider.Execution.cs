@@ -361,7 +361,7 @@ namespace nORM.Query
             {
                 if (IsUnusedCompiledParameter(compiledParams[i]))
                     continue;
-                ParameterAssign.AssignValue(cmd.Parameters[fixedParameterCount + boundIndex], paramValues[i] ?? DBNull.Value);
+                ParameterAssign.AssignValue(cmd.Parameters[fixedParameterCount + boundIndex], ApplyCompiledParamConverter(plan, compiledParams[i], paramValues[i]) ?? DBNull.Value);
                 boundIndex++;
             }
 
@@ -373,6 +373,20 @@ namespace nORM.Query
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsUnusedCompiledParameter(string parameterName)
             => parameterName.EndsWith("_unused", StringComparison.Ordinal);
+
+        /// <summary>
+        /// Applies the plan's per-compiled-parameter value converter (if any) so a closure value
+        /// compared against a value-converter column binds its provider representation. Almost always
+        /// a no-op (no converter columns in the predicate).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static object? ApplyCompiledParamConverter(QueryPlan plan, string name, object? value)
+        {
+            var converters = plan.ParameterConverters;
+            if (value != null && converters != null && converters.TryGetValue(name, out var converter))
+                return converter.ConvertToProvider(value);
+            return value;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void BindPlanParameters(DbCommand cmd, QueryPlan plan, IReadOnlyList<object?>? paramValues)
@@ -401,7 +415,7 @@ namespace nORM.Query
                     for (int i = 0; i < count; i++)
                     {
                         if (IsUnusedCompiledParameter(compiledParams[i])) continue;
-                        cmd.AddOptimizedParam(compiledParams[i], paramValues[i] ?? DBNull.Value);
+                        cmd.AddOptimizedParam(compiledParams[i], ApplyCompiledParamConverter(plan, compiledParams[i], paramValues[i]) ?? DBNull.Value);
                     }
                 }
             }

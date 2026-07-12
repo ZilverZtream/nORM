@@ -269,7 +269,7 @@ namespace nORM.Query
             if (!_correlatedParams.ContainsKey(corrInnerParam))
                 _correlatedParams[corrInnerParam] = (corrInnerMapping, corrInnerAlias);
 
-            var vctxCorr = new VisitorContext(_ctx, corrInnerMapping, _provider, corrInnerParam, corrInnerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctxCorr = new VisitorContext(_ctx, corrInnerMapping, _provider, corrInnerParam, corrInnerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var corrPredVisitor = FastExpressionVisitorPool.Get(in vctxCorr);
             var corrPredSql = corrPredVisitor.Translate(corrPredLambda.Body);
             foreach (var kvp in corrPredVisitor.GetParameters())
@@ -516,7 +516,7 @@ namespace nORM.Query
             if (!_correlatedParams.ContainsKey(filterParam))
                 _correlatedParams[filterParam] = (innerMapping, innerAlias);
 
-            var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
             var filterSql = filterVisitor.Translate(filterPredicate.Body);
 

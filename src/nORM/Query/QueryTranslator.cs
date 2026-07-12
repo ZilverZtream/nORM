@@ -71,6 +71,7 @@ namespace nORM.Query
         private readonly ParameterManager _parameterManager = new();
         private IDictionary<string, object> _params { get => _parameterManager.Parameters; set => _parameterManager.Parameters = value; }
         private List<string> _compiledParams { get => _parameterManager.CompiledParameters; set => _parameterManager.CompiledParameters = value; }
+        private Dictionary<string, nORM.Mapping.IValueConverter> _paramConverters => _parameterManager.CompiledParameterConverters;
         private Dictionary<ParameterExpression, string> _paramMap { get => _parameterManager.ParameterMap; set => _parameterManager.ParameterMap = value; }
         internal int ParameterIndex => _parameterManager.Index;
         private List<IncludePlan> _includes = new();
@@ -370,7 +371,7 @@ namespace nORM.Query
                 winBuilder.Append(") AS ").Append(_provider.Escape(subAlias));
                 if (windowedPred != null)
                 {
-                    var vctx = new VisitorContext(_ctx, subMappingWin, _provider, windowedPred.Parameters[0], _provider.Escape(subAlias), _correlatedParams, _compiledParams, _paramMap, _recursionDepth + 1, _params.Count);
+                    var vctx = new VisitorContext(_ctx, subMappingWin, _provider, windowedPred.Parameters[0], _provider.Escape(subAlias), _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth + 1, _params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var predSql = visitor.Translate(windowedPred.Body);
                     foreach (var kvp in visitor.GetParameters())

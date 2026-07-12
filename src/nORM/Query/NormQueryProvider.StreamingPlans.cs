@@ -271,9 +271,16 @@ namespace nORM.Query
                     $"the audit thread (407e03d, eeff6e7, cf39b61, 04a0003, 7d6d7ac, c6c4710) for the fix " +
                     $"shape.");
                 var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Count);
+                var converters = plan.ParameterConverters;
                 for (int i = 0; i < count; i++)
                 {
-                    parameters[plan.CompiledParameters[i]] = parameterValues[i] ?? DBNull.Value;
+                    var name = plan.CompiledParameters[i];
+                    var value = parameterValues[i];
+                    // A closure value compared against a value-converter column binds its provider
+                    // representation, matching the inline-constant and fast-path behavior.
+                    if (value != null && converters != null && converters.TryGetValue(name, out var converter))
+                        value = converter.ConvertToProvider(value);
+                    parameters[name] = value ?? DBNull.Value;
                 }
             }
             else

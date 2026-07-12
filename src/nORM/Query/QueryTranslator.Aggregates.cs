@@ -31,7 +31,7 @@ namespace nORM.Query
             var alias = EscapeAlias("T" + _joinCounter);
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var columnSql = visitor.Translate(selectorLambda.Body);
             // See HandleGroupBy / OrderByTranslator / Join family: literal constants in
@@ -154,7 +154,7 @@ namespace nORM.Query
                 var parts = new List<string>(compositeKey.Arguments.Count);
                 for (int i = 0; i < compositeKey.Arguments.Count; i++)
                 {
-                    var vctxPart = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                    var vctxPart = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                     var partVisitor = FastExpressionVisitorPool.Get(in vctxPart);
                     var partSql = partVisitor.Translate(compositeKey.Arguments[i]);
                     foreach (var kvp in partVisitor.GetParameters())
@@ -189,7 +189,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx2);
                     groupBySql = visitor.Translate(keySelectorLambda.Body);
                     // Use AddLiteralParameter (not AddParameter) so the inline-constant `@p0` from
@@ -267,7 +267,7 @@ namespace nORM.Query
                 {
                     var sp = selA.Parameters[0];
                     _correlatedParams[sp] = (subMapA, winAliasA);
-                    var vctxA = new VisitorContext(_ctx, subMapA, _provider, sp, winAliasA, _correlatedParams, _compiledParams, _paramMap, _recursionDepth + 1, _params.Count);
+                    var vctxA = new VisitorContext(_ctx, subMapA, _provider, sp, winAliasA, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth + 1, _params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxA);
                     var colSql = visitor.Translate(selA.Body);
                     foreach (var kvp in visitor.GetParameters())
@@ -294,7 +294,7 @@ namespace nORM.Query
                 var alias = EscapeAlias("T" + _joinCounter);
                 if (!_correlatedParams.ContainsKey(param))
                     _correlatedParams[param] = (_mapping, alias);
-                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var columnSql = visitor.Translate(selector.Body);
                 // AddLiteralParameter - see HandleAggregateExpression above.
@@ -373,7 +373,7 @@ namespace nORM.Query
             // collide with @p0/@p1 already allocated by the outer Where. Pooled visitors
             // reset _paramIndex to ParamIndexStart, so without this offset both predicates
             // would emit @p0 and the inner value would overwrite the outer in _params.
-            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
             var predicateSql = visitor.Translate(predicate.Body);
             // All() predicate parameters are fixed constants (not closure captures),

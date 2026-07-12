@@ -142,6 +142,7 @@ namespace nORM.Query
                 info.Alias,
                 _correlatedParams,
                 _compiledParams,
+                _paramConverters,
                 _paramMap,
                 _recursionDepth,
                 _params.Count);

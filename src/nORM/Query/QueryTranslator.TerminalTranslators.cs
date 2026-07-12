@@ -165,7 +165,7 @@ namespace nORM.Query
                     var winAlias = t.EscapeAlias("__wfs" + t._joinCounter++);
                     if (!t._correlatedParams.ContainsKey(winParam))
                         t._correlatedParams[winParam] = (subMappingFs, winAlias);
-                    var vctxWin = new VisitorContext(t._ctx, subMappingFs, t._provider, winParam, winAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var vctxWin = new VisitorContext(t._ctx, subMappingFs, t._provider, winParam, winAlias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                     var winVisitor = FastExpressionVisitorPool.Get(in vctxWin);
                     var winPredSql = winVisitor.Translate(winPred.Body);
                     foreach (var kvp in winVisitor.GetParameters())
@@ -195,7 +195,7 @@ namespace nORM.Query
                         var alias = t.EscapeAlias("T" + t._joinCounter);
                         if (!t._correlatedParams.ContainsKey(param))
                             t._correlatedParams[param] = (t._mapping, alias);
-                        var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                        var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctxFS);
                         var sql = visitor.Translate(predicate.Body);
                         if (t._where.Length > 0) t._where.Append(" AND ");
@@ -314,7 +314,7 @@ namespace nORM.Query
                         var lwParam = lastWinPred.Parameters[0];
                         if (!t._correlatedParams.ContainsKey(lwParam))
                             t._correlatedParams[lwParam] = (lastSubMap, lastAlias);
-                        var vctxLW = new VisitorContext(t._ctx, lastSubMap, t._provider, lwParam, lastAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                        var vctxLW = new VisitorContext(t._ctx, lastSubMap, t._provider, lwParam, lastAlias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                         var lwVisitor = FastExpressionVisitorPool.Get(in vctxLW);
                         var lwSql = lwVisitor.Translate(lastWinPred.Body);
                         foreach (var kvp in lwVisitor.GetParameters())
@@ -337,7 +337,7 @@ namespace nORM.Query
                             var okParam = keyLambda.Parameters[0];
                             if (!t._correlatedParams.ContainsKey(okParam))
                                 t._correlatedParams[okParam] = (lastSubMap, lastAlias);
-                            var vctxOk = new VisitorContext(t._ctx, lastSubMap, t._provider, okParam, lastAlias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                            var vctxOk = new VisitorContext(t._ctx, lastSubMap, t._provider, okParam, lastAlias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                             var okVisitor = FastExpressionVisitorPool.Get(in vctxOk);
                             var okSql = okVisitor.Translate(keyLambda.Body);
                             FastExpressionVisitorPool.Return(okVisitor);
@@ -366,7 +366,7 @@ namespace nORM.Query
                         var alias = t.EscapeAlias("T" + t._joinCounter);
                         if (!t._correlatedParams.ContainsKey(param))
                             t._correlatedParams[param] = (t._mapping, alias);
-                        var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                        var vctxLast = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctxLast);
                         var sql = visitor.Translate(lastPredicate.Body);
                         if (t._where.Length > 0) t._where.Append(" AND ");
@@ -427,7 +427,7 @@ namespace nORM.Query
                     if (!t._correlatedParams.ContainsKey(param))
                         t._correlatedParams[param] = (t._mapping, alias);
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias,
-                        t._correlatedParams, t._compiledParams, t._paramMap,
+                        t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap,
                         t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     var keySql = visitor.Translate(keySelector.Body);
@@ -474,7 +474,7 @@ namespace nORM.Query
                 {
                     var lp = predLambda.Parameters[0];
                     t._correlatedParams[lp] = (subMapC, winAliasC);
-                    var vctxC = new VisitorContext(t._ctx, subMapC, t._provider, lp, winAliasC, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                    var vctxC = new VisitorContext(t._ctx, subMapC, t._provider, lp, winAliasC, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctxC);
                     var predSql = visitor.Translate(predLambda.Body);
                     foreach (var kvp in visitor.GetParameters())
@@ -573,7 +573,7 @@ namespace nORM.Query
                             info = (t._mapping, t.EscapeAlias("T" + t._joinCounter));
                             t._correlatedParams[param] = info;
                         }
-                        var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramMap, t._recursionDepth, t._params.Count);
+                        var vctxCount = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctxCount);
                         var sql = visitor.Translate(countPredicate.Body);
                         if (t._where.Length > 0) t._where.Append(" AND ");

@@ -53,7 +53,7 @@ namespace nORM.Query
                             info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                             _correlatedParams[param] = info;
                         }
-                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                        var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                         var visitor = FastExpressionVisitorPool.Get(in vctx);
                         var sql = visitor.Translate(arg);
                         // AddLiteralParameter - see HandleAggregateExpression / OrderByTranslator.
@@ -80,7 +80,7 @@ namespace nORM.Query
                     info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                     _correlatedParams[param] = info;
                 }
-                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                var vctx = new VisitorContext(_ctx, _mapping, _provider, param, info.Alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                 var visitor = FastExpressionVisitorPool.Get(in vctx);
                 var valueSql = visitor.Translate(wf.ValueSelector.Body);
                 // AddLiteralParameter - window-function value selectors with COALESCE / literal
@@ -97,7 +97,7 @@ namespace nORM.Query
                         info = (_mapping, _correlatedParams.Values.FirstOrDefault().Alias ?? EscapeAlias("T" + _joinCounter));
                         _correlatedParams[dParam] = info;
                     }
-                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, dParam, info.Alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                     var visitor2 = FastExpressionVisitorPool.Get(in vctx2);
                     var defSql = visitor2.Translate(wf.DefaultValueSelector.Body);
                     // AddLiteralParameter - see the value-selector branch above.
