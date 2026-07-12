@@ -6,6 +6,38 @@ namespace nORM.Providers
 {
     public partial class SqliteProvider
     {
+        /// <summary>
+        /// Adds an integral 100ns-tick delta to a DateTime TEXT value with full tick
+        /// precision. SQLite's datetime() truncates its output to whole seconds and
+        /// strftime's %f keeps only milliseconds, so both drop sub-second precision --
+        /// of the shift AND of the original value. This form works in integer epoch
+        /// ticks instead: floor-epoch seconds from strftime('%s') plus the 7-digit
+        /// fractional tail parsed from the canonical text
+        /// ('yyyy-MM-dd HH:mm:ss[.fffffff]', fraction at position 21), then re-renders
+        /// the seconds part via 'unixepoch' and re-appends the fraction trimmed the way
+        /// Microsoft.Data.Sqlite serializes DateTime (trailing zeros and bare '.'
+        /// removed). Division/modulo are floored explicitly so negative epochs
+        /// (pre-1970) keep the correct fraction.
+        /// </summary>
+        private static string AddTicksToDateTimeText(string dateTimeSql, string ticksDeltaSql)
+        {
+            var frac = $"(CASE WHEN length({dateTimeSql}) > 20 THEN CAST(substr({dateTimeSql} || '0000000', 21, 7) AS INTEGER) ELSE 0 END)";
+            var tot = $"(strftime('%s', {dateTimeSql}) * 10000000 + {frac} + ({ticksDeltaSql}))";
+            var secs = $"(({tot} / 10000000) - (CASE WHEN {tot} % 10000000 < 0 THEN 1 ELSE 0 END))";
+            var fracPos = $"((({tot} % 10000000) + 10000000) % 10000000)";
+            return $"(strftime('%Y-%m-%d %H:%M:%S', {secs}, 'unixepoch') || RTRIM(RTRIM('.' || printf('%07d', {fracPos}), '0'), '.'))";
+        }
+
+        /// <summary>
+        /// Calendar-unit add (months/years) that keeps the original sub-second
+        /// fraction: datetime() renders whole seconds only, so re-append the
+        /// input's fractional tail (unchanged by calendar arithmetic), trimmed
+        /// to the Microsoft.Data.Sqlite serialization.
+        /// </summary>
+        private static string CalendarAddPreservingFraction(string dateTimeSql, string modifierSql)
+            => $"(datetime({dateTimeSql}, {modifierSql}) || RTRIM(RTRIM('.' || printf('%07d', " +
+               $"(CASE WHEN length({dateTimeSql}) > 20 THEN CAST(substr({dateTimeSql} || '0000000', 21, 7) AS INTEGER) ELSE 0 END)), '0'), '.'))";
+
         private static string? TryTranslateDateTimeFunction(string name, Type declaringType, string[] args)
         {
             if (declaringType != typeof(DateTime) && declaringType != typeof(DateTimeOffset))
@@ -101,6 +133,23 @@ namespace nORM.Providers
                 // dropping every comparison. Letting the bound value carry its own
                 // sign works for positive (no prefix), negative (leading -), and
                 // zero (no shift).
+                // The double-argument Add* family is tick-exact in .NET (AddDays(1.5) is
+                // +36h; the delta truncates toward zero at the 100ns tick). CAST(x AS
+                // INTEGER) truncates toward zero, matching .NET. Gated to DateTime:
+                // DateTimeOffset TEXT carries a trailing '+HH:MM' offset the epoch-tick
+                // parse does not understand, so DTO keeps the previous datetime() form.
+                nameof(DateTime.AddDays) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    AddTicksToDateTimeText(args[0], $"CAST(({args[1]}) * 864000000000 AS INTEGER)"),
+                nameof(DateTime.AddHours) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    AddTicksToDateTimeText(args[0], $"CAST(({args[1]}) * 36000000000 AS INTEGER)"),
+                nameof(DateTime.AddMinutes) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    AddTicksToDateTimeText(args[0], $"CAST(({args[1]}) * 600000000 AS INTEGER)"),
+                nameof(DateTime.AddSeconds) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    AddTicksToDateTimeText(args[0], $"CAST(({args[1]}) * 10000000 AS INTEGER)"),
+                nameof(DateTime.AddMonths) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    CalendarAddPreservingFraction(args[0], $"(({args[1]}) || ' months')"),
+                nameof(DateTime.AddYears) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    CalendarAddPreservingFraction(args[0], $"(({args[1]}) || ' years')"),
                 nameof(DateTime.AddDays) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' days')",
                 nameof(DateTime.AddMonths) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' months')",
                 nameof(DateTime.AddYears) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' years')",
@@ -117,6 +166,8 @@ namespace nORM.Providers
                 // ('yyyy-MM-dd HH:mm:ss.FFFFFFF' which trims trailing zeros);
                 // without this, '.500' lexically != param-bound '.5' and Where
                 // round-trip silently mis-matches.
+                nameof(DateTime.AddMilliseconds) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    AddTicksToDateTimeText(args[0], $"CAST(({args[1]}) * 10000 AS INTEGER)"),
                 nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 1000.0) || ' seconds'), '0'), '.')",
                 // AddTicks is the finest-grained Add* (1 tick = 100ns). Same
                 // strftime + RTRIM trim shape as AddMilliseconds; the divisor
@@ -125,6 +176,8 @@ namespace nORM.Providers
                 // tick deltas (e.g. 7500 ticks = 0.00075 seconds) get applied
                 // correctly while still trimming the trailing-zero / dot to
                 // match Microsoft.Data.Sqlite's FFFFFFF DateTime binding.
+                nameof(DateTime.AddTicks) when args.Length == 2 && declaringType == typeof(DateTime) =>
+                    AddTicksToDateTimeText(args[0], args[1]),
                 nameof(DateTime.AddTicks) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 10000000.0) || ' seconds'), '0'), '.')",
                 // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
                 nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",

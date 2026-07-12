@@ -20,6 +20,17 @@ namespace nORM.Providers
     public sealed partial class SqlServerProvider
     {
         /// <summary>
+        /// Adds an integral 100ns-tick delta to a datetime2/datetimeoffset expression.
+        /// DATEADD's number argument is int-only, so the delta is split into whole days,
+        /// milliseconds within the day, and the residual ticks as nanoseconds -- each
+        /// component stays within int range for any representable DateTime.
+        /// </summary>
+        private static string AddTicksExact(string dateSql, string ticksSql)
+            => $"DATEADD(nanosecond, CAST((({ticksSql}) % 10000) * 100 AS INT), " +
+               $"DATEADD(millisecond, CAST((({ticksSql}) % 864000000000) / 10000 AS INT), " +
+               $"DATEADD(day, CAST(({ticksSql}) / 864000000000 AS INT), {dateSql})))";
+
+        /// <summary>
         /// SQL Server stores TimeOnly as TIME(7). DATEDIFF(SECOND, t1, t2) on
         /// two TIMEs returns the signed second diff in (-86400, 86400). Wrap
         /// with +86400 then % 86400 to match TimeOnly's [0, 24h) semantics.
@@ -178,14 +189,20 @@ namespace nORM.Providers
                     nameof(DateTime.Second) => $"DATEPART(second, {args[0]})",
                     nameof(DateTime.DayOfYear) => $"DATEPART(dayofyear, {args[0]})",
                     nameof(DateTime.Date) => $"CAST({args[0]} AS DATE)",
-                    nameof(DateTime.AddDays) when args.Length == 2 => $"DATEADD(day, {args[1]}, {args[0]})",
+                    // The double-argument Add* family is tick-exact in .NET (AddDays(1.5)
+                    // is +36h, truncating toward zero at the 100ns tick), but DATEADD
+                    // truncates its number argument to WHOLE units (AddDays(1.5) became
+                    // +1 day). Convert the delta to integral ticks -- ROUND(x, 0, 1) is
+                    // T-SQL truncation toward zero, matching .NET -- and add in three
+                    // int-safe stages: whole days, milliseconds within the day, then the
+                    // sub-millisecond tick remainder as nanoseconds.
+                    nameof(DateTime.AddDays) when args.Length == 2 => AddTicksExact(args[0], $"CAST(ROUND(({args[1]}) * 864000000000, 0, 1) AS BIGINT)"),
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"DATEADD(month, {args[1]}, {args[0]})",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"DATEADD(year, {args[1]}, {args[0]})",
-                    nameof(DateTime.AddHours) when args.Length == 2 => $"DATEADD(hour, {args[1]}, {args[0]})",
-                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"DATEADD(minute, {args[1]}, {args[0]})",
-                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"DATEADD(second, {args[1]}, {args[0]})",
-                    // AddMilliseconds: DATEADD supports the `millisecond` datepart.
-                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"DATEADD(millisecond, {args[1]}, {args[0]})",
+                    nameof(DateTime.AddHours) when args.Length == 2 => AddTicksExact(args[0], $"CAST(ROUND(({args[1]}) * 36000000000, 0, 1) AS BIGINT)"),
+                    nameof(DateTime.AddMinutes) when args.Length == 2 => AddTicksExact(args[0], $"CAST(ROUND(({args[1]}) * 600000000, 0, 1) AS BIGINT)"),
+                    nameof(DateTime.AddSeconds) when args.Length == 2 => AddTicksExact(args[0], $"CAST(ROUND(({args[1]}) * 10000000, 0, 1) AS BIGINT)"),
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => AddTicksExact(args[0], $"CAST(ROUND(({args[1]}) * 10000, 0, 1) AS BIGINT)"),
                     // AddTicks: a tick = 100ns. SqlServer DATEADD(NANOSECOND, ...) exists
                     // in 2008+ but the underlying DATETIME2 has 100ns precision so sub-tick
                     // precision is dropped. The argument range matters: ticks * 100 can

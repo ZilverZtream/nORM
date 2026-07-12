@@ -142,14 +142,28 @@ namespace nORM.Providers
                     nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {source})",
                     nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {source})",
                     nameof(DateTime.Date) => $"DATE_TRUNC('day', {source})",
-                    nameof(DateTime.AddDays) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 day')",
+                    // The double-argument Add* family converts to whole microseconds
+                    // (timestamp's native precision). n * INTERVAL '1 day' would scale
+                    // exactly, but ROUND(numeric) pins the value to the microsecond grid
+                    // the same way the .NET tick result lands on it, so materialized
+                    // values compare equal to LINQ-to-Objects.
+                    nameof(DateTime.AddDays) when args.Length == 2 =>
+                        $"({args[0]} + ROUND(CAST(({args[1]}) AS numeric) * 86400000000) * INTERVAL '1 microsecond')",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 month')",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 year')",
-                    nameof(DateTime.AddHours) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 hour')",
-                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 minute')",
-                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 second')",
+                    nameof(DateTime.AddHours) when args.Length == 2 =>
+                        $"({args[0]} + ROUND(CAST(({args[1]}) AS numeric) * 3600000000) * INTERVAL '1 microsecond')",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 =>
+                        $"({args[0]} + ROUND(CAST(({args[1]}) AS numeric) * 60000000) * INTERVAL '1 microsecond')",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 =>
+                        $"({args[0]} + ROUND(CAST(({args[1]}) AS numeric) * 1000000) * INTERVAL '1 microsecond')",
                     // PostgreSQL supports millisecond interval natively.
-                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"({args[0]} + ({args[1]}) * INTERVAL '1 millisecond')",
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 =>
+                        $"({args[0]} + ROUND(CAST(({args[1]}) AS numeric) * 1000) * INTERVAL '1 microsecond')",
+                    // AddTicks: 1 tick = 100ns; integer division by 10 truncates toward
+                    // zero to the microsecond grid, matching .NET's tick handling.
+                    nameof(DateTime.AddTicks) when args.Length == 2 =>
+                        $"({args[0]} + (({args[1]}) / 10) * INTERVAL '1 microsecond')",
                     // Postgres EXTRACT(MILLISECONDS FROM ts) returns SS*1000+ms;
                     // modulo 1000 yields the millisecond component matching .NET.
                     nameof(DateTime.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {source})::int % 1000)",

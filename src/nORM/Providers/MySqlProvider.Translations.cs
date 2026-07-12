@@ -145,14 +145,28 @@ namespace nORM.Providers
                     nameof(DateTime.Second) => $"SECOND({args[0]})",
                     nameof(DateTime.DayOfYear) => $"DAYOFYEAR({args[0]})",
                     nameof(DateTime.Date) => $"DATE({args[0]})",
-                    nameof(DateTime.AddDays) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) DAY)",
+                    // The double-argument Add* family is tick-exact in .NET (AddDays(1.5)
+                    // is +36h), but INTERVAL (n) DAY/HOUR/MINUTE rounds a fractional n to
+                    // WHOLE units (verified on 8.0.46: INTERVAL 1.5 DAY = 2 days). Convert
+                    // the delta to whole microseconds instead -- DATETIME(6)'s native
+                    // precision; ROUND (half away from zero) picks the nearest grid point.
+                    nameof(DateTime.AddDays) when args.Length == 2 =>
+                        $"DATE_ADD({args[0]}, INTERVAL CAST(ROUND(({args[1]}) * 86400000000, 0) AS SIGNED) MICROSECOND)",
                     nameof(DateTime.AddMonths) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) MONTH)",
                     nameof(DateTime.AddYears) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) YEAR)",
-                    nameof(DateTime.AddHours) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) HOUR)",
-                    nameof(DateTime.AddMinutes) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) MINUTE)",
-                    nameof(DateTime.AddSeconds) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL ({args[1]}) SECOND)",
+                    nameof(DateTime.AddHours) when args.Length == 2 =>
+                        $"DATE_ADD({args[0]}, INTERVAL CAST(ROUND(({args[1]}) * 3600000000, 0) AS SIGNED) MICROSECOND)",
+                    nameof(DateTime.AddMinutes) when args.Length == 2 =>
+                        $"DATE_ADD({args[0]}, INTERVAL CAST(ROUND(({args[1]}) * 60000000, 0) AS SIGNED) MICROSECOND)",
+                    nameof(DateTime.AddSeconds) when args.Length == 2 =>
+                        $"DATE_ADD({args[0]}, INTERVAL CAST(ROUND(({args[1]}) * 1000000, 0) AS SIGNED) MICROSECOND)",
                     // MySQL DATETIME(6) supports microsecond precision; ms*1000 = microseconds.
-                    nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"DATE_ADD({args[0]}, INTERVAL (({args[1]}) * 1000) MICROSECOND)",
+                    nameof(DateTime.AddMilliseconds) when args.Length == 2 =>
+                        $"DATE_ADD({args[0]}, INTERVAL CAST(ROUND(({args[1]}) * 1000, 0) AS SIGNED) MICROSECOND)",
+                    // AddTicks: 1 tick = 100ns; DIV 10 truncates toward zero to the
+                    // microsecond grid, matching .NET's toward-zero tick handling.
+                    nameof(DateTime.AddTicks) when args.Length == 2 =>
+                        $"DATE_ADD({args[0]}, INTERVAL (({args[1]}) DIV 10) MICROSECOND)",
                     // MySQL DOES NOT expose MILLISECOND() but MICROSECOND returns
                     // 0..999999; integer-divide by 1000 to get the ms component.
                     nameof(DateTime.Millisecond) => $"(MICROSECOND({args[0]}) DIV 1000)",
