@@ -712,6 +712,29 @@ namespace nORM.Query
             // Normalize to `column <op> value` — flip the operator when the column is on the right.
             var op = leftIsColumn ? node.NodeType : FlipComparison(node.NodeType);
 
+            // A converter that stores STRINGS (enum-to-name etc.) compares under the column's
+            // collation; on CI-collation providers (MySQL, SQL Server) =/<> must use the same
+            // sargable ordinal wrap as plain string equality, or `Status == Active` would match
+            // rows storing 'ACTIVE'. Relational operators keep the plain compare (collation
+            // ordering of converter text is out of scope for ordinal equality semantics).
+            if (_provider.DefaultStringEqualityIsCaseInsensitive
+                && column.Converter!.ProviderType == typeof(string)
+                && op is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                var colSqlOrd = GetSql(memberSide);
+                var vs = _sql.Length;
+                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant, isFreeParameter);
+                var valSql = _sql.ToString(vs, _sql.Length - vs);
+                _sql.TruncateTo(vs);
+                if (op == ExpressionType.Equal)
+                    _sql.Append(_provider.OrdinalStringEqualSql(colSqlOrd, valSql));
+                else if (column.IsNullable)
+                    _sql.Append($"({colSqlOrd} IS NULL OR {_provider.OrdinalStringNotEqualSql(colSqlOrd, valSql)})");
+                else
+                    _sql.Append(_provider.OrdinalStringNotEqualSql(colSqlOrd, valSql));
+                return true;
+            }
+
             _sql.Append('(');
             if (op == ExpressionType.NotEqual && column.IsNullable)
             {
