@@ -16,9 +16,24 @@ namespace nORM.Query
         private static readonly ConcurrentDictionary<(Type From, Type To), Func<object, object>> _conversionCache = new();
 
         private static bool IsSimpleType(Type type)
-            // Include nullable primitives so projected subqueries (e.g. Select(x => x.NullableInt)) materialize correctly.
-            => _simpleTypeCache.GetOrAdd(type, static t => t.IsPrimitive || t == typeof(decimal) || t == typeof(string)
-                || (Nullable.GetUnderlyingType(t) is Type u && (u.IsPrimitive || u == typeof(decimal))));
+            // Gates the single-value scalar-projection path (Select(x => x.Member)). Covers every value
+            // the reader materializes as one column, including nullable variants — enum/Guid/date-time
+            // family were previously excluded, so Select(p => p.EnumProp) fell through to the entity
+            // constructor path and threw. string is a reference type so it is listed directly.
+            => _simpleTypeCache.GetOrAdd(type, static t =>
+            {
+                if (t == typeof(string)) return true;
+                var u = Nullable.GetUnderlyingType(t) ?? t;
+                return u.IsPrimitive
+                    || u.IsEnum
+                    || u == typeof(decimal)
+                    || u == typeof(Guid)
+                    || u == typeof(DateTime)
+                    || u == typeof(DateTimeOffset)
+                    || u == typeof(DateOnly)
+                    || u == typeof(TimeOnly)
+                    || u == typeof(TimeSpan);
+            });
 
         internal static (long Hits, long Misses, double HitRate) CacheStats
         {
