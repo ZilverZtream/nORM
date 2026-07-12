@@ -83,6 +83,58 @@ public class OptimisticConcurrencyLostUpdateTests
     }
 
     [Fact]
+    public async Task Sequential_updates_refresh_the_token_and_all_succeed()
+    {
+        using var cn = OpenDb();
+        using (var seed = cn.CreateCommand())
+        {
+            seed.CommandText = "INSERT INTO OccRow (Payload, Token) VALUES ('original', X'01')";
+            seed.ExecuteNonQuery();
+        }
+        int id = 1;
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var row = await ctx.Query<OccRow>().Where(r => r.Id == id).FirstAsync();
+
+        // Each update stamps a new token; the snapshot must refresh so the next update's WHERE
+        // matches. If it doesn't, the second update's stale WHERE affects 0 rows and throws.
+        for (int i = 1; i <= 3; i++)
+        {
+            row.Payload = "v" + i;
+            ctx.Update(row);
+            await ctx.SaveChangesAsync();
+        }
+
+        Assert.Equal("v3", PayloadInDb(cn, id));
+    }
+
+    [Fact]
+    public async Task Update_then_delete_same_context_succeeds()
+    {
+        using var cn = OpenDb();
+        using (var seed = cn.CreateCommand())
+        {
+            seed.CommandText = "INSERT INTO OccRow (Payload, Token) VALUES ('original', X'01')";
+            seed.ExecuteNonQuery();
+        }
+        int id = 1;
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var row = await ctx.Query<OccRow>().Where(r => r.Id == id).FirstAsync();
+
+        row.Payload = "updated";
+        ctx.Update(row);
+        await ctx.SaveChangesAsync();   // token stamped + snapshot refreshed
+
+        ctx.Remove(row);
+        await ctx.SaveChangesAsync();   // delete must match the refreshed token, not the original
+
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM OccRow";
+        Assert.Equal(0L, Convert.ToInt64(cmd.ExecuteScalar()));
+    }
+
+    [Fact]
     public async Task Direct_UpdateAsync_second_stale_write_must_not_silently_overwrite()
     {
         using var cn = OpenDb();

@@ -142,6 +142,11 @@ namespace nORM.Providers
         public override async Task<int> BulkUpdateAsync<T>(DbContext ctx, TableMapping m, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
             ValidateConnection(ctx.RawConnection);
+            // A client-managed [Timestamp] token must be freshly stamped per row on each update; the
+            // temp-table fast path below copies entity columns without changing the token, silently
+            // losing a concurrent write. Route through the row-by-row BatchedUpdateAsync instead.
+            if (m.ClientManagedConcurrencyToken)
+                return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";

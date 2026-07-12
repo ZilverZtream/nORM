@@ -1203,6 +1203,45 @@ public class ProviderBehaviorEquivalenceTests
         }
     }
 
+    // Bulk update must not silently lose a concurrent write on providers where nORM client-manages
+    // the byte[] token. SQL Server excluded: its token relies on native ROWVERSION semantics.
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
+    public async Task SP_OCC_BulkUpdate_StaleToken_DoesNotOverwrite(string kind)
+    {
+        var (cn, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+
+        var opts = provider!.UseAffectedRowsSemantics
+            ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
+            : new DbContextOptions();
+        using (cn)
+        await using (var ctxA = new DbContext(cn!, provider!, opts))
+        await using (var ctxB = new DbContext(cn!, provider!, opts))
+        {
+            Exec(cn!, OccDdl(kind));
+            Exec(cn!, "DELETE FROM LPM_OccItem");
+            // Seed via raw SQL so no DbContext disposal closes the shared connection mid-test.
+            Exec(cn!, "INSERT INTO LPM_OccItem (Id, Payload, Token) VALUES (1, 'original', NULL)");
+
+            var a = await ctxA.Query<LpmOccItem>().Where(x => x.Id == 1).FirstAsync();
+            var b = await ctxB.Query<LpmOccItem>().Where(x => x.Id == 1).FirstAsync();
+
+            a.Payload = "written-by-A";
+            var affectedA = await ctxA.BulkUpdateAsync(new[] { a });
+
+            // B's snapshot is stale; bulk skips the row (partial OCC) rather than clobbering A.
+            b.Payload = "written-by-B";
+            var affectedB = await ctxB.BulkUpdateAsync(new[] { b });
+
+            Assert.Equal(1, affectedA);   // A's write landed
+            Assert.Equal(0, affectedB);   // B's stale write touched no rows — A's data survives
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // F. TRANSACTION / LIFECYCLE PARITY
     // Row: "Transactions/lifecycle" — commit, rollback, and pre-cancellation
