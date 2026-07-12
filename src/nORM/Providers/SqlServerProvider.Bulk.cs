@@ -45,10 +45,19 @@ namespace nORM.Providers
             var insertableCols = m.Columns.Where(c => !c.IsDbGenerated).ToList();
             var operationKey = $"SqlServer_BulkInsert_{m.Type.Name}";
 
+            // When temporal versioning is enabled the table carries an AFTER INSERT trigger that writes
+            // each history row. SqlBulkCopy suppresses triggers by default, so a >512-row bulk insert
+            // would write ZERO history (and leave those rows with no open history version, so the first
+            // later update/delete also cannot preserve their prior state). Fire triggers so the temporal
+            // (and any user-defined) trigger runs within the same transaction as the copy.
+            var bulkCopyOptions = ctx.Options.IsTemporalVersioningEnabled
+                ? SqlBulkCopyOptions.FireTriggers
+                : SqlBulkCopyOptions.Default;
+
             var totalInserted = await ExecuteBulkOperationAsync(ctx, m, entityList, operationKey,
                 async (batch, tx, token) =>
                 {
-                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.RawConnection, SqlBulkCopyOptions.Default, (SqlTransaction)tx)
+                    using var bulkCopy = new SqlBulkCopy((SqlConnection)ctx.RawConnection, bulkCopyOptions, (SqlTransaction)tx)
                     {
                         DestinationTableName = m.EscTable,
                         BatchSize = batch.Count,

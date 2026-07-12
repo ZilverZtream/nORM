@@ -249,6 +249,46 @@ public class LiveProviderTemporalParityTests
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
+    public async Task Bulk_insert_over_threshold_writes_temporal_history_on_live_provider(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            if (SkipIfProtectedTemporalDatabase(connection, kind)) return;
+
+            var options = new DbContextOptions { OnModelCreating = mb => mb.Entity<TlpLiveRow>() };
+            options.EnableTemporalVersioning();
+
+            using var ctx = new DbContext(connection, provider, options);
+            await SetupAsync(connection, provider, kind);
+            try
+            {
+                // Trigger the temporal bootstrap (installs the history table + AFTER INSERT trigger).
+                Assert.Equal(0, await ctx.Query<TlpLiveRow>().CountAsync());
+
+                // > SqlBulkCopySmallBatchThreshold (512) so SqlServer takes the SqlBulkCopy path, which
+                // suppresses triggers by default. Every bulk-inserted row must still produce a history row.
+                var rows = System.Linq.Enumerable.Range(1, 600)
+                    .Select(i => new TlpLiveRow { Id = i, Name = "n" + i }).ToList();
+                await ctx.BulkInsertAsync(rows);
+
+                Assert.Equal(600L, await CountAsync(connection, provider, HistoryTable));
+            }
+            finally
+            {
+                await TeardownAsync(connection, provider, kind);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    [InlineData(ProviderKind.Sqlite)]
     public async Task Temporal_as_of_tag_returns_previous_state_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
