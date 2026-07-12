@@ -45,9 +45,42 @@ namespace nORM.Query
 
             if (!_correlatedParams.ContainsKey(outerKeySel.Parameters[0]))
                 _correlatedParams[outerKeySel.Parameters[0]] = (outerMapping, outerAlias);
+            // Composite (anonymous-type) keys: per-member equalities ANDed into the ON clause,
+            // string members ordinal-wrapped — mirrors HandleInnerJoin / HandleGroupJoin.
+            string? ljCompositeOnSql = null;
+            if (outerKeySel.Body is NewExpression ljOuterComposite
+                && innerKeySel.Body is NewExpression ljInnerComposite
+                && ljOuterComposite.Arguments.Count == ljInnerComposite.Arguments.Count
+                && ljOuterComposite.Arguments.Count > 0)
+            {
+                if (!_correlatedParams.ContainsKey(innerKeySel.Parameters[0]))
+                    _correlatedParams[innerKeySel.Parameters[0]] = (innerMapping, innerAlias);
+                var ljParts = new List<string>(ljOuterComposite.Arguments.Count);
+                for (int ci = 0; ci < ljOuterComposite.Arguments.Count; ci++)
+                {
+                    var vctxLo = new VisitorContext(_ctx, outerMapping, _provider, outerKeySel.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    var loVisitor = FastExpressionVisitorPool.Get(in vctxLo);
+                    var outerMemberSql = loVisitor.Translate(ljOuterComposite.Arguments[ci]);
+                    foreach (var kvp in loVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(loVisitor);
+
+                    var vctxLi = new VisitorContext(_ctx, innerMapping, _provider, innerKeySel.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    var liVisitor = FastExpressionVisitorPool.Get(in vctxLi);
+                    var innerMemberSql = liVisitor.Translate(ljInnerComposite.Arguments[ci]);
+                    foreach (var kvp in liVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(liVisitor);
+
+                    ljParts.Add(JoinBuilder.BuildOnEquality(
+                        outerMemberSql, innerMemberSql, _provider, ljOuterComposite.Arguments[ci].Type));
+                }
+                ljCompositeOnSql = string.Join(" AND ", ljParts);
+            }
+
             var vctxOuter = new VisitorContext(_ctx, outerMapping, _provider, outerKeySel.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
-            var outerKeySql = outerKeyVisitor.Translate(outerKeySel.Body);
+            var outerKeySql = ljCompositeOnSql != null ? "1" : outerKeyVisitor.Translate(outerKeySel.Body);
             // See HandleJoin: AddLiteralParameter for inline-constant key fragments.
             foreach (var kvp in outerKeyVisitor.GetParameters())
                 AddLiteralParameter(kvp.Key, kvp.Value);
@@ -57,7 +90,7 @@ namespace nORM.Query
                 _correlatedParams[innerKeySel.Parameters[0]] = (innerMapping, innerAlias);
             var vctxInner = new VisitorContext(_ctx, innerMapping, _provider, innerKeySel.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var innerKeyVisitor = FastExpressionVisitorPool.Get(in vctxInner);
-            var innerKeySql = innerKeyVisitor.Translate(innerKeySel.Body);
+            var innerKeySql = ljCompositeOnSql != null ? "1" : innerKeyVisitor.Translate(innerKeySel.Body);
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
@@ -90,7 +123,8 @@ namespace nORM.Query
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,
                 provider: _provider,
-                keyClrType: outerKeySel.Body.Type);
+                keyClrType: outerKeySel.Body.Type,
+                onSqlOverride: ljCompositeOnSql);
         }
 
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]

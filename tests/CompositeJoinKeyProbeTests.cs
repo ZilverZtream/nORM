@@ -73,4 +73,29 @@ public class CompositeJoinKeyProbeTests
             .ToList().OrderBy(x => x.Id).Select(x => (x.Id, x.Total)).ToList();
         Assert.Equal(new[] { (1, 40), (2, 20) }, rows);
     }
+
+    [Fact]
+    public void Composite_key_left_join_translates_and_matches()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE CjkL (Id INTEGER PRIMARY KEY, A TEXT NOT NULL, B INTEGER NOT NULL);
+                CREATE TABLE CjkR (Id INTEGER PRIMARY KEY, A TEXT NOT NULL, B INTEGER NOT NULL, Val INTEGER NOT NULL);
+                INSERT INTO CjkL VALUES (1,'x',1),(2,'z',9);
+                INSERT INTO CjkR VALUES (1,'x',1,10);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        var rows = (from l in ctx.Query<L>()
+                    join r in ctx.Query<R>() on new { l.A, l.B } equals new { r.A, r.B } into g
+                    from r in g.DefaultIfEmpty()
+                    select new { l.Id, Val = r != null ? r.Val : 0 })
+            .ToList().OrderBy(x => x.Id).Select(x => (x.Id, x.Val)).ToList();
+        // Left semantics: l1 matches r1 (10); l2 has no match (0).
+        Assert.Equal(new[] { (1, 10), (2, 0) }, rows);
+    }
 }
