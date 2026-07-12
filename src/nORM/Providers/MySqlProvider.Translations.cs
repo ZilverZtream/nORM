@@ -101,8 +101,15 @@ namespace nORM.Providers
                     nameof(string.Substring) when args.Length == 3 => $"SUBSTRING({args[0]}, ({args[1]}) + 1, {args[2]})",
                     nameof(string.Replace) when args.Length == 3 => $"REPLACE({args[0]}, {args[1]}, {args[2]})",
                     // LOCATE returns 1-based position or 0 if not found; .NET IndexOf is 0-based
-                    // returning -1, so subtract 1.
-                    nameof(string.IndexOf) when args.Length == 2 => $"(LOCATE({args[1]}, {args[0]}) - 1)",
+                    // returning -1, so subtract 1. .NET IndexOf matches ordinally, but LOCATE
+                    // follows the (case-insensitive by default) collation — collate the HAYSTACK
+                    // to utf8mb4_bin so matching is binary. Collating the needle does NOT make
+                    // LOCATE case-sensitive (verified on MySQL 8.0.46 — even a BINARY needle
+                    // still matches case-insensitively); only the searched string's collation
+                    // counts. The CAST-AS-CHAR form (not bare BINARY) keeps the haystack a
+                    // character string, so LOCATE still counts characters rather than bytes.
+                    nameof(string.IndexOf) when args.Length == 2 =>
+                        $"(LOCATE({args[1]}, {OrdinalComparableStringProjection(args[0])}) - 1)",
                     _ => null
                 };
             }

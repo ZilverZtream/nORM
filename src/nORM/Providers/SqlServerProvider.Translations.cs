@@ -116,10 +116,17 @@ namespace nORM.Providers
                     // a length parameter; LEN of the source is always >= what we need.
                     nameof(string.Substring) when args.Length == 2 => $"SUBSTRING({args[0]}, {args[1]} + 1, LEN({args[0]}))",
                     nameof(string.Substring) when args.Length == 3 => $"SUBSTRING({args[0]}, {args[1]} + 1, {args[2]})",
-                    nameof(string.Replace) when args.Length == 3 => $"REPLACE({args[0]}, {args[1]}, {args[2]})",
+                    // .NET Replace matches ordinally, but T-SQL REPLACE follows the (case-
+                    // insensitive by default) collation and would rewrite case variants too.
+                    // An explicit binary collation on the input makes the match ordinal.
+                    nameof(string.Replace) when args.Length == 3 =>
+                        $"REPLACE({OrdinalComparableStringProjection(args[0])}, {args[1]}, {args[2]})",
                     // CHARINDEX is 1-based and returns 0 if not found; .NET IndexOf is 0-based
-                    // and returns -1, so subtract 1 from CHARINDEX.
-                    nameof(string.IndexOf) when args.Length == 2 => $"(CHARINDEX({args[1]}, {args[0]}) - 1)",
+                    // and returns -1, so subtract 1 from CHARINDEX. The binary collation on the
+                    // needle makes the match ordinal (CHARINDEX otherwise follows the case-
+                    // insensitive default collation).
+                    nameof(string.IndexOf) when args.Length == 2 =>
+                        $"(CHARINDEX({OrdinalComparableStringProjection(args[1])}, {args[0]}) - 1)",
                     _ => null
                 };
             }
