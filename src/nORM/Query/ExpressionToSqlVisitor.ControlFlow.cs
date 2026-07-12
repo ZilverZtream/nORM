@@ -53,9 +53,14 @@ namespace nORM.Query
                 if (TryEmitMappedBooleanPredicate(node.Operand, expectedValue: false))
                     return node;
 
-                _sql.Append("(NOT(");
-                Visit(node.Operand);
-                _sql.Append("))");
+                // A C# predicate is a total boolean function, but its translation to SQL is
+                // three-valued: a comparison against a NULL column yields UNKNOWN, and wrapping
+                // that in a bare NOT(...) keeps it UNKNOWN, so the NULL row is filtered out. C#
+                // instead treats `!(nullCol == x)` (and `!(nullCol < x)`) as true, so that row
+                // must be INCLUDED. Push the negation down to the comparison leaves (De Morgan)
+                // so each leaf is emitted in its already-correct null-safe form rather than being
+                // negated whole. This is only reached for boolean negation in a predicate context.
+                EmitNegation(node.Operand);
                 return node;
             }
             if (node.NodeType is ExpressionType.Negate or ExpressionType.NegateChecked)
@@ -94,6 +99,103 @@ namespace nORM.Query
             }
             return base.VisitUnary(node);
         }
+
+        /// <summary>
+        /// Emits SQL for the logical negation of <paramref name="operand"/> using C# (two-valued)
+        /// boolean semantics rather than SQL three-valued logic. The negation is pushed down to the
+        /// comparison leaves so that NULL rows are handled the way LINQ-to-Objects would evaluate
+        /// them: <c>!(nullCol == x)</c> and <c>!(nullCol &lt; x)</c> are TRUE (row included), not
+        /// UNKNOWN (row filtered out).
+        /// </summary>
+        private void EmitNegation(Expression operand)
+        {
+            operand = StripBoolConvert(operand);
+            switch (operand)
+            {
+                // !!a == a
+                case UnaryExpression { NodeType: ExpressionType.Not } inner:
+                    Visit(StripBoolConvert(inner.Operand));
+                    return;
+
+                // De Morgan: !(a && b) == !a || !b, !(a || b) == !a && !b.
+                case BinaryExpression { NodeType: ExpressionType.AndAlso } and:
+                    _sql.Append('(');
+                    EmitNegation(and.Left);
+                    _sql.Append(" OR ");
+                    EmitNegation(and.Right);
+                    _sql.Append(')');
+                    return;
+                case BinaryExpression { NodeType: ExpressionType.OrElse } or:
+                    _sql.Append('(');
+                    EmitNegation(or.Left);
+                    _sql.Append(" AND ");
+                    EmitNegation(or.Right);
+                    _sql.Append(')');
+                    return;
+
+                // !(a == b) == a != b and !(a != b) == a == b. Routing back through VisitBinary
+                // reuses the existing null-safe expansion (e.g. NotEqual emits
+                // `(a IS NULL OR a <> b)`), so the NULL row is included exactly as C# requires.
+                case BinaryExpression { NodeType: ExpressionType.Equal } eq:
+                    Visit(Expression.NotEqual(eq.Left, eq.Right));
+                    return;
+                case BinaryExpression { NodeType: ExpressionType.NotEqual } ne:
+                    Visit(Expression.Equal(ne.Left, ne.Right));
+                    return;
+
+                // Relational operators cannot simply flip (`!(a < b)` is NOT `a >= b` when either
+                // side is NULL — C# lifts a NULL relational comparison to false, so its negation is
+                // true). Emit NOT(a op b) for the non-null rows and OR in an IS NULL guard for each
+                // operand that could be NULL, which rescues those rows to true.
+                case BinaryExpression
+                {
+                    NodeType: ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                        or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                } rel:
+                    EmitNegatedRelational(rel);
+                    return;
+
+                // Method calls (StartsWith, Contains, …), boolean columns, and anything else fall
+                // back to a straight NOT(...) — correct for non-nullable operands, and no worse than
+                // the previous behaviour for the rare nullable ones.
+                default:
+                    _sql.Append("(NOT(");
+                    Visit(operand);
+                    _sql.Append("))");
+                    return;
+            }
+        }
+
+        private void EmitNegatedRelational(BinaryExpression rel)
+        {
+            _sql.Append("(NOT(");
+            Visit(rel);
+            _sql.Append(')');
+            if (CouldBeNull(rel.Left))
+            {
+                _sql.Append(" OR (");
+                Visit(rel.Left);
+                _sql.Append(" IS NULL)");
+            }
+            if (CouldBeNull(rel.Right))
+            {
+                _sql.Append(" OR (");
+                Visit(rel.Right);
+                _sql.Append(" IS NULL)");
+            }
+            _sql.Append(')');
+        }
+
+        /// <summary>Strips boolean-preserving Convert nodes (e.g. <c>bool</c> ↔ <c>bool?</c>) so the
+        /// underlying comparison is what gets negated.</summary>
+        private static Expression StripBoolConvert(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u
+                   && (u.Type == typeof(bool) || u.Type == typeof(bool?)))
+                e = u.Operand;
+            return e;
+        }
+
         protected override Expression VisitConditional(ConditionalExpression node)
         {
             // x ? a : b -> (CASE WHEN x THEN a ELSE b END). Nested conditionals naturally
