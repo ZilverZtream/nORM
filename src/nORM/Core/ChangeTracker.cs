@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -432,7 +433,10 @@ namespace nORM.Core
         /// <see cref="EntityEntry.State"/>) directly, as this bypasses change-tracker
         /// invariants. Use <see cref="DbContext"/> APIs to transition entity state.
         /// </remarks>
-        public IEnumerable<EntityEntry> Entries => _entriesByReference.Values;
+        // Ordered by attach sequence so SaveChanges batches (and autoincrement key assignment)
+        // are deterministic in Add/Attach order — ConcurrentDictionary enumeration order is
+        // identity-hash based and varies between runs.
+        public IEnumerable<EntityEntry> Entries => _entriesByReference.Values.OrderBy(e => e.AttachSequence);
 
         /// <summary>
         /// Returns the tracked <see cref="EntityEntry"/> for the given entity instance, or null if not tracked.

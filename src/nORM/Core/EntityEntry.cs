@@ -30,6 +30,15 @@ namespace nORM.Core
         /// <summary>Multiplier for the polynomial byte-array hash in <see cref="ContentHashCode"/>.</summary>
         private const int ByteArrayHashMultiplier = 31;
 
+        private static long _attachCounter;
+
+        // Monotonic creation sequence so change-tracker enumeration (and therefore SaveChanges
+        // batch order) is deterministic in Add/Attach order. The backing stores are
+        // ConcurrentDictionaries whose enumeration order is identity-hash based and varies from
+        // run to run — without this, batched INSERT order (and thus autoincrement key
+        // assignment) was nondeterministic.
+        internal long AttachSequence { get; } = System.Threading.Interlocked.Increment(ref _attachCounter);
+
         private readonly TableMapping _mapping;
         // PERFORMANCE: Use null instead of Array.Empty to truly defer allocation
         private Column[]? _nonKeyColumns;
