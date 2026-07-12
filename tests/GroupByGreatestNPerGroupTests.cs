@@ -44,6 +44,15 @@ public class GroupByGreatestNPerGroupTests : IAsyncLifetime
               (1, 'NA',   90),
               (2, 'NA',   60),
               (3, 'EMEA', 70);
+            CREATE TABLE GnSale (Id INTEGER PRIMARY KEY, StoreId INTEGER NOT NULL, Category TEXT NOT NULL, SaleDate INTEGER NOT NULL, Amount INTEGER NOT NULL);
+            -- (Store, Category) groups; latest by SaleDate:
+            --   (1,'A') dates 1/3 -> 100/300 => 300;  (1,'B') date 2 -> 200;  (2,'A') dates 4/5 -> 400/500 => 500
+            INSERT INTO GnSale VALUES
+              (1, 1, 'A', 1, 100),
+              (2, 1, 'A', 3, 300),
+              (3, 1, 'B', 2, 200),
+              (4, 2, 'A', 5, 500),
+              (5, 2, 'A', 4, 400);
             """;
         await cmd.ExecuteNonQueryAsync();
         _ctx = new DbContext(_cn, new SqliteProvider());
@@ -123,6 +132,26 @@ public class GroupByGreatestNPerGroupTests : IAsyncLifetime
         Assert.Equal(3, rows["EMEA"]);
     }
 
+    [Fact]
+    public async Task Latest_amount_per_composite_key_store_and_category()
+    {
+        // Composite group key: correlation ANDs both key columns (StoreId AND Category).
+        var rows = (await _ctx.Query<GnSale>()
+            .GroupBy(s => new { s.StoreId, s.Category })
+            .Select(g => new
+            {
+                g.Key.StoreId,
+                g.Key.Category,
+                Latest = g.OrderByDescending(s => s.SaleDate).First().Amount
+            })
+            .ToListAsync())
+            .ToDictionary(r => (r.StoreId, r.Category), r => r.Latest);
+
+        Assert.Equal(300, rows[(1, "A")]);
+        Assert.Equal(200, rows[(1, "B")]);
+        Assert.Equal(500, rows[(2, "A")]);
+    }
+
     [Table("GnOrder")]
     public sealed class GnOrder
     {
@@ -138,5 +167,15 @@ public class GroupByGreatestNPerGroupTests : IAsyncLifetime
         [Key] public int Id { get; set; }
         public string Region { get; set; } = "";
         public int Score { get; set; }
+    }
+
+    [Table("GnSale")]
+    public sealed class GnSale
+    {
+        [Key] public int Id { get; set; }
+        public int StoreId { get; set; }
+        public string Category { get; set; } = "";
+        public int SaleDate { get; set; }
+        public int Amount { get; set; }
     }
 }

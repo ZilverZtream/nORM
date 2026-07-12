@@ -283,19 +283,16 @@ namespace nORM.Query
         /// <summary>
         /// Translates a greatest-N-per-group projection member — <c>g.OrderByDescending(x =&gt; x.Date).First().Amount</c>
         /// or <c>g.OrderBy(x =&gt; x.Date).Select(x =&gt; x.Amount).First()</c> — into a correlated
-        /// single-row subquery. Returns <c>null</c> when <paramref name="arg"/> is not that shape or the
-        /// group key is composite (which cannot correlate on a scalar equality). Supports First/FirstOrDefault
+        /// single-row subquery. Returns <c>null</c> when <paramref name="arg"/> is not that shape. The
+        /// subquery is correlated on the group key (single- or composite-column); supports First/FirstOrDefault
         /// and Last/LastOrDefault (the latter reverses the ordering); the subquery's LIMIT/TOP form is chosen
         /// by the provider.
         /// </summary>
         private string? TryTranslateGroupOrderedFirst(Expression arg, string alias, string groupBySql)
         {
-            // A scalar correlation predicate needs a single-column, non-composite key, and re-projecting
-            // through a group element selector is not yet plumbed for this shape.
+            // Re-projecting through a group element selector is not yet plumbed for this shape.
             if (_groupByKeySelector == null
-                || _groupByKeySelector.Body is NewExpression
                 || _groupByElementSelector != null
-                || _compositeKeyMemberSql.Count > 0
                 || string.IsNullOrEmpty(groupBySql))
                 return null;
 
@@ -369,15 +366,57 @@ namespace nORM.Query
             }
 
             const string subAlias = "g0";
-            var subKeySql = TranslateAgainstSubAlias(_groupByKeySelector.Body, _groupByKeySelector.Parameters[0], subAlias);
+            var whereSql = BuildGroupKeyCorrelation(subAlias, groupBySql);
+            if (whereSql == null)
+                return null;
             var orderSql = TranslateAgainstSubAlias(orderSelector.Body, orderSelector.Parameters[0], subAlias);
             var selectSql = TranslateAgainstSubAlias(resultBody, resultParam, subAlias);
 
             // Last/LastOrDefault picks the opposite end of the ordering.
             var descending = orderDescending ^ lastSemantics;
             var orderByFull = descending ? orderSql + " DESC" : orderSql;
-            var whereSql = subKeySql + " = " + groupBySql;
             return _provider.BuildCorrelatedTopOneSubquery(selectSql, _mapping.EscTable, subAlias, whereSql, orderByFull);
+        }
+
+        /// <summary>
+        /// Builds the correlation predicate tying a greatest-N-per-group subquery to the outer group,
+        /// equating every group-key column rendered against <paramref name="subAlias"/> to its outer
+        /// counterpart. Single-column keys compare against <paramref name="outerKeySql"/>; composite keys
+        /// (<c>GroupBy(x =&gt; new { x.A, x.B })</c>) compare each member against the per-member outer SQL
+        /// captured during GroupBy setup. Returns <c>null</c> if a key member cannot be resolved.
+        /// </summary>
+        private string? BuildGroupKeyCorrelation(string subAlias, string outerKeySql)
+        {
+            var keyBody = _groupByKeySelector!.Body;
+            var keyParam = _groupByKeySelector.Parameters[0];
+
+            if (keyBody is NewExpression composite && _compositeKeyMemberSql.Count > 0)
+            {
+                var conds = new List<string>(composite.Arguments.Count);
+                for (var i = 0; i < composite.Arguments.Count; i++)
+                {
+                    var memberName = composite.Members?[i]?.Name ?? $"Item{i + 1}";
+                    if (!_compositeKeyMemberSql.TryGetValue(memberName, out var outerMemberSql))
+                        return null;
+                    conds.Add(CorrelateKeyPart(composite.Arguments[i], keyParam, subAlias) + " = " + outerMemberSql);
+                }
+                return string.Join(" AND ", conds);
+            }
+
+            return CorrelateKeyPart(keyBody, keyParam, subAlias) + " = " + outerKeySql;
+        }
+
+        /// <summary>
+        /// Renders one group-key expression against the subquery alias, applying the same decimal
+        /// normalisation the GROUP BY side uses so numerically-equal decimal keys correlate.
+        /// </summary>
+        private string CorrelateKeyPart(Expression keyPart, ParameterExpression keyParam, string subAlias)
+        {
+            var sql = TranslateAgainstSubAlias(keyPart, keyParam, subAlias);
+            var partType = Nullable.GetUnderlyingType(keyPart.Type) ?? keyPart.Type;
+            if (partType == typeof(decimal))
+                sql = _provider.NormalizeDecimalForCompare(sql);
+            return sql;
         }
 
         /// <summary>
