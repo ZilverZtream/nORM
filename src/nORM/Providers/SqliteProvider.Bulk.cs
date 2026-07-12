@@ -84,9 +84,15 @@ namespace nORM.Providers
                     foreach (var entity in entityList)
                     {
                         // 5. Simply update the values of the existing parameters. No new objects created.
+                        // Apply the value converter and canonical type normalization (e.g. Guid->TEXT)
+                        // via the shared binder, exactly like every non-bulk write path — binding the raw
+                        // model value here would skip the converter and silently corrupt the column.
                         for (int i = 0; i < cols.Length; i++)
                         {
-                            parameters[i].Value = cols[i].Getter(entity) ?? DBNull.Value;
+                            var raw = cols[i].Getter(entity);
+                            var conv = cols[i].Converter;
+                            var val = conv != null ? conv.ConvertToProvider(raw) : raw;
+                            nORM.Query.ParameterAssign.AssignValue(parameters[i], val);
                         }
 
                         totalInserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
@@ -190,7 +196,13 @@ namespace nORM.Providers
                     {
                         for (int i = 0; i < insertCols.Length; i++)
                         {
-                            parameters[i].Value = insertCols[i].Getter(entity) ?? DBNull.Value;
+                            // Apply the value converter + canonical normalization like the normal path;
+                            // staging the raw model value would make the temp-table key/columns diverge
+                            // from the converter-encoded main table (silent no-op update / corruption).
+                            var raw = insertCols[i].Getter(entity);
+                            var conv = insertCols[i].Converter;
+                            var val = conv != null ? conv.ConvertToProvider(raw) : raw;
+                            nORM.Query.ParameterAssign.AssignValue(parameters[i], val);
                         }
                         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     }
