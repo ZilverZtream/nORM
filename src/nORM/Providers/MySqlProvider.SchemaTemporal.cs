@@ -144,6 +144,11 @@ CREATE TABLE {historyTable} (
             var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
             var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
             var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
+            // Scope the history close to the same tenant (SEC-MT): the history table is not PK-unique
+            // (its key includes the validity range), so matching on the entity key alone could close a
+            // different tenant's open row. No-op when the tenant column is already part of the key.
+            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
+                keyCondition += $" AND {Escape(tc.Name)} = OLD.{Escape(tc.Name)}";
 
             return $@"
 DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ai")};

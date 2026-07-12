@@ -130,6 +130,12 @@ namespace nORM.Providers
             var keyCondition = mapping.KeyColumns.Length > 0
                 ? string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"))
                 : "1=1";
+            // Scope the history close to the same tenant. The history table is not itself PK-unique
+            // (its key includes __ValidFrom), so matching on the entity key alone could close another
+            // tenant's open history row; adding the tenant predicate keeps temporal writes tenant-isolated
+            // like every other write path (SEC-MT). No-op when the tenant column is already part of the key.
+            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
+                keyCondition += $" AND {Escape(tc.Name)} = OLD.{Escape(tc.Name)}";
 
             return @$"
 CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}

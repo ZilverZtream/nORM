@@ -167,6 +167,14 @@ ORDER BY c.ORDINAL_POSITION";
             var deletedColumns = string.Join(", ", mapping.Columns.Select(c => "d." + Escape(c.Name)));
             var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h.{Escape(c.Name)} = d.{Escape(c.Name)}"));
             var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.Name)} = d.{Escape(c.Name)}"));
+            // Scope the history close to the same tenant (SEC-MT): the history table is not PK-unique
+            // (its key includes the validity range), so matching on the entity key alone could close a
+            // different tenant's open row. No-op when the tenant column is already part of the key.
+            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
+            {
+                keyCondition += $" AND h.{Escape(tc.Name)} = d.{Escape(tc.Name)}";
+                keyConditionH2 += $" AND h2.{Escape(tc.Name)} = d.{Escape(tc.Name)}";
+            }
 
             return $@"
 DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalInsert")};
