@@ -217,9 +217,56 @@ namespace nORM.Mapping
             ShadowFingerprint = sfp;
             SqlShapeKey = BuildSqlShapeKey();
 
-            DiscoverRelations(ctx);
-            BuildOwnedCollections(fluentConfig, p);
-            BuildManyToManyJoins(fluentConfig, p, ctx);
+            // Relationship discovery is deferred to EnsureRelationshipsInitialized so that a
+            // mapping is fully present in the context cache BEFORE it resolves any related
+            // mapping. Resolving relationships inside the constructor made a self-referential
+            // entity (Category→Parent, Employee→Manager) recurse into GetMapping for its own,
+            // not-yet-cached type — an unrecoverable StackOverflowException at first use.
+        }
+
+        // 0 = pending, 1 = in progress (re-entrant cycle), 2 = complete.
+        private volatile int _relInitState;
+
+        /// <summary>
+        /// Gets whether relationship discovery has completed for this mapping.
+        /// </summary>
+        internal bool RelationshipsInitialized => _relInitState == 2;
+
+        /// <summary>
+        /// Completes the second construction phase — relationship, owned-collection and
+        /// many-to-many discovery — which must run after the mapping is registered in the
+        /// context cache so cyclic type graphs (self-references, mutually referencing
+        /// entities) resolve against the cached instance instead of recursing.
+        /// </summary>
+        /// <remarks>
+        /// The caller (<see cref="DbContext.GetMapping"/>) holds a context-level, thread-reentrant
+        /// lock across the whole discovery cycle. A re-entrant call for a mapping already in
+        /// progress on the same cycle returns immediately: its columns are fully built (phase one),
+        /// which is all a dependent mapping needs to resolve its foreign keys.
+        /// </remarks>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Relationship discovery builds accessor delegates via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship discovery reflects over entity properties; trimming may remove the required members.")]
+        internal void EnsureRelationshipsInitialized(DbContext ctx)
+        {
+            // Already complete, or in progress higher up the same construction cycle.
+            if (_relInitState != 0)
+                return;
+
+            _relInitState = 1;
+            try
+            {
+                DiscoverRelations(ctx);
+                BuildOwnedCollections(_fluentConfig, Provider);
+                BuildManyToManyJoins(_fluentConfig, Provider, ctx);
+                _relInitState = 2;
+            }
+            catch
+            {
+                // Leave the mapping re-initializable after a transient failure rather than
+                // stranding it half-built.
+                _relInitState = 0;
+                throw;
+            }
         }
 
         private static Dictionary<string, Column> BuildColumnsByName(IEnumerable<Column> columns, Type entityType)

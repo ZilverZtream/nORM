@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -419,11 +420,17 @@ namespace nORM.Core
             var all = mappings.ToList();
             var deps = all.ToDictionary(
                 m => m,
-                m => all.Where(other => other != m && Array.Exists(m.Columns, c =>
-                    // FK-2: Match by full type name first (namespace-qualified) to avoid collisions
+                // A self-referential type (Category→Parent, Employee→Manager) is never its own
+                // *type-level* dependency: it sorts to a single position and any parent-before-child
+                // ordering is resolved among rows within the group, not between types. The `other != m`
+                // guard must therefore cover BOTH dependency tests — otherwise an explicit self
+                // relationship registers the mapping as depending on itself and the cycle check
+                // misreports a legitimate self-reference as a circular FK dependency.
+                m => all.Where(other => other != m && (Array.Exists(m.Columns, c =>
+                    // Match by full type name first (namespace-qualified) to avoid collisions
                     // between types with the same simple name in different namespaces.
                     MatchesPrincipalType(c.ForeignKeyPrincipalTypeName, other.Type)) ||
-                    HasExplicitRelationshipDependency(m, other)).ToList());
+                    HasExplicitRelationshipDependency(m, other))).ToList());
 
             var result = new List<TableMapping>();
             var visited = new HashSet<TableMapping>();
@@ -453,6 +460,97 @@ namespace nORM.Core
 
             foreach (var m in all) Visit(m, new List<TableMapping>());
             return result;
+        }
+
+        /// <summary>
+        /// Orders the rows of a single self-referential mapping group so a parent row is written
+        /// before the child row that references it (<paramref name="childrenFirst"/> = false, for
+        /// inserts) or after it (<paramref name="childrenFirst"/> = true, for deletes). A
+        /// self-referential table is one mapping, so <see cref="TopologicalSortMappings"/> cannot
+        /// separate parents from children — the dependency lives between rows, not types, and an
+        /// in-batch child insert that precedes its parent would violate the self-foreign-key.
+        /// Returns the input list unchanged when the mapping has no self-reference or has fewer
+        /// than two rows, so the common non-self-referential path pays no reordering cost.
+        /// </summary>
+        private static List<EntityEntry> OrderSelfReferentialRows(List<EntityEntry> entries, TableMapping map, bool childrenFirst)
+        {
+            if (entries.Count < 2)
+                return entries;
+
+            var selfRelation = map.Relations.Values.FirstOrDefault(r => r.DependentType == map.Type);
+            if (selfRelation == null)
+                return entries;
+
+            var principalKeys = selfRelation.PrincipalKeys;
+            var foreignKeys = selfRelation.ForeignKeys;
+
+            // Index rows by their principal-key value so a child row can locate its parent row
+            // within the same batch. Keys are formatted invariantly and length-delimited so that
+            // single- and multi-column (composite) self-references compare consistently.
+            static string FormatKey(IReadOnlyList<Column> cols, object entity)
+            {
+                // Length-prefixed, fully-printable segments (mirrors AppendSegment): a value can
+                // never forge a segment boundary, and the -1 length is an unambiguous null marker
+                // that no real value can produce.
+                var sb = new StringBuilder();
+                foreach (var c in cols)
+                {
+                    var v = c.Getter(entity);
+                    if (v == null)
+                    {
+                        sb.Append("-1:|");
+                    }
+                    else
+                    {
+                        var s = Convert.ToString(v, CultureInfo.InvariantCulture) ?? string.Empty;
+                        sb.Append(s.Length).Append(':').Append(s).Append('|');
+                    }
+                }
+                return sb.ToString();
+            }
+
+            static bool AllKeyPartsNull(IReadOnlyList<Column> cols, object entity)
+            {
+                foreach (var c in cols)
+                    if (c.Getter(entity) != null)
+                        return false;
+                return true;
+            }
+
+            var byPrincipal = new Dictionary<string, EntityEntry>(StringComparer.Ordinal);
+            foreach (var e in entries)
+            {
+                if (e.Entity != null)
+                    byPrincipal[FormatKey(principalKeys, e.Entity)] = e;
+            }
+
+            var ordered = new List<EntityEntry>(entries.Count);
+            // 1 = on the current DFS path (cycle guard), 2 = emitted.
+            var state = new Dictionary<EntityEntry, int>();
+
+            void Visit(EntityEntry node)
+            {
+                if (state.TryGetValue(node, out _))
+                    return; // already emitted, or on the current path (row-level cycle) — leave order to the DB.
+
+                state[node] = 1;
+                if (node.Entity != null && !AllKeyPartsNull(foreignKeys, node.Entity))
+                {
+                    var parentKey = FormatKey(foreignKeys, node.Entity);
+                    if (byPrincipal.TryGetValue(parentKey, out var parent) && !ReferenceEquals(parent, node))
+                        Visit(parent); // emit the parent first (post-order places it ahead of this node)
+                }
+
+                state[node] = 2;
+                ordered.Add(node);
+            }
+
+            foreach (var e in entries)
+                Visit(e);
+
+            if (childrenFirst)
+                ordered.Reverse();
+            return ordered;
         }
 
         /// <summary>

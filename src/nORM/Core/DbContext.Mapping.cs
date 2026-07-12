@@ -37,8 +37,31 @@ namespace nORM.Core
         /// </summary>
         /// <param name="t">The entity CLR type to map.</param>
         /// <returns>The mapping associated with the given type.</returns>
-        internal TableMapping GetMapping(Type t) => _m.GetOrAdd(t, static (k, args) =>
-            new TableMapping(k, args.p, args.ctx, args.modelBuilder.GetConfiguration(k)), (p: _p, ctx: this, modelBuilder: _modelBuilder));
+        internal TableMapping GetMapping(Type t)
+        {
+            var mapping = _m.GetOrAdd(t, static (k, args) =>
+                new TableMapping(k, args.p, args.ctx, args.modelBuilder.GetConfiguration(k)), (p: _p, ctx: this, modelBuilder: _modelBuilder));
+
+            // Fast path: relationships already discovered (the common case after warm-up) needs no lock.
+            if (!mapping.RelationshipsInitialized)
+            {
+                // Phase two runs under a context-level, thread-reentrant lock so cyclic type graphs
+                // (self-references, mutually referencing entities) resolve against the already-cached
+                // mapping instead of recursing into a not-yet-cached constructor. The lock also
+                // serialises first-time discovery across threads, preventing a cross-thread deadlock
+                // between two mutually referencing mappings.
+                lock (_mappingInitLock)
+                {
+                    mapping.EnsureRelationshipsInitialized(this);
+                }
+            }
+
+            return mapping;
+        }
+
+        // Serialises the deferred relationship-discovery phase; reentrant on the constructing thread
+        // so a self-referential or cyclic graph does not deadlock against itself.
+        private readonly object _mappingInitLock = new();
 
         /// <summary>
         /// Enumerates mappings for all entity types that were configured via the

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -222,6 +223,16 @@ namespace nORM.Core
                         if (entries.Count == 0)
                             continue;
                     }
+
+                    // A self-referential table (Category→Parent, Employee→Manager) is a single
+                    // mapping, so TopologicalSortMappings cannot separate parent rows from child
+                    // rows. Order the rows within the group so a parent is inserted before the
+                    // child that references it — and deleted after — or an in-batch write violates
+                    // the self-foreign-key. No-ops for the common non-self-referential mapping.
+                    if (state == EntityState.Added)
+                        entries = OrderSelfReferentialRows(entries, map, childrenFirst: false);
+                    else if (state == EntityState.Deleted)
+                        entries = OrderSelfReferentialRows(entries, map, childrenFirst: true);
 
                     await using var commandScope = new CommandScope(RawConnection, transaction);
 
