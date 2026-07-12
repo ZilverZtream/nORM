@@ -148,6 +148,13 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// SQL Server does not support <c>LIMIT</c>; the single-row correlated subquery uses
+        /// <c>SELECT TOP 1 ... ORDER BY ...</c> instead.
+        /// </summary>
+        public override string BuildCorrelatedTopOneSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql)
+            => $"(SELECT TOP 1 {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql})";
+
+        /// <summary>
         /// Adds SQL Server paging clauses to the SQL builder using <c>OFFSET</c> and <c>FETCH</c>.
         /// </summary>
         /// <param name="sb">The SQL builder to append to.</param>

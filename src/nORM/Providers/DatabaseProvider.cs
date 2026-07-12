@@ -190,6 +190,22 @@ namespace nORM.Providers
         public abstract void ApplyPaging(OptimizedSqlBuilder sb, int? limit, int? offset, string? limitParameterName, string? offsetParameterName);
 
         /// <summary>
+        /// Assembles a correlated subquery that returns a single ordered row, used to emit the
+        /// greatest-N-per-group pattern (<c>g.OrderByDescending(x =&gt; x.Date).First().Amount</c>)
+        /// as a scalar column inside a grouped projection. The default emits the ANSI
+        /// <c>ORDER BY ... LIMIT 1</c> form used by SQLite, PostgreSQL and MySQL; SQL Server
+        /// overrides it with <c>SELECT TOP 1</c>.
+        /// </summary>
+        /// <param name="selectSql">The scalar expression to project from the single row.</param>
+        /// <param name="tableSql">The escaped source table.</param>
+        /// <param name="alias">The subquery's table alias, distinct from the outer group alias.</param>
+        /// <param name="whereSql">The correlation predicate tying the subquery to the outer group key.</param>
+        /// <param name="orderBySql">The ordering that determines which single row is selected.</param>
+        /// <returns>A parenthesised scalar subquery.</returns>
+        public virtual string BuildCorrelatedTopOneSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql)
+            => $"(SELECT {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql} LIMIT 1)";
+
+        /// <summary>
         /// Returns SQL that retrieves the identity value generated for an inserted row.
         /// </summary>
         /// <param name="m">The mapping for the table being inserted into.</param>

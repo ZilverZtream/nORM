@@ -140,6 +140,7 @@ namespace nORM.Query
             if (elementSelectorLambda != null)
                 elementSelectorLambda = ExpandProjection(elementSelectorLambda);
             _groupByElementSelector = elementSelectorLambda;
+            _groupByKeySelector = keySelectorLambda;
             var param = keySelectorLambda.Parameters[0];
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);

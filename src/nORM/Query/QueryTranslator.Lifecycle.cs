@@ -106,6 +106,7 @@ namespace nORM.Query
                 _groupJoinResultSelector = null;
                 _groupJoinExpansionSelector = null;
                 _groupByElementSelector = null;
+                _groupByKeySelector = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _singleResult = false;
@@ -160,6 +161,7 @@ namespace nORM.Query
                 _groupJoinResultSelector = null;
                 _groupJoinExpansionSelector = null;
                 _groupByElementSelector = null;
+                _groupByKeySelector = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _contextStack.Clear();

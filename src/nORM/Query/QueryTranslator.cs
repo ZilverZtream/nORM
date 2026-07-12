@@ -114,6 +114,9 @@ namespace nORM.Query
         private LambdaExpression? _groupJoinResultSelector;
         private LambdaExpression? _groupJoinExpansionSelector;
         private LambdaExpression? _groupByElementSelector;
+        // The GroupBy key selector, retained so the projection builder can re-render the key
+        // against a subquery alias when emitting a greatest-N-per-group correlated subquery.
+        private LambdaExpression? _groupByKeySelector;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;

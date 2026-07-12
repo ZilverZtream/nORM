@@ -51,6 +51,16 @@ namespace nORM.Query
                     {
                         foreach (var (arg, memberName) in projectionItems)
                         {
+                            // Greatest-N-per-group: g.OrderByDescending(x => x.Date).First().Amount
+                            // emits a correlated single-row subquery correlated on the group key.
+                            if (TryTranslateGroupOrderedFirst(arg, alias, groupBySql) is { } orderedFirstSql)
+                            {
+                                var orderedFirstBuilder = PooledStringBuilder.Rent();
+                                orderedFirstBuilder.Append(orderedFirstSql).Append(" AS ").Append(_provider.Escape(memberName));
+                                selectItems.Add(orderedFirstBuilder.ToString());
+                                PooledStringBuilder.Return(orderedFirstBuilder);
+                                continue;
+                            }
                             // g.Key inside a projection projects the group key column.
                             if (arg is MemberExpression keyMember && keyMember.Member.Name == "Key")
                             {
@@ -268,6 +278,123 @@ namespace nORM.Query
             {
                 _selectItemsPool.Return(selectItems);
             }
+        }
+
+        /// <summary>
+        /// Translates a greatest-N-per-group projection member — <c>g.OrderByDescending(x =&gt; x.Date).First().Amount</c>
+        /// or <c>g.OrderBy(x =&gt; x.Date).Select(x =&gt; x.Amount).First()</c> — into a correlated
+        /// single-row subquery. Returns <c>null</c> when <paramref name="arg"/> is not that shape or the
+        /// group key is composite (which cannot correlate on a scalar equality). Supports First/FirstOrDefault
+        /// and Last/LastOrDefault (the latter reverses the ordering); the subquery's LIMIT/TOP form is chosen
+        /// by the provider.
+        /// </summary>
+        private string? TryTranslateGroupOrderedFirst(Expression arg, string alias, string groupBySql)
+        {
+            // A scalar correlation predicate needs a single-column, non-composite key, and re-projecting
+            // through a group element selector is not yet plumbed for this shape.
+            if (_groupByKeySelector == null
+                || _groupByKeySelector.Body is NewExpression
+                || _groupByElementSelector != null
+                || _compositeKeyMemberSql.Count > 0
+                || string.IsNullOrEmpty(groupBySql))
+                return null;
+
+            // Peel an optional trailing member access: `...First().Amount`.
+            System.Reflection.MemberInfo? tailMember = null;
+            if (arg is MemberExpression outerMember && outerMember.Expression is MethodCallExpression)
+            {
+                tailMember = outerMember.Member;
+                arg = outerMember.Expression;
+            }
+
+            if (arg is not MethodCallExpression firstCall || firstCall.Arguments.Count != 1)
+                return null;
+
+            bool lastSemantics;
+            switch (firstCall.Method.Name)
+            {
+                case "First":
+                case "FirstOrDefault": lastSemantics = false; break;
+                case "Last":
+                case "LastOrDefault": lastSemantics = true; break;
+                default: return null;
+            }
+
+            var firstSource = firstCall.Arguments[0];
+
+            // Optional `.Select(x => scalar)` between the ordering and First().
+            LambdaExpression? resultSelector = null;
+            if (firstSource is MethodCallExpression selectCall
+                && selectCall.Method.Name == "Select"
+                && selectCall.Arguments.Count == 2
+                && StripQuotes(selectCall.Arguments[1]) is LambdaExpression resLambda)
+            {
+                resultSelector = resLambda;
+                firstSource = selectCall.Arguments[0];
+            }
+
+            if (firstSource is not MethodCallExpression orderCall
+                || orderCall.Arguments.Count != 2
+                || StripQuotes(orderCall.Arguments[1]) is not LambdaExpression orderSelector)
+                return null;
+
+            bool orderDescending;
+            switch (orderCall.Method.Name)
+            {
+                case "OrderBy": orderDescending = false; break;
+                case "OrderByDescending": orderDescending = true; break;
+                default: return null;
+            }
+
+            // The ordering must apply directly to the grouping range variable.
+            if (orderCall.Arguments[0] is not ParameterExpression groupParam || !IsGroupingSequenceType(groupParam.Type))
+                return null;
+
+            // Resolve the scalar to project from the single row.
+            Expression resultBody;
+            ParameterExpression resultParam;
+            if (resultSelector != null)
+            {
+                resultParam = resultSelector.Parameters[0];
+                resultBody = resultSelector.Body;
+            }
+            else if (tailMember != null)
+            {
+                resultParam = Expression.Parameter(orderSelector.Parameters[0].Type, "e");
+                resultBody = Expression.MakeMemberAccess(resultParam, tailMember);
+            }
+            else
+            {
+                return null; // `.First()` with no scalar member/selector to project.
+            }
+
+            const string subAlias = "g0";
+            var subKeySql = TranslateAgainstSubAlias(_groupByKeySelector.Body, _groupByKeySelector.Parameters[0], subAlias);
+            var orderSql = TranslateAgainstSubAlias(orderSelector.Body, orderSelector.Parameters[0], subAlias);
+            var selectSql = TranslateAgainstSubAlias(resultBody, resultParam, subAlias);
+
+            // Last/LastOrDefault picks the opposite end of the ordering.
+            var descending = orderDescending ^ lastSemantics;
+            var orderByFull = descending ? orderSql + " DESC" : orderSql;
+            var whereSql = subKeySql + " = " + groupBySql;
+            return _provider.BuildCorrelatedTopOneSubquery(selectSql, _mapping.EscTable, subAlias, whereSql, orderByFull);
+        }
+
+        /// <summary>
+        /// Translates an expression whose root parameter represents a source row, rendering its mapped
+        /// columns against <paramref name="subAlias"/>. Used to build the SELECT / ORDER BY / correlation
+        /// fragments of a greatest-N-per-group subquery without disturbing the outer group aliasing.
+        /// </summary>
+        private string TranslateAgainstSubAlias(Expression body, ParameterExpression param, string subAlias)
+        {
+            var local = new Dictionary<ParameterExpression, (nORM.Mapping.TableMapping Mapping, string Alias)> { [param] = (_mapping, subAlias) };
+            var vctx = new VisitorContext(_ctx, _mapping, _provider, param, subAlias, local, _compiledParams, _paramMap, _recursionDepth, _params.Count);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            var sql = visitor.Translate(body);
+            foreach (var kvp in visitor.GetParameters())
+                AddLiteralParameter(kvp.Key, kvp.Value);
+            FastExpressionVisitorPool.Return(visitor);
+            return sql;
         }
 
         private static string? ExtractSourceFromClause(string sql)
