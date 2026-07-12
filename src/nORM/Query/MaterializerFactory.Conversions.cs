@@ -269,24 +269,30 @@ namespace nORM.Query
                 var (from, to) = key;
                 try
                 {
+                    // Pass InvariantCulture: the database stores numeric/temporal scalars
+                    // with invariant formatting, so a value read as a string (e.g. SQLite
+                    // TEXT affinity) must not be reparsed under a comma-decimal locale —
+                    // Convert.ChangeType(object, Type) uses CurrentCulture and would turn
+                    // "1.5" into 15 (or throw) on Swedish/German machines.
                     var param = Expression.Parameter(typeof(object), "value");
                     var convert = Expression.Convert(
                         Expression.Call(typeof(Convert), nameof(Convert.ChangeType),
                             null,
                             Expression.Convert(param, from),
-                            Expression.Constant(to)),
+                            Expression.Constant(to),
+                            Expression.Constant(CultureInfo.InvariantCulture, typeof(IFormatProvider))),
                         typeof(object));
                     return Expression.Lambda<Func<object, object>>(convert, param).Compile();
                 }
                 catch (InvalidCastException)
                 {
                     // Fallback to runtime conversion when expression tree compilation fails
-                    return value => Convert.ChangeType(value, to);
+                    return value => Convert.ChangeType(value, to, CultureInfo.InvariantCulture);
                 }
                 catch (InvalidOperationException)
                 {
                     // Fallback to runtime conversion when expression tree compilation fails
-                    return value => Convert.ChangeType(value, to);
+                    return value => Convert.ChangeType(value, to, CultureInfo.InvariantCulture);
                 }
             });
 
