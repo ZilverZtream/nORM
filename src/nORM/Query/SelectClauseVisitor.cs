@@ -52,6 +52,16 @@ namespace nORM.Query
         // the CI column collation. Identity on providers whose set ops are already ordinal.
         public bool ForceOrdinalStringProjections { get; set; }
 
+        // Shared with the owning QueryTranslator so PROJECTION closures emit compiled parameters
+        // (@cpN) instead of baked literals. Plans are cached by expression fingerprint, so a baked
+        // closure literal poisons the cache: a second run with a different captured value silently
+        // computes against the first run's value. The ParameterValueExtractor re-reads every
+        // closure in document order on each execution and binds these slots positionally — the
+        // same contract ExpressionToSqlVisitor's closure parameters use. Null in fragment-only
+        // uses, which keep the literal fallback.
+        public System.Collections.Generic.IDictionary<string, object>? SharedParams { get; set; }
+        public System.Collections.Generic.List<string>? SharedCompiledParams { get; set; }
+
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null, DbContext? ctx = null)
         {
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
@@ -366,6 +376,17 @@ namespace nORM.Query
             // DisplayClass field.
             if (QueryTranslator.TryGetConstantValue(node, out var capturedValue))
             {
+                // Emit a compiled parameter when the owning translator shared its channel: the
+                // live value is re-extracted on every plan-cache hit. Baking the literal would
+                // freeze the FIRST run's captured value into the cached SQL.
+                if (SharedParams != null && SharedCompiledParams != null)
+                {
+                    var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
+                    SharedParams[paramName] = DBNull.Value;
+                    SharedCompiledParams.Add(paramName);
+                    sb.Append(paramName);
+                    return node;
+                }
                 sb.Append(FormatLiteral(capturedValue));
                 return node;
             }

@@ -313,7 +313,7 @@ namespace nORM.Query
                             // table` would return the full row count and ignore the distinct.
                             if (_t._isDistinct && _t._projection != null)
                             {
-                                var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias, ctx: _t._ctx) { CoerceDecimalProjectionsToReal = true | _t._coerceDecimalProjectionsToReal, ForceOrdinalStringProjections = _t._forceOrdinalStringProjections };
+                                var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias, ctx: _t._ctx) { CoerceDecimalProjectionsToReal = true | _t._coerceDecimalProjectionsToReal, ForceOrdinalStringProjections = _t._forceOrdinalStringProjections, SharedParams = _t._params, SharedCompiledParams = _t._compiledParams };
                                 var projSelect = selectVisitor.Translate(_t._projection.Body);
                                 var subqueryAlias = _t.EscapeAlias("T0");
                                 prefix.Append("SELECT COUNT(*) FROM (SELECT DISTINCT ").Append(projSelect).Append(" FROM ").Append(fromClause);
@@ -348,7 +348,7 @@ namespace nORM.Query
                         }
                         else if (_t._projection != null)
                         {
-                            var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias, ctx: _t._ctx) { CoerceDecimalProjectionsToReal = _t._isDistinct || _t._coerceDecimalProjectionsToReal, ForceOrdinalStringProjections = _t._forceOrdinalStringProjections };
+                            var selectVisitor = new SelectClauseVisitor(_t._mapping, _t._groupBy, _t._provider, alias, ctx: _t._ctx) { CoerceDecimalProjectionsToReal = _t._isDistinct || _t._coerceDecimalProjectionsToReal, ForceOrdinalStringProjections = _t._forceOrdinalStringProjections, SharedParams = _t._params, SharedCompiledParams = _t._compiledParams };
                             select = selectVisitor.Translate(_t._projection.Body);
 
                             // Capture detected collections for split query processing
