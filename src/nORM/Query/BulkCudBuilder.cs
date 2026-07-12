@@ -298,6 +298,11 @@ namespace nORM.Query
                 }
                 else if (TryGetSetValue(call.Arguments[1], out var value))
                 {
+                    // Apply the column's value converter so the SET clause persists the provider
+                    // representation, matching the tracked write path. Skipping it silently stores the
+                    // raw model value (e.g. an enum's underlying int instead of its mapped name).
+                    if (value != null && targetColumn.Converter != null)
+                        value = targetColumn.Converter.ConvertToProvider(value);
                     var pName = _ctx.RawProvider.ParamPrefix + "u" + paramIndex++;
                     parameters[pName] = value ?? DBNull.Value;
                     assigns.Add((column, pName, value, null));
