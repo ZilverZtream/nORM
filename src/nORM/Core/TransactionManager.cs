@@ -95,6 +95,11 @@ namespace nORM.Core
                 else if (connection != null && connection.State == ConnectionState.Open)
                 {
                     shouldAcceptChanges = HandleEnlistmentPolicy(context, connection, ambientTransaction, policy);
+                    // Successfully enlisted (scope controls durability): if the scope is abandoned
+                    // without Complete(), the DB rolls back outside nORM, so register a key-reset on the
+                    // ambient transaction's completion to keep still-Added entities re-insertable.
+                    if (!shouldAcceptChanges && ambientTransaction != null)
+                        context.RegisterAmbientRollbackReset(ambientTransaction);
                 }
             }
             // else: existingTransaction != null — external explicit transaction controls durability.

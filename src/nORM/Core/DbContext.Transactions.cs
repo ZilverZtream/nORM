@@ -74,6 +74,47 @@ namespace nORM.Core
                 RestoreRolledBackGeneratedKeys(_transactionKeySnapshot);
         }
 
+        // The ambient System.Transactions.Transaction nORM enlisted in, plus the Added-entity key
+        // snapshot taken at enlistment. When the scope aborts (disposed without Complete) the DB rolls
+        // back OUTSIDE any DbContextTransaction, so the completion event is the only reset hook.
+        private System.Transactions.Transaction? _registeredAmbientTransaction;
+        private Dictionary<object, object?[]>? _ambientKeySnapshot;
+
+        /// <summary>
+        /// Registers a reset for a successfully-enlisted ambient <see cref="System.Transactions.Transaction"/>
+        /// so that, if the scope is disposed without Complete(), the DB-generated keys stamped while the
+        /// scope was active are reset (the entities stay Added because durability is the scope's; without
+        /// this the next SaveChanges silently drops them). Snapshots the current Added keys once per scope.
+        /// </summary>
+        internal void RegisterAmbientRollbackReset(System.Transactions.Transaction ambient)
+        {
+            if (ReferenceEquals(_registeredAmbientTransaction, ambient))
+                return; // already registered for this scope (a later SaveChanges within it)
+            _registeredAmbientTransaction = ambient;
+            _ambientKeySnapshot = SnapshotAddedGeneratedKeys();
+            ambient.TransactionCompleted += OnAmbientTransactionCompleted;
+        }
+
+        private void OnAmbientTransactionCompleted(object? sender, System.Transactions.TransactionEventArgs e)
+        {
+            try
+            {
+                if (e.Transaction?.TransactionInformation.Status == System.Transactions.TransactionStatus.Aborted
+                    && _ambientKeySnapshot != null)
+                {
+                    RestoreRolledBackGeneratedKeys(_ambientKeySnapshot);
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(sender as System.Transactions.Transaction, _registeredAmbientTransaction))
+                {
+                    _registeredAmbientTransaction = null;
+                    _ambientKeySnapshot = null;
+                }
+            }
+        }
+
         internal async Task CreateSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)
