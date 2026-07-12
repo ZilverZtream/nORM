@@ -345,7 +345,20 @@ namespace nORM.Query
                     }
                 }
                 if (rewritten != null)
-                    return queryCall.Update(queryCall.Object, rewritten);
+                {
+                    var updated = queryCall.Update(queryCall.Object, rewritten);
+                    // For an unmapped result (a join/groupjoin/selectmany projection into an anonymous
+                    // type) the base case cannot express a filter over that shape, so return as-is.
+                    // For a MAPPED result element type — set operations (Union/Intersect/Except) whose
+                    // result IS the entity type, and OfType<Derived>() — fall through so the base case
+                    // also wraps the combined expression. Without this, the left/source arm (which is
+                    // deliberately not recursed for same-type operators) keeps NO global filter and
+                    // leaks unfiltered rows: soft-deleted rows, or — with a tenant provider — another
+                    // tenant's rows.
+                    if (!_ctx.IsMapped(resultElementType))
+                        return updated;
+                    expression = updated;
+                }
             }
 
             var entityType = GetElementType(expression);
