@@ -59,4 +59,30 @@ public class DateTimeOffsetGroupKeyTests
         Assert.Equal(5, groups[1].Total);
         Assert.Equal(new DateTimeOffset(2020, 1, 1, 4, 0, 0, TimeSpan.Zero).UtcDateTime, groups[1].Key.UtcDateTime);
     }
+
+    [Fact]
+    public void Distinct_mixed_offset_same_instant_yields_one_value()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE DtoG (Id INTEGER PRIMARY KEY, WhenAt TEXT NOT NULL, Amount INTEGER NOT NULL);
+                INSERT INTO DtoG VALUES
+                    (1, '2020-01-01 05:00:00+02:00', 1),
+                    (2, '2020-01-01 03:00:00+00:00', 2),
+                    (3, '2020-01-01 04:00:00+00:00', 5);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        // LINQ Distinct over DateTimeOffset dedups by instant: {03:00Z, 04:00Z}.
+        var distinct = ctx.Query<Row>().Select(r => r.WhenAt).Distinct()
+            .ToList().Select(d => d.UtcDateTime).OrderBy(d => d).ToList();
+        Assert.Equal(2, distinct.Count);
+        Assert.Equal(new DateTime(2020, 1, 1, 3, 0, 0), distinct[0]);
+        Assert.Equal(new DateTime(2020, 1, 1, 4, 0, 0), distinct[1]);
+    }
 }

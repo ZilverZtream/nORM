@@ -399,6 +399,22 @@ namespace nORM.Query
                             _t._groupByOrdinalExtras.Add(_t._provider.ForceCaseSensitiveStringComparison(select));
                             emitDistinctKeyword = false;
                         }
+                        // Scalar DateTimeOffset Distinct: .NET dedups by INSTANT, but SQLite's
+                        // offset-suffixed TEXT dedups by representation and keeps same-instant
+                        // values distinct. Select the canonical UTC text and group by it — the
+                        // canonical form both dedups by instant and materializes as a
+                        // DateTimeOffset (identical mechanism to GROUP BY key canonicalization).
+                        if (emitDistinctKeyword
+                            && _t._groupBy.Count == 0
+                            && _t._projection != null
+                            && (Nullable.GetUnderlyingType(_t._projection.Body.Type) ?? _t._projection.Body.Type) == typeof(DateTimeOffset)
+                            && !select.Contains(" AS ", StringComparison.Ordinal)
+                            && _t._provider.CanonicalizeDateTimeOffsetGroupKey(select) is { } canonicalDistinct)
+                        {
+                            select = canonicalDistinct;
+                            _t._groupBy.Add(canonicalDistinct);
+                            emitDistinctKeyword = false;
+                        }
                         var distinct = emitDistinctKeyword ? "DISTINCT " : string.Empty;
                         var prefix = PooledStringBuilder.Rent();
                         try
