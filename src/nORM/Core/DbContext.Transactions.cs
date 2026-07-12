@@ -54,6 +54,26 @@ namespace nORM.Core
         // happen after the savepoint so a rollback-to-savepoint leaves those entities re-insertable.
         private Dictionary<string, Dictionary<object, object?[]>>? _savepointKeySnapshots;
 
+        // Snapshot of Added-entity DB-generated keys captured when a caller-owned transaction begins,
+        // used to reset keys stamped during the transaction if it is fully rolled back (the same
+        // silent-drop class as the savepoint fix, via a different rollback path).
+        private Dictionary<object, object?[]>? _transactionKeySnapshot;
+
+        internal void CaptureTransactionKeySnapshot()
+            => _transactionKeySnapshot = SnapshotAddedGeneratedKeys();
+
+        /// <summary>
+        /// Resets, after a full transaction rollback, the DB-generated keys stamped during the
+        /// transaction so the still-Added entities are re-inserted on the next SaveChanges instead of
+        /// being silently dropped by the "skip already-inserted" guard. Invoked by
+        /// <see cref="DbContextTransaction"/> before the transaction is cleared.
+        /// </summary>
+        internal void ResetGeneratedKeysAfterFullRollback()
+        {
+            if (_transactionKeySnapshot != null)
+                RestoreRolledBackGeneratedKeys(_transactionKeySnapshot);
+        }
+
         internal async Task CreateSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
         {
             if (transaction == null)

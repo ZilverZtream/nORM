@@ -95,7 +95,13 @@ namespace nORM.Core
             if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
                 return;
 
-            try { _transaction?.Rollback(); }
+            try
+            {
+                _transaction?.Rollback();
+                // The rollback undid every insert made in this transaction; reset the keys those
+                // inserts stamped so still-Added entities are re-inserted on the next SaveChanges.
+                _context.ResetGeneratedKeysAfterFullRollback();
+            }
             finally { DisposeTransactionAndClear(); }
         }
 
@@ -117,6 +123,9 @@ namespace nORM.Core
                     // Always use CancellationToken.None: a rollback must not be aborted even when
                     // the caller's token is already cancelled, otherwise the DB is left mid-transaction.
                     await _transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                // The rollback undid every insert made in this transaction; reset the keys those
+                // inserts stamped so still-Added entities are re-inserted on the next SaveChanges.
+                _context.ResetGeneratedKeysAfterFullRollback();
             }
             finally
             {

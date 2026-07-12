@@ -450,6 +450,9 @@ namespace nORM.Core
 
             Interlocked.Exchange(ref _currentTransaction, transaction);
             Volatile.Write(ref _currentContextTransaction, contextTransaction);
+            // Snapshot Added-entity keys so a full rollback of this caller-owned transaction can reset
+            // any key stamped while it was active (see DbContext.Transactions.cs).
+            CaptureTransactionKeySnapshot();
         }
 
         internal void ClearTransaction(DbTransaction transaction)
@@ -458,8 +461,9 @@ namespace nORM.Core
             {
                 Interlocked.Exchange(ref _currentTransaction, null);
                 Volatile.Write(ref _currentContextTransaction, null);
-                // Savepoint key snapshots are scoped to the transaction that owned them.
+                // Key snapshots are scoped to the transaction that owned them.
                 _savepointKeySnapshots?.Clear();
+                _transactionKeySnapshot = null;
             }
         }
 
