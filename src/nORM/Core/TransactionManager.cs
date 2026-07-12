@@ -202,7 +202,13 @@ namespace nORM.Core
         {
             try
             {
-                connection.EnlistTransaction(System.Transactions.Transaction.Current);
+                // Enlist in the ambientTransaction SNAPSHOT captured before the awaits,
+                // not the live Transaction.Current. Transaction.Current is execution-context
+                // flowed, so after EnsureConnectionAsync the continuation may resume where
+                // Transaction.Current has changed or cleared — re-reading it here could
+                // enlist the connection in the wrong scope (or none), silently breaking the
+                // atomicity the caller's TransactionScope was meant to provide.
+                connection.EnlistTransaction(ambientTransaction);
                 context.Options.Logger?.LogDebug(
                     "Explicitly enlisted connection in ambient transaction {TransactionId}.",
                     ambientTransaction.TransactionInformation.LocalIdentifier);
