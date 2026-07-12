@@ -688,6 +688,7 @@ M:nORM.Providers.DatabaseProvider.AddTimeSpanColumnToTimeOnlySql(System.String,S
 M:nORM.Providers.DatabaseProvider.AddYearsToDateOnlySql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String):System.Void
 M:nORM.Providers.DatabaseProvider.BuildContainsClause(System.Data.Common.DbCommand,System.String,System.Collections.Generic.IReadOnlyList{System.Object}):System.String
+M:nORM.Providers.DatabaseProvider.BuildCorrelatedTopOneSubquery(System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.BuildSimpleSelect(System.Span{System.Char},System.ReadOnlySpan{System.Char},System.ReadOnlySpan{System.Char},System.Int32&):System.Void
@@ -901,6 +902,7 @@ M:nORM.Providers.SqlServerProvider.AddTimeSpanColumnToDateTimeSql(System.String,
 M:nORM.Providers.SqlServerProvider.AddTimeSpanColumnToTimeOnlySql(System.String,System.String,System.Boolean):System.String
 M:nORM.Providers.SqlServerProvider.AddYearsToDateOnlySql(System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.ApplyPaging(nORM.Query.OptimizedSqlBuilder,System.Nullable{System.Int32},System.Nullable{System.Int32},System.String,System.String):System.Void
+M:nORM.Providers.SqlServerProvider.BuildCorrelatedTopOneSubquery(System.String,System.String,System.String,System.String,System.String):System.String
 M:nORM.Providers.SqlServerProvider.BulkDeleteAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Providers.SqlServerProvider.BulkInsertAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Providers.SqlServerProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mapping.TableMapping,System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -1327,6 +1329,7 @@ P:nORM.Mapping.TableMapping.Columns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableMapping.ColumnsByName:System.Collections.Generic.Dictionary{System.String,nORM.Mapping.Column}
 P:nORM.Mapping.TableMapping.ConverterFingerprint:System.Int32
 P:nORM.Mapping.TableMapping.DiscriminatorColumn:nORM.Mapping.Column
+P:nORM.Mapping.TableMapping.DiscriminatorValue:System.Object
 P:nORM.Mapping.TableMapping.EscTable:System.String
 P:nORM.Mapping.TableMapping.InsertColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableMapping.IsReadOnly:System.Boolean
@@ -1446,6 +1449,7 @@ P:nORM.Navigation.NavigationPropertyInfo.TargetType:System.Type
 P:nORM.Providers.DatabaseProvider.BooleanFalseLiteral:System.String
 P:nORM.Providers.DatabaseProvider.BooleanTrueLiteral:System.String
 P:nORM.Providers.DatabaseProvider.Capabilities:nORM.Providers.ProviderCapabilities
+P:nORM.Providers.DatabaseProvider.DefaultValuesInsertClause:System.String
 P:nORM.Providers.DatabaseProvider.LikeEscapeChar:System.Char
 P:nORM.Providers.DatabaseProvider.LiveColumnInfo.IsNullable:System.Boolean
 P:nORM.Providers.DatabaseProvider.LiveColumnInfo.Name:System.String
@@ -1467,6 +1471,7 @@ P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.OptimalBatchSize:System.Int
 P:nORM.Providers.DynamicBatchSizer.BatchSizingResult.Strategy:System.String
 P:nORM.Providers.IFastProvider.ParameterPrefixChar:System.Char
 P:nORM.Providers.MySqlProvider.Capabilities:nORM.Providers.ProviderCapabilities
+P:nORM.Providers.MySqlProvider.DefaultValuesInsertClause:System.String
 P:nORM.Providers.MySqlProvider.LikeEscapeChar:System.Char
 P:nORM.Providers.MySqlProvider.MaxParameters:System.Int32
 P:nORM.Providers.MySqlProvider.MaxSqlLength:System.Int32
