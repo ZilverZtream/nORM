@@ -185,6 +185,15 @@ namespace nORM.Providers
             => $"({left} = {right} AND {ForceCaseSensitiveStringComparison(left)} = {right})";
 
         /// <summary>
+        /// A VALUE-PRESERVING wrap that makes a projected string expression compare with ordinal
+        /// (binary) semantics in set operations (UNION / INTERSECT / EXCEPT dedup and matching).
+        /// Unlike <see cref="ForceCaseSensitiveStringComparison"/>, the result must still
+        /// materialize as a string (MySQL's bare <c>BINARY x</c> would come back as raw bytes).
+        /// Null means the provider's set ops are already ordinal (SQLite, PostgreSQL).
+        /// </summary>
+        internal virtual string? OrdinalComparableStringProjection(string sql) => null;
+
+        /// <summary>
         /// Ordinal string inequality, the negation of <see cref="OrdinalStringEqualSql"/>:
         /// collation-inequality implies byte-inequality (short-circuits), otherwise the binary
         /// term decides. Inequality is never index-sargable, so no narrowing term is needed.

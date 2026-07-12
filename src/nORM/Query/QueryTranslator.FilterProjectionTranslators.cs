@@ -369,7 +369,8 @@ namespace nORM.Query
                         {
                             var selectVisitor = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, t._outerDerivedAlias, ctx: t._ctx)
                             {
-                                CoerceDecimalProjectionsToReal = t._coerceDecimalProjectionsToReal
+                                CoerceDecimalProjectionsToReal = t._coerceDecimalProjectionsToReal,
+                                ForceOrdinalStringProjections = t._forceOrdinalStringProjections
                             };
                             var projSelect = selectVisitor.Translate(pendingProjection.Body);
                             t._detectedCollections.AddRange(selectVisitor.DetectedCollections);

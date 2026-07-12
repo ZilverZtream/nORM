@@ -46,6 +46,12 @@ namespace nORM.Query
         // use native DECIMAL and don't need this coercion.
         public bool CoerceDecimalProjectionsToReal { get; set; }
 
+        // When set, string column references in the projection are wrapped with the provider's
+        // value-preserving ordinal collation (OrdinalComparableStringProjection) so set-operation
+        // dedup/matching (UNION / INTERSECT / EXCEPT) compares byte-wise like LINQ instead of by
+        // the CI column collation. Identity on providers whose set ops are already ordinal.
+        public bool ForceOrdinalStringProjections { get; set; }
+
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null, DbContext? ctx = null)
         {
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
@@ -319,6 +325,13 @@ namespace nORM.Query
                     // others identity. Decimal projections from set ops /
                     // DISTINCT need numeric dedup on SQLite (TEXT storage).
                     sb.Append(_provider.NormalizeDecimalForCompare(col.EscCol));
+                }
+                else if (ForceOrdinalStringProjections && memberType == typeof(string)
+                         && _provider.OrdinalComparableStringProjection(col.EscCol) is { } ordinalSql)
+                {
+                    // Set-operation arm on a CI-collation provider: emit the value-preserving
+                    // binary-collated form so UNION/INTERSECT/EXCEPT compare byte-wise like LINQ.
+                    sb.Append(ordinalSql);
                 }
                 else
                 {

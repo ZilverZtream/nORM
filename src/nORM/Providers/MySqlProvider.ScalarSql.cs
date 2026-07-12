@@ -96,6 +96,15 @@ namespace nORM.Providers
         internal override bool DefaultStringEqualityIsCaseInsensitive => true;
 
         /// <summary>
+        /// Value-preserving ordinal wrap for set-operation projections. A bare <c>BINARY x</c>
+        /// materializes as VARBINARY (raw bytes); casting to utf8mb4 text with the binary
+        /// collation keeps the value a string while UNION / INTERSECT / EXCEPT compare
+        /// byte-wise (live-verified: dedup keeps 'abc' and 'ABC' distinct, values unchanged).
+        /// </summary>
+        internal override string OrdinalComparableStringProjection(string sql)
+            => $"CAST({sql} AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_bin";
+
+        /// <summary>
         /// MySQL's <c>FORMAT(x, N)</c> inserts thousand-separators by default
         /// ('1,234.50') which doesn't match .NET's <c>ToString("F2")</c>
         /// ('1234.50'). Wrap in REPLACE to strip the commas. The result still

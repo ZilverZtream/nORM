@@ -319,7 +319,9 @@ namespace nORM.Query
             // wrap so the computed boolean matches LINQ-to-Objects and the Where translation.
             if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
                 && _provider.DefaultStringEqualityIsCaseInsensitive
-                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)))
+                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)
+                    || (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(char)
+                    || (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(char)))
             {
                 var ordLeftStart = sb.Length;
                 Visit(node.Left);

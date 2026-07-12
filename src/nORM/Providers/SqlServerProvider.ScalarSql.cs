@@ -184,6 +184,14 @@ namespace nORM.Providers
         internal override bool DefaultStringEqualityIsCaseInsensitive => true;
 
         /// <summary>
+        /// Value-preserving ordinal wrap for set-operation projections: COLLATE changes only the
+        /// comparison semantics, not the value, so UNION / INTERSECT / EXCEPT dedup byte-wise
+        /// while the column still materializes as a string.
+        /// </summary>
+        internal override string OrdinalComparableStringProjection(string sql)
+            => $"{sql} COLLATE Latin1_General_100_BIN2";
+
+        /// <summary>
         /// Escapes special characters in a pattern used with SQL Server's <c>LIKE</c> operator.
         /// </summary>
         /// <param name="value">The pattern to escape.</param>

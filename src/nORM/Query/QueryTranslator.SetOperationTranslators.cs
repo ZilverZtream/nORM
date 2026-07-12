@@ -262,6 +262,20 @@ namespace nORM.Query
                 // logical value). The flag is scoped per-arm via try/finally.
                 var savedCoerce = t._coerceDecimalProjectionsToReal;
                 t._coerceDecimalProjectionsToReal = true;
+                // LINQ set operations compare strings ordinally, but UNION / INTERSECT / EXCEPT
+                // on CI-collation providers (MySQL, SQL Server) dedup and match by the column
+                // collation — merging "abc"/"ABC" in Union, cross-matching them in Intersect/
+                // Except. Wrap each arm's string projections in the provider's value-preserving
+                // ordinal collation so the set semantics match LINQ. Concat (UNION ALL) never
+                // dedups, so it needs no wrap.
+                var savedOrdinal = t._forceOrdinalStringProjections;
+                if (node.Method.Name != nameof(Queryable.Concat)
+                    && t._provider.DefaultStringEqualityIsCaseInsensitive
+                    && node.Method.GetGenericArguments() is { Length: 1 } setElem
+                    && setElem[0] == typeof(string))
+                {
+                    t._forceOrdinalStringProjections = true;
+                }
                 string leftSql, rightSql;
                 try
                 {
@@ -271,6 +285,7 @@ namespace nORM.Query
                 finally
                 {
                     t._coerceDecimalProjectionsToReal = savedCoerce;
+                    t._forceOrdinalStringProjections = savedOrdinal;
                 }
                 var setOp = node.Method.Name switch
                 {

@@ -183,6 +183,14 @@ namespace nORM.Query
         // tradeoff as the rest of the decimal-cluster - see SCV.CoerceDecimalProjectionsToReal.
         internal bool _coerceDecimalProjectionsToReal;
 
+        // Set by SetOperationTranslator around each UNION / INTERSECT / EXCEPT arm when the
+        // element type is string on a CI-collation provider: string projections get the
+        // value-preserving OrdinalComparableStringProjection wrap so the set-op dedups and
+        // matches byte-wise like LINQ. Plain field (not part of the sub-context snapshot) so it
+        // flows into TranslateSubExpression, scoped by try/finally at the set site — the exact
+        // pattern _coerceDecimalProjectionsToReal uses.
+        internal bool _forceOrdinalStringProjections;
+
         /// <summary>
         /// Converts a LINQ <see cref="Expression"/> into an executable <see cref="QueryPlan"/>,
         /// performing validation, setup and SQL generation in a thread-safe manner.

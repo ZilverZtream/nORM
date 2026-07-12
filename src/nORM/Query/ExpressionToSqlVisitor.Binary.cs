@@ -88,12 +88,14 @@ namespace nORM.Query
                 if (TryEmitDateTimeOffsetLiteralComparison(node))
                     return node;
 
-                // C# string equality is ordinal (case-sensitive); on providers whose default
-                // collation makes `=` case-insensitive (MySQL, SQL Server), string =/<> must emit
-                // the sargable ordinal wrap instead of a bare compare. SQLite/PostgreSQL compare
-                // ordinally already, so their flag is false and every emit below is unchanged.
+                // C# string and char equality are ordinal (case-sensitive); on providers whose
+                // default collation makes `=` case-insensitive (MySQL, SQL Server), string/char
+                // =/<> must emit the sargable ordinal wrap instead of a bare compare (chars
+                // translate to one-character SQL strings, e.g. SUBSTR(col,1,1), and fold case the
+                // same way). SQLite/PostgreSQL compare ordinally already, so their flag is false
+                // and every emit below is unchanged.
                 bool ordinalStringCompare = _provider.DefaultStringEqualityIsCaseInsensitive
-                    && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string));
+                    && (IsStringOrCharType(node.Left.Type) || IsStringOrCharType(node.Right.Type));
 
                 if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
                 {
@@ -518,6 +520,14 @@ namespace nORM.Query
             _sql.Append(op == ExpressionType.Equal ? " = " : " <> ");
             _sql.Append(literal);
             _sql.Append(")");
+        }
+
+        // string and char both translate to SQL text comparisons, so both need the ordinal
+        // (case-sensitive) equality treatment on CI-collation providers.
+        private static bool IsStringOrCharType(Type t)
+        {
+            var u = Nullable.GetUnderlyingType(t) ?? t;
+            return u == typeof(string) || u == typeof(char);
         }
 
         private static bool IsNullExpression(Expression e)

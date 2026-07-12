@@ -242,7 +242,8 @@ namespace nORM.Query
                     // ForceCaseSensitiveStringComparison IN over the SAME parameters — the plain
                     // IN narrows through any index, the binary IN filters exactly.
                     bool ordinalStringIn = _provider.DefaultStringEqualityIsCaseInsensitive
-                        && (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(string);
+                        && ((Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(string)
+                            || (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(char));
 
                     // Emits `col IN (@p…)` (registering the parameters once) and returns the
                     // rendered `(@p…)` list so the ordinal wrap can reference the same names.
