@@ -61,6 +61,10 @@ namespace nORM.Query
         // uses, which keep the literal fallback.
         public System.Collections.Generic.IDictionary<string, object>? SharedParams { get; set; }
         public System.Collections.Generic.List<string>? SharedCompiledParams { get; set; }
+        // Converter registrations for the compiled slots above: plan binders apply
+        // ConvertToProvider to the extracted value so a closure compared against a converter
+        // column binds the PROVIDER representation (same contract as Where-side closures).
+        public System.Collections.Generic.Dictionary<string, nORM.Mapping.IValueConverter>? SharedParamConverters { get; set; }
 
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null, DbContext? ctx = null)
         {

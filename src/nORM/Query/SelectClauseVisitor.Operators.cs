@@ -407,6 +407,33 @@ namespace nORM.Query
             var stripped = valueSide;
             while (stripped is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
                 stripped = u.Operand;
+            // Closure capture vs converter column: emit a compiled-parameter slot and register
+            // the converter so binders convert the LIVE value on every plan-cache hit.
+            if (stripped is MemberExpression
+                && QueryTranslator.TryGetConstantValue(stripped, out _)
+                && SharedParams != null && SharedCompiledParams != null && SharedParamConverters != null)
+            {
+                var closureOp = leftIsColumn ? node.NodeType : FlipScvComparison(node.NodeType);
+                var closureSb = EnsureBuilder();
+                var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
+                SharedParams[paramName] = DBNull.Value;
+                SharedCompiledParams.Add(paramName);
+                SharedParamConverters[paramName] = column.Converter!;
+                closureSb.Append('(');
+                Visit(memberSide);
+                closureSb.Append(' ').Append(closureOp switch
+                {
+                    ExpressionType.Equal => "=",
+                    ExpressionType.NotEqual => "<>",
+                    ExpressionType.LessThan => "<",
+                    ExpressionType.LessThanOrEqual => "<=",
+                    ExpressionType.GreaterThan => ">",
+                    ExpressionType.GreaterThanOrEqual => ">=",
+                    _ => throw new InvalidOperationException()
+                }).Append(' ').Append(paramName).Append(')');
+                return true;
+            }
+
             if (stripped is not ConstantExpression { Value: { } raw })
                 return false;
 
