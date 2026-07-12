@@ -40,6 +40,14 @@ namespace nORM.Query
                     return Visit(asContains);
                 }
             }
+            // A predicate comparing a value-converter column to an inline constant must bind the
+            // converted (provider) value, e.g. an enum stored as a string, or a converter that
+            // stores 42 as -42. Without this the constant binds in its model form and silently
+            // matches the wrong rows (or none). Closure-captured values are not handled here because
+            // they must be converted at execution time (the plan is fingerprint-cached across
+            // differing captured values); those still flow through the normal path.
+            if (TryEmitConvertedColumnConstantComparison(node))
+                return node;
             if (TryEmitDateTimeOffsetLiteralComparison(node))
                 return node;
 
@@ -609,6 +617,106 @@ namespace nORM.Query
             // Everything else (column references, method calls, etc.) could be null
             return true;
         }
+
+        /// <summary>
+        /// Emits <c>(column &lt;op&gt; @p)</c> for a comparison between a value-converter column and an
+        /// inline constant, binding the converter's provider representation of the constant. Returns
+        /// false (falling through to the normal comparison paths) when neither/both sides are a
+        /// converter column, when the value is not an inline constant, or when the value is a literal
+        /// null (the IS NULL path handles null and needs no conversion).
+        /// </summary>
+        /// <remarks>
+        /// Only inline constants are handled here. A closure-captured value compared to a converter
+        /// column still binds unconverted through the normal path — that requires converting the
+        /// value at execution time (the plan is fingerprint-cached across differing captured values)
+        /// and is tracked separately. Non-enum converter columns compared to a captured value are
+        /// already covered by the fast path, which extracts and converts the value eagerly.
+        /// </remarks>
+        private bool TryEmitConvertedColumnConstantComparison(BinaryExpression node)
+        {
+            if (node.NodeType is not (ExpressionType.Equal or ExpressionType.NotEqual
+                or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                or ExpressionType.LessThan or ExpressionType.LessThanOrEqual))
+                return false;
+
+            var leftIsColumn = TryGetConverterColumn(node.Left, out var leftColumn);
+            var rightIsColumn = TryGetConverterColumn(node.Right, out var rightColumn);
+            if (leftIsColumn == rightIsColumn)
+                return false; // neither is a converter column, or a column-vs-column comparison
+
+            var memberSide = leftIsColumn ? node.Left : node.Right;
+            var valueSide = leftIsColumn ? node.Right : node.Left;
+            var column = leftIsColumn ? leftColumn : rightColumn;
+
+            // Only inline constants are handled; anything else (a closure capture, another column)
+            // declines before anything is written to the SQL buffer.
+            if (StripConvert(valueSide) is not ConstantExpression { Value: { } rawValue })
+                return false;
+
+            // Normalize to `column <op> value` — flip the operator when the column is on the right.
+            var op = leftIsColumn ? node.NodeType : FlipComparison(node.NodeType);
+            var converted = column.Converter!.ConvertToProvider(rawValue);
+            var convertedType = converted?.GetType() ?? column.Converter!.ProviderType;
+
+            _sql.Append('(');
+            if (op == ExpressionType.NotEqual && column.IsNullable)
+            {
+                // Preserve C# `col != value` semantics for a nullable column: NULL rows must be
+                // included (SQL `NULL <> @p` is UNKNOWN, i.e. excluded).
+                var columnSql = GetSql(memberSide);
+                _sql.Append(columnSql).Append(" IS NULL OR ").Append(columnSql).Append(" <> ");
+                AppendConstant(converted, convertedType);
+            }
+            else
+            {
+                Visit(memberSide);
+                _sql.Append(op switch
+                {
+                    ExpressionType.Equal => " = ",
+                    ExpressionType.NotEqual => " <> ",
+                    ExpressionType.GreaterThan => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan => " < ",
+                    ExpressionType.LessThanOrEqual => " <= ",
+                    _ => throw new InvalidOperationException()
+                });
+                AppendConstant(converted, convertedType);
+            }
+            _sql.Append(')');
+            return true;
+        }
+
+        private static Expression StripConvert(Expression expr)
+        {
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            return expr;
+        }
+
+        private bool TryGetConverterColumn(Expression expr, out Column column)
+        {
+            column = null!;
+            expr = StripConvert(expr);
+            if (expr is MemberExpression me
+                && TableMapping.TryGetMemberAccessRoot(me, out var root)
+                && _parameterMappings.TryGetValue(root, out var info)
+                && info.Mapping.TryGetColumnForMemberAccess(me, out var col)
+                && col.Converter != null)
+            {
+                column = col;
+                return true;
+            }
+            return false;
+        }
+
+        private static ExpressionType FlipComparison(ExpressionType op) => op switch
+        {
+            ExpressionType.GreaterThan => ExpressionType.LessThan,
+            ExpressionType.GreaterThanOrEqual => ExpressionType.LessThanOrEqual,
+            ExpressionType.LessThan => ExpressionType.GreaterThan,
+            ExpressionType.LessThanOrEqual => ExpressionType.GreaterThanOrEqual,
+            _ => op // Equal / NotEqual are symmetric
+        };
 
         private bool TryEmitMappedBooleanPredicate(Expression expression, bool expectedValue)
         {

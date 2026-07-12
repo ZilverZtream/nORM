@@ -16,6 +16,20 @@ namespace nORM.Query
     internal static partial class FastPathQueryExecutor
     {
         /// <summary>
+        /// Applies a column's value converter to a predicate value so the fast path binds the
+        /// provider representation (e.g. a converter storing 42 as -42 must compare against -42, not
+        /// 42). Mirrors what the write path does with ConvertToProvider; without it a filter on a
+        /// converted column silently returns the wrong rows. Null is left untouched so the caller's
+        /// IS NULL handling still applies.
+        /// </summary>
+        private static object? ConvertPredicateValue(Column column, object? value)
+        {
+            if (column.Converter == null || value == null || value is DBNull)
+                return value;
+            return column.Converter.ConvertToProvider(value);
+        }
+
+        /// <summary>
         /// Non-async entry point - does SQL lookup and command setup synchronously,
         /// then dispatches to async materialization. Avoids one async state machine allocation.
         /// </summary>
@@ -24,6 +38,7 @@ namespace nORM.Query
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
                 throw new InvalidOperationException($"Fast path failed: column '{info.Property}' not found in mapping for '{typeof(T).Name}'.");
+            info = info with { Value = ConvertPredicateValue(column, info.Value) };
 
             // Cache full SQL (SELECT + WHERE + LIMIT) using ValueTuple key to avoid string allocation
             bool isNull = info.Value == null || info.Value == DBNull.Value;
@@ -72,6 +87,7 @@ namespace nORM.Query
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
                 throw new InvalidOperationException($"Fast path failed: column '{info.Property}' not found in mapping for '{typeof(T).Name}'.");
+            info = info with { Value = ConvertPredicateValue(column, info.Value) };
 
             bool isNull = info.Value == null || info.Value == DBNull.Value;
             bool isBoolTrue = !isNull && info.Value is bool bv2 && bv2;

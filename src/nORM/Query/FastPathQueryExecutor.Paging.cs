@@ -28,6 +28,29 @@ namespace nORM.Query
                 _ => throw new NormUnsupportedFeatureException($"Unsupported predicate operation '{operation}'.")
             };
 
+        /// <summary>
+        /// Rewrites predicate values through their column's value converter so the paged fast path
+        /// binds the provider representation (a converter storing 42 as -42 must compare against -42).
+        /// Returns the same instance when no predicate column has a converter, to avoid allocation on
+        /// the common path.
+        /// </summary>
+        private static ComplexQueryInfo ApplyConvertersToPredicates(TableMapping map, ComplexQueryInfo info)
+        {
+            PredicateInfo[]? rewritten = null;
+            for (var i = 0; i < info.Predicates.Length; i++)
+            {
+                var predicate = info.Predicates[i];
+                if (!map.ColumnsByName.TryGetValue(predicate.Property, out var column))
+                    continue;
+                var converted = ConvertPredicateValue(column, predicate.Value);
+                if (ReferenceEquals(converted, predicate.Value))
+                    continue;
+                rewritten ??= (PredicateInfo[])info.Predicates.Clone();
+                rewritten[i] = predicate with { Value = converted };
+            }
+            return rewritten == null ? info : info with { Predicates = rewritten };
+        }
+
         private static string BuildFilteredOrderedPageCacheKey<T>(ComplexQueryInfo info, DbContext ctx) where T : class
         {
             var key = new StringBuilder(typeof(T).FullName);
@@ -125,6 +148,7 @@ namespace nORM.Query
         private static Task<List<T>> ExecuteFilteredOrderedPageList<T>(DbContext ctx, ComplexQueryInfo info, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
+            info = ApplyConvertersToPredicates(map, info);
             var cacheKey = BuildFilteredOrderedPageCacheKey<T>(info, ctx);
             var sql = _pageSqlCache.GetOrAdd(cacheKey, static (_, state) =>
                 BuildFilteredOrderedPageSql<T>(state.Context, state.Mapping, state.Info), (Context: ctx, Mapping: map, Info: info));

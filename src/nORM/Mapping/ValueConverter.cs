@@ -45,12 +45,14 @@ namespace nORM.Mapping
         {
             if (modelValue == null || modelValue is DBNull) return null;
             if (modelValue is TModel typed) return ConvertToProvider(typed);
-            // Cross-type conversion (e.g., boxed int when TModel=long)
+            // Cross-type conversion (e.g., boxed int when TModel=long, or the underlying integer of
+            // an enum: LINQ lifts `p.EnumProp == Enum.X` to an int comparison, so a predicate binds
+            // the underlying integer rather than a boxed TModel enum).
             try
             {
-                return ConvertToProvider((TModel)System.Convert.ChangeType(modelValue, typeof(TModel)));
+                return ConvertToProvider(CoerceTo<TModel>(modelValue));
             }
-            catch (InvalidCastException ex)
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
             {
                 throw new InvalidCastException(
                     $"Cannot convert model value of type '{modelValue.GetType().Name}' to '{typeof(TModel).Name}' " +
@@ -65,14 +67,25 @@ namespace nORM.Mapping
             // Cross-type conversion (e.g., SQLite returns long for INTEGER, TProvider=int)
             try
             {
-                return ConvertFromProvider((TProvider)System.Convert.ChangeType(providerValue, typeof(TProvider)));
+                return ConvertFromProvider(CoerceTo<TProvider>(providerValue));
             }
-            catch (InvalidCastException ex)
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
             {
                 throw new InvalidCastException(
                     $"Cannot convert provider value of type '{providerValue.GetType().Name}' to '{typeof(TProvider).Name}' " +
                     $"for converter '{GetType().Name}'.", ex);
             }
+        }
+
+        // Coerces a boxed value to T. Enum targets need Enum.ToObject (System.Convert.ChangeType
+        // throws for enum destination types), which is exactly the shape a lifted enum predicate
+        // produces (the underlying integer boxed against an enum TModel).
+        private static T CoerceTo<T>(object value)
+        {
+            var target = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+            if (target.IsEnum)
+                return (T)Enum.ToObject(target, value);
+            return (T)System.Convert.ChangeType(value, target);
         }
     }
 }
