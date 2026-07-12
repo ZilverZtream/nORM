@@ -85,6 +85,12 @@ namespace nORM.Query
                     }
                     else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault))
                     {
+                        // The predicate overload First(source, predicate) carries its filter in
+                        // Arguments[1]; this fast path only reads Arguments[0], so accepting it would
+                        // silently DROP the predicate and return the first row of the whole table.
+                        // Fall through to the full translator, which handles the predicate correctly.
+                        if (mc.Arguments.Count > 1)
+                            return false;
                         resultMethodName = mc.Method.Name;
                         current = mc.Arguments[0];
                     }
