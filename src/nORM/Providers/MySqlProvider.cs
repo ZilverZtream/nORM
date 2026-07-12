@@ -43,6 +43,9 @@ namespace nORM.Providers
         /// <inheritdoc />
         public override string ForceCaseSensitiveStringComparison(string sql) => $"BINARY {sql}";
 
+        /// <summary>MySQL rejects <c>DEFAULT VALUES</c>; an all-default row is <c>INSERT INTO t () VALUES ()</c>.</summary>
+        public override string DefaultValuesInsertClause => "() VALUES ()";
+
         /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
         private const int TableSchemaCacheSize = 100;
 

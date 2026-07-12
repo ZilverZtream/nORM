@@ -36,7 +36,12 @@ namespace nORM.Providers
             if (entityList.Count == 0) return 0;
 
             var cols = m.Columns.Where(c => !c.IsDbGenerated).ToArray();
-            if (cols.Length == 0) return 0;
+            // Every column is DB-generated (e.g. an identity-only table). Postgres COPY and the
+            // multi-row VALUES form cannot express a zero-column insert, so returning 0 here would
+            // silently insert nothing. Delegate to the base implementation, which emits one
+            // `INSERT ... DEFAULT VALUES` per entity (as SQLite and the base contract already do).
+            if (cols.Length == 0)
+                return await base.BulkInsertAsync(ctx, m, entityList, ct).ConfigureAwait(false);
 
             var operationKey = $"Postgres_BulkInsert_{m.Type.Name}";
 

@@ -590,7 +590,7 @@ namespace nORM.Core
                 : string.Empty;
             var cols = _p.GetInsertColumns(map);
             if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable}{identityPrefix} DEFAULT VALUES{identityFragment}";
+                return $"INSERT INTO {map.EscTable}{identityPrefix} {_p.DefaultValuesInsertClause}{identityFragment}";
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
             return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix} VALUES ({paramNames}){identityFragment}";

@@ -48,7 +48,7 @@ namespace nORM.Providers
                 var identitySuffix = includeIdentityRetrieval ? GetIdentityRetrievalString(m) : string.Empty;
                 if (cols.Length == 0)
                 {
-                    return $"INSERT INTO {m.EscTable}{identityPrefix} DEFAULT VALUES{identitySuffix}";
+                    return $"INSERT INTO {m.EscTable}{identityPrefix} {DefaultValuesInsertClause}{identitySuffix}";
                 }
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 var valParams = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));

@@ -129,7 +129,7 @@ namespace nORM.Providers
                 var inserted = 0;
                 await using var cmd = ctx.CreateCommand();
                 if (transaction != null) cmd.Transaction = transaction;
-                cmd.CommandText = $"INSERT INTO {m.EscTable} DEFAULT VALUES";
+                cmd.CommandText = $"INSERT INTO {m.EscTable} {DefaultValuesInsertClause}";
                 for (int i = 0; i < batch.Count; i++)
                     inserted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 return inserted;

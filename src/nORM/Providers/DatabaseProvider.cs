@@ -59,6 +59,13 @@ namespace nORM.Providers
         public virtual string BooleanFalseLiteral => "0";
 
         /// <summary>
+        /// The clause following <c>INSERT INTO table</c> that inserts a single all-default row (when
+        /// every column is DB-generated). ANSI <c>DEFAULT VALUES</c> on SQLite/SQL Server/PostgreSQL;
+        /// MySQL rejects that and overrides to <c>() VALUES ()</c>.
+        /// </summary>
+        public virtual string DefaultValuesInsertClause => "DEFAULT VALUES";
+
+        /// <summary>
         /// Indicates whether this provider should prefer synchronous Read/ExecuteReader calls
         /// within async methods. True for providers like SQLite that don't support true async I/O,
         /// where async wrappers add pure overhead (~50-100ns per call).
