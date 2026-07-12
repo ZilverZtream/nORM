@@ -625,6 +625,34 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Reverses a <see cref="ReindexAfterInsert"/> that ran during a SaveChanges attempt which
+        /// was subsequently rolled back. Removes the now-stale key-based identity-map index created
+        /// for the rolled-back key and restores the entity's pre-insert key column values (default
+        /// for a first attempt). Without this, the retry sees a non-default DB-generated key, the
+        /// "skip already-inserted" guard treats the entity as persisted, and the row is silently
+        /// dropped even though its INSERT was rolled back.
+        /// </summary>
+        /// <param name="entity">The Added entity whose key was assigned by the failed attempt.</param>
+        /// <param name="mapping">Mapping information for the entity type.</param>
+        /// <param name="originalKeyValues">The key column values captured before the attempt ran.</param>
+        internal void RollbackGeneratedKeyAssignment(object entity, TableMapping mapping, object?[] originalKeyValues)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            ArgumentNullException.ThrowIfNull(mapping);
+            ArgumentNullException.ThrowIfNull(originalKeyValues);
+
+            // Drop the identity-map entry keyed by the rolled-back (non-default) key so a later
+            // lookup does not resolve to an entity whose row no longer exists.
+            var currentPk = GetPrimaryKeyValue(entity, mapping);
+            if (currentPk != null && _entriesByKey.TryGetValue(mapping.Type, out var typeDict))
+                typeDict.TryRemove(currentPk, out _);
+
+            // Restore the pre-attempt key values so the retry re-inserts the row.
+            for (int i = 0; i < mapping.KeyColumns.Length && i < originalKeyValues.Length; i++)
+                mapping.KeyColumns[i].Setter(entity, originalKeyValues[i]);
+        }
+
+        /// <summary>
         /// After a principal with a DB-generated key is inserted and its key hydrated, updates the
         /// foreign key of every still-Added dependent reachable through the principal's collection
         /// navigations to the newly generated key value. Relationship fixup (see

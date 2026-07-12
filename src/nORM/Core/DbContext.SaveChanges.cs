@@ -179,6 +179,25 @@ namespace nORM.Core
                     return 0;
             }
 
+            // Snapshot the DB-generated key values of Added entities before the attempt runs. A
+            // rolled-back INSERT still leaves the key it assigned on the entity; capturing the
+            // pre-attempt value lets the rollback path restore it so the retry re-inserts the row
+            // instead of skipping it as already-persisted (silent data loss).
+            List<(object Entity, TableMapping Map, object?[] Keys)>? addedKeySnapshot = null;
+            foreach (var entry in changedEntries)
+            {
+                if (entry.State == EntityState.Added
+                    && entry.Entity is { } addedEntity
+                    && entry.Mapping.KeyColumns.Any(k => k.IsDbGenerated))
+                {
+                    var m = entry.Mapping;
+                    var keys = new object?[m.KeyColumns.Length];
+                    for (int i = 0; i < m.KeyColumns.Length; i++)
+                        keys[i] = m.KeyColumns[i].Getter(addedEntity);
+                    (addedKeySnapshot ??= new()).Add((addedEntity, m, keys));
+                }
+            }
+
             await using var transactionManager = await TransactionManager.CreateAsync(this, ct).ConfigureAwait(false);
             ct = transactionManager.Token;
             var transaction = transactionManager.Transaction;
@@ -354,6 +373,31 @@ namespace nORM.Core
                         "SaveChanges failed and rollback also failed. See inner exceptions for details.",
                         originalEx, rollbackEx);
                 }
+
+                // The rollback discarded every row inserted this attempt. Reset the in-memory
+                // DB-generated keys those inserts stamped so a retry (or a caller re-saving) treats
+                // the entities as never-inserted; otherwise the "skip already-inserted" guard drops
+                // them and the rows are silently lost. Only keys mutated during this attempt are
+                // reset - an entity carrying a non-default key from a prior committed save is left
+                // untouched.
+                if (addedKeySnapshot != null)
+                {
+                    foreach (var (entity, map, keys) in addedKeySnapshot)
+                    {
+                        var changed = false;
+                        for (int i = 0; i < map.KeyColumns.Length; i++)
+                        {
+                            if (!Equals(map.KeyColumns[i].Getter(entity), keys[i]))
+                            {
+                                changed = true;
+                                break;
+                            }
+                        }
+                        if (changed)
+                            ChangeTracker.RollbackGeneratedKeyAssignment(entity, map, keys);
+                    }
+                }
+
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
                 throw; // unreachable - satisfies compiler
             }
