@@ -96,11 +96,10 @@ namespace nORM.Query
                     }
                     else if (mc.Method.Name is nameof(Queryable.Take))
                     {
-                        // Accept Take so queries like .Where(...).Take(10) hit simple path;
-                        // reject non-constant or negative Take values so validation falls through.
-                        if (mc.Arguments[1] is not ConstantExpression takeConst || takeConst.Value is not int tv || tv < 0)
-                            return false;
-                        current = mc.Arguments[0];
+                        // This fast path never emits a LIMIT/TOP, so accepting Take would silently
+                        // return the WHOLE table instead of the first n rows. Fall through to the full
+                        // translator, which applies the row limit correctly.
+                        return false;
                     }
                     else if (mc.Method.Name is nameof(Queryable.Single) or nameof(Queryable.SingleOrDefault))
                     {
