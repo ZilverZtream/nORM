@@ -743,6 +743,12 @@ namespace nORM.Query
                 columnSql = _provider.NormalizeDecimalForCompare(columnSql);
             }
 
+            // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so its
+            // provider hook casts integral operands to FLOAT (identity elsewhere). Mirrors the
+            // top-level aggregate paths in QueryTranslator.Aggregates.cs.
+            if (sqlAgg == "AVG")
+                columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
+
             var whereFilter = ExtractAggregateSourceFilter(methodCall);
             if (whereFilter == null) return $"{sqlAgg}({columnSql})";
 
