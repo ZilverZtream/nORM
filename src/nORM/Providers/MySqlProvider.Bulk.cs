@@ -244,6 +244,13 @@ namespace nORM.Providers
             if (keyCols.Count == 0)
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
+            // Optimistic concurrency: the native IN(keys) path matches by key only, which
+            // cannot honour a concurrency token. Route token-carrying entities through the
+            // shared fallback, which matches (key AND token) so a row another writer has
+            // updated is skipped, not destroyed. Token-less entities keep the fast path.
+            if (m.TimestampColumn != null)
+                return await base.BatchedDeleteAsync(ctx, m, entityList, ct).ConfigureAwait(false);
+
             var operationKey = $"MySql_BulkDelete_{m.Type.Name}";
             var hasTenant = ctx.Options.TenantProvider != null;
             var tenantColumn = hasTenant ? ctx.RequireTenantColumn(m, "MySQL bulk delete") : null;

@@ -305,6 +305,14 @@ namespace nORM.Providers
             if (m.KeyColumns.Length != 1)
                 return await base.BatchedDeleteAsync(ctx, m, entityList, ct).ConfigureAwait(false);
 
+            // Optimistic concurrency: the fast `= ANY(keys)` path matches by key only,
+            // which cannot honour a concurrency token. Route token-carrying entities
+            // through the shared fallback, which matches (key AND token) so a row another
+            // writer has updated is skipped, not destroyed. Token-less entities keep the
+            // fast native path.
+            if (m.TimestampColumn != null)
+                return await base.BatchedDeleteAsync(ctx, m, entityList, ct).ConfigureAwait(false);
+
             var keyCol = m.KeyColumns[0];
             var operationKey = $"Postgres_BulkDelete_{m.Type.Name}";
             var sizing = BatchSizer.CalculateOptimalBatchSize(entityList.Take(BatchSizingSampleCount), m, operationKey, entityList.Count);

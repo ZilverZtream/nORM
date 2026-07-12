@@ -207,6 +207,13 @@ namespace nORM.Providers
             ValidateConnection(ctx.RawConnection);
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
+            // Optimistic concurrency: the temp-table key JOIN matches by key only, which
+            // cannot honour a concurrency token. Route token-carrying entities through the
+            // shared fallback, which matches (key AND token) so a row another writer has
+            // updated is skipped, not destroyed. Token-less entities keep the fast path.
+            if (m.TimestampColumn != null)
+                return await base.BatchedDeleteAsync(ctx, m, entities, ct).ConfigureAwait(false);
+
             var sw = Stopwatch.StartNew();
             var tempTableName = $"#BulkDelete_{Guid.NewGuid():N}";
             var keyColDefs = string.Join(", ", m.KeyColumns.Select(c => $"{c.EscCol} {GetStagingSqlType(c, m)}"));
