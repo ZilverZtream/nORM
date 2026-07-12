@@ -41,7 +41,10 @@ namespace nORM.Query
             };
 
             var childMapping = _ctx.GetMapping(relation.DependentType);
-            var subAlias = $"T_nav_{Guid.NewGuid().ToString("N").Substring(0, 8)}";
+            // Escape the alias BEFORE handing it to the sub-visitor: PostgreSQL folds unquoted
+            // identifiers to lowercase, so a selector emitting the raw alias would not match the
+            // quoted alias in the FROM clause ("missing FROM-clause entry").
+            var subAlias = _provider.Escape($"T_nav_{Guid.NewGuid().ToString("N").Substring(0, 8)}");
 
             // Translate the selector lambda against the child mapping. Routing through a
             // dedicated child-parameter binding lets nested member access / arithmetic /
@@ -56,10 +59,16 @@ namespace nORM.Query
             var selectorSql = subVisitor.Translate(selectorLambda.Body);
             _paramIndex = subVisitor.ParamIndex;
 
+            // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so its
+            // provider hook casts integral operands to FLOAT (identity elsewhere) — same hook as
+            // the other aggregate emit paths.
+            if (sqlAgg == "AVG")
+                selectorSql = _provider.AverageAggregateOperand(selectorSql, selectorLambda.Body.Type);
+
             _sql.Append("(SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
-                .Append(" FROM ").Append(childMapping.EscTable).Append(' ').Append(_provider.Escape(subAlias))
+                .Append(" FROM ").Append(childMapping.EscTable).Append(' ').Append(subAlias)
                 .Append(" WHERE ");
-            AppendRelationPredicate(_sql, relation, _provider.Escape(subAlias), parentInfo.Alias);
+            AppendRelationPredicate(_sql, relation, subAlias, parentInfo.Alias);
             _sql.Append(')');
         }
 

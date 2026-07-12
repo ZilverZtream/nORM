@@ -59,6 +59,24 @@ namespace nORM.Query
                         node.Method.Name, selNavParent, selNavInfo, selRel, selectorLambda);
                     return node;
                 }
+                // Direct selector overload — `parent.Children.Sum/Min/Max/Average(c => c.Value)`
+                // is semantically Select(selector).Aggregate(); emit the same correlated scalar
+                // subquery as the Select-then-aggregate shape above.
+                if (node.Arguments.Count == 2
+                    && node.Method.Name is nameof(Queryable.Sum)
+                                       or nameof(Queryable.Min)
+                                       or nameof(Queryable.Max)
+                                       or nameof(Queryable.Average)
+                    && node.Arguments[0] is MemberExpression dirNav
+                    && dirNav.Expression is ParameterExpression dirNavParent
+                    && _parameterMappings.TryGetValue(dirNavParent, out var dirNavInfo)
+                    && dirNavInfo.Mapping.Relations.TryGetValue(dirNav.Member.Name, out var dirRel)
+                    && StripQuotes(node.Arguments[1]) is LambdaExpression dirSelector)
+                {
+                    EmitNavigationScalarAggregateSubquery(
+                        node.Method.Name, dirNavParent, dirNavInfo, dirRel, dirSelector);
+                    return node;
+                }
                 switch (node.Method.Name)
                 {
                     case nameof(Queryable.GroupBy):

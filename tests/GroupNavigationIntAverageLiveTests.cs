@@ -140,6 +140,45 @@ public class GroupNavigationIntAverageLiveTests
     [InlineData("mysql")]
     [InlineData("postgres")]
     [InlineData("sqlserver")]
+    public void Navigation_int_average_in_where_is_fractional(string kind)
+    {
+        var (factory, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+        var q = kind == "postgres" ? "\"" : "";
+        var tp = $"{q}GnAvgP_Test{q}";
+        var tk = $"{q}GnAvgK_Test{q}";
+        var idCol = kind switch
+        {
+            "mysql" => "Id INT PRIMARY KEY AUTO_INCREMENT",
+            "postgres" => "\"Id\" SERIAL PRIMARY KEY",
+            _ => "Id INT IDENTITY PRIMARY KEY",
+        };
+        string C(string n, string t2) => kind == "postgres" ? $"\"{n}\" {t2}" : $"{n} {t2}";
+        Exec(factory!, $"DROP TABLE IF EXISTS {tk}");
+        Exec(factory!, $"DROP TABLE IF EXISTS {tp}");
+        Exec(factory!, $"CREATE TABLE {tp} ({idCol}, {C("Name", "VARCHAR(20) NOT NULL")})");
+        Exec(factory!, $"CREATE TABLE {tk} ({idCol}, {C("ParentId", "INT NOT NULL")}, {C("Amount", "INT NOT NULL")})");
+        Exec(factory!, $"INSERT INTO {tp} {(kind == "postgres" ? "(\"Name\")" : "(Name)")} VALUES ('a')");
+        Exec(factory!, $"INSERT INTO {tk} {(kind == "postgres" ? "(\"ParentId\", \"Amount\")" : "(ParentId, Amount)")} VALUES (1,1),(1,2)");
+        try
+        {
+            using var ctx = new DbContext(factory!(), provider!);
+            // C#: children avg 1.5 > 1.4 → the parent matches. A truncating AVG(int)=1 would
+            // silently drop it; an untranslated navigation aggregate would throw.
+            var rows = ctx.Query<Parent>().Where(p => p.Kids.Average(k => k.Amount) > 1.4).ToList();
+            Assert.Single(rows);
+        }
+        finally
+        {
+            Exec(factory!, $"DROP TABLE IF EXISTS {tk}");
+            Exec(factory!, $"DROP TABLE IF EXISTS {tp}");
+        }
+    }
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
     public void Grouped_int_average_is_fractional(string kind)
     {
         var (factory, provider, skip) = OpenLive(kind);
