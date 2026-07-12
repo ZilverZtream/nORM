@@ -67,6 +67,23 @@ namespace nORM.Mapping
         /// <summary>Gets the discriminator column used for TPH inheritance, if any.</summary>
         public Column? DiscriminatorColumn { get; private set; } = null;
 
+        /// <summary>
+        /// For a TPH derived type, the fixed discriminator value that identifies this subtype
+        /// (from <see cref="DiscriminatorValueAttribute"/>); <c>null</c> for base or non-TPH types.
+        /// </summary>
+        public object? DiscriminatorValue { get; private set; }
+
+        /// <summary>
+        /// Stamps the discriminator column on a derived TPH entity with this subtype's fixed value
+        /// before it is written, so an inserted <c>Car</c> persists as a <c>Car</c> and round-trips
+        /// to the correct subtype. No-op for base or non-TPH mappings.
+        /// </summary>
+        internal void ApplyDiscriminator(object entity)
+        {
+            if (DiscriminatorValue != null && DiscriminatorColumn != null)
+                DiscriminatorColumn.Setter(entity, DiscriminatorValue);
+        }
+
         /// <summary>Gets mappings for derived types in TPH inheritance scenarios.</summary>
         public Dictionary<object, TableMapping> TphMappings { get; } = new();
 
@@ -109,6 +126,25 @@ namespace nORM.Mapping
             Provider = p;
             _fluentConfig = fluentConfig;
 
+            // TPH derived type: it carries [DiscriminatorValue] and shares the table of the ancestor
+            // that declares [DiscriminatorColumn]. Resolve that root so writes target the shared table
+            // rather than a non-existent table named after the subtype. The root's table name is
+            // computed directly from its type/attribute — never via GetMapping(root), which would
+            // recurse into the still-constructing root through its TphMappings discovery loop.
+            var discriminatorValueAttr = t.GetCustomAttribute<DiscriminatorValueAttribute>(inherit: false);
+            Type? tphRoot = null;
+            if (discriminatorValueAttr != null)
+            {
+                for (var anc = t.BaseType; anc != null && anc != typeof(object); anc = anc.BaseType)
+                {
+                    if (anc.GetCustomAttribute<DiscriminatorColumnAttribute>(inherit: false) != null)
+                    {
+                        tphRoot = anc;
+                        break;
+                    }
+                }
+            }
+
             var splitAttr = t.GetCustomAttribute<TableSplitAttribute>();
             var splitType = fluentConfig?.TableSplitWith ?? splitAttr?.PrincipalType;
             if (splitType != null)
@@ -116,6 +152,14 @@ namespace nORM.Mapping
                 var principal = ctx.GetMapping(splitType);
                 EscTable = principal.EscTable;
                 TableName = principal.TableName;
+            }
+            else if (tphRoot != null)
+            {
+                var rootTableAttr = tphRoot.GetCustomAttribute<TableAttribute>();
+                TableName = GetTableName(tphRoot, rootTableAttr);
+                EscTable = rootTableAttr is not null
+                    ? IdentifierEscaping.EscapeTable(p, rootTableAttr.Name, rootTableAttr.Schema)
+                    : p.Escape(TableName);
             }
             else
             {
@@ -144,6 +188,15 @@ namespace nORM.Mapping
                 }
             }
             AddOwnedNavigationShadowColumns(cols, t, p, fluentConfig);
+
+            if (tphRoot != null)
+            {
+                // Derived TPH type: bind the inherited discriminator column and the fixed value that
+                // identifies this subtype, so ApplyDiscriminator stamps it before every insert.
+                var rootDiscAttr = tphRoot.GetCustomAttribute<DiscriminatorColumnAttribute>(inherit: false)!;
+                DiscriminatorColumn = cols.FirstOrDefault(c => string.Equals(c.Prop.Name, rootDiscAttr.PropertyName, StringComparison.OrdinalIgnoreCase));
+                DiscriminatorValue = discriminatorValueAttr!.Value;
+            }
 
             var discriminatorAttr = t.GetCustomAttribute<DiscriminatorColumnAttribute>();
             if (discriminatorAttr != null)

@@ -236,6 +236,9 @@ namespace nORM.Core
                 if (entity == null)
                     throw new ArgumentNullException(nameof(entity));
 
+                // Stamp the TPH discriminator so a derived entity persists (and reads back) as its subtype.
+                _mapping.ApplyDiscriminator(entity);
+
                 var bindings = _bindings;
                 for (int i = 0; i < bindings.Length; i++)
                 {

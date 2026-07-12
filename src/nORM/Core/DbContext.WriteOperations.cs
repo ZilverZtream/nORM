@@ -347,6 +347,8 @@ namespace nORM.Core
             switch (operation)
             {
                 case WriteOperation.Insert:
+                    // Stamp the TPH discriminator so a derived entity persists (and reads back) as its subtype.
+                    map.ApplyDiscriminator(entity);
                     foreach (var col in _p.GetInsertColumns(map))
                     {
                         var rawVal = col.Getter(entity);
@@ -673,6 +675,8 @@ namespace nORM.Core
             switch (operation)
             {
                 case WriteOperation.Insert:
+                    // Stamp the TPH discriminator so a derived entity persists (and reads back) as its subtype.
+                    map.ApplyDiscriminator(entity);
                     foreach (var col in _p.GetInsertColumns(map))
                     {
                         var rawVal = col.Getter(entity);
@@ -842,6 +846,9 @@ namespace nORM.Core
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Insert);
+                    // Stamp the TPH discriminator so bulk-inserted derived entities also persist as
+                    // their subtype (covers every provider's bulk path from this single choke point).
+                    map.ApplyDiscriminator(entity);
                 }
                 return await _p.BulkInsertAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, ct);
