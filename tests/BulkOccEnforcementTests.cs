@@ -85,6 +85,39 @@ public class BulkOccEnforcementTests
     }
 
     [Fact]
+    public async Task Bulk_delete_of_many_token_rows_does_not_exceed_the_parameter_limit()
+    {
+        // Each OCC-token row binds 2 parameters (key + token). Well beyond SQLite's
+        // 999-variable limit at one param/row, this many rows would overflow if the
+        // batch size ignored the per-row parameter cost.
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE BoccRow (Id INTEGER PRIMARY KEY AUTOINCREMENT, Payload TEXT NOT NULL, Token BLOB NOT NULL)";
+            cmd.ExecuteNonQuery();
+            for (var i = 1; i <= 900; i++)
+            {
+                using var ins = cn.CreateCommand();
+                ins.CommandText = $"INSERT INTO BoccRow (Id, Payload, Token) VALUES ({i}, 'p{i}', X'00000001')";
+                ins.ExecuteNonQuery();
+            }
+        }
+        using var _cn = cn;
+        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<BoccRow>() };
+        await using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        var rows = Enumerable.Range(1, 900)
+            .Select(i => new BoccRow { Id = i, Payload = $"p{i}", Token = new byte[] { 0, 0, 0, 1 } })
+            .ToArray();
+
+        var deleted = await ctx.BulkDeleteAsync(rows);
+
+        Assert.Equal(900, deleted);
+        Assert.Equal(0, RowCount(cn));
+    }
+
+    [Fact]
     public async Task Bulk_delete_with_stale_token_skips_the_row_and_deletes_nothing()
     {
         var (cn, ctx) = CreateContext();

@@ -298,10 +298,20 @@ namespace nORM.Providers
                 throw new NormConfigurationException($"Cannot delete from '{m.EscTable}': no key columns defined.");
 
             var totalDeleted = 0;
-            // Respect provider parameter limits when batching deletes
+            // Respect the provider parameter limit when batching deletes. Each row binds
+            // one parameter per key column plus one for the concurrency token (OCC path);
+            // a single tenant parameter is shared across the batch. Dividing MaxParameters
+            // by the per-row cost (with headroom) prevents "too many SQL variables" — the
+            // previous min(BulkBatchSize, MaxParameters) ignored per-row cost and overflowed
+            // once the token and/or composite keys were bound.
+            var paramsPerRow = Math.Max(1, m.KeyColumns.Length + (m.TimestampColumn != null ? 1 : 0));
             var batchSize = ctx.Options.BulkBatchSize;
             if (MaxParameters != int.MaxValue)
-                batchSize = Math.Min(batchSize, MaxParameters);
+            {
+                var tenantHeadroom = ctx.Options.TenantProvider != null ? 1 : 0;
+                var maxByParams = Math.Max(1, (MaxParameters - tenantHeadroom - 5) / paramsPerRow);
+                batchSize = Math.Min(batchSize, maxByParams);
+            }
             if (batchSize <= 0) batchSize = 1;
 
             // Respect ambient CurrentTransaction; only create a new transaction if none is active.
