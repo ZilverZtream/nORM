@@ -258,6 +258,17 @@ namespace nORM.Query
                   .Append(") & ~(").Append(xorLeftSql).Append(" & ").Append(xorRightSql).Append("))");
                 return node;
             }
+            // A comparison against a value-converter column must bind the converter's PROVIDER value,
+            // not the raw model value: `p.Status == Status.Active` projected as a bool would otherwise
+            // emit `Status = 1` against a column storing 'Active' and be false for every row. Mirror
+            // ETSV.VisitBinary's converter handling for the projection (SelectClauseVisitor) path.
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                    or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                && TryEmitConvertedColumnComparison(node))
+            {
+                return node;
+            }
             // Decimal comparisons / arithmetic on TEXT-stored decimal columns
             // must coerce both operands to REAL or SQLite performs lex compare
             // ('10.5' < '2' because '1' < '2'). Mirror of ETSV's bilateral
@@ -348,6 +359,69 @@ namespace nORM.Query
             sb.Append(')');
             return node;
         }
+
+        /// <summary>
+        /// Emits <c>(column &lt;op&gt; &lt;converted literal&gt;)</c> for a projected comparison between a
+        /// value-converter column and an inline constant. Returns false (falling through to the generic
+        /// comparison) when neither/both sides are a converter column or the value is not an inline
+        /// constant. Closure/parameter values are not handled (rare in a projection comparison).
+        /// </summary>
+        private bool TryEmitConvertedColumnComparison(BinaryExpression node)
+        {
+            var leftIsColumn = TryGetConverterColumn(node.Left, out var leftColumn);
+            var rightIsColumn = TryGetConverterColumn(node.Right, out var rightColumn);
+            if (leftIsColumn == rightIsColumn)
+                return false;
+
+            var memberSide = leftIsColumn ? node.Left : node.Right;
+            var valueSide = leftIsColumn ? node.Right : node.Left;
+            var column = leftIsColumn ? leftColumn : rightColumn;
+
+            var stripped = valueSide;
+            while (stripped is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                stripped = u.Operand;
+            if (stripped is not ConstantExpression { Value: { } raw })
+                return false;
+
+            var converted = column.Converter!.ConvertToProvider(raw);
+            var op = leftIsColumn ? node.NodeType : FlipScvComparison(node.NodeType);
+            var sb = EnsureBuilder();
+            sb.Append('(');
+            Visit(memberSide);
+            sb.Append(' ').Append(op switch
+            {
+                ExpressionType.Equal => "=",
+                ExpressionType.NotEqual => "<>",
+                ExpressionType.LessThan => "<",
+                ExpressionType.LessThanOrEqual => "<=",
+                ExpressionType.GreaterThan => ">",
+                ExpressionType.GreaterThanOrEqual => ">=",
+                _ => throw new InvalidOperationException()
+            }).Append(' ').Append(FormatLiteral(converted)).Append(')');
+            return true;
+        }
+
+        private bool TryGetConverterColumn(Expression expr, out Column column)
+        {
+            column = null!;
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (expr is MemberExpression me && _mapping.TryGetColumnForMemberAccess(me, out var col) && col.Converter != null)
+            {
+                column = col;
+                return true;
+            }
+            return false;
+        }
+
+        private static ExpressionType FlipScvComparison(ExpressionType op) => op switch
+        {
+            ExpressionType.GreaterThan => ExpressionType.LessThan,
+            ExpressionType.GreaterThanOrEqual => ExpressionType.LessThanOrEqual,
+            ExpressionType.LessThan => ExpressionType.GreaterThan,
+            ExpressionType.LessThanOrEqual => ExpressionType.GreaterThanOrEqual,
+            _ => op
+        };
 
         protected override Expression VisitUnary(UnaryExpression node)
         {
