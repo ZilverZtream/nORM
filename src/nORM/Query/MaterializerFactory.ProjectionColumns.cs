@@ -94,7 +94,15 @@ namespace nORM.Query
                             && m.Member.Name == "Key")
                         {
                             var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                            cols.Add(new Column(memberName, m.Type, mapping.Type, mapping.Provider, memberName));
+                            var keyCol = new Column(memberName, m.Type, mapping.Type, mapping.Provider, memberName);
+                            // The grouped key column stores its provider representation (e.g. an enum
+                            // as its name). Without ConvertFromProvider the materializer reads the raw
+                            // string as the enum's underlying integer and throws. Resolve the key's
+                            // converter by its model type — safe for an enum key because a second
+                            // column of the exact same enum type (and a different converter) is not a
+                            // real schema, and the key type is part of the materializer cache key.
+                            keyCol.Converter = ResolveGroupKeyConverter(mapping, m.Type);
+                            cols.Add(keyCol);
                             continue;
                         }
 
@@ -128,8 +136,13 @@ namespace nORM.Query
                     }
                     else if (arg is ParameterExpression p)
                     {
+                        // A bare key parameter from the rewritten 3-arg GroupBy `(k, gs) => new { k, ... }`
+                        // stands in for the group key; apply the key column's converter (enum keys only)
+                        // so the model value is materialized, mirroring the g.Key member branch above.
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                        cols.Add(new Column(memberName, p.Type, mapping.Type, mapping.Provider, memberName));
+                        var keyParamCol = new Column(memberName, p.Type, mapping.Type, mapping.Provider, memberName);
+                        keyParamCol.Converter = ResolveGroupKeyConverter(mapping, p.Type);
+                        cols.Add(keyParamCol);
                     }
                     else if (arg is MethodCallExpression mce)
                     {
@@ -192,6 +205,28 @@ namespace nORM.Query
                 return cols.ToArray();
             }
             return mapping.Columns;
+        }
+
+        /// <summary>
+        /// Resolves the value converter to apply to an IGrouping.Key column. Restricted to enum key
+        /// types — those are the ones that crash when the stored provider value (e.g. the enum name)
+        /// is read as the enum's underlying integer. Matches by the converter's model type and
+        /// declines if more than one column matches (ambiguous) so it never guesses wrong.
+        /// </summary>
+        private static IValueConverter? ResolveGroupKeyConverter(TableMapping mapping, Type keyType)
+        {
+            var t = Nullable.GetUnderlyingType(keyType) ?? keyType;
+            if (!t.IsEnum) return null;
+            IValueConverter? found = null;
+            foreach (var c in mapping.Columns)
+            {
+                if (c.Converter == null) continue;
+                var modelT = Nullable.GetUnderlyingType(c.Converter.ModelType) ?? c.Converter.ModelType;
+                if (modelT != t) continue;
+                if (found != null) return null; // ambiguous
+                found = c.Converter;
+            }
+            return found;
         }
 
         /// <summary>
