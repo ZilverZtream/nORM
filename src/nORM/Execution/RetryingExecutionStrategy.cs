@@ -21,7 +21,10 @@ namespace nORM.Execution
             _policy = policy;
         }
 
-        public async Task<T> ExecuteAsync<T>(Func<DbContext, CancellationToken, Task<T>> operation, CancellationToken ct)
+        public Task<T> ExecuteAsync<T>(Func<DbContext, CancellationToken, Task<T>> operation, CancellationToken ct)
+            => ExecuteAsync(operation, null, ct);
+
+        public async Task<T> ExecuteAsync<T>(Func<DbContext, CancellationToken, Task<T>> operation, Func<bool>? isCommitAttempted, CancellationToken ct)
         {
             int retryCount = 0;
             while (true)
@@ -38,6 +41,12 @@ namespace nORM.Execution
                 {
                     var normEx = ex is NormException ? ex as NormException : new NormException(ex.Message, null, null, ex);
                     _ctx.Options.Logger?.LogError(normEx!, retryCount);
+
+                    // Once the operation has attempted its commit the outcome is unknown, so replaying
+                    // it could duplicate an already-committed write. Surface the error without retrying,
+                    // mirroring the commit-attempted guard on the SaveChanges retry path.
+                    if (isCommitAttempted?.Invoke() ?? false)
+                        throw normEx!;
 
                     bool shouldRetry;
                     try

@@ -75,8 +75,13 @@ namespace nORM.Core
                 return await prepared.ExecuteAsync(entity, ct).ConfigureAwait(false);
             }
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
+            var commitAttempted = false;
             return await _executionStrategy.ExecuteAsync((ctx, token) =>
-                WriteWithTransactionAsync(entity, map, WriteOperation.Insert, null, token, ownsTransaction: true), ct).ConfigureAwait(false);
+            {
+                commitAttempted = false; // reset per attempt
+                return WriteWithTransactionAsync(entity, map, WriteOperation.Insert, null, token,
+                    ownsTransaction: true, onCommitAttempted: () => commitAttempted = true);
+            }, () => commitAttempted, ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -192,11 +197,16 @@ namespace nORM.Core
                 return await ExecuteWriteCommandAsync(entity, map, operation, null, ambientScope.Token).ConfigureAwait(false);
             }
 
+            var commitAttempted = false;
             return await _executionStrategy.ExecuteAsync((ctx, token) =>
-                WriteWithTransactionAsync(entity, map, operation, null, token, ownsTransaction: true), ct).ConfigureAwait(false);
+            {
+                commitAttempted = false; // reset per attempt
+                return WriteWithTransactionAsync(entity, map, operation, null, token,
+                    ownsTransaction: true, onCommitAttempted: () => commitAttempted = true);
+            }, () => commitAttempted, ct).ConfigureAwait(false);
         }
 
-        private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction) where T : class
+        private async Task<int> WriteWithTransactionAsync<T>(T entity, TableMapping map, WriteOperation operation, DbTransaction? transaction, CancellationToken ct, bool ownsTransaction, Action? onCommitAttempted = null) where T : class
         {
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             // When we own the transaction, track it separately so it can always be disposed
@@ -218,7 +228,12 @@ namespace nORM.Core
             {
                 var recordsAffected = await ExecuteWriteCommandAsync(entity, map, operation, currentTransaction, ct).ConfigureAwait(false);
                 if (ownsTransaction)
+                {
+                    // Signal that the commit is about to run: a failure from here on has an unknown
+                    // outcome and must not be retried, or the write could be duplicated.
+                    onCommitAttempted?.Invoke();
                     await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                }
                 return recordsAffected;
             }
             catch (Exception originalEx)

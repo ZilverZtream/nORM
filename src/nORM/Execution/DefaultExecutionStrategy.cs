@@ -25,5 +25,9 @@ namespace nORM.Execution
                 throw new NormException(ex.Message, null, null, ex);
             }
         }
+
+        // No retry occurs here, so the commit-attempted signal is irrelevant - execute once.
+        public Task<T> ExecuteAsync<T>(Func<DbContext, CancellationToken, Task<T>> operation, Func<bool>? isCommitAttempted, CancellationToken ct)
+            => ExecuteAsync(operation, ct);
     }
 }
