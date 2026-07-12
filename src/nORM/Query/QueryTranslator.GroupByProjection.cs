@@ -369,6 +369,17 @@ namespace nORM.Query
             var whereSql = BuildGroupKeyCorrelation(subAlias, groupBySql);
             if (whereSql == null)
                 return null;
+
+            // The subquery re-scans the grouped table, so the entity's global filters (soft-delete,
+            // tenant) must be repeated inside it — the outer GROUP BY is filtered by ApplyGlobalFilters
+            // but this correlated subquery is not, so a soft-deleted "latest" row would otherwise leak.
+            var globalFilter = GlobalFilterFragment.Combine(_ctx, _mapping.Type);
+            if (globalFilter != null)
+            {
+                var filterSql = TranslateAgainstSubAlias(globalFilter.Body, globalFilter.Parameters[0], subAlias);
+                whereSql = whereSql + " AND (" + filterSql + ")";
+            }
+
             var orderSql = TranslateAgainstSubAlias(orderSelector.Body, orderSelector.Parameters[0], subAlias);
             var selectSql = TranslateAgainstSubAlias(resultBody, resultParam, subAlias);
 
