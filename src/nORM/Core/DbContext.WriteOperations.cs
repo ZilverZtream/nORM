@@ -378,11 +378,28 @@ namespace nORM.Core
                     }
                     break;
                 case WriteOperation.Update:
+                    // Client-managed token: capture the OLD value for the WHERE predicate, then stamp a
+                    // fresh one on the entity so the SET binding below writes the new value. BuildUpdate
+                    // names the SET token @Token and the WHERE token @Token_orig so they don't collide.
+                    object? whereTokenDirect = null;
+                    if (map.TimestampColumn != null)
+                    {
+                        var tc = map.TimestampColumn;
+                        whereTokenDirect = originalToken ?? tc.Getter(entity);
+                        if (map.ClientManagedConcurrencyToken)
+                            tc.Setter(entity, GenerateConcurrencyToken(tc, whereTokenDirect));
+                    }
                     foreach (var col in map.UpdateColumns)
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
                         cmd.AddOptimizedParam(_p.ParamPrefix + col.PropName, val, GetParameterKnownType(col, val));
+                    }
+                    if (map.ClientManagedConcurrencyToken)
+                    {
+                        var tc = map.TimestampColumn!;
+                        var newTok = tc.Getter(entity);
+                        cmd.AddOptimizedParam(_p.ParamPrefix + tc.PropName, newTok, GetParameterKnownType(tc, newTok));
                     }
                     foreach (var col in map.KeyColumns)
                     {
@@ -392,15 +409,13 @@ namespace nORM.Core
                     }
                     if (map.TimestampColumn != null)
                     {
-                        // Use the original snapshot token (not the current possibly-mutated property value)
-                        // to match the concurrency predicate parity of the batched SaveChanges path.
-                        // Fallback to current property value when originalToken is null - this happens
-                        // for entities that were attached without going through full snapshot tracking
-                        // (e.g. manual Attach() or first-time tracked entities where no snapshot was
-                        // captured yet). In that case the current property value is the best available
-                        // token for the WHERE predicate.
-                        var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
-                        cmd.AddOptimizedParam(_p.ParamPrefix + map.TimestampColumn.PropName, tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
+                        // WHERE compares the OLD token (captured above). When client-managed, bind it
+                        // under the distinct @Token_orig name; otherwise the DB-generated rowversion
+                        // path keeps the original @Token name.
+                        var whereName = map.ClientManagedConcurrencyToken
+                            ? map.TimestampColumn.PropName + "_orig"
+                            : map.TimestampColumn.PropName;
+                        cmd.AddOptimizedParam(_p.ParamPrefix + whereName, whereTokenDirect, GetParameterKnownType(map.TimestampColumn, whereTokenDirect));
                     }
                     // X1: bind tenant param to match the WHERE predicate added by BuildUpdate(includeTenant=true).
                     // Skip if TenantColumn is already in UpdateColumns - same @PropName is already bound

@@ -81,4 +81,59 @@ public class OptimisticConcurrencyLostUpdateTests
         // A's write survives.
         Assert.Equal("written-by-A", PayloadInDb(cn, id));
     }
+
+    [Fact]
+    public async Task Direct_UpdateAsync_second_stale_write_must_not_silently_overwrite()
+    {
+        using var cn = OpenDb();
+        using (var seed = cn.CreateCommand())
+        {
+            seed.CommandText = "INSERT INTO OccRow (Payload, Token) VALUES ('original', X'01')";
+            seed.ExecuteNonQuery();
+        }
+        int id = 1;
+
+        using var ctxA = new DbContext(cn, new SqliteProvider());
+        using var ctxB = new DbContext(cn, new SqliteProvider());
+
+        var a = await ctxA.Query<OccRow>().Where(r => r.Id == id).FirstAsync();
+        var b = await ctxB.Query<OccRow>().Where(r => r.Id == id).FirstAsync();
+
+        a.Payload = "written-by-A";
+        await ctxA.UpdateAsync(a);
+
+        b.Payload = "written-by-B";
+        await Assert.ThrowsAsync<DbConcurrencyException>(() => ctxB.UpdateAsync(b));
+
+        Assert.Equal("written-by-A", PayloadInDb(cn, id));
+    }
+
+    [Fact]
+    public async Task Bulk_UpdateAsync_second_stale_write_must_not_silently_overwrite()
+    {
+        using var cn = OpenDb();
+        using (var seed = cn.CreateCommand())
+        {
+            seed.CommandText = "INSERT INTO OccRow (Payload, Token) VALUES ('original', X'01')";
+            seed.ExecuteNonQuery();
+        }
+        int id = 1;
+
+        using var ctxA = new DbContext(cn, new SqliteProvider());
+        using var ctxB = new DbContext(cn, new SqliteProvider());
+
+        var a = await ctxA.Query<OccRow>().Where(r => r.Id == id).FirstAsync();
+        var b = await ctxB.Query<OccRow>().Where(r => r.Id == id).FirstAsync();
+
+        a.Payload = "written-by-A";
+        await ctxA.BulkUpdateAsync(new[] { a });
+
+        // Bulk uses partial-OCC semantics: the stale row is silently skipped (0 rows affected) rather
+        // than throwing — but crucially it must NOT overwrite A's newer write.
+        b.Payload = "written-by-B";
+        var affected = await ctxB.BulkUpdateAsync(new[] { b });
+
+        Assert.Equal(0, affected);
+        Assert.Equal("written-by-A", PayloadInDb(cn, id));
+    }
 }

@@ -265,7 +265,11 @@ namespace nORM.Mapping
             // so stale concurrent writes are detected. SQL Server's ROWVERSION is DB-generated and read
             // back from the OUTPUT clause instead. UpdateColumns stays token-free (the token is bound
             // separately) so provider SQL that names params by column don't collide on the token.
-            ClientManagedConcurrencyToken = TimestampColumn != null && !p.SupportsNativeRowVersion;
+            // Only a byte[] token (the rowversion convention) is nORM-managed; string/int tokens are
+            // application-managed (the caller sets the next value) and must keep the existing behavior
+            // where nORM only compares the snapshot token in the WHERE clause.
+            ClientManagedConcurrencyToken = TimestampColumn != null && !p.SupportsNativeRowVersion
+                && (Nullable.GetUnderlyingType(TimestampColumn.Prop.PropertyType) ?? TimestampColumn.Prop.PropertyType) == typeof(byte[]);
             UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated).ToArray();
 
             // Compute converter fingerprint for materializer cache differentiation

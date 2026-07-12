@@ -223,11 +223,36 @@ namespace nORM.Providers
                     if (batchHasTenant)
                         ctx.RequireTenantColumn(m, "bulk update fallback");
                     cmd.CommandText = BuildUpdate(m, batchHasTenant);
+                    // Client-managed token: capture the OLD value for the WHERE predicate, then stamp a
+                    // fresh one so the SET clause writes the new value (BuildUpdate names them @Token and
+                    // @Token_orig respectively). Prevents a stale concurrent write from winning.
+                    object? bulkOldToken = null;
+                    if (m.TimestampColumn != null)
+                    {
+                        bulkOldToken = m.TimestampColumn.Getter(entity);
+                        if (m.ClientManagedConcurrencyToken)
+                            m.TimestampColumn.Setter(entity, nORM.Core.DbContext.GenerateConcurrencyToken(m.TimestampColumn, bulkOldToken));
+                    }
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp && !(batchHasTenant && ReferenceEquals(c, m.TenantColumn))))
                         cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
-                    if (m.TimestampColumn != null) cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
+                    if (m.TimestampColumn != null)
+                    {
+                        var tc = m.TimestampColumn;
+                        if (m.ClientManagedConcurrencyToken)
+                        {
+                            cmd.AddParam(ParamPrefix + tc.PropName, tc.Getter(entity));        // SET @Token = new
+                            cmd.AddParam(ParamPrefix + tc.PropName + "_orig", bulkOldToken);   // WHERE @Token_orig = old
+                        }
+                        else
+                        {
+                            cmd.AddParam(ParamPrefix + tc.PropName, bulkOldToken);             // WHERE @Token = old
+                        }
+                    }
                     // X1: bind tenant param to match the WHERE predicate added when batchHasTenant is true.
                     if (batchHasTenant) cmd.AddParam(ParamPrefix + m.TenantColumn!.PropName, ctx.GetRequiredTenantId(m, "bulk update fallback"));
+                    // Bulk update uses partial-OCC semantics: a stale row (token mismatch) affects zero
+                    // rows and is silently skipped; the fresh token stamped above is what makes a later
+                    // stale write miss it, preventing the lost update without failing the whole batch.
                     totalUpdated += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 }
                 // Use CancellationToken.None so a cancelled caller token after a successful commit

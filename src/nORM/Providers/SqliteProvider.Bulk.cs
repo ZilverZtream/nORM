@@ -220,6 +220,11 @@ namespace nORM.Providers
                         ? $" AND {tempTableName}.{Escape(m.TimestampColumn.PropName)} IS {m.EscTable}.{m.TimestampColumn.EscCol}"
                         : "";
                     var setClause = string.Join(", ", nonKeyCols.Select(c => $"{c.EscCol} = (SELECT {Escape(c.PropName)} FROM {tempTableName} WHERE {keyMatchConditions})"));
+                    // Client-managed token: stamp a fresh value (server-side randomblob) so a stale
+                    // concurrent bulk update — whose EXISTS/OCC match still carries the old token —
+                    // affects zero rows instead of silently overwriting a newer write.
+                    if (m.ClientManagedConcurrencyToken)
+                        setClause += (setClause.Length > 0 ? ", " : "") + $"{m.TimestampColumn!.EscCol} = randomblob(8)";
                     var whereClause = $"EXISTS (SELECT 1 FROM {tempTableName} WHERE {keyMatchConditions}{tsCondition})";
                     // X1: Add tenant predicate to prevent cross-tenant modifications
                     if (ctx.Options.TenantProvider != null)

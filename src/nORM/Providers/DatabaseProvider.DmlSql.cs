@@ -74,15 +74,23 @@ namespace nORM.Providers
             var cacheOp = includeTenant ? "UPDATE_TENANT" : "UPDATE";
             return _sqlCache.GetOrAdd((m.Type, m.TableName, cacheOp, m.SqlShapeKey), _ =>
             {
-                var set = string.Join(", ", m.UpdateColumns
-                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}"));
+                var setCols = m.UpdateColumns
+                    .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
+                // Client-managed concurrency token: write a fresh value in SET (@Token) so a stale
+                // concurrent UPDATE affects zero rows. Providers without a native rowversion only.
+                if (m.ClientManagedConcurrencyToken)
+                    setCols.Add($"{m.TimestampColumn!.EscCol}={ParamPrefix}{m.TimestampColumn.PropName}");
+                var set = string.Join(", ", setCols);
 
                 var whereCols = m.KeyColumns
                     .Select(c => $"{c.EscCol}={ParamPrefix}{c.PropName}").ToList();
                 if (m.TimestampColumn != null)
                 {
                     var tc = m.TimestampColumn;
-                    whereCols.Add($"({tc.EscCol}={ParamPrefix}{tc.PropName} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{tc.PropName} IS NULL))");
+                    // When the token is also in SET (@Token), the WHERE compares the OLD value under a
+                    // distinct name (@Token_orig) so the two bindings don't collide.
+                    var whereParam = m.ClientManagedConcurrencyToken ? $"{tc.PropName}_orig" : tc.PropName;
+                    whereCols.Add($"({tc.EscCol}={ParamPrefix}{whereParam} OR ({tc.EscCol} IS NULL AND {ParamPrefix}{whereParam} IS NULL))");
                 }
                 // X1: include tenant column in WHERE so direct UpdateAsync cannot cross-write rows
                 // belonging to other tenants - parity with the batched SaveChangesAsync path.
