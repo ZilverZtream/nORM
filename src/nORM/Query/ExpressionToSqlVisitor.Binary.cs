@@ -393,10 +393,14 @@ namespace nORM.Query
                 ExpressionType.AndAlso => " AND ",
                 ExpressionType.OrElse => " OR ",
                 // Arithmetic operators flow through to SQL directly; the column type drives the
-                // server's semantics (integer vs decimal vs double).
+                // server's semantics (integer vs decimal vs double). Integer division is the
+                // exception: C# truncates but MySQL's / yields a decimal, so integral-typed
+                // division routes through the provider's integer-division operator (DIV there).
                 ExpressionType.Add => " + ",
                 ExpressionType.Subtract => " - ",
                 ExpressionType.Multiply => " * ",
+                ExpressionType.Divide when DatabaseProvider.IsIntegralArithmeticType(node.Type)
+                    => $" {_provider.IntegerDivisionOperator} ",
                 ExpressionType.Divide => " / ",
                 ExpressionType.Modulo => " % ",
                 // Bitwise operators on integer columns: the And/Or/ExclusiveOr node types

@@ -144,6 +144,29 @@ namespace nORM.Providers
         public virtual string NormalizeDateTimeOffsetForCompare(string sql) => sql;
 
         /// <summary>
+        /// The SQL operator for INTEGER division — C# <c>int / int</c> truncates toward zero, and
+        /// SQLite / SQL Server / PostgreSQL <c>/</c> on integer operands does the same, so the
+        /// default is <c>/</c>. MySQL's <c>/</c> always produces a DECIMAL (5/2 = 2.5), which
+        /// silently changes predicate results and materialized values; it overrides with
+        /// <c>DIV</c>, whose truncation toward zero matches C# for negative operands too.
+        /// Only used when the expression's static type is integral; floating/decimal division
+        /// keeps <c>/</c> everywhere.
+        /// </summary>
+        internal virtual string IntegerDivisionOperator => "/";
+
+        /// <summary>
+        /// True when <paramref name="t"/> (nullable-unwrapped) is an integral numeric type, i.e.
+        /// C# arithmetic over it uses integer semantics (truncating division). Drives the
+        /// <see cref="IntegerDivisionOperator"/> emit decision.
+        /// </summary>
+        internal static bool IsIntegralArithmeticType(Type t)
+        {
+            var u = Nullable.GetUnderlyingType(t) ?? t;
+            return u == typeof(int) || u == typeof(long) || u == typeof(short) || u == typeof(sbyte)
+                || u == typeof(byte) || u == typeof(ushort) || u == typeof(uint) || u == typeof(ulong);
+        }
+
+        /// <summary>
         /// True when this provider's default <c>LIKE</c> cannot be forced case-sensitive with a
         /// collation modifier and the ordinal string-match path must instead bypass <c>LIKE</c>
         /// entirely (see <see cref="GetOrdinalStringMatchSql"/>). Only SQLite sets this: its

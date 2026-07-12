@@ -404,6 +404,12 @@ namespace nORM.Query
                             ExpressionType.Add => "+",
                             ExpressionType.Subtract => "-",
                             ExpressionType.Multiply => "*",
+                            // C# integer division truncates; MySQL's / yields a decimal (which
+                            // would then ROUND on assignment to an int column — corrupted write),
+                            // so integral-typed division uses the provider's integer-division
+                            // operator (DIV there, / elsewhere).
+                            ExpressionType.Divide when nORM.Providers.DatabaseProvider.IsIntegralArithmeticType(be.Type)
+                                => _ctx.RawProvider.IntegerDivisionOperator,
                             ExpressionType.Divide => "/",
                             ExpressionType.Modulo => "%",
                             // All four supported providers accept native << and >>
@@ -583,6 +589,10 @@ namespace nORM.Query
                             ExpressionType.Add => "+",
                             ExpressionType.Subtract => "-",
                             ExpressionType.Multiply => "*",
+                            // Integral division truncates in C#; route through the provider's
+                            // integer-division operator (MySQL DIV) like the other emit paths.
+                            ExpressionType.Divide when nORM.Providers.DatabaseProvider.IsIntegralArithmeticType(be.Type)
+                                => _ctx.RawProvider.IntegerDivisionOperator,
                             ExpressionType.Divide => "/",
                             ExpressionType.Modulo => "%",
                             _ => throw new NormUnsupportedFeatureException(

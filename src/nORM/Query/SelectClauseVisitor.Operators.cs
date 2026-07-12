@@ -342,6 +342,10 @@ namespace nORM.Query
                 ExpressionType.Add => "+",
                 ExpressionType.Subtract => "-",
                 ExpressionType.Multiply => "*",
+                // C# integer division truncates; MySQL's / yields a decimal, so integral-typed
+                // division uses the provider's integer-division operator (DIV there, / elsewhere).
+                ExpressionType.Divide when nORM.Providers.DatabaseProvider.IsIntegralArithmeticType(node.Type)
+                    => _provider.IntegerDivisionOperator,
                 ExpressionType.Divide => "/",
                 ExpressionType.Modulo => "%",
                 // SQLite, SQL Server, MySQL, and PostgreSQL all support << and >>

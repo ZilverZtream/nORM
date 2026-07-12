@@ -83,6 +83,13 @@ namespace nORM.Providers
         public override char LikeEscapeChar => '!';
 
         /// <summary>
+        /// MySQL's <c>/</c> always yields a DECIMAL (5/2 = 2.5) unlike C#'s truncating
+        /// <c>int / int</c>; <c>DIV</c> discards the fraction (truncating toward zero, matching
+        /// C# for negative operands) so integer-typed division translates faithfully.
+        /// </summary>
+        internal override string IntegerDivisionOperator => "DIV";
+
+        /// <summary>
         /// MySQL's <c>FORMAT(x, N)</c> inserts thousand-separators by default
         /// ('1,234.50') which doesn't match .NET's <c>ToString("F2")</c>
         /// ('1234.50'). Wrap in REPLACE to strip the commas. The result still
