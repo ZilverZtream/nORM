@@ -171,6 +171,11 @@ namespace nORM.Providers
         internal override bool UsesOrdinalStringMatchBypass => true;
 
         internal override string GetOrdinalStringMatchSql(string columnSql, string patternSql, OrdinalStringMatch kind)
+            => OrdinalStringMatchCore(columnSql, patternSql, kind);
+
+        // Shared by the visitor-facing hook above and TranslateFunction's projection route so the
+        // WHERE and SELECT translations of the same string match cannot drift apart.
+        private static string OrdinalStringMatchCore(string columnSql, string patternSql, OrdinalStringMatch kind)
             => kind switch
             {
                 // An empty pattern matches every (non-null) row in .NET; guard so it does here too.

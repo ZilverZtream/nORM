@@ -27,21 +27,18 @@ namespace nORM.Providers
                 // raw "ISNULLOREMPTY(...)" -- a SQLite 'no such function' error.
                 nameof(string.IsNullOrEmpty) when args.Length == 1 => $"({args[0]} IS NULL OR {args[0]} = '')",
                 nameof(string.IsNullOrWhiteSpace) when args.Length == 1 => $"({args[0]} IS NULL OR LTRIM(RTRIM({args[0]})) = '')",
-                // StartsWith / EndsWith / Contains in projection -- mirror the Where
-                // path's simple-literal LIKE shape. The pattern arg is already a
-                // bound parameter or quoted literal, so concat with %-wildcards via
-                // SQLite's || operator. Wildcard-in-pattern escape (the GetLikeEscapeSql
-                // path the Where handler uses for variable patterns) is not duplicated
-                // here -- the projection translates the user-visible "does this row
-                // contain X" shape and matches the most-common 'literal substring' use.
                 // string.Concat static with 2+ args -- chain via SQLite's || operator.
                 // Mirror of ExpressionToSqlVisitor's ~line 1333 inline path so SCV
                 // doesn't fall through to its lambda-expecting Queryable fallback
                 // (which crashes with "Expected a lambda expression as argument 1").
                 nameof(string.Concat) when args.Length >= 2 => "(" + string.Join(" || ", args) + ")",
-                nameof(string.StartsWith) when args.Length == 2 => $"({args[0]} LIKE {args[1]} || '%')",
-                nameof(string.EndsWith) when args.Length == 2 => $"({args[0]} LIKE '%' || {args[1]})",
-                nameof(string.Contains) when args.Length == 2 => $"({args[0]} LIKE '%' || {args[1]} || '%')",
+                // StartsWith / EndsWith / Contains in projection -- SQLite's LIKE folds ASCII
+                // case regardless of collation, so mirror the Where path's byte-exact
+                // instr/substr forms (ordinal, matching .NET). These also need no wildcard
+                // escaping: the pattern text matches literally.
+                nameof(string.StartsWith) when args.Length == 2 => OrdinalStringMatchCore(args[0], args[1], OrdinalStringMatch.StartsWith),
+                nameof(string.EndsWith) when args.Length == 2 => OrdinalStringMatchCore(args[0], args[1], OrdinalStringMatch.EndsWith),
+                nameof(string.Contains) when args.Length == 2 => OrdinalStringMatchCore(args[0], args[1], OrdinalStringMatch.Contains),
                 nameof(string.ToUpper) => $"UPPER({args[0]})",
                 nameof(string.ToLower) => $"LOWER({args[0]})",
                 nameof(string.ToUpperInvariant) => $"UPPER({args[0]})",
