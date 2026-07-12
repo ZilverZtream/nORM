@@ -66,30 +66,31 @@ public class LinqExecuteUpdateNavAggregateValueTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ExecuteUpdate_setproperty_to_nav_collection_sum_throws_actionable_guidance()
+    public async Task ExecuteUpdate_setproperty_to_nav_collection_sum_emits_correlated_subquery()
     {
-        // Correlated subquery in the SET clause isn't supported yet; the
-        // error must point the user at the two working paths (read+loop or
-        // raw SQL) rather than just say "Call node not supported".
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-        {
-            await _ctx.Query<EunParent>()
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Total, p => p.Items!.Sum(i => i.Amount)));
-        });
-        Assert.Contains("Navigation-collection aggregate", ex.Message);
-        Assert.Contains("Items.Sum", ex.Message);
-        Assert.Contains("Workarounds", ex.Message);
-        Assert.Contains("loop and", ex.Message);
-        Assert.Contains("raw SQL", ex.Message);
+        // The rolled-up value is the SUM of each parent's OWN children — a correlated
+        // subquery, not the global total. This one update in one round-trip guards the
+        // three silent-wrongness shapes from the class summary: translation throwing, a
+        // literal that ignores child data, and an uncorrelated SUM that would give every
+        // parent the same global sum (65) instead of 60 / 5 / 0.
+        await _ctx.Query<EunParent>()
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Total, p => p.Items!.Sum(i => i.Amount)));
+
+        await using var cmd = _cn.CreateCommand();
+        cmd.CommandText = "SELECT Id, Total FROM EunParent ORDER BY Id";
+        await using var rdr = await cmd.ExecuteReaderAsync();
+        var rows = new List<(int Id, int Total)>();
+        while (await rdr.ReadAsync()) rows.Add((rdr.GetInt32(0), rdr.GetInt32(1)));
+        // Parent 1 -> 60, Parent 2 -> 5, Parent 3 -> 0 (no children -> COALESCE(SUM, 0)).
+        Assert.Equal(new[] { (1, 60), (2, 5), (3, 0) }, rows);
     }
 
     [Fact]
     public async Task ExecuteUpdate_loop_workaround_writes_per_parent_total()
     {
-        // Confirms the recommended workaround actually works: project the
-        // rolled-up totals, then loop and update each entity individually.
-        // SCV recognises the Select+Sum nav-aggregate shape (efba58f); the
-        // direct Sum(selector) form is parked behind a separate path.
+        // The project-then-loop pattern remains valid as an alternative to the
+        // single-statement correlated-subquery form: project the rolled-up totals,
+        // then update each entity individually.
         var rollups = await _ctx.Query<EunParent>()
             .Select(p => new { p.Id, Total = p.Items!.Select(i => i.Amount).Sum() })
             .ToListAsync();

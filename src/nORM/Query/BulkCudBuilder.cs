@@ -428,20 +428,12 @@ namespace nORM.Query
                           && navAgg.Arguments.Count >= 1
                           && navAgg.Arguments[0] is MemberExpression navAggMember
                           && navAggMember.Expression == rowParam
-                          && mapping.Relations.TryGetValue(navAggMember.Member.Name, out _):
+                          && mapping.Relations.TryGetValue(navAggMember.Member.Name, out var navRelation):
                         // Navigation-collection aggregate inside a SET clause (e.g.
-                        // `SetProperty(r => r.Total, r => r.Items.Sum(i => i.Amount))`) needs
-                        // a correlated subquery against the dependent table inside the UPDATE,
-                        // which the current builder doesn't yet emit. Point users at the two
-                        // working paths so they don't grep the codebase looking for why the
-                        // throw fires.
-                        throw new NormUnsupportedFeatureException(
-                            $"Navigation-collection aggregate '{navAggMember.Member.Name}.{navAgg.Method.Name}(...)' " +
-                            "in a SetProperty value expression requires a correlated subquery in the UPDATE SET " +
-                            "clause, which is not yet supported. Workarounds: (1) project the parent rows with " +
-                            "Select(p => new {{ p.Id, Total = p.Items.Sum(i => i.Amount) }}), then loop and " +
-                            "Update each entity individually; or (2) execute the UPDATE via raw SQL with a " +
-                            "correlated subquery in the SET clause.");
+                        // `SetProperty(r => r.Total, r => r.Items.Sum(i => i.Amount))`) emits a
+                        // correlated subquery against the dependent table, correlated to the outer
+                        // row being updated.
+                        return RenderNavigationAggregate(navAgg, navAggMember, navRelation);
 
                     default:
                         throw new NormUnsupportedFeatureException(
@@ -492,6 +484,146 @@ namespace nORM.Query
 
                     default:
                         return Render(p);
+                }
+            }
+
+            // Emits a correlated subquery for a navigation-collection aggregate used as a
+            // SetProperty value, e.g. SetProperty(p => p.Total, p => p.Items.Sum(i => i.Amount)):
+            //   (SELECT COALESCE(SUM(n0."Amount"), 0) FROM "Item" n0 WHERE n0."ParentId" = "Parent"."Id")
+            // The dependent table is always aliased so a self-referential aggregate
+            // (p.Children.Count()) cannot collide with the outer table reference.
+            string RenderNavigationAggregate(MethodCallExpression navAgg, MemberExpression navAggMember, TableMapping.Relation relation)
+            {
+                var dependent = _ctx.GetMapping(relation.DependentType);
+                const string depAlias = "n0";
+
+                var func = navAgg.Method.Name switch
+                {
+                    nameof(Enumerable.Sum) => "SUM",
+                    nameof(Enumerable.Count) or nameof(Enumerable.LongCount) => "COUNT",
+                    nameof(Enumerable.Min) => "MIN",
+                    nameof(Enumerable.Max) => "MAX",
+                    nameof(Enumerable.Average) => "AVG",
+                    _ => throw new NormUnsupportedFeatureException(
+                        $"Aggregate '{navAgg.Method.Name}' over navigation collection '{navAggMember.Member.Name}' is not supported."),
+                };
+
+                string agg;
+                if (func == "COUNT")
+                {
+                    // Count()            -> COUNT(*)
+                    // Count(i => pred)   -> COUNT(CASE WHEN pred THEN 1 END)   (NULL rows are not counted)
+                    if (navAgg.Arguments.Count == 1)
+                        agg = "COUNT(*)";
+                    else if (StripQuotes(navAgg.Arguments[^1]) is LambdaExpression countPred)
+                        agg = $"COUNT(CASE WHEN {RenderDependentPredicate(countPred.Body, countPred.Parameters[0], dependent, depAlias)} THEN 1 END)";
+                    else
+                        throw new NormUnsupportedFeatureException(
+                            $"Count over '{navAggMember.Member.Name}' has an unsupported argument shape.");
+                }
+                else
+                {
+                    if (navAgg.Arguments.Count < 2 || StripQuotes(navAgg.Arguments[^1]) is not LambdaExpression selector)
+                        throw new NormUnsupportedFeatureException(
+                            $"Aggregate '{navAgg.Method.Name}' over '{navAggMember.Member.Name}' requires a mapped-column selector.");
+                    var operand = RenderDependentOperand(selector.Body, selector.Parameters[0], dependent, depAlias);
+                    agg = $"{func}({operand})";
+                    // Enumerable.Sum returns 0 for an empty sequence; SQL SUM yields NULL. Coalesce
+                    // so the persisted value matches LINQ semantics (Count already yields 0).
+                    if (func == "SUM")
+                        agg = $"COALESCE({agg}, 0)";
+                }
+
+                if (relation.ForeignKeys.Count != relation.PrincipalKeys.Count || relation.ForeignKeys.Count == 0)
+                    throw new NormUnsupportedFeatureException(
+                        $"Relationship '{navAggMember.Member.Name}' has no usable key columns for a navigation-aggregate subquery.");
+
+                var conds = new List<string>(relation.ForeignKeys.Count + 1);
+                for (var i = 0; i < relation.ForeignKeys.Count; i++)
+                    conds.Add($"{depAlias}.{relation.ForeignKeys[i].EscCol} = {mapping.EscTable}.{relation.PrincipalKeys[i].EscCol}");
+
+                // Tenant-scope the dependent aggregate so a multi-tenant UPDATE cannot fold in rows
+                // from another tenant that happen to share the same foreign-key value.
+                if (_ctx.Options.TenantProvider != null && dependent.TenantColumn is { } depTenant)
+                    conds.Add($"{depAlias}.{depTenant.EscCol} = {RenderLiteral(_ctx.GetRequiredTenantId(dependent, "ExecuteUpdate navigation aggregate"))}");
+
+                return $"(SELECT {agg} FROM {dependent.EscTable} {depAlias} WHERE {string.Join(" AND ", conds)})";
+            }
+
+            // Renders a value expression over the dependent row of a navigation aggregate, prefixing
+            // mapped columns with the dependent alias. Supports mapped columns, inlined constants and
+            // arithmetic between them — the practical surface of an aggregate selector.
+            string RenderDependentOperand(Expression e, ParameterExpression depParam, TableMapping dependent, string alias)
+            {
+                switch (e)
+                {
+                    case UnaryExpression ue when ue.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked:
+                        return RenderDependentOperand(ue.Operand, depParam, dependent, alias);
+
+                    case MemberExpression me when TableMapping.TryGetMemberAccessRoot(me, out var root) && root == depParam:
+                        if (!dependent.TryGetColumnForMemberAccess(me, out var dcol))
+                            throw new NormUnsupportedFeatureException(
+                                $"Aggregate selector member '{me.Member.Name}' is not a mapped column on '{dependent.TableName}'.");
+                        return $"{alias}.{dcol.EscCol}";
+
+                    case MemberExpression captured when nORM.Query.QueryTranslator.TryGetConstantValue(captured, out var capturedValue):
+                        return RenderLiteral(capturedValue);
+
+                    case ConstantExpression ce:
+                        return RenderLiteral(ce.Value);
+
+                    case BinaryExpression be:
+                        var op = be.NodeType switch
+                        {
+                            ExpressionType.Add => "+",
+                            ExpressionType.Subtract => "-",
+                            ExpressionType.Multiply => "*",
+                            ExpressionType.Divide => "/",
+                            ExpressionType.Modulo => "%",
+                            _ => throw new NormUnsupportedFeatureException(
+                                $"Operator '{be.NodeType}' is not supported inside a navigation-aggregate selector."),
+                        };
+                        return $"({RenderDependentOperand(be.Left, depParam, dependent, alias)} {op} {RenderDependentOperand(be.Right, depParam, dependent, alias)})";
+
+                    default:
+                        throw new NormUnsupportedFeatureException(
+                            $"Selector expression '{e}' inside a navigation aggregate is not translatable; use a mapped column or arithmetic over mapped columns.");
+                }
+            }
+
+            // Renders a boolean predicate over the dependent row (for Count(predicate)).
+            string RenderDependentPredicate(Expression p, ParameterExpression depParam, TableMapping dependent, string alias)
+            {
+                switch (p)
+                {
+                    case UnaryExpression not when not.NodeType == ExpressionType.Not:
+                        return $"(NOT {RenderDependentPredicate(not.Operand, depParam, dependent, alias)})";
+
+                    case BinaryExpression pb:
+                        var pop = pb.NodeType switch
+                        {
+                            ExpressionType.Equal => "=",
+                            ExpressionType.NotEqual => "<>",
+                            ExpressionType.GreaterThan => ">",
+                            ExpressionType.GreaterThanOrEqual => ">=",
+                            ExpressionType.LessThan => "<",
+                            ExpressionType.LessThanOrEqual => "<=",
+                            ExpressionType.AndAlso or ExpressionType.And => "AND",
+                            ExpressionType.OrElse or ExpressionType.Or => "OR",
+                            _ => throw new NormUnsupportedFeatureException(
+                                $"Predicate operator '{pb.NodeType}' is not supported inside a navigation-aggregate Count."),
+                        };
+                        if (pop is "AND" or "OR")
+                            return $"({RenderDependentPredicate(pb.Left, depParam, dependent, alias)} {pop} {RenderDependentPredicate(pb.Right, depParam, dependent, alias)})";
+                        return $"({RenderDependentOperand(pb.Left, depParam, dependent, alias)} {pop} {RenderDependentOperand(pb.Right, depParam, dependent, alias)})";
+
+                    case MemberExpression pm when pm.Type == typeof(bool)
+                        && TableMapping.TryGetMemberAccessRoot(pm, out var boolRoot) && boolRoot == depParam:
+                        return $"({RenderDependentOperand(pm, depParam, dependent, alias)} = {_ctx.RawProvider.BooleanTrueLiteral})";
+
+                    default:
+                        throw new NormUnsupportedFeatureException(
+                            $"Predicate '{p}' inside a navigation-aggregate Count is not translatable.");
                 }
             }
         }
