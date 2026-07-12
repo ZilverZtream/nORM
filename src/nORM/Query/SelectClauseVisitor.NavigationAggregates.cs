@@ -425,6 +425,12 @@ namespace nORM.Query
                 selectorSql = _provider.NormalizeDecimalForCompare(selectorSql);
             }
 
+            // C# Average over ints is a double; SQL Server's AVG(int) truncates (and the truncated
+            // Int32 then fails the double materializer). Same hook as the other aggregate emit
+            // paths: cast integral operands to FLOAT there, identity elsewhere.
+            if (sqlAgg == "AVG")
+                selectorSql = _provider.AverageAggregateOperand(selectorSql, selectorLambda.Body.Type);
+
             sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
               .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
               .Append(" WHERE ");

@@ -81,6 +81,61 @@ public class GroupNavigationIntAverageLiveTests
         new Row { Id = 3, Grp = 2, Amount = 2 }, new Row { Id = 4, Grp = 2, Amount = 3 },
     };
 
+    [Table("GnAvgP_Test")]
+    private class Parent
+    {
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public List<Kid> Kids { get; set; } = new();
+    }
+
+    [Table("GnAvgK_Test")]
+    private class Kid
+    {
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int Id { get; set; }
+        public int ParentId { get; set; }
+        public int Amount { get; set; }
+    }
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
+    public void Navigation_int_average_projection_is_fractional(string kind)
+    {
+        var (factory, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+        var q = kind == "postgres" ? "\"" : "";
+        var tp = $"{q}GnAvgP_Test{q}";
+        var tk = $"{q}GnAvgK_Test{q}";
+        var idCol = kind switch
+        {
+            "mysql" => "Id INT PRIMARY KEY AUTO_INCREMENT",
+            "postgres" => "\"Id\" SERIAL PRIMARY KEY",
+            _ => "Id INT IDENTITY PRIMARY KEY",
+        };
+        string C(string n, string t2) => kind == "postgres" ? $"\"{n}\" {t2}" : $"{n} {t2}";
+        Exec(factory!, $"DROP TABLE IF EXISTS {tk}");
+        Exec(factory!, $"DROP TABLE IF EXISTS {tp}");
+        Exec(factory!, $"CREATE TABLE {tp} ({idCol}, {C("Name", "VARCHAR(20) NOT NULL")})");
+        Exec(factory!, $"CREATE TABLE {tk} ({idCol}, {C("ParentId", "INT NOT NULL")}, {C("Amount", "INT NOT NULL")})");
+        Exec(factory!, $"INSERT INTO {tp} {(kind == "postgres" ? "(\"Name\")" : "(Name)")} VALUES ('a')");
+        Exec(factory!, $"INSERT INTO {tk} {(kind == "postgres" ? "(\"ParentId\", \"Amount\")" : "(ParentId, Amount)")} VALUES (1,1),(1,2)");
+        try
+        {
+            using var ctx = new DbContext(factory!(), provider!);
+            // C#: children 1,2 → 1.5. A truncating AVG(int) returns 1.
+            var rows = ctx.Query<Parent>().Select(p => new { p.Id, Avg = p.Kids.Average(k => k.Amount) }).ToList();
+            Assert.Single(rows);
+            Assert.Equal(1.5, rows[0].Avg, 3);
+        }
+        finally
+        {
+            Exec(factory!, $"DROP TABLE IF EXISTS {tk}");
+            Exec(factory!, $"DROP TABLE IF EXISTS {tp}");
+        }
+    }
+
     [Theory]
     [InlineData("mysql")]
     [InlineData("postgres")]
