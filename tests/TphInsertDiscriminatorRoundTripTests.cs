@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -18,7 +19,7 @@ namespace nORM.Tests;
 [Xunit.Trait("Category", "Fast")]
 public class TphVehicle
 {
-    public int Id { get; set; }
+    [Key] public int Id { get; set; }
     public int Kind { get; set; }
 }
 
