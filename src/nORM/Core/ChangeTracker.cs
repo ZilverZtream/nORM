@@ -621,6 +621,38 @@ namespace nORM.Core
             var typeDict = _entriesByKey.GetOrAdd(mapping.Type,
                 _ => new ConcurrentDictionary<object, EntityEntry>());
             typeDict.TryAdd(pk, entry);
+            PropagateGeneratedKeyToChildren(entity, mapping);
+        }
+
+        /// <summary>
+        /// After a principal with a DB-generated key is inserted and its key hydrated, updates the
+        /// foreign key of every still-Added dependent reachable through the principal's collection
+        /// navigations to the newly generated key value. Relationship fixup (see
+        /// DbContext.FixupNavigationChildren) sets a child's FK from the principal's PK at
+        /// change-detection time, but a DB-generated principal key is still default then; this closes
+        /// the gap so a whole new object graph saved in one call links up correctly.
+        /// </summary>
+        internal void PropagateGeneratedKeyToChildren(object principal, TableMapping mapping)
+        {
+            if (mapping.Relations.Count == 0)
+                return;
+
+            foreach (var relation in mapping.Relations.Values)
+            {
+                if (relation.NavProp.GetValue(principal) is not System.Collections.IEnumerable collection || collection is string)
+                    continue;
+
+                foreach (var child in collection)
+                {
+                    if (child == null)
+                        continue;
+                    var childEntry = GetEntryOrDefault(child);
+                    if (childEntry == null || childEntry.State != EntityState.Added)
+                        continue;
+                    for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
+                        relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
+                }
+            }
         }
 
         /// <summary>

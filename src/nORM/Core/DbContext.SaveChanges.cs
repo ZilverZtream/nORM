@@ -152,6 +152,7 @@ namespace nORM.Core
             if (detectChanges)
             {
                 ChangeTracker.DetectAllChanges();
+                FixupNavigationChildren();
             }
             var changedEntries = ChangeTracker.Entries
                 .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
@@ -400,6 +401,59 @@ namespace nORM.Core
                     cache.InvalidateTag(tag);
             }
             return totalAffected;
+        }
+
+        /// <summary>
+        /// Discovers dependents reachable through the collection navigations of tracked, non-deleted
+        /// entities that are not yet tracked themselves, tracks each as <see cref="EntityState.Added"/>,
+        /// and populates its foreign key from the principal's primary key — the documented
+        /// <c>principal.Children.Add(child)</c> relationship-fixup contract. A work queue visits a newly
+        /// added child's own collections too, so a deep object graph is added in one SaveChanges. When
+        /// the principal's key is DB-generated (still default here), the foreign key is re-propagated
+        /// after the principal is inserted (see <see cref="ChangeTracker.PropagateGeneratedKeyToChildren"/>).
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Relationship fixup reads navigation properties and resolves dependent mappings via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup reflects over navigation properties; trimming may remove the required members.")]
+        private void FixupNavigationChildren()
+        {
+            var queue = new Queue<EntityEntry>();
+            foreach (var e in ChangeTracker.Entries)
+                if (e.Entity != null && e.State != EntityState.Deleted && e.Mapping.Relations.Count > 0)
+                    queue.Enqueue(e);
+            if (queue.Count == 0)
+                return;
+
+            while (queue.Count > 0)
+            {
+                var entry = queue.Dequeue();
+                var principal = entry.Entity;
+                if (principal == null)
+                    continue;
+
+                foreach (var relation in entry.Mapping.Relations.Values)
+                {
+                    if (relation.NavProp.GetValue(principal) is not System.Collections.IEnumerable collection || collection is string)
+                        continue;
+
+                    TableMapping? childMapping = null;
+                    foreach (var child in collection)
+                    {
+                        if (child == null || ChangeTracker.GetEntryOrDefault(child) != null)
+                            continue;
+
+                        childMapping ??= GetMapping(relation.DependentType);
+                        var childEntry = ChangeTracker.Track(child, EntityState.Added, childMapping);
+
+                        // Set the FK from the principal's PK. Correct immediately when the principal's key
+                        // is already assigned; re-propagated after insert for DB-generated principal keys.
+                        for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
+                            relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
+
+                        if (childEntry.Mapping.Relations.Count > 0)
+                            queue.Enqueue(childEntry);
+                    }
+                }
+            }
         }
 
         private int CalculateBatchSize(int totalEntries, int paramsPerEntity)
