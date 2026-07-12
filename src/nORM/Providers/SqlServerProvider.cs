@@ -58,6 +58,10 @@ namespace nORM.Providers
         /// </summary>
         internal override bool PrefersSyncFastPathExecution => true;
 
+        // ROWVERSION auto-increments on every UPDATE and is read back via the OUTPUT clause, so nORM
+        // must not client-manage the [Timestamp] token here.
+        internal override bool SupportsNativeRowVersion => true;
+
         internal override bool PrefersSyncCompiledQueryExecution => true;
 
         internal override bool PrefersSyncQueryPlanExecution => true;

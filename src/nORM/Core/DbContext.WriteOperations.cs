@@ -643,6 +643,17 @@ namespace nORM.Core
                     .Append('=')
                     .Append(_p.ParamPrefix).Append('p').Append(idx++);
             }
+            // Client-managed concurrency token: write a fresh value in the SET clause so a stale
+            // concurrent UPDATE (whose WHERE still carries the old token) affects zero rows. The
+            // parameter binder generates the new value and binds this slot; the old token is compared
+            // separately in the WHERE below.
+            if (map.ClientManagedConcurrencyToken)
+            {
+                if (setSb.Length > 0) setSb.Append(", ");
+                setSb.Append(map.TimestampColumn!.EscCol)
+                    .Append('=')
+                    .Append(_p.ParamPrefix).Append('p').Append(idx++);
+            }
             var whereParts = new List<string>();
             foreach (var col in map.KeyColumns)
                 whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
@@ -706,11 +717,30 @@ namespace nORM.Core
                     }
                     break;
                 case WriteOperation.Update:
+                    // Capture the OLD token for the WHERE predicate BEFORE stamping a new one, then
+                    // (when client-managed) write a fresh token onto the entity so the SET loop below —
+                    // which now includes the timestamp column — binds the new value. The concurrency
+                    // check stays correct because WHERE compares the captured old token.
+                    object? whereTokenBatched = null;
+                    if (map.TimestampColumn != null)
+                    {
+                        var tc = map.TimestampColumn;
+                        whereTokenBatched = originalToken ?? tc.Getter(entity);
+                        if (map.ClientManagedConcurrencyToken)
+                            tc.Setter(entity, GenerateConcurrencyToken(tc, whereTokenBatched));
+                    }
                     foreach (var col in map.UpdateColumns)
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
                         cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
+                    }
+                    if (map.ClientManagedConcurrencyToken)
+                    {
+                        // SET slot for the freshly-stamped token (set on the entity above).
+                        var tc = map.TimestampColumn!;
+                        var newTok = tc.Getter(entity);
+                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", newTok, GetParameterKnownType(tc, newTok));
                     }
                     foreach (var col in map.KeyColumns)
                     {
@@ -720,9 +750,8 @@ namespace nORM.Core
                     }
                     if (map.TimestampColumn != null)
                     {
-                        // Use the original snapshot token when available rather than the current
-                        // (possibly mutated) property value, to ensure the correct concurrency check.
-                        var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
+                        // WHERE compares the OLD token captured before the new one was stamped.
+                        var tokenValue = whereTokenBatched;
                         cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     if (Options.TenantProvider != null)
@@ -750,6 +779,33 @@ namespace nORM.Core
 
         internal static Type? GetParameterKnownType(Column col, object? providerValue)
             => providerValue?.GetType() ?? (col.Converter == null ? col.Prop.PropertyType : null);
+
+        /// <summary>
+        /// Produces a fresh concurrency-token value that differs from <paramref name="oldValue"/>, for
+        /// providers without a native rowversion. byte[] / Guid use a new GUID (globally unique so a
+        /// stale writer's token can never collide); integer tokens increment. Other types are rejected
+        /// with a clear message rather than silently failing to protect against lost updates.
+        /// </summary>
+        internal static object GenerateConcurrencyToken(Column tokenColumn, object? oldValue)
+        {
+            var t = Nullable.GetUnderlyingType(tokenColumn.Prop.PropertyType) ?? tokenColumn.Prop.PropertyType;
+            if (t == typeof(byte[]))
+            {
+                // 8 bytes matches the conventional rowversion width (SQL Server ROWVERSION / VARBINARY(8));
+                // 64 random bits make a stale writer's token collision negligible.
+                var g = Guid.NewGuid().ToByteArray();
+                return new[] { g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7] };
+            }
+            if (t == typeof(Guid)) return Guid.NewGuid();
+            if (t == typeof(long)) return (oldValue is long l ? l : 0L) + 1L;
+            if (t == typeof(ulong)) return (oldValue is ulong ul ? ul : 0UL) + 1UL;
+            if (t == typeof(int)) return (oldValue is int i ? i : 0) + 1;
+            if (t == typeof(uint)) return (oldValue is uint u ? u : 0U) + 1U;
+            throw new NormConfigurationException(
+                $"Concurrency token column '{tokenColumn.PropName}' has type '{t.Name}', which nORM cannot " +
+                "auto-manage on a provider without a native rowversion. Use byte[], Guid, or an integer token, " +
+                "or run on SQL Server (ROWVERSION).");
+        }
 
         // TODO: Consider replacing the tuple array with parallel name[] and value[] arrays
         // to reduce per-element overhead. ValueTuple<string, object> boxes the object on every

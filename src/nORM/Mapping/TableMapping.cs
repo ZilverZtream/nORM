@@ -46,6 +46,12 @@ namespace nORM.Mapping
         /// <summary>Gets the timestamp column used for concurrency, if any.</summary>
         public Column? TimestampColumn { get; }
 
+        /// <summary>
+        /// True when nORM writes a fresh <see cref="TimestampColumn"/> value on each UPDATE (providers
+        /// without a native rowversion). When true the token column is part of <see cref="UpdateColumns"/>.
+        /// </summary>
+        public bool ClientManagedConcurrencyToken { get; }
+
         /// <summary>Gets the tenant discriminator column, if multi-tenancy is enabled.</summary>
         public Column? TenantColumn { get; }
 
@@ -254,6 +260,12 @@ namespace nORM.Mapping
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
+            // On providers without a native rowversion (SQLite/PostgreSQL/MySQL), nORM writes a fresh
+            // [Timestamp] value on every UPDATE (appended to the SET clause by the batched write path)
+            // so stale concurrent writes are detected. SQL Server's ROWVERSION is DB-generated and read
+            // back from the OUTPUT clause instead. UpdateColumns stays token-free (the token is bound
+            // separately) so provider SQL that names params by column don't collide on the token.
+            ClientManagedConcurrencyToken = TimestampColumn != null && !p.SupportsNativeRowVersion;
             UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated).ToArray();
 
             // Compute converter fingerprint for materializer cache differentiation

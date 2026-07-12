@@ -47,6 +47,14 @@ namespace nORM.Providers
         internal virtual bool UseAffectedRowsSemantics => false;
 
         /// <summary>
+        /// True when the provider generates a new concurrency token on every UPDATE at the database
+        /// level (SQL Server ROWVERSION). When false (SQLite, PostgreSQL, MySQL — no native
+        /// rowversion), nORM client-manages the [Timestamp] token: it writes a fresh value in the SET
+        /// clause on each UPDATE so a stale concurrent write is detected instead of silently winning.
+        /// </summary>
+        internal virtual bool SupportsNativeRowVersion => false;
+
+        /// <summary>
         /// Ensures the provided connection is open before executing provider operations.
         /// </summary>
         /// <param name="connection">The connection to validate.</param>
