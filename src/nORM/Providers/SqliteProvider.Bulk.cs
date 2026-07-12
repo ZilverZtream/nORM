@@ -321,15 +321,7 @@ namespace nORM.Providers
                         cmd.Transaction = transaction;
                         cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
 
-                        var paramNames = new List<string>();
                         var paramIndex = 0;
-
-                        foreach (var entity in batch)
-                        {
-                            var paramName = $"{ParamPrefix}p{paramIndex++}";
-                            paramNames.Add(paramName);
-                            cmd.AddParam(paramName, keyCol.Getter(entity));
-                        }
 
                         // X1: Add tenant predicate to prevent cross-tenant deletes
                         var tenantSuffix = "";
@@ -340,7 +332,36 @@ namespace nORM.Providers
                             cmd.AddParam(tenantParam, ctx.GetRequiredTenantId(m, "SQLite bulk delete"));
                             tenantSuffix = $" AND {tenantCol.EscCol} = {tenantParam}";
                         }
-                        cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)}){tenantSuffix}";
+
+                        if (m.TimestampColumn != null)
+                        {
+                            // Optimistic concurrency: match each row by (key AND token) so a
+                            // row whose token another writer bumped is skipped, not destroyed.
+                            // Consistent with bulk update — stale rows are skipped and the
+                            // reduced affected count is returned (no throw).
+                            var tc = m.TimestampColumn;
+                            var rowConds = new List<string>();
+                            foreach (var entity in batch)
+                            {
+                                var kp = $"{ParamPrefix}p{paramIndex++}";
+                                var tp = $"{ParamPrefix}p{paramIndex++}";
+                                cmd.AddParam(kp, keyCol.Getter(entity));
+                                cmd.AddParam(tp, tc.Getter(entity));
+                                rowConds.Add($"({keyCol.EscCol} = {kp} AND ({tc.EscCol} = {tp} OR ({tc.EscCol} IS NULL AND {tp} IS NULL)))");
+                            }
+                            cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE ({string.Join(" OR ", rowConds)}){tenantSuffix}";
+                        }
+                        else
+                        {
+                            var paramNames = new List<string>();
+                            foreach (var entity in batch)
+                            {
+                                var paramName = $"{ParamPrefix}p{paramIndex++}";
+                                paramNames.Add(paramName);
+                                cmd.AddParam(paramName, keyCol.Getter(entity));
+                            }
+                            cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)}){tenantSuffix}";
+                        }
                         totalDeleted += await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                     }
                 }

@@ -541,8 +541,10 @@ public class AdversarialBulkTenantTests
 
         var ctx = new DbContext(cn, new SqliteProvider());
 
-        // BulkDelete the entity
-        await ctx.BulkDeleteAsync(new[] { new G50OccItem { Id = 1, TenantId = "X" } });
+        // BulkDelete the entity. The delete now enforces optimistic concurrency, so
+        // the entity must carry the matching token (tok-1) to be removed — deleting
+        // with a stale/absent token correctly skips the row.
+        await ctx.BulkDeleteAsync(new[] { new G50OccItem { Id = 1, TenantId = "X", RowVersion = "tok-1" } });
 
         // Verify entity is deleted
         var count = await CountRowsAsync(cn, "G50OccItem");
