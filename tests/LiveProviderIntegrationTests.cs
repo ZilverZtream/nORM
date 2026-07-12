@@ -574,7 +574,7 @@ public class LiveProviderIntegrationTests
 
         var visitorType = typeof(DbContext).Assembly.GetType("nORM.Query.ExpressionToSqlVisitor", true)!;
         var visitor = Activator.CreateInstance(visitorType, ctx, mapping, provider, param,
-            provider.Escape("T0"), null, null, null)!;
+            provider.Escape("T0"), null, null, null, null)!;
         var sql = (string)visitorType.GetMethod("Translate")!.Invoke(visitor, new object[] { expr })!;
         var parameters = (Dictionary<string, object>)visitorType.GetMethod("GetParameters")!.Invoke(visitor, null)!;
 
