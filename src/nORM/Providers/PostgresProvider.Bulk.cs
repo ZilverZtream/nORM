@@ -60,7 +60,11 @@ namespace nORM.Providers
                         importer.StartRow();
                         foreach (var col in cols)
                         {
-                            var val = col.Getter(entity);
+                            // Apply the value converter like every non-bulk write path; binding the raw
+                            // model value would skip the converter and silently corrupt the column.
+                            var raw = col.Getter(entity);
+                            var conv = col.Converter;
+                            var val = conv != null ? conv.ConvertToProvider(raw) : raw;
                             if (val == null) importer.WriteNull();
                             else importer.Write(val);
                         }
@@ -105,7 +109,9 @@ namespace nORM.Providers
                 foreach (var col in cols)
                 {
                     var paramName = $"{ParamPrefix}p{paramIndex++}";
-                    var value = col.Getter(entity) ?? DBNull.Value;
+                    var raw = col.Getter(entity);
+                    var conv = col.Converter;
+                    var value = (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
                     cmd.AddParam(paramName, value);
                 }
             }
@@ -209,7 +215,9 @@ namespace nORM.Providers
                             foreach (var col in valueCols)
                             {
                                 var pName = $"{ParamPrefix}p{paramIndex++}";
-                                cmd.AddParam(pName, col.Getter(entity));
+                                var raw = col.Getter(entity);
+                                var conv = col.Converter;
+                                cmd.AddParam(pName, conv != null ? conv.ConvertToProvider(raw) : raw);
                                 paramNames.Add(pName);
                             }
                             valueRows.Add($"({string.Join(", ", paramNames)})");

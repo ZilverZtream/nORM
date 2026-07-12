@@ -471,7 +471,11 @@ namespace nORM.Providers
             public object GetValue(int i)
             {
                 if (_current == null) throw new InvalidOperationException("No current record");
-                return _columns[i].Getter(_current) ?? DBNull.Value;
+                // Apply the value converter like every non-bulk write path so SqlBulkCopy writes the
+                // converter-encoded value, not the raw model value (which read-back would corrupt).
+                var raw = _columns[i].Getter(_current);
+                var conv = _columns[i].Converter;
+                return (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
             }
 
             /// <summary>

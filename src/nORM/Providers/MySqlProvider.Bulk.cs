@@ -251,7 +251,9 @@ namespace nORM.Providers
                     for (int j = 0; j < cols.Count; j++)
                     {
                         var pName = $"{ParamPrefix}s{pIndex++}";
-                        cmd.AddParam(pName, cols[j].Getter(list[start + i]));
+                        var raw = cols[j].Getter(list[start + i]);
+                        var conv = cols[j].Converter;
+                        cmd.AddParam(pName, conv != null ? conv.ConvertToProvider(raw) : raw);
                         sb.Append(j > 0 ? "," : string.Empty).Append(pName);
                     }
                     sb.Append(')');
@@ -314,7 +316,9 @@ namespace nORM.Providers
                     foreach (var col in keyCols)
                     {
                         var pName = $"{ParamPrefix}p{paramIndex++}";
-                        cmd.AddParam(pName, col.Getter(entity));
+                        var raw = col.Getter(entity);
+                        var conv = col.Converter;
+                        cmd.AddParam(pName, conv != null ? conv.ConvertToProvider(raw) : raw);
                         paramNames.Add(pName);
                     }
                     if (keyCols.Count == 1)
@@ -424,7 +428,11 @@ namespace nORM.Providers
                 {
                     var entity = batch[i];
                     for (int j = 0; j < cols.Count; j++)
-                        values[j] = cols[j].Getter(entity) ?? DBNull.Value;
+                    {
+                        var raw = cols[j].Getter(entity);
+                        var conv = cols[j].Converter;
+                        values[j] = (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
+                    }
 
                     table.Rows.Add(values);
                 }

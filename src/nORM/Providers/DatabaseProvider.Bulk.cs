@@ -149,7 +149,11 @@ namespace nORM.Providers
                     for (int j = 0; j < cols.Count; j++)
                     {
                         var pName = $"{ParamPrefix}p{pIndex++}";
-                        cmd.AddParam(pName, cols[j].Getter(batch[i]));
+                        // Apply the value converter like every non-bulk write path; binding the raw model
+                        // value would skip the converter and silently corrupt the column on read-back.
+                        var raw = cols[j].Getter(batch[i]);
+                        var conv = cols[j].Converter;
+                        cmd.AddParam(pName, conv != null ? conv.ConvertToProvider(raw) : raw);
                         sb.Append(j > 0 ? $",{pName}" : pName);
                     }
                     sb.Append(")");
