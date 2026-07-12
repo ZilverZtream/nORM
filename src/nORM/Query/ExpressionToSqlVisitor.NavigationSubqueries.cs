@@ -116,6 +116,15 @@ namespace nORM.Query
             sourceExpr = Expression.Call(typeof(Queryable), nameof(Queryable.Where),
                 new[] { depType }, sourceExpr, Expression.Quote(fkPredicate));
 
+            // Apply the dependent entity's global filters (soft-delete, tenant) inside the correlated
+            // subquery, so a navigation predicate (Any/All/Count/LongCount) counts only visible rows.
+            // Without this, c.Orders.Any() over-includes a parent whose only orders are soft-deleted,
+            // and c.Orders.Count() counts filtered-out rows.
+            var childGlobalFilter = GlobalFilterFragment.Combine(_ctx, depType);
+            if (childGlobalFilter != null)
+                sourceExpr = Expression.Call(typeof(Queryable), nameof(Queryable.Where),
+                    new[] { depType }, sourceExpr, Expression.Quote(childGlobalFilter));
+
             // Re-emit the aggregate call (Any/All/Count/LongCount) against the synthesized
             // Queryable source. The original predicate (if any) is the second arg.
             var methodName = originalCall.Method.Name;

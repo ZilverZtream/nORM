@@ -168,6 +168,12 @@ namespace nORM.Query
             var extraFilterSql = extraFilter != null
                 ? RenderNavigationFilter(extraFilter, depAlias)
                 : null;
+            // The dependent's global filters (soft-delete, tenant) restrict which rows are visible to
+            // the aggregate. Applied as a plain AND in every branch (including All, where the extra
+            // predicate is inverted but visibility is not) so a projected Count/Any/All counts only
+            // visible rows instead of leaking filtered-out ones.
+            var globalFilter = _ctx != null ? GlobalFilterFragment.Combine(_ctx, depType) : null;
+            var globalFilterSql = globalFilter != null ? RenderNavigationFilter(globalFilter, depAlias) : null;
             // Use predicate-overload Count(predicate) sugar when the unwrapped filter is the
             // first / only filter and the outer call is Count() — keeps the SQL compact.
             // For Any/All, AND the filter into the EXISTS / NOT EXISTS subquery's WHERE.
@@ -178,6 +184,7 @@ namespace nORM.Query
                 sb.Append("CASE WHEN EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
+                if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
                 if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
                 sb.Append(") THEN 1 ELSE 0 END");
             }
@@ -186,7 +193,9 @@ namespace nORM.Query
                 sb.Append("CASE WHEN NOT EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
-                // All(p) ≡ NOT EXISTS(row matching NOT p) — invert the extra filter, not AND it.
+                if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
+                // All(p) ≡ NOT EXISTS(visible row matching NOT p) — invert the extra filter, not the
+                // global filter (visibility must still restrict the set the predicate ranges over).
                 if (extraFilterSql != null) sb.Append(" AND NOT (").Append(extraFilterSql).Append(')');
                 sb.Append(") THEN 1 ELSE 0 END");
             }
@@ -195,6 +204,7 @@ namespace nORM.Query
                 sb.Append("COUNT(*) FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
+                if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
                 if (extraFilterSql != null) sb.Append(" AND ").Append(extraFilterSql);
             }
             sb.Append(')');
@@ -257,35 +267,48 @@ namespace nORM.Query
         }
 
         private string RenderNavigationFilter(LambdaExpression filter, string depAlias)
+            => RenderNavigationFilterBody(filter.Body, filter.Parameters[0], depAlias);
+
+        // Renders a predicate against the dependent alias. Recursive so it covers the common global
+        // filter shapes (soft-delete `!c.IsDeleted`, a bare boolean flag, and `&&`/`||` compositions)
+        // in addition to the simple `c.X op constant` comparisons.
+        private string RenderNavigationFilterBody(Expression body, ParameterExpression elementParam, string depAlias)
         {
-            // Render a simple `c => c.X op constant` style predicate against the dependent
-            // alias. Supports BinaryExpression with member-access on one side and a constant
-            // (or member of a closure) on the other — the same surface area as the rest of
-            // SCV's translatable subset. More complex predicates fall through to the throw
-            // below which routes back to client-eval messaging.
-            if (filter.Body is BinaryExpression be)
+            switch (body)
             {
-                var lhs = RenderFilterSide(be.Left, filter.Parameters[0], depAlias);
-                var rhs = RenderFilterSide(be.Right, filter.Parameters[0], depAlias);
-                var op = be.NodeType switch
-                {
-                    ExpressionType.Equal => "=",
-                    ExpressionType.NotEqual => "<>",
-                    ExpressionType.GreaterThan => ">",
-                    ExpressionType.GreaterThanOrEqual => ">=",
-                    ExpressionType.LessThan => "<",
-                    ExpressionType.LessThanOrEqual => "<=",
-                    ExpressionType.AndAlso => "AND",
-                    ExpressionType.OrElse => "OR",
-                    _ => throw new InvalidOperationException(
-                        $"Navigation filter binary operator '{be.NodeType}' isn't yet supported in a projection subquery. " +
-                        "Use a simple comparison (==, !=, <, >, <=, >=, &&, ||) or wrap with `ClientEvaluationPolicy.Allow`.")
-                };
-                return $"{lhs} {op} {rhs}";
+                case UnaryExpression { NodeType: ExpressionType.Not } notExpr:
+                    return $"NOT ({RenderNavigationFilterBody(notExpr.Operand, elementParam, depAlias)})";
+
+                // Bare boolean member (`c.IsActive`) → `alias.IsActive = <true>`.
+                case MemberExpression boolMember when boolMember.Type == typeof(bool) && boolMember.Expression == elementParam:
+                    return $"{RenderFilterSide(boolMember, elementParam, depAlias)} = {_provider.BooleanTrueLiteral}";
+
+                case BinaryExpression { NodeType: ExpressionType.AndAlso or ExpressionType.OrElse } logical:
+                    var logicalOp = logical.NodeType == ExpressionType.AndAlso ? "AND" : "OR";
+                    return $"({RenderNavigationFilterBody(logical.Left, elementParam, depAlias)} {logicalOp} {RenderNavigationFilterBody(logical.Right, elementParam, depAlias)})";
+
+                case BinaryExpression be:
+                    var lhs = RenderFilterSide(be.Left, elementParam, depAlias);
+                    var rhs = RenderFilterSide(be.Right, elementParam, depAlias);
+                    var op = be.NodeType switch
+                    {
+                        ExpressionType.Equal => "=",
+                        ExpressionType.NotEqual => "<>",
+                        ExpressionType.GreaterThan => ">",
+                        ExpressionType.GreaterThanOrEqual => ">=",
+                        ExpressionType.LessThan => "<",
+                        ExpressionType.LessThanOrEqual => "<=",
+                        _ => throw new InvalidOperationException(
+                            $"Navigation filter binary operator '{be.NodeType}' isn't yet supported in a projection subquery. " +
+                            "Use a simple comparison (==, !=, <, >, <=, >=, &&, ||) or wrap with `ClientEvaluationPolicy.Allow`.")
+                    };
+                    return $"{lhs} {op} {rhs}";
+
+                default:
+                    throw new InvalidOperationException(
+                        "Navigation filter inside a projection subquery supports comparisons, `!`, bare boolean flags, " +
+                        "and `&&`/`||` compositions. For more complex shapes, wrap with `ClientEvaluationPolicy.Allow`.");
             }
-            throw new InvalidOperationException(
-                "Navigation filter inside a projection subquery currently supports only simple binary predicates " +
-                "(`c => c.X op constant`). For more complex shapes, wrap with `ClientEvaluationPolicy.Allow`.");
         }
 
         private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias)

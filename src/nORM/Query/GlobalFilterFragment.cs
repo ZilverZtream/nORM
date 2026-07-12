@@ -55,9 +55,11 @@ namespace nORM.Query
         /// <summary>
         /// Combines every global filter that applies to <paramref name="entityType"/> into one AND-ed
         /// lambda, mirroring NormQueryProvider.CombineGlobalFilterPredicates (including the two-parameter
-        /// <c>(ctx, e) =&gt; …</c> filter form, whose context parameter is inlined as a constant).
+        /// <c>(ctx, e) =&gt; …</c> filter form, whose context parameter is inlined as a constant). Exposed
+        /// so translator-built correlated subqueries can add the same filter as a <c>Where</c> clause.
+        /// Returns <c>null</c> when no filter applies.
         /// </summary>
-        private static LambdaExpression? Combine(DbContext ctx, Type entityType)
+        internal static LambdaExpression? Combine(DbContext ctx, Type entityType)
         {
             List<Expression>? bodies = null;
             ParameterExpression? param = null;
