@@ -90,6 +90,12 @@ namespace nORM.Providers
         internal override string IntegerDivisionOperator => "DIV";
 
         /// <summary>
+        /// MySQL's default collations (utf8mb4_0900_ai_ci and friends) make <c>=</c>
+        /// case-insensitive, unlike C# ordinal string equality.
+        /// </summary>
+        internal override bool DefaultStringEqualityIsCaseInsensitive => true;
+
+        /// <summary>
         /// MySQL's <c>FORMAT(x, N)</c> inserts thousand-separators by default
         /// ('1,234.50') which doesn't match .NET's <c>ToString("F2")</c>
         /// ('1234.50'). Wrap in REPLACE to strip the commas. The result still

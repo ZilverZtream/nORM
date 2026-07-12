@@ -167,6 +167,32 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// True when the provider's DEFAULT column collation compares strings case-insensitively
+        /// with <c>=</c> (MySQL utf8mb4_*_ci, SQL Server *_CI_AS), so translating C#'s ordinal
+        /// string equality faithfully requires the sargable wrap below. SQLite (BINARY) and
+        /// PostgreSQL are already ordinal, so the default is false and their emits are untouched.
+        /// </summary>
+        internal virtual bool DefaultStringEqualityIsCaseInsensitive => false;
+
+        /// <summary>
+        /// Sargable ordinal (case-sensitive) string equality: byte-equality implies
+        /// collation-equality, so the plain <c>=</c> term narrows through any index on the column
+        /// while the <see cref="ForceCaseSensitiveStringComparison"/> term filters the case
+        /// variants exactly. Only emitted when
+        /// <see cref="DefaultStringEqualityIsCaseInsensitive"/> is true.
+        /// </summary>
+        internal string OrdinalStringEqualSql(string left, string right)
+            => $"({left} = {right} AND {ForceCaseSensitiveStringComparison(left)} = {right})";
+
+        /// <summary>
+        /// Ordinal string inequality, the negation of <see cref="OrdinalStringEqualSql"/>:
+        /// collation-inequality implies byte-inequality (short-circuits), otherwise the binary
+        /// term decides. Inequality is never index-sargable, so no narrowing term is needed.
+        /// </summary>
+        internal string OrdinalStringNotEqualSql(string left, string right)
+            => $"({left} <> {right} OR {ForceCaseSensitiveStringComparison(left)} <> {right})";
+
+        /// <summary>
         /// True when this provider's default <c>LIKE</c> cannot be forced case-sensitive with a
         /// collation modifier and the ordinal string-match path must instead bypass <c>LIKE</c>
         /// entirely (see <see cref="GetOrdinalStringMatchSql"/>). Only SQLite sets this: its

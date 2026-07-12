@@ -88,6 +88,13 @@ namespace nORM.Query
                 if (TryEmitDateTimeOffsetLiteralComparison(node))
                     return node;
 
+                // C# string equality is ordinal (case-sensitive); on providers whose default
+                // collation makes `=` case-insensitive (MySQL, SQL Server), string =/<> must emit
+                // the sargable ordinal wrap instead of a bare compare. SQLite/PostgreSQL compare
+                // ordinally already, so their flag is false and every emit below is unchanged.
+                bool ordinalStringCompare = _provider.DefaultStringEqualityIsCaseInsensitive
+                    && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string));
+
                 if (NeedsNullSafeExpansion(node.Left, node.Right, node.NodeType))
                 {
                     int ls = _sql.Length;
@@ -102,7 +109,12 @@ namespace nORM.Query
 
                     if (node.NodeType == ExpressionType.Equal)
                     {
-                        _sql.Append(_provider.NullSafeEqual(lf, rf));
+                        // Ordinal string equality composes with the base null-safe shape directly
+                        // (MySQL and SQL Server both use the base NullSafeEqual form).
+                        if (ordinalStringCompare)
+                            _sql.Append($"({_provider.OrdinalStringEqualSql(lf, rf)} OR ({lf} IS NULL AND {rf} IS NULL))");
+                        else
+                            _sql.Append(_provider.NullSafeEqual(lf, rf));
                     }
                     else
                     {
@@ -112,10 +124,32 @@ namespace nORM.Query
                         // reduces to: (lf IS NULL OR lf <> rf)
                         bool rightCouldBeNull = CouldBeNull(node.Right);
                         if (!rightCouldBeNull)
-                            _sql.Append($"({lf} IS NULL OR {lf} <> {rf})");
+                        {
+                            _sql.Append(ordinalStringCompare
+                                ? $"({lf} IS NULL OR {_provider.OrdinalStringNotEqualSql(lf, rf)})"
+                                : $"({lf} IS NULL OR {lf} <> {rf})");
+                        }
+                        else if (ordinalStringCompare)
+                        {
+                            _sql.Append($"(({lf} IS NOT NULL AND {rf} IS NOT NULL AND {_provider.OrdinalStringNotEqualSql(lf, rf)})" +
+                                        $" OR ({lf} IS NULL AND {rf} IS NOT NULL)" +
+                                        $" OR ({lf} IS NOT NULL AND {rf} IS NULL))");
+                        }
                         else
+                        {
                             _sql.Append(_provider.NullSafeNotEqual(lf, rf));
+                        }
                     }
+                    return node;
+                }
+
+                if (ordinalStringCompare)
+                {
+                    var ordL = GetSql(node.Left);
+                    var ordR = GetSql(node.Right);
+                    _sql.Append(node.NodeType == ExpressionType.Equal
+                        ? _provider.OrdinalStringEqualSql(ordL, ordR)
+                        : _provider.OrdinalStringNotEqualSql(ordL, ordR));
                     return node;
                 }
             }

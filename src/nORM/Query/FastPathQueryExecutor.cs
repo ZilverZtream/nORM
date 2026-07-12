@@ -261,5 +261,18 @@ namespace nORM.Query
                 return sql.Replace("SELECT ", $"SELECT TOP({limit}) ");
             return sql + $" LIMIT {limit}";
         }
+
+        // C# string equality is ordinal; providers whose default collation folds case (MySQL,
+        // SQL Server) need the sargable ordinal wrap so the fast path matches the same rows the
+        // full translator and LINQ-to-Objects do. Decided by the column's CLR type so the cached
+        // SQL stays stable per (entity, property, provider).
+        private static string BuildEqualityPredicate(DbContext ctx, Column column)
+        {
+            var paramName = ctx.RawProvider.ParamPrefix + "p0";
+            var colType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+            return colType == typeof(string) && ctx.RawProvider.DefaultStringEqualityIsCaseInsensitive
+                ? ctx.RawProvider.OrdinalStringEqualSql(column.EscCol, paramName)
+                : $"{column.EscCol} = {paramName}";
+        }
     }
 }

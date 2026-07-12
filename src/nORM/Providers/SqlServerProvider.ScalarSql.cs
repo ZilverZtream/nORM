@@ -178,6 +178,12 @@ namespace nORM.Providers
                 : new SqlParameter(name, value ?? DBNull.Value);
 
         /// <summary>
+        /// SQL Server's usual default database collation (SQL_Latin1_General_CP1_CI_AS) makes
+        /// <c>=</c> case-insensitive, unlike C# ordinal string equality.
+        /// </summary>
+        internal override bool DefaultStringEqualityIsCaseInsensitive => true;
+
+        /// <summary>
         /// Escapes special characters in a pattern used with SQL Server's <c>LIKE</c> operator.
         /// </summary>
         /// <param name="value">The pattern to escape.</param>

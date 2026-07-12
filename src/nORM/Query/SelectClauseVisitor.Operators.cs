@@ -314,6 +314,27 @@ namespace nORM.Query
                 return node;
             }
 
+            // C# string equality is ordinal; on providers whose default collation folds case
+            // (MySQL, SQL Server) a projected `x.Name == "abc"` must use the sargable ordinal
+            // wrap so the computed boolean matches LINQ-to-Objects and the Where translation.
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                && _provider.DefaultStringEqualityIsCaseInsensitive
+                && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)))
+            {
+                var ordLeftStart = sb.Length;
+                Visit(node.Left);
+                var ordLeftSql = sb.ToString(ordLeftStart, sb.Length - ordLeftStart);
+                sb.Length = ordLeftStart;
+                var ordRightStart = sb.Length;
+                Visit(node.Right);
+                var ordRightSql = sb.ToString(ordRightStart, sb.Length - ordRightStart);
+                sb.Length = ordRightStart;
+                sb.Append(node.NodeType == ExpressionType.Equal
+                    ? _provider.OrdinalStringEqualSql(ordLeftSql, ordRightSql)
+                    : _provider.OrdinalStringNotEqualSql(ordLeftSql, ordRightSql));
+                return node;
+            }
+
             sb.Append('(');
             Visit(node.Left);
             sb.Append(' ').Append(node.NodeType switch

@@ -130,11 +130,20 @@ namespace nORM.Tests
 
             var (sql, parameters) = Translate<Product>(p => p.Name!.ToUpper() == "ABC", connection, provider);
             var t0 = provider.Escape("T0");
-            var expected = $"(UPPER({t0}.{provider.Escape("Name")}) = @p0)";
+            // Providers whose default collation folds case (MySQL, SQL Server) emit the sargable
+            // ordinal wrap for string equality; the others keep the plain compare.
+            var expected = ExpectedStringEquality(provider, $"UPPER({t0}.{provider.Escape("Name")})");
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("ABC", parameters["@p0"]);
         }
+
+        // Builds the expected SQL for an ordinal string equality against @p0 through the same
+        // provider hook the translator uses, so shape assertions stay in lock-step with the emit.
+        private static string ExpectedStringEquality(nORM.Providers.DatabaseProvider provider, string lhsSql)
+            => provider.DefaultStringEqualityIsCaseInsensitive
+                ? provider.OrdinalStringEqualSql(lhsSql, "@p0")
+                : $"({lhsSql} = @p0)";
 
         [Theory]
         [MemberData(nameof(SimpleEqualityProviders))]
@@ -146,7 +155,7 @@ namespace nORM.Tests
 
             var (sql, parameters) = Translate<Product>(p => CustomFunctions.Soundex(p.Name!) == "ABC", connection, provider);
             var t0 = provider.Escape("T0");
-            var expected = $"(SOUNDEX({t0}.{provider.Escape("Name")}) = @p0)";
+            var expected = ExpectedStringEquality(provider, $"SOUNDEX({t0}.{provider.Escape("Name")})");
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("ABC", parameters["@p0"]);
@@ -163,7 +172,7 @@ namespace nORM.Tests
             var (sql, parameters) = Translate<JsonEntity>(e => Json.Value<string>(e.ProfileData!, "$.address.city") == "New York", connection, provider);
             var t0 = provider.Escape("T0");
             var columnSql = $"{t0}.{provider.Escape("ProfileData")}";
-            var expected = $"({provider.TranslateJsonPathAccess(columnSql, "$.address.city")} = @p0)";
+            var expected = ExpectedStringEquality(provider, provider.TranslateJsonPathAccess(columnSql, "$.address.city"));
             Assert.Equal(expected, sql);
             Assert.Single(parameters);
             Assert.Equal("New York", parameters["@p0"]);

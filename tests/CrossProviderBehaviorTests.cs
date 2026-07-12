@@ -1972,6 +1972,16 @@ public class CrossProviderBehaviorTests
             ctx.Add(new PMNull { Id = i, Tag = i % 2 == 0 ? "even" : "odd", Grp = i % 4, Amount = i });
         await ctx.SaveChangesAsync();
 
+        // String equality wraps in the MySQL/SQL Server ordinal form (BINARY / COLLATE), which
+        // the SQLite backend cannot execute; assert the marker and leave execution to the live
+        // suite there. The compiled-parameter mechanics under test stay executed via sqlite and
+        // postgres (and by the integer-parameter compiled-query tests for all four kinds).
+        if (RequiresProviderNativeCaseSensitiveLike(kind))
+        {
+            AssertCaseSensitiveLikeShape(ctx.Query<PMNull>().Where(x => x.Tag == "even").ToString());
+            return;
+        }
+
         var compiled = Norm.CompileQuery((DbContext c, string tag) =>
             c.Query<PMNull>().Where(x => x.Tag == tag));
 

@@ -663,6 +663,15 @@ namespace nORM.Query
             {
                 lhs = $"LOWER({lhs})";
                 rhs = $"LOWER({rhs})";
+                visitor._sql.Append('(').Append(lhs).Append(" = ").Append(rhs).Append(')');
+                return;
+            }
+            // Ordinal comparison (string.Equals default / StringComparison.Ordinal): providers
+            // whose default collation folds case need the sargable ordinal wrap.
+            if (visitor._provider.DefaultStringEqualityIsCaseInsensitive)
+            {
+                visitor._sql.Append(visitor._provider.OrdinalStringEqualSql(lhs, rhs));
+                return;
             }
             visitor._sql.Append('(').Append(lhs).Append(" = ").Append(rhs).Append(')');
         }

@@ -110,7 +110,15 @@ namespace nORM.Query
                                        or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
                     if (isOrderCmp && (colType == typeof(DateTime) || colType == typeof(DateTimeOffset)))
                         colSql = ctx.RawProvider.NormalizeDateTimeForCompare(colSql);
-                    sql.Append(colSql).Append(' ').Append(SqlOperator(predicate.Operation)).Append(' ').Append(paramName);
+                    // C# string equality is ordinal; providers whose default collation folds case
+                    // (MySQL, SQL Server) need the sargable ordinal wrap here too, or the fast path
+                    // would match different rows than the full translator.
+                    if (predicate.Operation == ExpressionType.Equal
+                        && colType == typeof(string)
+                        && ctx.RawProvider.DefaultStringEqualityIsCaseInsensitive)
+                        sql.Append(ctx.RawProvider.OrdinalStringEqualSql(colSql, paramName));
+                    else
+                        sql.Append(colSql).Append(' ').Append(SqlOperator(predicate.Operation)).Append(' ').Append(paramName);
                 }
             }
 

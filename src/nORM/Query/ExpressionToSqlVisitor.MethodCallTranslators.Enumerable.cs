@@ -237,6 +237,46 @@ namespace nORM.Query
                     // multiple smaller IN clauses let the query optimizer produce better plans than a
                     // single massive IN list, at the cost of a slightly larger SQL string and plan
                     // cache variance (different collection sizes produce different SQL shapes).
+                    // C# list.Contains(string) is ordinal; on providers whose default collation
+                    // makes IN case-insensitive (MySQL, SQL Server), pair each IN with a
+                    // ForceCaseSensitiveStringComparison IN over the SAME parameters — the plain
+                    // IN narrows through any index, the binary IN filters exactly.
+                    bool ordinalStringIn = _provider.DefaultStringEqualityIsCaseInsensitive
+                        && (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(string);
+
+                    // Emits `col IN (@p…)` (registering the parameters once) and returns the
+                    // rendered `(@p…)` list so the ordinal wrap can reference the same names.
+                    string EmitInList(IEnumerable<object?> items)
+                    {
+                        var listStart = _sql.Length;
+                        _sql.Append(" IN (");
+                        bool first = true;
+                        foreach (var item in items)
+                        {
+                            if (!first) _sql.Append(", ");
+                            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                            _sql.AppendParameterizedValue(paramName, item, _paramSink);
+                            first = false;
+                        }
+                        _sql.Append(")");
+                        return _sql.ToString(listStart, _sql.Length - listStart);
+                    }
+
+                    void EmitMembershipTest(IEnumerable<object?> items)
+                    {
+                        var colSql = GetSql(valueExpr);
+                        if (ordinalStringIn) _sql.Append('(');
+                        _sql.Append(colSql);
+                        var renderedList = EmitInList(items);
+                        if (ordinalStringIn)
+                        {
+                            _sql.Append(" AND ")
+                                .Append(_provider.ForceCaseSensitiveStringComparison(colSql))
+                                .Append(renderedList)
+                                .Append(')');
+                        }
+                    }
+
                     const int MaxInClauseItems = 1000;
                     if (nonNullItems.Count > MaxInClauseItems)
                     {
@@ -245,18 +285,7 @@ namespace nORM.Query
                         for (int batch = 0; batch < nonNullItems.Count; batch += MaxInClauseItems)
                         {
                             if (batch > 0) _sql.Append(" OR ");
-                            var batchItems = nonNullItems.Skip(batch).Take(MaxInClauseItems);
-                            Visit(valueExpr);
-                            _sql.Append(" IN (");
-                            bool first = true;
-                            foreach (var item in batchItems)
-                            {
-                                if (!first) _sql.Append(", ");
-                                var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                                _sql.AppendParameterizedValue(paramName, item, _paramSink);
-                                first = false;
-                            }
-                            _sql.Append(")");
+                            EmitMembershipTest(nonNullItems.Skip(batch).Take(MaxInClauseItems));
                         }
                         _sql.Append(")");
                         if (hasNulls)
@@ -269,15 +298,7 @@ namespace nORM.Query
                     else
                     {
                         if (hasNulls) _sql.Append("(");
-                        Visit(valueExpr);
-                        _sql.Append(" IN (");
-                        for (int i = 0; i < nonNullItems.Count; i++)
-                        {
-                            if (i > 0) _sql.Append(", ");
-                            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _sql.AppendParameterizedValue(paramName, nonNullItems[i], _paramSink);
-                        }
-                        _sql.Append(")");
+                        EmitMembershipTest(nonNullItems);
                         if (hasNulls)
                         {
                             _sql.Append(" OR ");

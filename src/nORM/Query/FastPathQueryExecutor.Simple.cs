@@ -58,7 +58,7 @@ namespace nORM.Query
                 else if (isBoolFalse)
                     sql += $" WHERE {ctx.RawProvider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
                 else
-                    sql += $" WHERE {column.EscCol} = {ctx.RawProvider.ParamPrefix}p0";
+                    sql += $" WHERE {BuildEqualityPredicate(ctx, column)}";
                 if (takeCount.HasValue)
                     sql = ApplyLimit(sql, takeCount.Value, ctx.RawProvider);
                 _fullSqlCache[cacheKey] = sql;
@@ -106,7 +106,7 @@ namespace nORM.Query
                 else if (isBoolFalse)
                     sql += $" WHERE {ctx.RawProvider.FormatBooleanPredicate(column.EscCol, expectedValue: false)}";
                 else
-                    sql += $" WHERE {column.EscCol} = {ctx.RawProvider.ParamPrefix}p0";
+                    sql += $" WHERE {BuildEqualityPredicate(ctx, column)}";
                 if (takeCount.HasValue)
                     sql = ApplyLimit(sql, takeCount.Value, ctx.RawProvider);
                 _fullSqlCache[cacheKey] = sql;
