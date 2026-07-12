@@ -646,14 +646,19 @@ namespace nORM.Query
             // Classify the value side before writing anything so an unhandled shape declines cleanly.
             var stripped = StripConvert(valueSide);
             var isInlineConstant = stripped is ConstantExpression;
+            // A free parameter (not a mapped entity column, not a grouping key) is a compiled-query
+            // parameter; VisitParameter emits a compiled slot for it.
+            var isFreeParameter = stripped is ParameterExpression fpe
+                && !_parameterMappings.ContainsKey(fpe)
+                && !_groupingKeys.ContainsKey(fpe);
             if (isInlineConstant)
             {
                 if (((ConstantExpression)stripped).Value == null)
                     return false; // literal null -> IS NULL path
             }
-            else if (!TryGetConstantValue(valueSide, out _))
+            else if (!isFreeParameter && !TryGetConstantValue(valueSide, out _))
             {
-                return false; // not a simple constant/closure value (e.g. another column)
+                return false; // not a simple constant/closure/parameter value (e.g. another column)
             }
 
             // Normalize to `column <op> value` — flip the operator when the column is on the right.
@@ -666,7 +671,7 @@ namespace nORM.Query
                 // included (SQL `NULL <> @p` is UNKNOWN, i.e. excluded).
                 var columnSql = GetSql(memberSide);
                 _sql.Append(columnSql).Append(" IS NULL OR ").Append(columnSql).Append(" <> ");
-                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant);
+                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant, isFreeParameter);
             }
             else
             {
@@ -681,19 +686,29 @@ namespace nORM.Query
                     ExpressionType.LessThanOrEqual => " <= ",
                     _ => throw new InvalidOperationException()
                 });
-                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant);
+                EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant, isFreeParameter);
             }
             _sql.Append(')');
             return true;
         }
 
-        private void EmitConvertedValueOperand(Expression strippedValue, nORM.Mapping.IValueConverter converter, bool isInlineConstant)
+        private void EmitConvertedValueOperand(Expression strippedValue, nORM.Mapping.IValueConverter converter, bool isInlineConstant, bool isFreeParameter)
         {
             if (isInlineConstant)
             {
                 var raw = ((ConstantExpression)strippedValue).Value;
                 var converted = converter.ConvertToProvider(raw);
                 AppendConstant(converted, converted?.GetType() ?? converter.ProviderType);
+                return;
+            }
+
+            if (isFreeParameter)
+            {
+                // Compiled-query parameter: let VisitParameter emit (and reuse) its compiled slot,
+                // then record the converter for that slot name so the compiled-query binder applies it.
+                Visit(strippedValue);
+                if (_paramMap.TryGetValue((ParameterExpression)strippedValue, out var slotName))
+                    _paramConverters[slotName] = converter;
                 return;
             }
 

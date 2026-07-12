@@ -222,6 +222,19 @@ namespace nORM.Internal
             }
         }
 
+        /// <summary>
+        /// Applies the plan's per-compiled-parameter value converter (if any) so a compiled-query
+        /// parameter compared against a value-converter column binds its provider representation.
+        /// Almost always a no-op (no converter columns in the predicate).
+        /// </summary>
+        private static object? ConvertCompiledArg(nORM.Query.QueryPlan plan, string name, object? value)
+        {
+            var converters = plan.ParameterConverters;
+            if (value != null && converters != null && converters.TryGetValue(name, out var converter))
+                return converter.ConvertToProvider(value);
+            return value;
+        }
+
         private static Func<TContext, TParam, Task<List<T>>> CompileWithTimeout<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression, CancellationToken token)
             where TContext : DbContext
             where T : class
@@ -374,7 +387,7 @@ namespace nORM.Internal
                         {
                             var p = cmd.CreateParameter();
                             p.ParameterName = compiledParams2[i];
-                            ParameterAssign.AssignValue(p, i < args.Length ? args[i] : DBNull.Value);
+                            ParameterAssign.AssignValue(p, i < args.Length ? ConvertCompiledArg(cachedPlan, compiledParams2[i], args[i]) : DBNull.Value);
                             cmd.Parameters.Add(p);
                         }
                         ApplyPreparedParameterSizeHints(cmd);
@@ -390,7 +403,7 @@ namespace nORM.Internal
                     var fixedParamCount = state.FixedParamCount;
                     for (int i = 0; i < compiledCount; i++)
                     {
-                        ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], args[i]);
+                        ParameterAssign.AssignValue(cmd.Parameters[fixedParamCount + i], ConvertCompiledArg(cachedPlan, compiledParams[i], args[i]));
                         ApplyPreparedParameterSizeHint(cmd, cmd.Parameters[fixedParamCount + i]);
                     }
 
