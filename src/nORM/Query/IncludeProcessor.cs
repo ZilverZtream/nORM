@@ -467,6 +467,13 @@ namespace nORM.Query
                         sb.Append(" AND ").Append(alias).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tp);
                     }
 
+                    // Apply the general global filters (e.g. soft-delete) to each eager-loaded level.
+                    // ApplyGlobalFilters only filters the root LINQ tree; this hand-built Include SQL must
+                    // repeat the predicate or a soft-deleted / cross-tenant child leaks into the graph.
+                    var globalFilterSql = GlobalFilterFragment.Build(_ctx, map, alias, cmd);
+                    if (globalFilterSql != null)
+                        sb.Append(" AND ").Append(globalFilterSql);
+
                     // Separate multiple result-set statements with semicolons;
                     // skip the trailing one so the final SQL is clean.
                     if (i < path.Count - 1)

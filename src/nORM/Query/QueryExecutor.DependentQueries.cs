@@ -153,6 +153,13 @@ namespace nORM.Query
                 cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
 
+            // Apply the general global filters (e.g. soft-delete) to the eager-loaded child too — the
+            // root query is filtered by ApplyGlobalFilters, but this hand-built dependent SQL is not, so
+            // without this a soft-deleted (or cross-tenant) child leaks into the navigation collection.
+            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
+            if (globalFilterSql != null)
+                sql.Append(" AND ").Append(globalFilterSql);
+
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
@@ -212,6 +219,13 @@ namespace nORM.Query
                 sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
                 cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
+
+            // Apply the general global filters (e.g. soft-delete) to the eager-loaded child too — the
+            // root query is filtered by ApplyGlobalFilters, but this hand-built dependent SQL is not, so
+            // without this a soft-deleted (or cross-tenant) child leaks into the navigation collection.
+            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
+            if (globalFilterSql != null)
+                sql.Append(" AND ").Append(globalFilterSql);
 
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
