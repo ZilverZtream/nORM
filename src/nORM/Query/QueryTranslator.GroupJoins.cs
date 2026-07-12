@@ -83,9 +83,47 @@ namespace nORM.Query
             var sqlOuterKeySelector = ExpandProjection(effectiveOuterKeySelector);
             if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
                 _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
+            // Composite (anonymous-type) keys: emit one equality per member ANDed into the ON
+            // clause (the generic visitor would mash the members into invalid SQL); string
+            // members get the ordinal wrap like scalar keys. Segmentation matches by the
+            // COMPILED outer key (anonymous types compare by value), so the runtime needs no
+            // composite-specific matching — only the SQL and the ordering must be per-member.
+            string? gjCompositeOnSql = null;
+            var gjCompositeOuterMemberSqls = new List<string>();
+            if (sqlOuterKeySelector.Body is NewExpression gjOuterComposite
+                && innerKeySelector.Body is NewExpression gjInnerComposite
+                && gjOuterComposite.Arguments.Count == gjInnerComposite.Arguments.Count
+                && gjOuterComposite.Arguments.Count > 0)
+            {
+                if (!_correlatedParams.ContainsKey(innerKeySelector.Parameters[0]))
+                    _correlatedParams[innerKeySelector.Parameters[0]] = (innerMapping, innerAlias);
+                var gjParts = new List<string>(gjOuterComposite.Arguments.Count);
+                for (int ci = 0; ci < gjOuterComposite.Arguments.Count; ci++)
+                {
+                    var vctxGo = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    var goVisitor = FastExpressionVisitorPool.Get(in vctxGo);
+                    var outerMemberSql = goVisitor.Translate(gjOuterComposite.Arguments[ci]);
+                    foreach (var kvp in goVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(goVisitor);
+                    gjCompositeOuterMemberSqls.Add(outerMemberSql);
+
+                    var vctxGi = new VisitorContext(_ctx, innerMapping, _provider, innerKeySelector.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    var giVisitor = FastExpressionVisitorPool.Get(in vctxGi);
+                    var innerMemberSql = giVisitor.Translate(gjInnerComposite.Arguments[ci]);
+                    foreach (var kvp in giVisitor.GetParameters())
+                        AddLiteralParameter(kvp.Key, kvp.Value);
+                    FastExpressionVisitorPool.Return(giVisitor);
+
+                    gjParts.Add(JoinBuilder.BuildOnEquality(
+                        outerMemberSql, innerMemberSql, _provider, gjOuterComposite.Arguments[ci].Type));
+                }
+                gjCompositeOnSql = string.Join(" AND ", gjParts);
+            }
+
             var vctxOuter = new VisitorContext(_ctx, _mapping, _provider, sqlOuterKeySelector.Parameters[0], outerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var outerKeyVisitor = FastExpressionVisitorPool.Get(in vctxOuter);
-            var outerKeySql = outerKeyVisitor.Translate(sqlOuterKeySelector.Body);
+            var outerKeySql = gjCompositeOnSql != null ? "1" : outerKeyVisitor.Translate(sqlOuterKeySelector.Body);
             // See HandleJoin: AddLiteralParameter so inline constants in the key selector
             // aren't mis-flagged as compiled-runtime placeholders.
             foreach (var kvp in outerKeyVisitor.GetParameters())
@@ -145,9 +183,17 @@ namespace nORM.Query
                 distinct: _isDistinct,
                 outerFromOverride: gjOuterFromOverride,
                 provider: _provider,
-                keyClrType: sqlOuterKeySelector.Body.Type);
-            // Insert outer-key sort at the front of _orderBy so it is always first.
-            _orderBy.Insert(0, (outerKeySql, true));
+                keyClrType: sqlOuterKeySelector.Body.Type,
+                onSqlOverride: gjCompositeOnSql);
+            // Insert outer-key sort at the front of _orderBy so it is always first. Composite
+            // keys order by each member so streaming group segmentation stays contiguous.
+            if (gjCompositeOnSql != null)
+            {
+                for (int oi = gjCompositeOuterMemberSqls.Count - 1; oi >= 0; oi--)
+                    _orderBy.Insert(0, (gjCompositeOuterMemberSqls[oi], true));
+            }
+            else
+                _orderBy.Insert(0, (outerKeySql, true));
             // Ordinal string keys on CI-collation providers: CI ordering leaves case variants
             // ("abc"/"ABC") interleaved within a tie, which would split the client-side group
             // segmentation. Order by the binary key second so byte-equal rows stay contiguous.
@@ -157,8 +203,16 @@ namespace nORM.Query
             var outerType = runtimeResultSelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
             var resultType = runtimeResultSelector.Body.Type;
+            // The runtime uses the inner key column only as a LEFT-JOIN null probe (segmentation
+            // matches by the compiled outer key, and anonymous keys compare by value), so any
+            // single member of a composite key suffices: a matched inner row has ALL key members
+            // non-null (SQL = with NULL never matches).
+            var innerKeyProbeBody = innerKeySelector.Body is NewExpression innerCompositeForProbe
+                && innerCompositeForProbe.Arguments.Count > 0
+                ? innerCompositeForProbe.Arguments[0]
+                : innerKeySelector.Body;
             var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
-                ExtractPropertyName(innerKeySelector.Body) == c.PropName);
+                ExtractPropertyName(innerKeyProbeBody) == c.PropName);
             if (innerKeyColumn != null)
             {
                 var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
