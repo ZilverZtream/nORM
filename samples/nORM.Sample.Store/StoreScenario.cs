@@ -156,6 +156,20 @@ public static class StoreScenario
         var compiledRows = await compiled(ctx, 10m);
         await RequireAsync(compiledRows.Count == 1 && compiledRows[0].Sku == "A-COFFEE",
             "compiled query should preserve tenant boundary");
+
+        // Join to customers: the tenant filter must apply to the INNER (joined-to)
+        // sequence, not just the outer orders — a cross-tenant customer must never
+        // surface through the join. Every visible order belongs to tenant A, whose
+        // sole customer is "Aster Operations"; tenant B's "Boreal Retail" must not leak.
+        var orderCustomers = await ctx.Query<StoreOrder>()
+            .Join(ctx.Query<StoreCustomer>(), o => o.CustomerId, c => c.Id,
+                (o, c) => new { o.Id, Customer = c.Name })
+            .ToListAsync(cancellationToken);
+        await RequireAsync(
+            orderCustomers.Count > 0 && orderCustomers.All(x => x.Customer == "Aster Operations"),
+            "join to customers must apply the tenant filter to the inner sequence; " +
+            "no cross-tenant customer may surface. Got: " +
+            string.Join(", ", orderCustomers.Select(x => x.Customer).Distinct()));
     }
 
     private static async Task VerifyTemporalAsync(
