@@ -185,6 +185,23 @@ namespace nORM.Providers
             => $"({left} = {right} AND {ForceCaseSensitiveStringComparison(left)} = {right})";
 
         /// <summary>
+        /// Wraps the operand of an AVG aggregate. C# Average over integral values returns a
+        /// double (avg(1,2) = 1.5), but SQL Server's AVG(int) does integer division (1) — its
+        /// override casts integral operands to FLOAT. The other providers already return
+        /// fractional averages for integer inputs, so the default is identity.
+        /// </summary>
+        internal virtual string AverageAggregateOperand(string sql, Type operandClrType) => sql;
+
+        /// <summary>
+        /// True when ORDER BY must emit an explicit null-rank for NULLABLE keys to match C#'s
+        /// "null is smallest" ordering (nulls first ascending, last descending). PostgreSQL
+        /// defaults to the opposite (NULLS LAST asc / NULLS FIRST desc); the other providers
+        /// already sort nulls first ascending. The rank is a leading `(key IS NOT NULL)` entry
+        /// sharing the key's direction, which stays correct when Reverse() flips directions.
+        /// </summary>
+        internal virtual bool RequiresExplicitNullOrderingForNullableKeys => false;
+
+        /// <summary>
         /// A VALUE-PRESERVING wrap that makes a projected string expression compare with ordinal
         /// (binary) semantics in set operations (UNION / INTERSECT / EXCEPT dedup and matching).
         /// Unlike <see cref="ForceCaseSensitiveStringComparison"/>, the result must still

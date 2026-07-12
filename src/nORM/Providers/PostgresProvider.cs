@@ -146,6 +146,13 @@ namespace nORM.Providers
             true,
             "Requires Npgsql and PostgreSQL 12.0 or newer.");
 
+        /// <summary>
+        /// PostgreSQL sorts nulls LAST ascending / FIRST descending by default — the opposite of
+        /// C#'s "null is smallest" ordering — so nullable order keys need the explicit null-rank
+        /// entry. Every other supported provider already sorts nulls first ascending.
+        /// </summary>
+        internal override bool RequiresExplicitNullOrderingForNullableKeys => true;
+
         /// <summary>PostgreSQL supports <c>IS NOT DISTINCT FROM</c> for index-friendly null-safe equality.</summary>
         public override string NullSafeEqual(string left, string right)
             => $"{left} IS NOT DISTINCT FROM {right}";

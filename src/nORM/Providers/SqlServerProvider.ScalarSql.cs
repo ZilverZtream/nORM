@@ -192,6 +192,14 @@ namespace nORM.Providers
             => $"{sql} COLLATE Latin1_General_100_BIN2";
 
         /// <summary>
+        /// T-SQL AVG over an integer operand performs integer division (AVG of 1,2 = 1), but C#
+        /// Average over ints returns a double (1.5). Cast integral operands to FLOAT so the
+        /// aggregate matches C# semantics; non-integral operands (decimal, float) already do.
+        /// </summary>
+        internal override string AverageAggregateOperand(string sql, Type operandClrType)
+            => IsIntegralArithmeticType(operandClrType) ? $"CAST({sql} AS FLOAT)" : sql;
+
+        /// <summary>
         /// Escapes special characters in a pattern used with SQL Server's <c>LIKE</c> operator.
         /// </summary>
         /// <param name="value">The pattern to escape.</param>

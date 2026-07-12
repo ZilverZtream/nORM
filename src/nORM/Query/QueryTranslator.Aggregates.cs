@@ -47,6 +47,11 @@ namespace nORM.Query
             if (!AggregateFunctionMap.TryGetValue(functionName, out var sqlFunction))
                 sqlFunction = functionName.ToUpperInvariant();
 
+            // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so its
+            // provider hook casts integral operands to FLOAT (identity elsewhere).
+            if (sqlFunction == "AVG")
+                columnSql = _provider.AverageAggregateOperand(columnSql, selectorLambda.Body.Type);
+
             _sql.AppendSelect(ReadOnlySpan<char>.Empty);
             _sql.AppendAggregateFunction(sqlFunction, columnSql);
 
@@ -286,6 +291,9 @@ namespace nORM.Query
                     foreach (var kvp in visitor.GetParameters())
                         AddLiteralParameter(kvp.Key, kvp.Value);
                     FastExpressionVisitorPool.Return(visitor);
+                    // See HandleAggregate: SQL Server AVG(int) truncates; cast integral operands.
+                    if (aggUpper == "AVG")
+                        colSql = _provider.AverageAggregateOperand(colSql, selA.Body.Type);
                     _sql.Append("SELECT ").Append(aggUpper).Append('(').Append(colSql).Append(") FROM (")
                         .Append(subPlanA.Sql).AppendFragment(") AS ").Append(winAliasA);
                 }
@@ -342,6 +350,11 @@ namespace nORM.Query
                 {
                     columnSql = _provider.NormalizeDecimalForCompare(columnSql);
                 }
+
+                // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so
+                // its provider hook casts integral operands to FLOAT (identity elsewhere).
+                if (sqlFunction == "AVG")
+                    columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
 
                 // Build complete SELECT ... FROM ... so the sql-length guard in Generate()
                 // correctly skips the default SELECT/FROM assembly block.

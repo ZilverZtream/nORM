@@ -85,7 +85,13 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.OrderBy(p => p.Name).ThenBy(p => p.Id), connection, provider);
         var t0 = provider.Escape("T0");
-        var expected = $"{BaseSelect(provider, true)} ORDER BY {t0}.{provider.Escape("Name")} ASC, {t0}.{provider.Escape("Id")} ASC";
+        // Providers that default to NULLS LAST ascending (PostgreSQL) emit a null-rank entry
+        // before nullable keys so nulls sort first like LINQ; Name is a nullable reference key.
+        var nameKey = $"{t0}.{provider.Escape("Name")}";
+        var nameOrder = provider.RequiresExplicitNullOrderingForNullableKeys
+            ? $"({nameKey} IS NOT NULL) ASC, {nameKey}"
+            : nameKey;
+        var expected = $"{BaseSelect(provider, true)} ORDER BY {nameOrder} ASC, {t0}.{provider.Escape("Id")} ASC";
         Assert.Equal(expected, sql);
     }
 
@@ -98,7 +104,13 @@ public class QueryTranslatorCrossProviderTests : TestBase
         var provider = setup.Provider;
         var (sql, _, _) = TranslateQuery<Product, Product>(q => q.OrderByDescending(p => p.Name).ThenByDescending(p => p.Id), connection, provider);
         var t0 = provider.Escape("T0");
-        var expected = $"{BaseSelect(provider, true)} ORDER BY {t0}.{provider.Escape("Name")} DESC, {t0}.{provider.Escape("Id")} DESC";
+        // See the ascending variant: nullable keys carry the null-rank on PostgreSQL, and the
+        // rank flips with the key so descending puts nulls last like LINQ.
+        var nameKeyD = $"{t0}.{provider.Escape("Name")}";
+        var nameOrderD = provider.RequiresExplicitNullOrderingForNullableKeys
+            ? $"({nameKeyD} IS NOT NULL) DESC, {nameKeyD}"
+            : nameKeyD;
+        var expected = $"{BaseSelect(provider, true)} ORDER BY {nameOrderD} DESC, {t0}.{provider.Escape("Id")} DESC";
         Assert.Equal(expected, sql);
     }
 

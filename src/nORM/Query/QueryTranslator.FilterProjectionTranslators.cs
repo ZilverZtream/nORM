@@ -752,18 +752,29 @@ namespace nORM.Query
                         if (u == typeof(DateTimeOffset)) return t._provider.NormalizeDateTimeOffsetForCompare(sql);
                         return sql;
                     }
+                    // C# sorts null keys as SMALLEST (first ascending, last descending). PostgreSQL
+                    // defaults to the opposite, so nullable keys there get a leading null-rank
+                    // entry `(key IS NOT NULL)` with the same direction — false(null) < true, and
+                    // because rank and key flip together the semantics survive Reverse().
+                    void AddOrderKey(string keySql, Type keyType)
+                    {
+                        if (t._provider.RequiresExplicitNullOrderingForNullableKeys
+                            && (!keyType.IsValueType || Nullable.GetUnderlyingType(keyType) != null))
+                            t._orderBy.Add(($"({keySql} IS NOT NULL)", ascending));
+                        t._orderBy.Add((CoerceOrderKey(keySql, keyType), ascending));
+                    }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                     {
                         foreach (var member in newKey.Arguments)
                         {
                             var memberSql = visitor.Translate(member);
-                            t._orderBy.Add((CoerceOrderKey(memberSql, member.Type), ascending));
+                            AddOrderKey(memberSql, member.Type);
                         }
                     }
                     else
                     {
                         var sql = visitor.Translate(keySelector.Body);
-                        t._orderBy.Add((CoerceOrderKey(sql, keySelector.Body.Type), ascending));
+                        AddOrderKey(sql, keySelector.Body.Type);
                     }
                     // Merge any parameters the visitor allocated (e.g. for COALESCE fallback
                     // constants in `OrderBy(r => r.Col ?? int.MaxValue)`) back into the outer
