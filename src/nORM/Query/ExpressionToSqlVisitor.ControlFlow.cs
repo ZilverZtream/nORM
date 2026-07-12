@@ -155,15 +155,96 @@ namespace nORM.Query
                     EmitNegatedRelational(rel);
                     return;
 
-                // Method calls (StartsWith, Contains, …), boolean columns, and anything else fall
-                // back to a straight NOT(...) — correct for non-nullable operands, and no worse than
-                // the previous behaviour for the rare nullable ones.
+                // Negated Contains over a constant list with NO null (`!ids.Contains(nullableCol)`):
+                // SQL `col NOT IN (…)` is UNKNOWN for a NULL column and drops that row, but C#
+                // `!list.Contains(null)` is true when the list has no null, so the row must be
+                // INCLUDED. Rescue it with OR col IS NULL. (Empty / all-null / has-null lists are
+                // already correct under a plain NOT — the positive form handles the null column for
+                // those — so only the no-null shape is special-cased here.)
+                case MethodCallExpression mc
+                    when ClassifyConstantContains(mc, out var containsCol) == ContainsListShape.NoNull:
+                    _sql.Append("(NOT(");
+                    Visit(mc);
+                    _sql.Append(')');
+                    if (containsCol != null && CouldBeNull(containsCol))
+                    {
+                        _sql.Append(" OR (");
+                        Visit(containsCol);
+                        _sql.Append(" IS NULL)");
+                    }
+                    _sql.Append(')');
+                    return;
+
+                // Method calls (StartsWith, other Contains shapes, …), boolean columns, and anything
+                // else fall back to a straight NOT(...) — correct for non-nullable operands, and no
+                // worse than the previous behaviour for the rare nullable ones.
                 default:
                     _sql.Append("(NOT(");
                     Visit(operand);
                     _sql.Append("))");
                     return;
             }
+        }
+
+        private enum ContainsListShape { NotConstantContains, Empty, AllNull, HasNullWithValues, NoNull }
+
+        /// <summary>
+        /// Classifies <paramref name="operand"/> when it is a <c>Contains</c>/<c>ContainsKey</c>/
+        /// <c>ContainsValue</c> over a compile-time-constant collection, reporting the tested value
+        /// expression and whether the collection is empty, all-null, has a null among values, or has
+        /// no null at all. Used to decide whether a negated Contains needs an <c>IS NULL</c> rescue.
+        /// Mirrors the operand detection in the Contains translator (MethodCallTranslators.Enumerable).
+        /// </summary>
+        private ContainsListShape ClassifyConstantContains(Expression operand, out Expression? valueExpr)
+        {
+            valueExpr = null;
+            if (operand is not MethodCallExpression node)
+                return ContainsListShape.NotConstantContains;
+
+            bool isDictContains = (node.Method.Name == "ContainsKey" || node.Method.Name == "ContainsValue")
+                && node.Object != null
+                && node.Arguments.Count == 1
+                && node.Method.DeclaringType is { } dictDt
+                && IsDictionaryLikeReceiver(dictDt);
+            if (node.Method.Name != nameof(List<int>.Contains) && !isDictContains)
+                return ContainsListShape.NotConstantContains;
+
+            Expression? collectionExpr = null;
+            if (node.Method.DeclaringType == typeof(Enumerable))
+            {
+                if (node.Arguments.Count == 2)
+                {
+                    collectionExpr = node.Arguments[0];
+                    valueExpr = node.Arguments[1];
+                }
+            }
+            else if (node.Object != null && node.Arguments.Count == 1)
+            {
+                collectionExpr = node.Object;
+                valueExpr = node.Arguments[0];
+            }
+            if (collectionExpr == null || valueExpr == null)
+                return ContainsListShape.NotConstantContains;
+            if (!TryGetConstantValue(collectionExpr, out var colVal)
+                || colVal is not IEnumerable en || colVal is string)
+            {
+                valueExpr = null;
+                return ContainsListShape.NotConstantContains;
+            }
+
+            IEnumerable itemSource = en;
+            if (isDictContains && colVal is IDictionary dict)
+                itemSource = node.Method.Name == "ContainsValue" ? dict.Values : dict.Keys;
+
+            bool any = false, anyNull = false, anyNonNull = false;
+            foreach (var item in itemSource)
+            {
+                any = true;
+                if (item is null) anyNull = true; else anyNonNull = true;
+            }
+            if (!any) return ContainsListShape.Empty;
+            if (anyNull && !anyNonNull) return ContainsListShape.AllNull;
+            return anyNull ? ContainsListShape.HasNullWithValues : ContainsListShape.NoNull;
         }
 
         private void EmitNegatedRelational(BinaryExpression rel)
