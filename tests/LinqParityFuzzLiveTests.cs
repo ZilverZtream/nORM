@@ -120,7 +120,7 @@ public class LinqParityFuzzLiveTests
         Exec(factory!, CreateTableSql(kind));
         try
         {
-            await using var ctx = new DbContext(factory!(), provider!);
+            await using var ctx = new DbContext(factory!(), provider!, LinqParityFuzzTests.CreateFuzzOptions());
             await LinqParityFuzzTests.SeedAsync(ctx);
             await LinqParityFuzzTests.SeedChildrenAsync(ctx);
             LinqParityFuzzTests.RunFuzz(ctx, seed: 20260713, cases: 250);
@@ -129,6 +129,8 @@ public class LinqParityFuzzLiveTests
             LinqParityFuzzTests.RunJoinFuzz(ctx, seed: 42, cases: 100);
             LinqParityFuzzTests.RunSelectManyFuzz(ctx, seed: 20260713, cases: 80);
             LinqParityFuzzTests.RunSelectManyFuzz(ctx, seed: 42, cases: 80);
+            LinqParityFuzzTests.RunNavFlattenFuzz(ctx, seed: 20260713, cases: 80);
+            LinqParityFuzzTests.RunNavFlattenFuzz(ctx, seed: 42, cases: 80);
         }
         finally
         {

@@ -79,6 +79,25 @@ public class LinqLeftJoinTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SelectMany_filtered_navigation_DefaultIfEmpty_keeps_parents_whose_children_all_fail_the_filter()
+    {
+        // The filter gates the JOIN (ON clause), so parents with no matching
+        // children — including those whose children all fail the filter — still
+        // appear once with a null child side. Alpha keeps only its 'a-2' child;
+        // Beta's single child fails the filter; Lone has none.
+        var rows = (await _ctx.Query<LjParent>()
+            .SelectMany(p => p.Children.Where(c => c.Tag == "a-2").DefaultIfEmpty(),
+                        (p, c) => new { ParentName = p.Name, ChildTag = c == null ? null : c.Tag })
+            .ToListAsync())
+            .OrderBy(r => r.ParentName).ToArray();
+
+        Assert.Equal(3, rows.Length);
+        Assert.Contains(rows, r => r.ParentName == "Alpha" && r.ChildTag == "a-2");
+        Assert.Contains(rows, r => r.ParentName == "Beta" && r.ChildTag == null);
+        Assert.Contains(rows, r => r.ParentName == "Lone" && r.ChildTag == null);
+    }
+
+    [Fact]
     public async Task SelectMany_navigation_DefaultIfEmpty_entity_result_materializes_null_elements()
     {
         var children = await _ctx.Query<LjParent>()

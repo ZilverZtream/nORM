@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
 using nORM.Providers;
 using Xunit;
@@ -242,13 +243,31 @@ public class LinqParityFuzzTests
             cmd.ExecuteNonQuery();
         }
 
-        using var ctx = new DbContext(cn, new SqliteProvider());
+        using var ctx = new DbContext(cn, new SqliteProvider(), CreateFuzzOptions());
         await SeedAsync(ctx);
         await SeedChildrenAsync(ctx);
         RunFuzz(ctx, seed, cases: 400);
         RunJoinFuzz(ctx, seed, cases: 150);
         RunSelectManyFuzz(ctx, seed, cases: 120);
+        RunNavFlattenFuzz(ctx, seed, cases: 120);
     }
+
+    /// <summary>
+    /// Model configuration for the navigation-mapped fuzz entities. NavRow /
+    /// NavChild map onto the same fuzz tables as Row / Child but carry a
+    /// collection navigation so the navigation-flatten translation arm gets
+    /// fuzzed alongside the correlated and cross arms.
+    /// </summary>
+    internal static DbContextOptions CreateFuzzOptions() => new DbContextOptions
+    {
+        OnModelCreating = mb =>
+        {
+            mb.Entity<NavRow>().HasKey(r => r.Id);
+            mb.Entity<NavChild>().HasKey(c => c.Id);
+            mb.Entity<NavRow>().HasMany(r => r.Kids).WithOne()
+                               .HasForeignKey(c => c.ParentId, r => r.Id);
+        }
+    };
 
     /// <summary>Inserts the shared dataset through the context under test.</summary>
     internal static async System.Threading.Tasks.Task SeedAsync(DbContext ctx)
@@ -297,6 +316,177 @@ public class LinqParityFuzzTests
     }
 
     private sealed record JoinRow(int PId, int CId, int V);
+
+    // ── Navigation flatten fuzzing ───────────────────────────────────────────
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("FuzzRow_Test")]
+    private class NavRow
+    {
+        public int Id { get; set; }
+        public int IntVal { get; set; }
+        public int? NullableInt { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public double Price { get; set; }
+        public bool Flag { get; set; }
+        public DateTime Created { get; set; }
+        public List<NavChild> Kids { get; set; } = new();
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("FuzzChild_Test")]
+    private class NavChild
+    {
+        public int Id { get; set; }
+        public int ParentId { get; set; }
+        public int ChildVal { get; set; }
+        public string Tag { get; set; } = string.Empty;
+    }
+
+    /// <summary>In-memory oracle copies with the navigation populated.</summary>
+    private static NavRow[] BuildNavRows()
+        => Rows.Select(r => new NavRow
+        {
+            Id = r.Id,
+            IntVal = r.IntVal,
+            NullableInt = r.NullableInt,
+            Name = r.Name,
+            Amount = r.Amount,
+            Price = r.Price,
+            Flag = r.Flag,
+            Created = r.Created,
+            Kids = Children.Where(c => c.ParentId == r.Id)
+                           .Select(c => new NavChild { Id = c.Id, ParentId = c.ParentId, ChildVal = c.ChildVal, Tag = c.Tag })
+                           .ToList(),
+        }).ToArray();
+
+    // The predicate generator addresses members by name, and NavRow mirrors
+    // Row's scalar members, so the same generator fuzzes both entity shapes.
+    private static Expression<Func<NavRow, bool>> GenerateNavPredicate(Random rng)
+    {
+        var p = Expression.Parameter(typeof(NavRow), "r");
+        var body = GenerateBool(rng, p, depth: 0);
+        return Expression.Lambda<Func<NavRow, bool>>(body, p);
+    }
+
+    /// <summary>
+    /// Runs generated navigation-flatten shapes (plain and filtered
+    /// SelectMany over a collection navigation, computed result selectors,
+    /// DefaultIfEmpty left joins in projected and entity-result forms, with a
+    /// coin-flip windowed outer) against the context and the LINQ-to-Objects
+    /// oracle over nav-populated copies of the same rows.
+    /// </summary>
+    internal static void RunNavFlattenFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var unsupported = 0;
+        var navRows = BuildNavRows();
+
+        for (var i = 0; i < cases; i++)
+        {
+            var predicate = GenerateNavPredicate(rng);
+            var kind = rng.Next(5);
+            var caseRng = new Random(rng.Next());
+
+            IQueryable<NavRow> parents = ctx.Query<NavRow>().Where(predicate);
+            IQueryable<NavRow> oracleParents = navRows.AsQueryable().Where(predicate);
+
+            var windowed = caseRng.Next(3) == 0;
+            if (windowed)
+            {
+                var skip = caseRng.Next(0, 10);
+                var take = caseRng.Next(1, 20);
+                parents = parents.OrderBy(p => p.Id).Skip(skip).Take(take);
+                oracleParents = oracleParents.OrderBy(p => p.Id).Skip(skip).Take(take);
+            }
+
+            try
+            {
+                switch (kind)
+                {
+                    case 0: // plain navigation flatten, entity result
+                    {
+                        var db = parents.SelectMany(p => p.Kids)
+                            .ToList().Select(c => (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        var oracle = oracleParents.SelectMany(p => p.Kids)
+                            .ToList().Select(c => (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"nav flatten mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 1: // filtered navigation flatten with a closure bound in the filter
+                    {
+                        var k = caseRng.Next(-3, 3);
+                        var db = parents.SelectMany(p => p.Kids.Where(c => c.ChildVal > k))
+                            .ToList().Select(c => (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        var oracle = oracleParents.SelectMany(p => p.Kids.Where(c => c.ChildVal > k))
+                            .ToList().Select(c => (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"filtered nav flatten mismatch seed={seed} case={i} windowed={windowed} k={k}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 2: // result selector with a computed member
+                    {
+                        var db = parents.SelectMany(p => p.Kids, (p, c) => new { p.Id, CId = c.Id, V = p.IntVal + c.ChildVal })
+                            .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.SelectMany(p => p.Kids, (p, c) => new { p.Id, CId = c.Id, V = p.IntVal + c.ChildVal })
+                            .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"nav computed projection mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(6))}]\noracle: [{string.Join(" | ", oracle.Take(6))}]");
+                        break;
+                    }
+                    case 3: // navigation DefaultIfEmpty left join, null-safe projection (optionally filtered)
+                    {
+                        var k = caseRng.Next(-3, 3);
+                        if (caseRng.Next(2) == 0)
+                        {
+                            var db = parents.SelectMany(p => p.Kids.DefaultIfEmpty(),
+                                    (p, c) => new { p.Id, CId = c == null ? (int?)null : (int?)c.Id, V = c == null ? -99 : c.ChildVal })
+                                .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                            var oracle = oracleParents.SelectMany(p => p.Kids.DefaultIfEmpty(),
+                                    (p, c) => new { p.Id, CId = c == null ? (int?)null : (int?)c.Id, V = c == null ? -99 : c.ChildVal })
+                                .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                            Assert.True(db.SequenceEqual(oracle),
+                                $"nav left join mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(6))}]\noracle: [{string.Join(" | ", oracle.Take(6))}]");
+                        }
+                        else
+                        {
+                            var db = parents.SelectMany(p => p.Kids.Where(c => c.ChildVal > k).DefaultIfEmpty(),
+                                    (p, c) => new { p.Id, CId = c == null ? (int?)null : (int?)c.Id, V = c == null ? -99 : c.ChildVal })
+                                .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                            var oracle = oracleParents.SelectMany(p => p.Kids.Where(c => c.ChildVal > k).DefaultIfEmpty(),
+                                    (p, c) => new { p.Id, CId = c == null ? (int?)null : (int?)c.Id, V = c == null ? -99 : c.ChildVal })
+                                .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                            Assert.True(db.SequenceEqual(oracle),
+                                $"filtered nav left join mismatch seed={seed} case={i} windowed={windowed} k={k}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(6))}]\noracle: [{string.Join(" | ", oracle.Take(6))}]");
+                        }
+                        break;
+                    }
+                    default: // navigation DefaultIfEmpty left join, entity result (null elements)
+                    {
+                        var db = parents.SelectMany(p => p.Kids.DefaultIfEmpty())
+                            .ToList().Select(c => c == null ? (0, 0, 0) : (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        var oracle = oracleParents.SelectMany(p => p.Kids.DefaultIfEmpty())
+                            .ToList().Select(c => c == null ? (0, 0, 0) : (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"nav left join entity mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                }
+            }
+            catch (NormUnsupportedFeatureException)
+            {
+                unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"nav flatten shape threw (seed={seed} case={i} kind={kind} windowed={windowed})\npredicate: {predicate}", ex);
+            }
+        }
+
+        Assert.True(unsupported < cases / 5,
+            $"{unsupported}/{cases} navigation flatten shapes were declined as unsupported (seed {seed}).");
+    }
 
     /// <summary>
     /// Runs generated join shapes (inner join, GroupJoin aggregate) against the

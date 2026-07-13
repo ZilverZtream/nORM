@@ -206,6 +206,61 @@ namespace nORM.Query
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
 
             RegisterSelectManyResultSelectorParameters(resultSelector, outerMapping, outerAlias, innerMapping, innerAlias);
+
+            var onParts = new List<string>(relation.PrincipalKeys.Count);
+            for (var keyIndex = 0; keyIndex < relation.PrincipalKeys.Count; keyIndex++)
+            {
+                onParts.Add(
+                    $"{outerAlias}.{relation.PrincipalKeys[keyIndex].EscCol} = {innerAlias}.{relation.ForeignKeys[keyIndex].EscCol}");
+            }
+            var relationOnSql = string.Join(" AND ", onParts);
+
+            if (resultSelector != null && CanEmitSelectManyProjectionSql(resultSelector))
+            {
+                // See TryHandleCorrelatedSelectMany: computed selector members emit as
+                // translated SQL items so the positional materializer lines up; the
+                // needed-columns emission diverged from the constructor arguments as
+                // soon as a member was computed. The navigation filter goes into the
+                // ON clause — a DefaultIfEmpty LEFT JOIN keeps its unmatched rows only
+                // when the filter gates the join, not the result.
+                var navRewriter = new QuerySyntaxLeftJoinRewriter(
+                    resultSelector.Parameters[0], resultSelector.Parameters[1],
+                    string.Empty, resultSelector.Parameters[0], resultSelector.Parameters[1]);
+                var rewrittenNavSelector = Expression.Lambda(navRewriter.Visit(resultSelector.Body)!, resultSelector.Parameters);
+
+                var onConditions = new List<string>();
+                if (RenderSelectManyInnerGlobalFilterSql(innerMapping, innerAlias) is { } navGlobalFilterSql)
+                    onConditions.Add("(" + navGlobalFilterSql + ")");
+                if (filterPredicate != null)
+                    onConditions.Add("(" + TranslateNavigationFilterPredicate(filterPredicate, innerMapping, innerAlias) + ")");
+
+                var navTransparent = ComposeTransparentIdentifierSelector(resultSelector);
+                JoinBuilder.SetupJoinProjection(rewrittenNavSelector, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
+                _transparentIdentifier = navTransparent;
+                RegisterTransparentIdentifierTail(navTransparent, innerMapping, innerAlias);
+
+                _sql.Clear();
+                JoinBuilder.BuildJoinClauseInto(
+                    _sql,
+                    _projection,
+                    outerMapping,
+                    outerAlias,
+                    innerMapping,
+                    innerAlias,
+                    useLeftJoin ? "LEFT JOIN" : "INNER JOIN",
+                    outerKeySql: "1",
+                    innerKeySql: "1",
+                    distinct: _isDistinct,
+                    outerFromOverride: outerFromOverride != null ? "(" + outerFromOverride + ") AS " + outerAlias : null,
+                    additionalOnConditions: onConditions.Count > 0 ? string.Join(" AND ", onConditions) : null,
+                    translateProjectionExpression: TranslateJoinProjectionExpression,
+                    escapeProjectionAlias: _provider.Escape,
+                    provider: _provider,
+                    keyClrType: null,
+                    onSqlOverride: relationOnSql);
+                return true;
+            }
+
             var composedProjection = ComposeSelectManyProjection(resultSelector);
             var effectiveProjection = composedProjection ?? _projection;
 
@@ -218,14 +273,7 @@ namespace nORM.Query
             AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
             var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
             _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
-            _sql.Append("ON ");
-            for (var keyIndex = 0; keyIndex < relation.PrincipalKeys.Count; keyIndex++)
-            {
-                if (keyIndex > 0)
-                    _sql.Append(" AND ");
-                _sql.Append(outerAlias).Append('.').Append(relation.PrincipalKeys[keyIndex].EscCol)
-                    .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKeys[keyIndex].EscCol);
-            }
+            _sql.Append("ON ").Append(relationOnSql);
 
             // The child's global filters (soft-delete, tenant) must gate the flattened rows.
             // Without a result selector the flatten's RESULT type is the child itself and the
@@ -240,7 +288,19 @@ namespace nORM.Query
             }
 
             if (filterPredicate != null)
-                AppendSelectManyFilterPredicate(filterPredicate, innerMapping, innerAlias);
+            {
+                if (useLeftJoin)
+                {
+                    // The navigation filter gates the JOIN, not the result set: in the
+                    // WHERE clause it would evaluate UNKNOWN over the unmatched rows'
+                    // NULLs and silently drop the very rows DefaultIfEmpty keeps.
+                    _sql.Append(" AND (").Append(TranslateNavigationFilterPredicate(filterPredicate, innerMapping, innerAlias)).Append(')');
+                }
+                else
+                {
+                    AppendSelectManyFilterPredicate(filterPredicate, innerMapping, innerAlias);
+                }
+            }
 
             if (resultSelector != null)
             {
@@ -711,21 +771,39 @@ namespace nORM.Query
             TableMapping innerMapping,
             string innerAlias)
         {
+            var filterSql = TranslateNavigationFilterPredicate(filterPredicate, innerMapping, innerAlias);
+            if (_where.Length > 0)
+                _where.Append(" AND ");
+            _where.Append('(').Append(filterSql).Append(')');
+        }
+
+        /// <summary>
+        /// Translates a navigation filter (`p.Kids.Where(c => ...)`) against the
+        /// flatten join's inner alias. The caller decides placement: WHERE for an
+        /// inner-join flatten, ON for a DefaultIfEmpty LEFT JOIN.
+        /// </summary>
+        private string TranslateNavigationFilterPredicate(
+            LambdaExpression filterPredicate,
+            TableMapping innerMapping,
+            string innerAlias)
+        {
             var filterParam = filterPredicate.Parameters[0];
             if (!_correlatedParams.ContainsKey(filterParam))
                 _correlatedParams[filterParam] = (innerMapping, innerAlias);
 
             var vctxFilter = new VisitorContext(_ctx, innerMapping, _provider, filterParam, innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var filterVisitor = FastExpressionVisitorPool.Get(in vctxFilter);
-            var filterSql = filterVisitor.Translate(filterPredicate.Body);
-
-            if (_where.Length > 0)
-                _where.Append(" AND ");
-            _where.Append('(').Append(filterSql).Append(')');
-
-            foreach (var kvp in filterVisitor.GetParameters())
-                _params[kvp.Key] = kvp.Value;
-            FastExpressionVisitorPool.Return(filterVisitor);
+            try
+            {
+                var filterSql = filterVisitor.Translate(filterPredicate.Body);
+                foreach (var kvp in filterVisitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                return filterSql;
+            }
+            finally
+            {
+                FastExpressionVisitorPool.Return(filterVisitor);
+            }
         }
 
         private void AppendSelectManyOuterFrom(
