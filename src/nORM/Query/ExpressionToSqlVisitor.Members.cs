@@ -215,35 +215,70 @@ namespace nORM.Query
                 || !principalMap.ColumnsByName.TryGetValue(targetMemberName, out var targetCol))
                 return null;
 
-            string? fkValueSql;
-            TableMapping ownerMap;
-            if (navExpr.Expression is ParameterExpression rootP
-                && _parameterMappings.TryGetValue(rootP, out var rootInfo))
-            {
-                ownerMap = rootInfo.Mapping;
-                var fkCol = FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
-                if (fkCol == null) return null;
-                fkValueSql = $"{rootInfo.Alias}.{fkCol.EscCol}";
-            }
-            else if (navExpr.Expression is MemberExpression parentNav)
-            {
-                var ownerType = System.Nullable.GetUnderlyingType(parentNav.Type) ?? parentNav.Type;
-                if (!ownerType.IsClass || ownerType == typeof(string)) return null;
-                try { ownerMap = _ctx.GetMapping(ownerType); }
-                catch { return null; }
-                var fkCol = FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
-                if (fkCol == null) return null;
-                fkValueSql = BuildReferenceNavigationScalarSql(parentNav, fkCol.PropName, depth + 1);
-                if (fkValueSql == null) return null;
-            }
-            else
-            {
+            if (!TryResolveNavigationFkValueSql(navExpr, navType, principalMap, depth, out var fkValueSql))
                 return null;
-            }
 
             var alias = _provider.Escape("NR" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
             return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
                    $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
+        }
+
+        /// <summary>
+        /// SQL producing the FOREIGN KEY VALUE of a reference-navigation receiver:
+        /// the dependent's FK column for a root-parameter owner, or a nested scalar
+        /// subquery fetching the FK through a deeper chain. Also used by the
+        /// whole-entity null test (`e.Dept == null` is FK-IS-NULL).
+        /// </summary>
+        internal bool TryResolveNavigationFkValueSql(
+            MemberExpression navExpr, Type navType, TableMapping principalMap, int depth, out string fkValueSql)
+        {
+            fkValueSql = string.Empty;
+            if (navExpr.Expression is ParameterExpression rootP
+                && _parameterMappings.TryGetValue(rootP, out var rootInfo))
+            {
+                var fkCol = FindReferenceNavForeignKey(rootInfo.Mapping, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return false;
+                fkValueSql = $"{rootInfo.Alias}.{fkCol.EscCol}";
+                return true;
+            }
+            if (navExpr.Expression is MemberExpression parentNav)
+            {
+                var ownerType = System.Nullable.GetUnderlyingType(parentNav.Type) ?? parentNav.Type;
+                if (!ownerType.IsClass || ownerType == typeof(string) || _ctx == null) return false;
+                TableMapping ownerMap;
+                try { ownerMap = _ctx.GetMapping(ownerType); }
+                catch { return false; }
+                var fkCol = FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return false;
+                var nested = BuildReferenceNavigationScalarSql(parentNav, fkCol.PropName, depth + 1);
+                if (nested == null) return false;
+                fkValueSql = nested;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// SQL for a whole-entity navigation receiver's FK value, for null tests:
+        /// resolves the navigation type/mapping gates then delegates to
+        /// <see cref="TryResolveNavigationFkValueSql(MemberExpression, Type, TableMapping, int, out string)"/>.
+        /// </summary>
+        internal bool TryResolveNavigationFkValueSql(Expression expr, out string fkValueSql)
+        {
+            fkValueSql = string.Empty;
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (expr is not MemberExpression navExpr || _ctx == null)
+                return false;
+            var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+            if (!navType.IsClass || navType == typeof(string))
+                return false;
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navType); }
+            catch { return false; }
+            if (principalMap.KeyColumns.Length != 1)
+                return false;
+            return TryResolveNavigationFkValueSql(navExpr, navType, principalMap, depth: 0, out fkValueSql);
         }
 
         /// <summary>

@@ -151,6 +151,39 @@ public class ReferenceNavigationScalarTests
     }
 
     [Fact]
+    public void Nav_equals_null_finds_orphans()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // A whole-entity null test asks whether the parent is missing — the FK is NULL.
+        var ids = ctx.Query<Emp>().Where(e => e.Dept == null).Select(e => e.Id).ToList();
+        Assert.Equal(new[] { 2 }, ids);
+    }
+
+    [Fact]
+    public void Nav_not_equals_null_finds_parented()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        var ids = ctx.Query<Emp>().Where(e => e.Dept != null).Select(e => e.Id).OrderBy(i => i).ToList();
+        Assert.Equal(new[] { 1, 3 }, ids);
+    }
+
+    [Fact]
+    public void Two_hop_nav_equals_null_tests_nested_fk()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // cid's dept (Ops) has no region; bob has no dept at all (nested FK subquery
+        // yields NULL either way).
+        var ids = ctx.Query<Emp>().Where(e => e.Dept!.Region == null).Select(e => e.Id).OrderBy(i => i).ToList();
+        Assert.Equal(new[] { 2, 3 }, ids);
+    }
+
+    [Fact]
     public void Nav_member_in_string_method_translates()
     {
         var (cn, ctx) = Setup();
