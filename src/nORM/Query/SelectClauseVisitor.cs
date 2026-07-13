@@ -357,6 +357,16 @@ namespace nORM.Query
                 return node;
             }
 
+            // Single-reference navigation traversal in a projection: e.Dept.Title
+            // emits a correlated scalar subquery (NULL when the parent is missing),
+            // mirroring the predicate translator.
+            if (node.Expression is MemberExpression scvNavExpr
+                && BuildScvReferenceNavigationScalarSql(scvNavExpr, node.Member.Name, depth: 0) is { } navScalarSql)
+            {
+                sb.Append(navScalarSql);
+                return node;
+            }
+
             // Member on a non-entity type (DateTime.Year, string.Length, TimeSpan.TotalHours,
             // etc.) — route through the provider's function map the same way
             // ExpressionToSqlVisitor does on the WHERE side. Without this, projection emits
@@ -401,6 +411,53 @@ namespace nORM.Query
             throw new InvalidOperationException(
                 $"Member '{node.Member.Name}' on type '{node.Member.DeclaringType?.Name}' is not mapped to a column in table '{_mapping.TableName}'. " +
                 $"Ensure the property is read/write and not a navigation collection.");
+        }
+
+        /// <summary>
+        /// Correlated scalar subquery for a reference-navigation member in a
+        /// projection; the chain roots at the projection parameter (this visitor's
+        /// mapping/alias) and nests one subquery per additional hop. Null when the
+        /// receiver is not a mapped single-key reference navigation.
+        /// </summary>
+        private string? BuildScvReferenceNavigationScalarSql(MemberExpression navExpr, string targetMemberName, int depth)
+        {
+            var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+            if (!navType.IsClass || navType == typeof(string) || _ctx == null)
+                return null;
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navType); }
+            catch { return null; }
+            if (principalMap.KeyColumns.Length != 1
+                || !principalMap.ColumnsByName.TryGetValue(targetMemberName, out var targetCol))
+                return null;
+
+            string? fkValueSql;
+            if (navExpr.Expression is ParameterExpression)
+            {
+                var fkCol = ExpressionToSqlVisitor.FindReferenceNavForeignKey(_mapping, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return null;
+                fkValueSql = $"{_outerAlias}.{fkCol.EscCol}";
+            }
+            else if (navExpr.Expression is MemberExpression parentNav)
+            {
+                var ownerType = System.Nullable.GetUnderlyingType(parentNav.Type) ?? parentNav.Type;
+                if (!ownerType.IsClass || ownerType == typeof(string)) return null;
+                TableMapping ownerMap;
+                try { ownerMap = _ctx.GetMapping(ownerType); }
+                catch { return null; }
+                var fkCol = ExpressionToSqlVisitor.FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return null;
+                fkValueSql = BuildScvReferenceNavigationScalarSql(parentNav, fkCol.PropName, depth + 1);
+                if (fkValueSql == null) return null;
+            }
+            else
+            {
+                return null;
+            }
+
+            var alias = _provider.Escape("NR" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
+                   $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
         }
     }
 }

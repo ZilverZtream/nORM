@@ -136,6 +136,13 @@ namespace nORM.Query
                 _sql.Append($"{info.Alias}.{column.EscCol}");
                 return node;
             }
+            // Single-reference navigation traversal: e.Dept.Title (or deeper,
+            // e.Dept.Head.Name) emits a correlated scalar subquery against the
+            // principal table, keyed by the dependent's FK. A missing parent
+            // yields SQL NULL, which drops the row from predicates and projects
+            // null — the relational (EF-style) semantics for optional navigations.
+            if (TryEmitReferenceNavigationScalar(node))
+                return node;
             if (node.Expression is ParameterExpression p && !_parameterMappings.ContainsKey(p))
             {
                 var key = (p, node.Member.Name);
@@ -178,6 +185,93 @@ namespace nORM.Query
             }
             throw new NormUnsupportedFeatureException($"Member '{node.Member.Name}' is not supported in this context.");
         }
+        private bool TryEmitReferenceNavigationScalar(MemberExpression node)
+        {
+            if (node.Expression is not MemberExpression navExpr)
+                return false;
+            var sql = BuildReferenceNavigationScalarSql(navExpr, node.Member.Name, depth: 0);
+            if (sql == null) return false;
+            _sql.Append(sql);
+            return true;
+        }
+
+        /// <summary>
+        /// Correlated scalar subquery for <c>navChain.member</c>:
+        /// <c>(SELECT NR0.col FROM Principal NR0 WHERE NR0.pk = fkValue)</c>, where the
+        /// FK value is the dependent's column for a root-parameter owner or a nested
+        /// subquery for a deeper chain. Returns null when the receiver is not a mapped
+        /// single-key reference navigation so the caller falls through to the normal
+        /// member handling (closures, provider functions).
+        /// </summary>
+        private string? BuildReferenceNavigationScalarSql(MemberExpression navExpr, string targetMemberName, int depth)
+        {
+            var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+            if (!navType.IsClass || navType == typeof(string) || _ctx == null)
+                return null;
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navType); }
+            catch { return null; }
+            if (principalMap.KeyColumns.Length != 1
+                || !principalMap.ColumnsByName.TryGetValue(targetMemberName, out var targetCol))
+                return null;
+
+            string? fkValueSql;
+            TableMapping ownerMap;
+            if (navExpr.Expression is ParameterExpression rootP
+                && _parameterMappings.TryGetValue(rootP, out var rootInfo))
+            {
+                ownerMap = rootInfo.Mapping;
+                var fkCol = FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return null;
+                fkValueSql = $"{rootInfo.Alias}.{fkCol.EscCol}";
+            }
+            else if (navExpr.Expression is MemberExpression parentNav)
+            {
+                var ownerType = System.Nullable.GetUnderlyingType(parentNav.Type) ?? parentNav.Type;
+                if (!ownerType.IsClass || ownerType == typeof(string)) return null;
+                try { ownerMap = _ctx.GetMapping(ownerType); }
+                catch { return null; }
+                var fkCol = FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return null;
+                fkValueSql = BuildReferenceNavigationScalarSql(parentNav, fkCol.PropName, depth + 1);
+                if (fkValueSql == null) return null;
+            }
+            else
+            {
+                return null;
+            }
+
+            var alias = _provider.Escape("NR" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
+                   $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
+        }
+
+        /// <summary>
+        /// Resolves the dependent-side FK column backing a reference navigation:
+        /// the [ForeignKey]/convention marker (which stores the navigation or
+        /// principal-type name), the <c>NavNameId</c> convention, or the fluent
+        /// relation registered on the principal.
+        /// </summary>
+        internal static Column? FindReferenceNavForeignKey(
+            TableMapping ownerMap, string navName, Type principalType, TableMapping principalMap)
+        {
+            foreach (var c in ownerMap.Columns)
+            {
+                if (c.ForeignKeyPrincipalTypeName != null
+                    && (string.Equals(c.ForeignKeyPrincipalTypeName, navName, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(c.ForeignKeyPrincipalTypeName, principalType.Name, StringComparison.OrdinalIgnoreCase)))
+                    return c;
+            }
+            if (ownerMap.ColumnsByName.TryGetValue(navName + "Id", out var conventional))
+                return conventional;
+            foreach (var rel in principalMap.Relations.Values)
+            {
+                if (rel.DependentType == ownerMap.Type && !rel.IsComposite)
+                    return rel.ForeignKey;
+            }
+            return null;
+        }
+
         protected override Expression VisitConstant(ConstantExpression node)
         {
             AppendConstant(node.Value, node.Type);
