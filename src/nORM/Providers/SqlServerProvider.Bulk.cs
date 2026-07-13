@@ -338,7 +338,12 @@ namespace nORM.Providers
         /// </summary>
         private static string GetStagingSqlType(Mapping.Column c, TableMapping m)
         {
-            var underlying = Nullable.GetUnderlyingType(c.Prop.PropertyType) ?? c.Prop.PropertyType;
+            // Rows are staged post-conversion (EntityDataReader applies ConvertToProvider),
+            // so the staging column must be typed for the PROVIDER representation — typing
+            // by the CLR property makes SqlBulkCopy reject or coerce converted values
+            // (e.g. a DateTime stored as BIGINT ticks).
+            var effective = c.Converter?.ProviderType ?? c.Prop.PropertyType;
+            var underlying = Nullable.GetUnderlyingType(effective) ?? effective;
             if (underlying == typeof(decimal))
             {
                 if (m.FluentConfiguration?.Precisions is { } precisions
@@ -348,7 +353,7 @@ namespace nORM.Providers
                 }
                 return "DECIMAL(38,18)";
             }
-            return GetSqlType(c.Prop.PropertyType);
+            return GetSqlType(underlying);
         }
 
         private static string GetSqlType(Type t)
