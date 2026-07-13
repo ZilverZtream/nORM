@@ -76,7 +76,9 @@ namespace nORM.Core
         INormQueryable<T> AsNoTracking();
 
         /// <summary>
-        /// Splits collection navigations into multiple queries to reduce result set inflation.
+        /// Accepted for EF Core compatibility and has no additional effect:
+        /// <see cref="Include{TProperty}"/> always eager-loads its navigation paths
+        /// through coordinated follow-up queries.
         /// </summary>
         INormQueryable<T> AsSplitQuery();
 
@@ -168,9 +170,10 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Configures the query to execute related collection loads as separate database queries.
+        /// Accepted for EF Core compatibility and has no additional effect: Include
+        /// always eager-loads its navigation paths.
         /// </summary>
-        /// <returns>A query configured for split query execution.</returns>
+        /// <returns>The same query; eager loading is driven by Include alone.</returns>
         public INormQueryable<T> AsSplitQuery()
         {
             var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
@@ -370,9 +373,10 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Configures the query to execute related collection loads as separate database queries.
+        /// Accepted for EF Core compatibility and has no additional effect: Include
+        /// always eager-loads its navigation paths.
         /// </summary>
-        /// <returns>A query configured for split query execution.</returns>
+        /// <returns>The same query; eager loading is driven by Include alone.</returns>
         public INormQueryable<T> AsSplitQuery()
         {
             var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
