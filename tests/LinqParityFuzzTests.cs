@@ -213,6 +213,9 @@ public class LinqParityFuzzTests
     [InlineData(20260713)]
     [InlineData(42)]
     [InlineData(987654321)]
+    [InlineData(1)]
+    [InlineData(777_000_111)]
+    [InlineData(31337)]
     public async System.Threading.Tasks.Task Generated_query_shapes_match_linq_to_objects(int seed)
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -287,7 +290,7 @@ public class LinqParityFuzzTests
         string Describe() =>
             $"seed={seed} case={caseIndex} ordered={ordered}\npredicate: {predicate}\nsecond: {secondPredicate}\npipeline: {db.Expression}";
 
-        switch (caseRng.Next(5))
+        switch (caseRng.Next(7))
         {
             case 0: // materialize
                 var dbRows = db.Select(r => r.Id).ToList();
@@ -316,7 +319,7 @@ public class LinqParityFuzzTests
                     Assert.True(dbMax == orMax, $"Max mismatch\n{Describe()}\ndb: {dbMax} oracle: {orMax}");
                 }
                 break;
-            default: // group
+            case 4: // group
                 var dbGroups = db.GroupBy(r => r.IntVal)
                     .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
                     .ToList().OrderBy(x => x.Key).ToList();
@@ -325,7 +328,59 @@ public class LinqParityFuzzTests
                     .ToList().OrderBy(x => x.Key).ToList();
                 Assert.True(dbGroups.SequenceEqual(orGroups), $"GroupBy mismatch\n{Describe()}\ndb: [{string.Join(" | ", dbGroups)}]\noracle: [{string.Join(" | ", orGroups)}]");
                 break;
+            case 5: // generated constructor projection (SCV surface)
+                var projection = GenerateProjection(caseRng);
+                var dbProj = db.Select(projection).ToList();
+                var orProj = oracle.AsQueryable().Select(projection).ToList();
+                if (!ordered)
+                {
+                    dbProj = dbProj.OrderBy(x => x.Id).ToList();
+                    orProj = orProj.OrderBy(x => x.Id).ToList();
+                }
+                Assert.True(dbProj.SequenceEqual(orProj),
+                    $"projection mismatch\n{Describe()}\nprojection: {projection}\ndb: [{string.Join(" | ", dbProj)}]\noracle: [{string.Join(" | ", orProj)}]");
+                break;
+            default: // distinct scalar
+                var dbDistinct = db.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
+                var orDistinct = oracle.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
+                Assert.True(dbDistinct.SequenceEqual(orDistinct),
+                    $"Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbDistinct)}]\noracle: [{string.Join(",", orDistinct)}]");
+                break;
         }
+    }
+
+    private sealed record ProjRow(int Id, int X, bool B);
+
+    /// <summary>
+    /// Generates a constructor projection over computed expressions so the
+    /// SELECT-clause translator gets fuzzed too (arithmetic and boolean
+    /// projections have their own emission paths distinct from predicates).
+    /// </summary>
+    private static Expression<Func<Row, ProjRow>> GenerateProjection(Random rng)
+    {
+        var p = Expression.Parameter(typeof(Row), "r");
+        var ctor = typeof(ProjRow).GetConstructors().Single();
+
+        var member = Expression.Property(p, nameof(Row.IntVal));
+        var k = rng.Next(1, 4);
+        Expression x = rng.Next(4) switch
+        {
+            0 => Expression.Add(member, Expression.Constant(k)),
+            1 => Expression.Subtract(member, Expression.Constant(k)),
+            2 => Expression.Multiply(member, Expression.Constant(k)),
+            _ => Expression.Property(p, nameof(Row.Id)),
+        };
+        Expression b = rng.Next(3) switch
+        {
+            0 => Expression.GreaterThan(member, Expression.Constant(rng.Next(-3, 4))),
+            1 => Expression.Property(p, nameof(Row.Flag)),
+            _ => Expression.Equal(
+                    Expression.Property(Expression.Property(p, nameof(Row.Name)), nameof(string.Length)),
+                    Expression.Constant(rng.Next(0, 8))),
+        };
+
+        var body = Expression.New(ctor, Expression.Property(p, nameof(Row.Id)), x, b);
+        return Expression.Lambda<Func<Row, ProjRow>>(body, p);
     }
 
     /// <summary>
