@@ -59,15 +59,10 @@ namespace nORM.Query
                 {
                     var nullTestOperand = leftNull ? node.Right : node.Left;
                     // Whole-entity navigation null test: `e.Dept == null` asks whether
-                    // the parent is missing, which is the dependent's FK being NULL —
-                    // visiting the navigation itself has no scalar SQL form.
-                    if (TryResolveNavigationFkValueSql(nullTestOperand, out var navFkSql))
-                    {
-                        _sql.Append('(').Append(navFkSql)
-                            .Append(node.NodeType == ExpressionType.Equal ? " IS NULL" : " IS NOT NULL")
-                            .Append(')');
+                    // the parent is missing — the FK being NULL, or (when the principal
+                    // carries global filters) the parent row being filtered out.
+                    if (TryEmitNavigationNullTest(nullTestOperand, testIsNull: node.NodeType == ExpressionType.Equal))
                         return node;
-                    }
                     _sql.Append("(");
                     Visit(nullTestOperand);
                     _sql.Append(node.NodeType == ExpressionType.Equal ? " IS NULL" : " IS NOT NULL");

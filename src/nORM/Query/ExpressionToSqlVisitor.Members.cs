@@ -229,6 +229,46 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Emits a whole-entity navigation null test. Without global filters on the
+        /// principal this is the dependent's FK being [NOT] NULL. When the principal
+        /// type carries global filters, a filtered-out parent must read as MISSING —
+        /// consistent with member reads through the navigation — so the test probes
+        /// the principal row itself with the filter applied.
+        /// </summary>
+        internal bool TryEmitNavigationNullTest(Expression expr, bool testIsNull)
+        {
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (expr is not MemberExpression navExpr || _ctx == null)
+                return false;
+            var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+            if (!navType.IsClass || navType == typeof(string))
+                return false;
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navType); }
+            catch { return false; }
+            if (principalMap.KeyColumns.Length != 1)
+                return false;
+            if (!TryResolveNavigationFkValueSql(navExpr, navType, principalMap, depth: 0, out var fkValueSql))
+                return false;
+
+            var probeAlias = _provider.Escape("NF");
+            var filterSql = RenderPrincipalGlobalFilterSql(principalMap, probeAlias);
+            if (filterSql == null)
+            {
+                _sql.Append('(').Append(fkValueSql)
+                    .Append(testIsNull ? " IS NULL" : " IS NOT NULL").Append(')');
+                return true;
+            }
+            _sql.Append(testIsNull ? "NOT EXISTS(" : "EXISTS(")
+                .Append("SELECT 1 FROM ").Append(principalMap.EscTable).Append(' ').Append(probeAlias)
+                .Append(" WHERE ").Append(probeAlias).Append('.').Append(principalMap.KeyColumns[0].EscCol)
+                .Append(" = ").Append(fkValueSql)
+                .Append(" AND ").Append(filterSql).Append(')');
+            return true;
+        }
+
+        /// <summary>
         /// Translates the combined global filter of a navigation principal against the
         /// correlated subquery's alias. Same sub-visitor pattern as the aggregate
         /// selector branches (paramIndexStart offset prevents @pN collisions).

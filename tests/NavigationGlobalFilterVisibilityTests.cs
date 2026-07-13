@@ -112,4 +112,29 @@ public class NavigationGlobalFilterVisibilityTests
         Assert.Equal(1, rows[0].N); // ann: chore 2 is Done → filtered out
         Assert.Equal(1, rows[1].N);
     }
+    [Fact]
+    public void Nav_null_test_treats_filtered_parent_as_missing()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        // bob's dept is soft-deleted -> invisible -> bob behaves like an orphan.
+        var orphans = ctx.Query<Emp>().Where(e => e.Dept == null)
+            .Select(e => e.Name).ToList().OrderBy(n => n).ToList();
+        Assert.Equal(new[] { "bob" }, orphans);
+
+        var withDept = ctx.Query<Emp>().Where(e => e.Dept != null)
+            .Select(e => e.Name).ToList();
+        Assert.Equal(new[] { "ann" }, withDept);
+    }
+
+    [Fact]
+    public void Nav_null_projection_treats_filtered_parent_as_missing()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        var rows = ctx.Query<Emp>().Select(e => new { e.Name, HasDept = e.Dept != null })
+            .ToList().OrderBy(r => r.Name).ToList();
+        Assert.True(rows[0].HasDept);   // ann
+        Assert.False(rows[1].HasDept);  // bob: filtered parent = missing
+    }
 }

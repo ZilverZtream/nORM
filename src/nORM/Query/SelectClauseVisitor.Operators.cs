@@ -118,18 +118,17 @@ namespace nORM.Query
                 if (leftIsNull ^ rightIsNull)
                 {
                     var operand = leftIsNull ? node.Right : node.Left;
-                    string operandSql;
-                    if (TryResolveScvNavigationFkValueSql(operand, out var navFkSql))
+                    // Whole-entity navigation: missing parent is FK-NULL, or — when the
+                    // principal carries global filters — a filtered-out parent row.
+                    if (TryRenderScvNavigationNullTest(operand, node.NodeType == ExpressionType.Equal, out var navTestSql))
                     {
-                        operandSql = navFkSql;
+                        sb.Append(navTestSql);
+                        return node;
                     }
-                    else
-                    {
-                        var opStart = sb.Length;
-                        Visit(operand);
-                        operandSql = sb.ToString(opStart, sb.Length - opStart);
-                        sb.Length = opStart;
-                    }
+                    var opStart = sb.Length;
+                    Visit(operand);
+                    var operandSql = sb.ToString(opStart, sb.Length - opStart);
+                    sb.Length = opStart;
                     // Bare predicate: the top-of-method wrapper handles value positions.
                     sb.Append('(').Append(operandSql)
                       .Append(node.NodeType == ExpressionType.Equal ? " IS NULL)" : " IS NOT NULL)");

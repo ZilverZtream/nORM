@@ -463,6 +463,44 @@ namespace nORM.Query
             return false;
         }
 
+        /// <summary>
+        /// Renders a whole-entity navigation null test for a projection: FK [NOT] NULL
+        /// normally, or a [NOT] EXISTS probe of the principal row when the principal
+        /// type carries global filters — a filtered-out parent must read as missing,
+        /// consistent with member reads through the navigation. Emits a bare predicate;
+        /// the boolean-value wrapper handles value positions.
+        /// </summary>
+        private bool TryRenderScvNavigationNullTest(Expression expr, bool testIsNull, out string sql)
+        {
+            sql = string.Empty;
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (expr is not MemberExpression navExpr || _ctx == null)
+                return false;
+            var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+            if (!navType.IsClass || navType == typeof(string))
+                return false;
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navType); }
+            catch { return false; }
+            if (principalMap.KeyColumns.Length != 1)
+                return false;
+            if (!TryResolveScvNavigationFkValueSql(navExpr, out var fkValueSql))
+                return false;
+
+            var combined = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
+            if (combined == null)
+            {
+                sql = $"({fkValueSql}{(testIsNull ? " IS NULL" : " IS NOT NULL")})";
+                return true;
+            }
+            var probeAlias = _provider.Escape("NF");
+            var filterSql = RenderNavigationFilter(combined, probeAlias);
+            sql = $"{(testIsNull ? "NOT EXISTS(" : "EXISTS(")}SELECT 1 FROM {principalMap.EscTable} {probeAlias} " +
+                  $"WHERE {probeAlias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql} AND {filterSql})";
+            return true;
+        }
+
         private string? BuildScvReferenceNavigationScalarSql(MemberExpression navExpr, string targetMemberName, int depth)
         {
             var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
