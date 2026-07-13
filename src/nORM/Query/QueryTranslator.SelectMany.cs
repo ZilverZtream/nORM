@@ -227,6 +227,25 @@ namespace nORM.Query
                     .Append(" = ").Append(innerAlias).Append('.').Append(relation.ForeignKeys[keyIndex].EscCol);
             }
 
+            // The child's global filters (soft-delete, tenant) must gate the flattened rows.
+            // Without a result selector the flatten's RESULT type is the child itself and the
+            // provider-level rewrite wraps the whole query in the child's filter; a result
+            // selector projects an unmapped shape that rewrite cannot express, so the filter
+            // goes into the ON clause here (ON, not WHERE, so a DefaultIfEmpty LEFT JOIN
+            // keeps its unmatched rows).
+            if (resultSelector != null && _ctx != null
+                && GlobalFilterFragment.Combine(_ctx, relation.DependentType) is { } childGlobalFilter)
+            {
+                var gfParam = childGlobalFilter.Parameters[0];
+                var vctxGf = new VisitorContext(_ctx, innerMapping, _provider, gfParam, innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                var gfVisitor = FastExpressionVisitorPool.Get(in vctxGf);
+                var gfSql = gfVisitor.Translate(childGlobalFilter.Body);
+                foreach (var kvp in gfVisitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                FastExpressionVisitorPool.Return(gfVisitor);
+                _sql.Append(" AND (").Append(gfSql).Append(')');
+            }
+
             if (filterPredicate != null)
                 AppendSelectManyFilterPredicate(filterPredicate, innerMapping, innerAlias);
 
