@@ -126,6 +126,9 @@ namespace nORM.Providers
         public override string GetNullSafeConcatSql(string left, string right)
             => $"(COALESCE({left}, '') || COALESCE({right}, ''))";
 
+        /// <summary>SQLite treats a negative LIMIT as unlimited; clamp to zero.</summary>
+        internal override string ClampNonNegativeLimitExpression(string expr) => $"max({expr}, 0)";
+
         /// <summary>SQLite TEXT affinity is the natural target for numeric/Guid/DateTime ToString().</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS TEXT)";
 

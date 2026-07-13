@@ -272,8 +272,10 @@ public class LiveCrossProviderTests
         provider.ApplyPaging(sb, 5, 3, "@lim", "@off");
         var sql = sb.ToString();
         Assert.Contains("ORDER BY (SELECT NULL)", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("OFFSET @off ROWS", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("FETCH NEXT @lim ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
+        // Parameterized counts embed the LINQ empty-window decision (Take(n <= 0)
+        // must return no rows, but FETCH rejects a row count below one).
+        Assert.Contains("OFFSET (0 + CASE WHEN (@lim) < 1 THEN 2147483647 ELSE (@off) END) ROWS", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH NEXT (0 + CASE WHEN (@lim) < 1 THEN 1 ELSE (@lim) END) ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -285,8 +287,8 @@ public class LiveCrossProviderTests
         provider.ApplyPaging(sb, 5, 3, "@lim", "@off");
         var sql = sb.ToString();
         Assert.DoesNotContain("(SELECT NULL)", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("OFFSET @off ROWS", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("FETCH NEXT @lim ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("OFFSET (0 + CASE WHEN (@lim) < 1 THEN 2147483647 ELSE (@off) END) ROWS", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH NEXT (0 + CASE WHEN (@lim) < 1 THEN 1 ELSE (@lim) END) ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

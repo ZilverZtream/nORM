@@ -818,7 +818,7 @@ public class SqlServerProviderTests
         _provider.ApplyPaging(sb, 10, null, "@p0", null);
         var sql = sb.ToString();
         Assert.Contains("OFFSET", sql);
-        Assert.Contains("FETCH NEXT @p0 ROWS ONLY", sql);
+        Assert.Contains("FETCH NEXT (0 + CASE WHEN (@p0) < 1 THEN 1 ELSE (@p0) END) ROWS ONLY", sql);
     }
 
     [Fact]

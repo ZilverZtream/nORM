@@ -706,8 +706,11 @@ public class BulkProviderParityTests
         sb.Append("SELECT * FROM G40_Item ORDER BY Id");
         p.ApplyPaging(sb, 10, 5, "@lim", "@off");
         var sql = sb.ToString();
-        Assert.Contains("OFFSET @off ROWS", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("FETCH NEXT @lim ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
+        // Parameterized counts embed the LINQ empty-window decision as a CASE:
+        // FETCH rejects a row count below one, so Take(n <= 0) routes the OFFSET
+        // past any addressable row instead.
+        Assert.Contains("OFFSET (0 + CASE WHEN (@lim) < 1 THEN 2147483647 ELSE (@off) END) ROWS", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH NEXT (0 + CASE WHEN (@lim) < 1 THEN 1 ELSE (@lim) END) ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

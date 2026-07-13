@@ -88,6 +88,17 @@ namespace nORM.Providers
         public virtual string GetNullSafeConcatSql(string left, string right) => GetConcatSql(left, right);
 
         /// <summary>
+        /// Clamps a composite LIMIT/FETCH expression (e.g. the <c>(take - skip)</c>
+        /// rewrite of Take-then-Skip) to zero when it evaluates negative. LINQ
+        /// semantics for such a window are "no rows", but SQLite interprets a
+        /// negative LIMIT as UNLIMITED, so passing the raw difference through would
+        /// silently return the whole table. Identity by default: MySQL's LIMIT does
+        /// not accept expressions at all, and providers whose engines already error
+        /// on negative values keep their behavior.
+        /// </summary>
+        internal virtual string ClampNonNegativeLimitExpression(string expr) => expr;
+
+        /// <summary>
         /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation -
         /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
         /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native

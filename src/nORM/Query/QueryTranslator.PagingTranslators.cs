@@ -15,6 +15,28 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        /// <summary>
+        /// LINQ paging counts follow Enumerable semantics: Take/TakeLast with a
+        /// non-positive count yield an empty sequence and Skip/SkipLast with a
+        /// negative count skip nothing -- no exception, and never the raw negative
+        /// value in SQL (SQLite treats a negative LIMIT as UNLIMITED, which would
+        /// silently return the whole table). Literal counts clamp at translation;
+        /// parameter-bound counts clamp at bind time through this pseudo-converter
+        /// registered under the paging parameter's name.
+        /// </summary>
+        private sealed class NonNegativePagingCount : nORM.Mapping.IValueConverter
+        {
+            public static readonly NonNegativePagingCount Instance = new();
+            public Type ModelType => typeof(int);
+            public Type ProviderType => typeof(int);
+            public object? ConvertToProvider(object? modelValue)
+                => modelValue is int i && i < 0 ? 0 : modelValue;
+            public object? ConvertFromProvider(object? providerValue) => providerValue;
+        }
+
+        private void ClampPagingParameterAtBind(string parameterName)
+            => _parameterManager.CompiledParameterConverters[parameterName] = NonNegativePagingCount.Instance;
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class TakeTranslator : IMethodCallTranslator
@@ -30,8 +52,7 @@ namespace nORM.Query
                 var source = t.Visit(node.Arguments[0]);
                 if (t.IsPostMaterializeTailMode && QueryTranslator.TryGetIntValue(node.Arguments[1], out var clientTake))
                 {
-                    if (clientTake < 0) throw new ArgumentOutOfRangeException(nameof(clientTake), clientTake, "Take count must be non-negative.");
-                    t.AppendPostMaterializeTake(clientTake);
+                    t.AppendPostMaterializeTake(Math.Max(0, clientTake));
                     return source;
                 }
                 // Non-literal count in tail mode (reshape, group-join, or raw GroupBy
@@ -45,10 +66,11 @@ namespace nORM.Query
                 if (t.TryBindPagingParameter(node.Arguments[1], out var tName))
                 {
                     t._takeParam = tName;
+                    t.ClampPagingParameterAtBind(tName);
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
-                    if (take < 0) throw new ArgumentOutOfRangeException(nameof(take), take, "Take count must be non-negative.");
+                    take = Math.Max(0, take);
                     // Inline literal Take values directly in SQL instead of parameterizing.
                     // Parameterized LIMIT (@p0) prevents SQLite's planner from using ANALYZE statistics
                     // to estimate result cardinality. Literal LIMIT (20) lets the planner optimize.
@@ -86,8 +108,7 @@ namespace nORM.Query
                 // no-row query by setting _take = 0.
                 if (t._take.HasValue && QueryTranslator.TryGetIntValue(node.Arguments[1], out int skipForLiteral))
                 {
-                    if (skipForLiteral < 0)
-                        throw new ArgumentOutOfRangeException(nameof(skipForLiteral), skipForLiteral, "Skip count must be non-negative.");
+                    skipForLiteral = Math.Max(0, skipForLiteral);
                     var originalTake = t._take.Value;
                     t._take = Math.Max(0, originalTake - skipForLiteral);
                     t._skip = skipForLiteral;
@@ -105,11 +126,11 @@ namespace nORM.Query
                     if (t.TryBindPagingParameter(node.Arguments[1], out var sParam))
                     {
                         skipExpr = sParam;
+                        t.ClampPagingParameterAtBind(sParam);
                     }
                     else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skipLit))
                     {
-                        if (skipLit < 0) throw new ArgumentOutOfRangeException(nameof(skipLit), skipLit, "Skip count must be non-negative.");
-                        skipExpr = skipLit.ToString();
+                        skipExpr = Math.Max(0, skipLit).ToString();
                     }
                     else
                     {
@@ -117,11 +138,12 @@ namespace nORM.Query
                             "Skip argument could not be bound to a parameter or literal.");
                     }
                     // Reset the existing take fields and emit (take - skip) as the new limit
-                    // expression; pin the offset. Negative results clip to 0 via GREATEST/IIF
-                    // on providers that support it — fall back to a portable MAX of (expr, 0)
-                    // via the provider's LIMIT engine which generally clamps to 0 anyway.
+                    // expression; pin the offset. The difference can be negative even with
+                    // valid inputs (Take(3).Skip(5) must return NO rows), and SQLite treats
+                    // a negative LIMIT as unlimited -- clamp through the provider's
+                    // expression-level hook.
                     t._take = null;
-                    t._takeParam = $"({existingTakeExpr} - {skipExpr})";
+                    t._takeParam = t._ctx.RawProvider.ClampNonNegativeLimitExpression($"({existingTakeExpr} - {skipExpr})");
                     t._skip = null;
                     t._skipParam = skipExpr;
                     return source;
@@ -129,12 +151,12 @@ namespace nORM.Query
                 if (t.TryBindPagingParameter(node.Arguments[1], out var sName))
                 {
                     t._skipParam = sName;
+                    t.ClampPagingParameterAtBind(sName);
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
-                    if (skip < 0) throw new ArgumentOutOfRangeException(nameof(skip), skip, "Skip count must be non-negative.");
                     // Inline literal Skip values directly in SQL (same rationale as Take).
-                    t._skip = skip;
+                    t._skip = Math.Max(0, skip);
                     t._skipParam = null;
                 }
                 return source;
@@ -353,14 +375,11 @@ namespace nORM.Query
             {
                 if (isTake) t._takeParam = paramName;
                 else t._skipParam = paramName;
+                t.ClampPagingParameterAtBind(paramName);
             }
             else if (TryGetIntValue(node.Arguments[1], out int countLit))
             {
-                if (countLit < 0)
-                    throw new ArgumentOutOfRangeException(
-                        node.Method.Name,
-                        countLit,
-                        $"{node.Method.Name} count must be non-negative.");
+                countLit = Math.Max(0, countLit);
                 if (isTake) t._take = countLit;
                 else t._skip = countLit;
             }

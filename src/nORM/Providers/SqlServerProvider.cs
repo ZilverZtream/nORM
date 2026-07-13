@@ -179,15 +179,33 @@ namespace nORM.Providers
                 // ORDER BY clauses (e.g. "order by name") are detected correctly and a
                 // duplicate ORDER BY is not appended.
                 if (!HasTopLevelOrderBy(sb.ToString())) sb.Append(" ORDER BY (SELECT NULL)");
-                sb.Append(" OFFSET ");
-                if (offsetParameterName != null) sb.Append(offsetParameterName);
-                else if (offset.HasValue) sb.Append(offset.Value);
-                else sb.Append("0");
-                sb.Append(" ROWS");
+                // T-SQL FETCH rejects a row count below one, but LINQ's Take contract
+                // for a non-positive count is an EMPTY window (and the Take-then-Skip
+                // rewrite can produce a negative composite even from valid inputs).
+                // Empty windows route the OFFSET past any addressable row instead of
+                // emitting an invalid FETCH. Parameterized counts embed that decision
+                // as a CASE: the engine rejects a BARE CASE (and any bigint-typed
+                // expression) in OFFSET/FETCH but accepts an int-typed CASE inside
+                // arithmetic, hence the "(0 + CASE ...)" shape and the int-max
+                // sentinel (both verified against a live server).
+                string offsetSql = offsetParameterName ?? (offset.HasValue ? offset.Value.ToString() : "0");
                 if (limitParameterName != null)
-                    sb.Append(" FETCH NEXT ").Append(limitParameterName).Append(" ROWS ONLY");
-                else if (limit.HasValue)
-                    sb.Append(" FETCH NEXT ").Append(limit.Value).Append(" ROWS ONLY");
+                {
+                    sb.Append(" OFFSET (0 + CASE WHEN (").Append(limitParameterName)
+                      .Append(") < 1 THEN 2147483647 ELSE (").Append(offsetSql).Append(") END) ROWS");
+                    sb.Append(" FETCH NEXT (0 + CASE WHEN (").Append(limitParameterName)
+                      .Append(") < 1 THEN 1 ELSE (").Append(limitParameterName).Append(") END) ROWS ONLY");
+                }
+                else if (limit.HasValue && limit.Value <= 0)
+                {
+                    sb.Append(" OFFSET 2147483647 ROWS");
+                }
+                else
+                {
+                    sb.Append(" OFFSET ").Append(offsetSql).Append(" ROWS");
+                    if (limit.HasValue)
+                        sb.Append(" FETCH NEXT ").Append(limit.Value).Append(" ROWS ONLY");
+                }
             }
         }
 

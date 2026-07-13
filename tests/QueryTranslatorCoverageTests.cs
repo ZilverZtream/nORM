@@ -178,7 +178,7 @@ public class QueryTranslatorCoverageTests
     }
 
     [Fact]
-    public void Take_NegativeValue_TranslationThrowsArgumentOutOfRange()
+    public void Take_NegativeValue_ClampsToEmptyWindow()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -186,20 +186,14 @@ public class QueryTranslatorCoverageTests
         CreateQtProductTable(cn);
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        // Translation-time check: Take(-1) should throw during Translate()
-        // Exception is wrapped in TargetInvocationException by reflection
-        var q = ctx.Query<QtProduct>().Take(-1);
-        var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
-        var translator = Activator.CreateInstance(translatorType, ctx)!;
-        var ex = Assert.ThrowsAny<Exception>(() =>
-            translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { q.Expression }));
-        // Unwrap TargetInvocationException
-        var inner = ex is System.Reflection.TargetInvocationException tie ? tie.InnerException : ex;
-        Assert.IsType<ArgumentOutOfRangeException>(inner);
+        // LINQ Take with a non-positive count is an empty sequence, never an
+        // exception -- and the raw negative must not reach SQL (SQLite reads a
+        // negative LIMIT as unlimited).
+        Assert.Empty(ctx.Query<QtProduct>().Take(-1).ToList());
     }
 
     [Fact]
-    public void Skip_NegativeValue_TranslationThrowsArgumentOutOfRange()
+    public void Skip_NegativeValue_SkipsNothing()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -207,14 +201,9 @@ public class QueryTranslatorCoverageTests
         CreateQtProductTable(cn);
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        // Translation-time check: Skip(-1) should throw during Translate()
-        var q = ctx.Query<QtProduct>().Skip(-1);
-        var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
-        var translator = Activator.CreateInstance(translatorType, ctx)!;
-        var ex = Assert.ThrowsAny<Exception>(() =>
-            translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { q.Expression }));
-        var inner = ex is System.Reflection.TargetInvocationException tie ? tie.InnerException : ex;
-        Assert.IsType<ArgumentOutOfRangeException>(inner);
+        // LINQ Skip with a negative count skips nothing, never throws.
+        var all = ctx.Query<QtProduct>().ToList().Count;
+        Assert.Equal(all, ctx.Query<QtProduct>().Skip(-1).ToList().Count);
     }
 
     // ─── Distinct ─────────────────────────────────────────────────────────

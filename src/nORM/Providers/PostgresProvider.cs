@@ -177,6 +177,9 @@ namespace nORM.Providers
             return $"\"{id.Replace("\"", "\"\"")}\"";
         }
 
+        /// <summary>PostgreSQL errors on a negative LIMIT; clamp to zero for LINQ's empty-window semantics.</summary>
+        internal override string ClampNonNegativeLimitExpression(string expr) => $"GREATEST({expr}, 0)";
+
         /// <summary>
         /// Adds PostgreSQL-specific <c>LIMIT</c> and <c>OFFSET</c> clauses to the SQL builder.
         /// </summary>

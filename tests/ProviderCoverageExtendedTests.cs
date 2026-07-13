@@ -1467,8 +1467,8 @@ public class ProviderCoverageExtendedTests
         sb.Append("SELECT * FROM [T] ORDER BY [Id]");
         p.ApplyPaging(sb, null, null, "@limit", "@offset");
         var sql = sb.ToSqlString();
-        Assert.Contains("FETCH NEXT @limit ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("OFFSET @offset ROWS", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("FETCH NEXT (0 + CASE WHEN (@limit) < 1 THEN 1 ELSE (@limit) END) ROWS ONLY", sql, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("OFFSET (0 + CASE WHEN (@limit) < 1 THEN 2147483647 ELSE (@offset) END) ROWS", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
