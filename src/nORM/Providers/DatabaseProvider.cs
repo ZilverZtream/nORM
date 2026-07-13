@@ -88,6 +88,15 @@ namespace nORM.Providers
         internal virtual bool PrefersSyncCompiledQueryExecution => PrefersSyncExecution;
 
         /// <summary>
+        /// Indicates whether multi-statement write batches benefit from DbCommand.Prepare.
+        /// SQL Server overrides this to false: SqlCommand.Prepare demands explicit Size/Scale
+        /// metadata on every variable-length and temporal parameter (throwing otherwise), and
+        /// the engine's ad-hoc plan cache already parameterizes these batches, so preparing
+        /// adds failure modes without a performance win.
+        /// </summary>
+        internal virtual bool SupportsPreparedBatchCommands => true;
+
+        /// <summary>
         /// Indicates whether general cached query-plan execution should prefer synchronous
         /// reader loops. Kept separate from fast-path and compiled execution because provider
         /// async overhead differs across prepared, pooled, and ad-hoc commands.

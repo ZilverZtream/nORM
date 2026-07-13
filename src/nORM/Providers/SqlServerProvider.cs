@@ -64,6 +64,14 @@ namespace nORM.Providers
 
         internal override bool PrefersSyncCompiledQueryExecution => true;
 
+        /// <summary>
+        /// SqlCommand.Prepare requires explicit Size/Scale metadata on every
+        /// variable-length and temporal parameter and throws when any is missing,
+        /// while SQL Server's ad-hoc plan cache already parameterizes batched
+        /// writes — preparing adds failure modes without a performance win.
+        /// </summary>
+        internal override bool SupportsPreparedBatchCommands => false;
+
         internal override bool PrefersSyncQueryPlanExecution => true;
 
         // SQL Server T-SQL does not support row-tuple comparisons in WHERE IN

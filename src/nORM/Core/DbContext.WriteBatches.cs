@@ -115,7 +115,7 @@ namespace nORM.Core
             // Skip PrepareAsync when identity retrieval is needed: the INSERT SQL contains
             // multiple result-set-returning statements (e.g. "; SELECT LAST_INSERT_ID();")
             // and some providers (MySQL) do not support preparing multi-statement commands.
-            if (batch.Count > 1 && !HasDbGeneratedKey(map.KeyColumns))
+            if (batch.Count > 1 && !HasDbGeneratedKey(map.KeyColumns) && _p.SupportsPreparedBatchCommands)
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             if (HasDbGeneratedKey(map.KeyColumns))
@@ -246,7 +246,7 @@ namespace nORM.Core
             }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
-            if (batch.Count > 1)
+            if (batch.Count > 1 && _p.SupportsPreparedBatchCommands)
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
@@ -318,7 +318,7 @@ namespace nORM.Core
             }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Delete, cmd.CommandText));
-            if (batch.Count > 1)
+            if (batch.Count > 1 && _p.SupportsPreparedBatchCommands)
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             var deleted = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);

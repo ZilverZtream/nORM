@@ -338,7 +338,11 @@ namespace nORM.Query
         }
         private string CreateSafeLikePattern(string value, LikeOperation operation)
         {
-            if (string.IsNullOrEmpty(value)) return string.Empty;
+            // Contains("")/StartsWith("")/EndsWith("") are always true in C#, so an
+            // empty needle must produce the match-everything pattern. The old
+            // empty-string return emitted `LIKE ''`, which matches ONLY empty values
+            // and silently dropped every other row.
+            if (string.IsNullOrEmpty(value)) return "%";
 
             // DOS PROTECTION FIX: Validate pattern length to prevent database CPU spike
             // Extremely long LIKE patterns (millions of '%' chars) can cause severe performance issues

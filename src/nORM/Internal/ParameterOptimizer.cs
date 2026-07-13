@@ -156,6 +156,11 @@ namespace nORM.Internal
                         ApplyProviderDecimalMetadata(param, null);
                     else if (IsVariableLengthType(dbType))
                         param.Size = GetTypedNullSize(dbType);
+                    // SqlCommand.Prepare requires an explicit scale for time/datetime2/
+                    // datetimeoffset parameters, including typed nulls.
+                    else if (param is SqlParameter sqlScaledNull
+                        && dbType is DbType.Time or DbType.DateTime2 or DbType.DateTimeOffset)
+                        sqlScaledNull.Scale = 7;
                 }
                 else
                 {
@@ -178,8 +183,12 @@ namespace nORM.Internal
                     param.DbType = DbType.String;
                     if (param is SqlParameter)
                     {
+                        // SqlCommand.Prepare rejects variable-length parameters with
+                        // Size 0, so an empty string must still declare a positive
+                        // size or every prepared batch containing one throws.
                         var str = (string)value;
-                        param.Size = str.Length <= MaxInlineStringSize ? str.Length : -1;
+                        param.Size = str.Length == 0 ? 1
+                            : str.Length <= MaxInlineStringSize ? str.Length : -1;
                     }
                 }
                 else if (valueType == typeof(long))
@@ -199,6 +208,11 @@ namespace nORM.Internal
                 {
                     param.DbType = DbType.DateTime2;
                     param.Value = DateTime.SpecifyKind((DateTime)value, DateTimeKind.Unspecified);
+                    // SqlCommand.Prepare requires an explicit scale for datetime2
+                    // parameters (it misreports the omission as a variable-length
+                    // Size error). 7 is datetime2's full 100ns precision.
+                    if (param is SqlParameter sqlDt)
+                        sqlDt.Scale = 7;
                 }
                 else if (valueType == typeof(DateOnly))
                 {
@@ -219,6 +233,9 @@ namespace nORM.Internal
                     var t = (TimeOnly)value;
                     param.Value = t.ToTimeSpan();
                     param.DbType = DbType.Time;
+                    // See the DateTime branch: Prepare needs an explicit scale for time.
+                    if (param is SqlParameter sqlTime)
+                        sqlTime.Scale = 7;
                 }
                 else if (valueType == typeof(char))
                 {
@@ -274,6 +291,12 @@ namespace nORM.Internal
                     // D-3 fix: broadened comment — this applies to all providers, not just SQL Server.
                     if (valueType == typeof(byte[]))
                         param.Size = -1;
+                    // SqlCommand.Prepare requires an explicit scale for time/datetime2/
+                    // datetimeoffset parameters (misreported as a Size error); 7 is the
+                    // full 100ns precision of those types.
+                    else if (param is SqlParameter sqlScaled
+                        && mappedType is DbType.Time or DbType.DateTime2 or DbType.DateTimeOffset)
+                        sqlScaled.Scale = 7;
                 }
                 else
                 {
