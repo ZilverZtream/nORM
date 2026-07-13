@@ -79,9 +79,63 @@ namespace nORM.Query
                 t._mapping = subMapD;
                 t.MergeSubPlanParameters(subPlanD);
                 var winAliasD = t.EscapeAlias("__wdis" + t._joinCounter++);
+
+                // C# Distinct() on strings is ordinal, but DISTINCT on CI-collation
+                // providers (MySQL, SQL Server) folds case and silently collapses
+                // "abc" and "ABC". Mirror of the flat-path rewrite in
+                // TranslationBuilder: for a windowed scalar string projection whose
+                // sub-select emits one plain column, group the wrap by
+                // (column, binary column) instead of emitting DISTINCT — grouping by
+                // the composite is byte-wise distinctness while the SELECT keeps
+                // returning the plain string.
+                var elementArgs = node.Arguments[0].Type.IsGenericType
+                    ? node.Arguments[0].Type.GetGenericArguments()
+                    : Type.EmptyTypes;
+                if (t._provider.DefaultStringEqualityIsCaseInsensitive
+                    && elementArgs.Length > 0
+                    && elementArgs[0] == typeof(string)
+                    && TryGetSingleColumnSelectIdentifier(subPlanD.Sql, out var distinctCol))
+                {
+                    t._sql.AppendFragment("SELECT ").Append(distinctCol)
+                          .AppendFragment(" FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
+                    t._groupBy.Add(distinctCol);
+                    t._groupByOrdinalExtras.Add(t._provider.ForceCaseSensitiveStringComparison(distinctCol));
+                    t._isDistinct = true;
+                    return node;
+                }
+
                 t._sql.AppendFragment("SELECT DISTINCT * FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
                 t._isDistinct = true;
                 return node;
+            }
+
+            /// <summary>
+            /// Matches a sub-select whose output list is exactly one plain
+            /// (optionally table-qualified) escaped column identifier and returns
+            /// the bare identifier for use in the wrapping scope. Expression
+            /// selects, aliases, and multi-column lists return false — those fall
+            /// back to the DISTINCT keyword.
+            /// </summary>
+            private static bool TryGetSingleColumnSelectIdentifier(string sql, out string column)
+            {
+                column = string.Empty;
+                if (!sql.StartsWith("SELECT ", StringComparison.Ordinal)) return false;
+                var fromIdx = sql.IndexOf(" FROM ", StringComparison.Ordinal);
+                if (fromIdx < 0) return false;
+                var list = sql.Substring(7, fromIdx - 7).Trim();
+                if (list.Length is 0 or > 128) return false;
+                if (list.Contains(',') || list.Contains('(') || list.Contains(' ')) return false;
+                var lastDot = list.LastIndexOf('.');
+                if (lastDot >= 0) list = list[(lastDot + 1)..];
+                if (list.Length < 3) return false;
+                var first = list[0];
+                var last = list[^1];
+                var escaped = (first == '"' && last == '"')
+                    || (first == '[' && last == ']')
+                    || (first == '`' && last == '`');
+                if (!escaped) return false;
+                column = list;
+                return true;
             }
         }
 

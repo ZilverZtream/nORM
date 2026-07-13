@@ -32,6 +32,7 @@ public class LinqParityFuzzTests
         public int IntVal { get; set; }
         public int? NullableInt { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string? Nick { get; set; }
         public decimal Amount { get; set; }
         public double Price { get; set; }
         public bool Flag { get; set; }
@@ -45,6 +46,9 @@ public class LinqParityFuzzTests
     private static Row[] BuildRows()
     {
         var names = new[] { "alpha", "ALPHA", "Alpha", "beta", "", "gamma", "Gamma", "delta", "α-unicode", "beta" };
+        // Nulls interleaved with case variants and the empty string: null vs ""
+        // is exactly the distinction SQL null semantics get wrong.
+        var nicks = new[] { null, "alpha", "", "ALPHA", "b", null, "beta", "Gamma" };
         var rows = new List<Row>();
         for (var i = 0; i < 40; i++)
         {
@@ -54,6 +58,7 @@ public class LinqParityFuzzTests
                 IntVal = (i % 7) - 3,                    // -3..3 with duplicates
                 NullableInt = i % 4 == 0 ? null : (i % 5) - 2,
                 Name = names[i % names.Length],
+                Nick = nicks[i % nicks.Length],
                 Amount = ((i * 37) % 11 - 5) + (i % 3) * 0.25m,
                 Price = ((i * 13) % 9 - 4) + (i % 2) * 0.5,
                 Flag = i % 3 == 0,
@@ -85,7 +90,7 @@ public class LinqParityFuzzTests
             };
         }
 
-        return rng.Next(7) switch
+        return rng.Next(8) switch
         {
             0 => IntComparison(rng, p),
             1 => NullableIntComparison(rng, p),
@@ -95,6 +100,7 @@ public class LinqParityFuzzTests
                     : Expression.Not(Expression.Property(p, nameof(Row.Flag))),
             4 => DecimalComparison(rng, p),
             5 => DateComparison(rng, p),
+            6 => NullableStringLeaf(rng, p),
             _ => ArithmeticComparison(rng, p),
         };
     }
@@ -145,6 +151,52 @@ public class LinqParityFuzzTests
                     Expression.Property(member, nameof(string.Length)),
                     Expression.Constant(rng.Next(0, 8))),
         };
+    }
+
+    /// <summary>
+    /// Nullable string predicates under C# semantics — the oracle runs the
+    /// identical tree, so every generated form must be NRE-free: equality and
+    /// its negation (null must satisfy <c>!=</c>), null tests, null-guarded
+    /// method calls, coalesced Length, and cross-column comparison.
+    /// </summary>
+    private static Expression NullableStringLeaf(Random rng, ParameterExpression p)
+    {
+        var member = Expression.Property(p, "Nick");
+        var s = Expression.Constant(StringPool[rng.Next(StringPool.Length)]);
+        switch (rng.Next(6))
+        {
+            case 0: // null test, plain and negated
+            {
+                var isNull = Expression.Equal(member, Expression.Constant(null, typeof(string)));
+                return rng.Next(2) == 0 ? isNull : Expression.Not(isNull);
+            }
+            case 1: // equality against a constant: C# says null != "x" is TRUE
+                return Expression.MakeBinary(
+                    rng.Next(2) == 0 ? ExpressionType.Equal : ExpressionType.NotEqual, member, s);
+            case 2: // null-guarded method call
+            {
+                var guard = Expression.NotEqual(member, Expression.Constant(null, typeof(string)));
+                Expression call = rng.Next(3) switch
+                {
+                    0 => Expression.Call(member, nameof(string.Contains), Type.EmptyTypes, s),
+                    1 => Expression.Call(member, nameof(string.StartsWith), Type.EmptyTypes, s),
+                    _ => Expression.Call(member, nameof(string.EndsWith), Type.EmptyTypes, s),
+                };
+                return Expression.AndAlso(guard, call);
+            }
+            case 3: // coalesced Length comparison
+                return Expression.MakeBinary(
+                    CompareOps[rng.Next(CompareOps.Length)],
+                    Expression.Property(Expression.Coalesce(member, Expression.Constant(string.Empty)), nameof(string.Length)),
+                    Expression.Constant(rng.Next(0, 6)));
+            case 4: // cross-column: null != non-null Name is TRUE in C#
+                return Expression.MakeBinary(
+                    rng.Next(2) == 0 ? ExpressionType.Equal : ExpressionType.NotEqual,
+                    member, Expression.Property(p, nameof(Row.Name)));
+            default: // negated equality (De Morgan pushdown + null semantics)
+                return Expression.Not(Expression.MakeBinary(
+                    rng.Next(2) == 0 ? ExpressionType.Equal : ExpressionType.NotEqual, member, s));
+        }
     }
 
     private static Expression DecimalComparison(Random rng, ParameterExpression p)
@@ -230,6 +282,7 @@ public class LinqParityFuzzTests
                     IntVal INTEGER NOT NULL,
                     NullableInt INTEGER NULL,
                     Name TEXT NOT NULL,
+                    Nick TEXT NULL,
                     Amount TEXT NOT NULL,
                     Price REAL NOT NULL,
                     Flag INTEGER NOT NULL,
@@ -326,6 +379,7 @@ public class LinqParityFuzzTests
         public int IntVal { get; set; }
         public int? NullableInt { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string? Nick { get; set; }
         public decimal Amount { get; set; }
         public double Price { get; set; }
         public bool Flag { get; set; }
@@ -350,6 +404,7 @@ public class LinqParityFuzzTests
             IntVal = r.IntVal,
             NullableInt = r.NullableInt,
             Name = r.Name,
+            Nick = r.Nick,
             Amount = r.Amount,
             Price = r.Price,
             Flag = r.Flag,
@@ -779,14 +834,27 @@ public class LinqParityFuzzTests
                     Assert.True(dbMax == orMax, $"Max mismatch\n{Describe()}\ndb: {dbMax} oracle: {orMax}");
                 }
                 break;
-            case 4: // group
-                var dbGroups = db.GroupBy(r => r.IntVal)
-                    .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
-                    .ToList().OrderBy(x => x.Key).ToList();
-                var orGroups = oracle.GroupBy(r => r.IntVal)
-                    .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
-                    .ToList().OrderBy(x => x.Key).ToList();
-                Assert.True(dbGroups.SequenceEqual(orGroups), $"GroupBy mismatch\n{Describe()}\ndb: [{string.Join(" | ", dbGroups)}]\noracle: [{string.Join(" | ", orGroups)}]");
+            case 4: // group — int key, or nullable string key (NULL group + ordinal case variants)
+                if (caseRng.Next(2) == 0)
+                {
+                    var dbGroups = db.GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
+                        .ToList().OrderBy(x => x.Key).ToList();
+                    var orGroups = oracle.GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
+                        .ToList().OrderBy(x => x.Key).ToList();
+                    Assert.True(dbGroups.SequenceEqual(orGroups), $"GroupBy mismatch\n{Describe()}\ndb: [{string.Join(" | ", dbGroups)}]\noracle: [{string.Join(" | ", orGroups)}]");
+                }
+                else
+                {
+                    var dbNickGroups = db.GroupBy(r => r.Nick)
+                        .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
+                        .ToList().OrderBy(x => x.Key, StringComparer.Ordinal).ToList();
+                    var orNickGroups = oracle.GroupBy(r => r.Nick)
+                        .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.Id) })
+                        .ToList().OrderBy(x => x.Key, StringComparer.Ordinal).ToList();
+                    Assert.True(dbNickGroups.SequenceEqual(orNickGroups), $"nullable-string GroupBy mismatch\n{Describe()}\ndb: [{string.Join(" | ", dbNickGroups)}]\noracle: [{string.Join(" | ", orNickGroups)}]");
+                }
                 break;
             case 5: // generated constructor projection (SCV surface)
                 var projection = GenerateProjection(caseRng);
@@ -800,11 +868,21 @@ public class LinqParityFuzzTests
                 Assert.True(dbProj.SequenceEqual(orProj),
                     $"projection mismatch\n{Describe()}\nprojection: {projection}\ndb: [{string.Join(" | ", dbProj)}]\noracle: [{string.Join(" | ", orProj)}]");
                 break;
-            default: // distinct scalar
-                var dbDistinct = db.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
-                var orDistinct = oracle.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
-                Assert.True(dbDistinct.SequenceEqual(orDistinct),
-                    $"Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbDistinct)}]\noracle: [{string.Join(",", orDistinct)}]");
+            default: // distinct scalar — int, or nullable string (NULL dedup + ordinal case variants)
+                if (caseRng.Next(2) == 0)
+                {
+                    var dbDistinct = db.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
+                    var orDistinct = oracle.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
+                    Assert.True(dbDistinct.SequenceEqual(orDistinct),
+                        $"Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbDistinct)}]\noracle: [{string.Join(",", orDistinct)}]");
+                }
+                else
+                {
+                    var dbNickDistinct = db.Select(r => r.Nick).Distinct().ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
+                    var orNickDistinct = oracle.Select(r => r.Nick).Distinct().ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
+                    Assert.True(dbNickDistinct.SequenceEqual(orNickDistinct),
+                        $"nullable-string Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbNickDistinct)}]\noracle: [{string.Join(",", orNickDistinct)}]");
+                }
                 break;
         }
         }
@@ -814,12 +892,13 @@ public class LinqParityFuzzTests
         }
     }
 
-    private sealed record ProjRow(int Id, int X, bool B);
+    private sealed record ProjRow(int Id, int X, bool B, string? S);
 
     /// <summary>
     /// Generates a constructor projection over computed expressions so the
-    /// SELECT-clause translator gets fuzzed too (arithmetic and boolean
-    /// projections have their own emission paths distinct from predicates).
+    /// SELECT-clause translator gets fuzzed too (arithmetic, boolean, and
+    /// nullable-string projections have their own emission paths distinct
+    /// from predicates).
     /// </summary>
     private static Expression<Func<Row, ProjRow>> GenerateProjection(Random rng)
     {
@@ -843,8 +922,23 @@ public class LinqParityFuzzTests
                     Expression.Property(Expression.Property(p, nameof(Row.Name)), nameof(string.Length)),
                     Expression.Constant(rng.Next(0, 8))),
         };
+        var nick = Expression.Property(p, "Nick");
+        var concat = typeof(string).GetMethod(nameof(string.Concat), new[] { typeof(string), typeof(string) })!;
+        Expression s = rng.Next(4) switch
+        {
+            // Raw null round-trip through the reader.
+            0 => nick,
+            1 => Expression.Coalesce(nick, Expression.Constant(string.Empty)),
+            // Conditional on the null test — SCV must not lose the NULL branch.
+            2 => Expression.Condition(
+                    Expression.Equal(nick, Expression.Constant(null, typeof(string))),
+                    Expression.Property(p, nameof(Row.Name)),
+                    nick),
+            // C# concat treats null as empty ("x" stays "x"); SQL || / CONCAT would null it.
+            _ => Expression.Add(nick, Expression.Constant("x"), concat),
+        };
 
-        var body = Expression.New(ctor, Expression.Property(p, nameof(Row.Id)), x, b);
+        var body = Expression.New(ctor, Expression.Property(p, nameof(Row.Id)), x, b, s);
         return Expression.Lambda<Func<Row, ProjRow>>(body, p);
     }
 
