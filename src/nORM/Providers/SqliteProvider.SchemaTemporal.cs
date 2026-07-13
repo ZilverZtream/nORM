@@ -95,7 +95,9 @@ namespace nORM.Providers
             {
                 if (liveMap.TryGetValue(c.Name, out var live))
                     return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                var sqlType = GetSqliteType(c.Prop.PropertyType);
+                // History rows copy the main table's converter-encoded values, so the
+                // fallback types by the PROVIDER representation.
+                var sqlType = GetSqliteType(c.Converter?.ProviderType ?? c.Prop.PropertyType);
                 var nullability = IsNullableOrReferenceType(c.Prop.PropertyType) ? "" : " NOT NULL";
                 return $"{Escape(c.Name)} {sqlType}{nullability}";
             }));

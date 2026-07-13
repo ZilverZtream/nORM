@@ -164,7 +164,8 @@ namespace nORM.Providers
             try
             {
                 // Create temp table with same schema
-                var colDefs = string.Join(", ", m.Columns.Select(c => $"{Escape(c.PropName)} {GetSqliteType(c.Prop.PropertyType)}"));
+                // Staged values are converter-encoded, so type by the PROVIDER representation.
+                var colDefs = string.Join(", ", m.Columns.Select(c => $"{Escape(c.PropName)} {GetSqliteType(c.Converter?.ProviderType ?? c.Prop.PropertyType)}"));
                 await using (var cmd = ctx.RawConnection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
@@ -285,8 +286,14 @@ namespace nORM.Providers
         private static string GetSqliteType(Type t)
         {
             t = Nullable.GetUnderlyingType(t) ?? t;
-            if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool)) return "INTEGER";
-            if (t == typeof(decimal) || t == typeof(double) || t == typeof(float)) return "REAL";
+            if (t.IsEnum) t = Enum.GetUnderlyingType(t);
+            if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool)
+                || t == typeof(sbyte) || t == typeof(ushort) || t == typeof(uint) || t == typeof(ulong)) return "INTEGER";
+            if (t == typeof(double) || t == typeof(float)) return "REAL";
+            // Decimals bind as canonical TEXT; a REAL-affinity staging column collapses
+            // them to the nearest double (15-16 significant digits) and the temp-table
+            // join writes the degraded value back into the main table.
+            if (t == typeof(decimal)) return "TEXT";
             if (t == typeof(byte[])) return "BLOB";
             return "TEXT";
         }

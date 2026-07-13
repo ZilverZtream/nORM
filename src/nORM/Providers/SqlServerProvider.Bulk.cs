@@ -376,7 +376,10 @@ namespace nORM.Providers
             if (t == typeof(DateTimeOffset)) return "DATETIMEOFFSET";
             if (t == typeof(TimeSpan)) return "TIME";
             if (t == typeof(bool)) return "BIT";
-            if (t == typeof(decimal)) return "DECIMAL(18,2)";
+            // Wide default: staging overrides decimals via GetStagingSqlType, so this
+            // entry serves the temporal history fallback, where a narrow scale would
+            // silently round copied rows.
+            if (t == typeof(decimal)) return "DECIMAL(38,18)";
             if (t == typeof(double)) return "FLOAT";
             if (t == typeof(float)) return "REAL";
             if (t == typeof(Guid)) return "UNIQUEIDENTIFIER";

@@ -76,8 +76,9 @@ public class TemporalSchemaTests
         Assert.Contains("\"IsActive\" INTEGER", ddl);
         Assert.Contains("\"Counter\" INTEGER", ddl);
 
- // Floating-point types must map to REAL, not TEXT
-        Assert.Contains("\"Price\" REAL", ddl);
+ // Floating-point types must map to REAL; decimals stay TEXT because REAL
+ // affinity collapses values beyond double precision.
+        Assert.Contains("\"Price\" TEXT", ddl);
         Assert.Contains("\"Score\" REAL", ddl);
 
  // String stays TEXT
@@ -196,7 +197,7 @@ public class TemporalSchemaTests
         Assert.Contains(columns, c => c.Name == "Id" && c.Type.Contains("INTEGER"));
         Assert.Contains(columns, c => c.Name == "Name" && c.Type.Contains("TEXT"));
         Assert.Contains(columns, c => c.Name == "IsActive" && c.Type.Contains("INTEGER"));
-        Assert.Contains(columns, c => c.Name == "Price" && c.Type.Contains("REAL"));
+        Assert.Contains(columns, c => c.Name == "Price" && c.Type.Contains("TEXT"));
     }
 
  // ── SQL Server: history table should use same type mapping as main table ─
@@ -217,7 +218,7 @@ public class TemporalSchemaTests
         Assert.Contains("[Id] INT", ddl);
         Assert.Contains("[IsActive] BIT", ddl);
         Assert.Contains("[Counter] BIGINT", ddl);
-        Assert.Contains("[Price] DECIMAL(18,2)", ddl);
+        Assert.Contains("[Price] DECIMAL(38,18)", ddl);
         Assert.Contains("[CreatedAt] DATETIME2", ddl);
         Assert.Contains("[Name] NVARCHAR(MAX)", ddl);
     }

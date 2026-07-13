@@ -101,7 +101,9 @@ ORDER BY ordinal_position";
             {
                 if (liveMap.TryGetValue(c.Name, out var live))
                     return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                return $"{Escape(c.Name)} {GetPostgresType(c.Prop.PropertyType)}";
+                // History rows copy the main table's converter-encoded values, so the
+                // fallback types by the PROVIDER representation.
+                return $"{Escape(c.Name)} {GetPostgresType(c.Converter?.ProviderType ?? c.Prop.PropertyType)}";
             }));
 
             return $@"

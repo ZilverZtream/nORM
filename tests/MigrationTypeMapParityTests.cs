@@ -95,7 +95,7 @@ public class MigrationTypeMapParityTests
     }
 
     [Theory]
-    [InlineData("sqlite", "NUMERIC")]
+    [InlineData("sqlite", "TEXT")] // SQLite has no decimal type; TEXT affinity stores every digit
     [InlineData("sqlserver", "DECIMAL(28,6)")]
     [InlineData("mysql", "DECIMAL(28,6)")]
     [InlineData("postgres", "DECIMAL(28,6)")]

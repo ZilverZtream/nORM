@@ -120,7 +120,9 @@ ALTER TABLE {table} MODIFY COLUMN {tsCol} DATETIME(6) NOT NULL";
             {
                 if (liveMap.TryGetValue(c.Name, out var live))
                     return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                return $"{Escape(c.Name)} {GetSqlType(c.Prop.PropertyType)}";
+                // History rows copy the main table's converter-encoded values, so the
+                // fallback types by the PROVIDER representation.
+                return $"{Escape(c.Name)} {GetSqlType(c.Converter?.ProviderType ?? c.Prop.PropertyType)}";
             }));
 
             return $@"

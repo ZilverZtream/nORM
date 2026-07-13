@@ -31,7 +31,11 @@ namespace nORM.Migration
             { typeof(bool).FullName!, "INTEGER" },
             { typeof(string).FullName!, "TEXT" },
             { typeof(DateTime).FullName!, "TEXT" },
-            { typeof(decimal).FullName!, "NUMERIC" },
+            // TEXT, not NUMERIC: SQLite's NUMERIC affinity converts any well-formed
+            // real literal to REAL (a double), silently collapsing decimals beyond
+            // 15-16 significant digits on every insert. TEXT stores the canonical
+            // decimal string exactly — the same mapping EF Core uses for SQLite.
+            { typeof(decimal).FullName!, "TEXT" },
             { typeof(double).FullName!, "REAL" },
             { typeof(float).FullName!, "REAL" },
             { typeof(Guid).FullName!, "TEXT" },

@@ -387,7 +387,7 @@ public class MigrationSqlGenerationTests
     }
 
     [Fact]
-    public void Sqlite_DecimalColumn_MapsToNumeric()
+    public void Sqlite_DecimalColumn_MapsToText()
     {
         var table = MakeTable("T",
             PkCol("Id"),
@@ -398,7 +398,9 @@ public class MigrationSqlGenerationTests
 
         var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
         var createStmt = sql.Up.Single(s => s.StartsWith("CREATE TABLE"));
-        Assert.Contains("\"Price\" NUMERIC", createStmt);
+        // TEXT, not NUMERIC: NUMERIC affinity converts real literals to REAL and
+        // silently collapses decimals beyond double precision on every insert.
+        Assert.Contains("\"Price\" TEXT", createStmt);
     }
 
     [Fact]

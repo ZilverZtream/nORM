@@ -422,7 +422,10 @@ namespace nORM.Providers
             if (t == typeof(DateTimeOffset)) return "TIMESTAMPTZ";
             if (t == typeof(TimeSpan)) return "INTERVAL";
             if (t == typeof(bool)) return "BOOLEAN";
-            if (t == typeof(decimal)) return "DECIMAL(18,2)";
+            // Wide default: history rows copy main-table decimals, and a narrow scale
+            // would silently round them (no single SQL DECIMAL holds every .NET decimal;
+            // live introspection of the main table is the exact path).
+            if (t == typeof(decimal)) return "DECIMAL(38,18)";
             if (t == typeof(Guid)) return "UUID";
             if (t == typeof(byte[])) return "BYTEA";
             if (t == typeof(float)) return "REAL";
