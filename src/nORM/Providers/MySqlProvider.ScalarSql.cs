@@ -260,15 +260,22 @@ namespace nORM.Providers
         public override string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment)
             => $"DATE(DATE_ADD({dateOnlySql}, INTERVAL ({yearsSqlFragment}) YEAR))";
 
-        /// <summary>MySQL ADDTIME(TIME, SEC_TO_TIME(N)) stays TIME (no DATETIME promotion).</summary>
+        /// <summary>
+        /// .NET TimeOnly arithmetic wraps around midnight, but MySQL's ADDTIME does
+        /// not — TIME values happily exceed 24 hours ('23:30' + 2.5h = '26:00:00').
+        /// Convert to seconds, apply a positive modulo (MOD keeps the dividend's
+        /// sign, so the double-MOD folds negative results back into [0, 86400)),
+        /// and convert back to TIME.
+        /// </summary>
         public override string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment)
-            => $"ADDTIME({timeOnlySql}, SEC_TO_TIME({secondsSqlFragment}))";
+            => $"SEC_TO_TIME(MOD(MOD(TIME_TO_SEC({timeOnlySql}) + ({secondsSqlFragment}), 86400) + 86400, 86400))";
 
-        /// <summary>MySQL ADDTIME / SUBTIME(TIME, TIME) stay TIME.</summary>
+        /// <summary>Same midnight wrap as <see cref="AddSecondsToTimeOnlySql"/> for a TimeSpan column operand.</summary>
         public override string? AddTimeSpanColumnToTimeOnlySql(string timeOnlySql, string timeSpanColumnSql, bool subtract)
-            => subtract
-                ? $"SUBTIME({timeOnlySql}, {timeSpanColumnSql})"
-                : $"ADDTIME({timeOnlySql}, {timeSpanColumnSql})";
+        {
+            var op = subtract ? "-" : "+";
+            return $"SEC_TO_TIME(MOD(MOD(TIME_TO_SEC({timeOnlySql}) {op} TIME_TO_SEC({timeSpanColumnSql}), 86400) + 86400, 86400))";
+        }
 
         /// <summary>MySQL uses SIGNED / UNSIGNED for integer casts - `CAST(x AS INT)` is a syntax error.</summary>
         public override string GetIntCastSql(string innerSql, bool asLong = false)

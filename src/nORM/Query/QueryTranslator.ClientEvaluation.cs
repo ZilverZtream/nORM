@@ -154,6 +154,12 @@ namespace nORM.Query
                 nameof(DateOnly.AddMonths),
                 nameof(DateOnly.AddYears),
                 nameof(TimeOnly.Add),
+                // TimeOnly.AddHours/AddMinutes wrap around midnight; the SCV branch
+                // and the provider AddSecondsToTimeOnlySql hook implement that wrap.
+                // (Name-based list: these entries also open DateTime.AddHours /
+                // AddMinutes, whose handlers exist in both visitors.)
+                nameof(TimeOnly.AddHours),
+                nameof(TimeOnly.AddMinutes),
                 // DateTime/DateTimeOffset.Add / .Subtract(TimeSpan) instance forms.
                 // The method names are also shared with several other types whose
                 // semantics differ; the SCV handler keys off the receiver type so

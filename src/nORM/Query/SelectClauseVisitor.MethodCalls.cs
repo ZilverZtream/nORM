@@ -453,6 +453,48 @@ namespace nORM.Query
                     return node;
                 }
             }
+            // TimeOnly.Add / AddHours / AddMinutes in a projection -- mirrors the
+            // predicate translator's TryTranslateTimeOnlyAdd. Without this branch the
+            // projection falls to client evaluation and throws under the default
+            // policy. .NET TimeOnly arithmetic wraps around midnight; the provider
+            // hooks implement that wrap.
+            if (node.Object != null
+                && (Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type) == typeof(TimeOnly)
+                && node.Arguments.Count == 1
+                && ((node.Method.Name == nameof(TimeOnly.Add)
+                     && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(TimeSpan))
+                    || ((node.Method.Name is nameof(TimeOnly.AddHours) or nameof(TimeOnly.AddMinutes))
+                        && (Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type) == typeof(double))))
+            {
+                var timeOnlySql = TranslateProjectionArg(node.Object);
+                string? timeArith = null;
+                if (node.Method.Name != nameof(TimeOnly.Add)
+                    && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var timeScalarVal)
+                    && timeScalarVal is double timeScalar)
+                {
+                    ReserveUnusedCompiledSlotForClosure(node.Arguments[0]);
+                    var perUnit = node.Method.Name == nameof(TimeOnly.AddHours) ? 3600.0 : 60.0;
+                    timeArith = _provider.AddSecondsToTimeOnlySql(
+                        timeOnlySql, ((long)(timeScalar * perUnit)).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+                else if (node.Method.Name == nameof(TimeOnly.Add)
+                    && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var timeSpanVal)
+                    && timeSpanVal is TimeSpan timeSpan)
+                {
+                    ReserveUnusedCompiledSlotForClosure(node.Arguments[0]);
+                    timeArith = _provider.AddSecondsToTimeOnlySql(
+                        timeOnlySql, ((long)timeSpan.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+                else if (node.Method.Name == nameof(TimeOnly.Add))
+                {
+                    var spanColumnSql = TranslateProjectionArg(node.Arguments[0]);
+                    timeArith = _provider.AddTimeSpanColumnToTimeOnlySql(timeOnlySql, spanColumnSql, subtract: false);
+                }
+                if (timeArith != null) { sb.Append(timeArith); return node; }
+                throw new NormUnsupportedFeatureException(
+                    $"{_provider.GetType().Name} does not implement the TimeOnly arithmetic hook required for TimeOnly.{node.Method.Name} in a projection.");
+            }
+
             fallthrough:
 
             // Scalar/named functions on known static surfaces (Math.Abs, Math.Min,
@@ -518,6 +560,23 @@ namespace nORM.Query
             }
             sb.Append(')');
             return node;
+        }
+
+
+        /// <summary>
+        /// A closure value baked into cached SQL still occupies a slot in the
+        /// compiled-parameter list so the extractor's positional document-order
+        /// mapping stays aligned (the expression fingerprint hashes the value, so
+        /// distinct captures get distinct plans). Mirrors the predicate
+        /// translator's placeholder bookkeeping.
+        /// </summary>
+        private void ReserveUnusedCompiledSlotForClosure(Expression argument)
+        {
+            if (argument is not MemberExpression || SharedCompiledParams == null)
+                return;
+            var placeholder = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}_unused";
+            if (SharedParams != null) SharedParams[placeholder] = DBNull.Value;
+            SharedCompiledParams.Add(placeholder);
         }
 
     }

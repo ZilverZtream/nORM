@@ -65,7 +65,9 @@ public sealed class TimeOnlyAddHoursMinutesProviderShapeTests : TestBase
                 Assert.Contains("interval", sql, StringComparison.OrdinalIgnoreCase);
                 break;
             case ProviderKind.MySql:
-                Assert.Contains("ADDTIME(", sql);
+                // .NET TimeOnly arithmetic wraps around midnight; MySQL's ADDTIME
+                // does not, so the emit folds seconds through a positive modulo.
+                Assert.Contains("SEC_TO_TIME(MOD(", sql);
                 break;
         }
     }
