@@ -373,11 +373,15 @@ namespace nORM.Core
                 foreach (var kc in map.KeyColumns)
                 {
                     pkConds.Add($"{kc.EscCol}={_p.ParamPrefix}v{pi}");
-                    cmd.AddParam($"{_p.ParamPrefix}v{pi++}", kc.Getter(entity));
+                    // Bind the converter's provider value like the write itself does — a raw
+                    // model key matches nothing and misreports every row as a stale conflict.
+                    var rawKey = kc.Getter(entity);
+                    cmd.AddParam($"{_p.ParamPrefix}v{pi++}", kc.Converter != null ? kc.Converter.ConvertToProvider(rawKey) : rawKey);
                 }
                 // Null-safe token equality matches the predicate used in BuildUpdateBatch/BuildDeleteBatch.
                 pkConds.Add($"({tc.EscCol}={_p.ParamPrefix}v{pi} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}v{pi} IS NULL))");
                 var tok = entry.OriginalToken;
+                if (tok != null && tc.Converter != null) tok = tc.Converter.ConvertToProvider(tok);
                 cmd.AddParam($"{_p.ParamPrefix}v{pi++}", tok ?? (object)DBNull.Value);
                 conditions.Add($"({string.Join(" AND ", pkConds)})");
             }
@@ -431,11 +435,15 @@ namespace nORM.Core
             foreach (var kc in map.KeyColumns)
             {
                 conditions.Add($"{kc.EscCol}={_p.ParamPrefix}v{pi}");
-                cmd.AddParam($"{_p.ParamPrefix}v{pi++}", kc.Getter(entity));
+                // Bind the converter's provider value like the write itself does — a raw
+                // model key matches nothing and misreports the update as a stale conflict.
+                var rawKey = kc.Getter(entity);
+                cmd.AddParam($"{_p.ParamPrefix}v{pi++}", kc.Converter != null ? kc.Converter.ConvertToProvider(rawKey) : rawKey);
             }
             // Null-safe token equality mirrors the predicate in BuildUpdate/BuildUpdateBatch.
             conditions.Add($"({tc.EscCol}={_p.ParamPrefix}v{pi} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}v{pi} IS NULL))");
             var tok = originalToken ?? tc.Getter(entity);
+            if (tok != null && tc.Converter != null) tok = tc.Converter.ConvertToProvider(tok);
             cmd.AddParam($"{_p.ParamPrefix}v{pi++}", tok ?? (object)DBNull.Value);
 
             var sb = new StringBuilder("SELECT COUNT(*) FROM ").Append(map.EscTable).Append(" WHERE ");
