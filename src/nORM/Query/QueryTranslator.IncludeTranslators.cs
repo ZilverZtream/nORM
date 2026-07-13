@@ -197,19 +197,34 @@ namespace nORM.Query
                 {
                     return t.Visit(source);
                 }
-                // OfType<DerivedType>() on a TPH hierarchy: TranslationBuilder.Setup() already
-                // injected the discriminator WHERE predicate and set _rootType to the derived
-                // type. VisitConstant will reset _rootType back to the base type when it sees the
-                // inner IQueryable<BaseType> constant — restore it so the materializer targets Dog,
-                // not Animal.
-                if (targetElement.IsSubclassOf(sourceElement) &&
-                    targetElement.GetCustomAttribute<DiscriminatorValueAttribute>() != null &&
-                    t._mapping.DiscriminatorColumn != null)
+                // OfType<DerivedType>() on a TPH hierarchy. When the derived type is the
+                // query's element type (no downstream projection), TranslationBuilder.Setup()
+                // already injected the discriminator WHERE predicate — only _rootType needs
+                // restoring after VisitConstant resets it to the base. With a downstream
+                // Select, Setup saw the PROJECTION's element type instead and injected
+                // nothing — without the predicate here, OfType<Dog>().Select(...) would
+                // silently return every subtype's rows.
+                if (targetElement.IsSubclassOf(sourceElement)
+                    && targetElement.GetCustomAttribute<DiscriminatorValueAttribute>() is { } discriminatorValue)
                 {
-                    var derivedRoot = t._rootType;
-                    t.Visit(source);
-                    t._rootType = derivedRoot;
-                    return source;
+                    var baseMapping = t.TrackMapping(sourceElement);
+                    if (baseMapping.DiscriminatorColumn != null)
+                    {
+                        var setupHandledDiscriminator = t._rootType == targetElement;
+                        t.Visit(source);
+                        t._rootType = targetElement;
+                        if (!setupHandledDiscriminator)
+                        {
+                            t._mapping = baseMapping;
+                            var paramName = t._ctx!.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
+                            t._params[paramName] = discriminatorValue.Value;
+                            if (t._where.Length > 0)
+                                t._where.Append(" AND ");
+                            t._where.Append('(').Append(baseMapping.DiscriminatorColumn!.EscCol)
+                                .Append(" = ").Append(paramName).Append(')');
+                        }
+                        return source;
+                    }
                 }
                 throw new NormUnsupportedFeatureException(
                     $"{node.Method.Name}<{targetElement.Name}>() on IQueryable<{sourceElement.Name}> cannot be translated to SQL: " +
