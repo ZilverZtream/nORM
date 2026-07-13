@@ -289,14 +289,17 @@ namespace nORM.Query
                 var needle = GetSql(node.Arguments[0]);
                 if (ignoreCase)
                 {
+                    // The base IndexOf translation matches ordinally, so LOWER-ing both
+                    // operands yields OrdinalIgnoreCase exactly (binary compare of the
+                    // lowered forms).
                     haystack = $"LOWER({haystack})";
                     needle = $"LOWER({needle})";
                 }
-                else if (forceCaseSensitive)
-                {
-                    haystack = _provider.ForceCaseSensitiveStringComparison(haystack);
-                    needle = _provider.ForceCaseSensitiveStringComparison(needle);
-                }
+                // Explicit StringComparison.Ordinal needs no extra wrapping: the base
+                // IndexOf translation is ordinal by default, and stacking another
+                // ForceCaseSensitiveStringComparison collation on an operand the
+                // translation already collates is a syntax error on SQL Server
+                // (chained COLLATE clauses).
                 var indexOfSql = _provider.TranslateFunction(nameof(string.IndexOf), typeof(string), haystack, needle);
                 if (indexOfSql != null)
                 {
@@ -325,11 +328,10 @@ namespace nORM.Query
                 var source = GetSql(node.Object);
                 var oldValue = GetSql(node.Arguments[0]);
                 var newValue = GetSql(node.Arguments[1]);
-                if (_provider is SqlServerProvider)
-                {
-                    source = _provider.ForceCaseSensitiveStringComparison(source);
-                    oldValue = _provider.ForceCaseSensitiveStringComparison(oldValue);
-                }
+                // No provider-specific wrapping here: the base Replace translation
+                // already matches ordinally (SQL Server collates the REPLACE input;
+                // MySQL REPLACE is natively case-sensitive), and a second collation
+                // on the same operand is a syntax error on SQL Server.
                 var replaceSql = _provider.TranslateFunction(nameof(string.Replace), typeof(string), source, oldValue, newValue);
                 if (replaceSql != null)
                 {
