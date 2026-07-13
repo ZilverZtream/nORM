@@ -43,6 +43,8 @@ public class ReferenceNavigationScalarTests
         public string Name { get; set; } = "";
         public int? DeptId { get; set; }
         [ForeignKey(nameof(DeptId))] public Dept? Dept { get; set; }
+        public int? BackupDeptId { get; set; }
+        [ForeignKey(nameof(BackupDeptId))] public Dept? BackupDept { get; set; }
     }
 
     private static (SqliteConnection, DbContext) Setup()
@@ -54,10 +56,10 @@ public class ReferenceNavigationScalarTests
             cmd.CommandText = """
                 CREATE TABLE Region (Id INTEGER PRIMARY KEY, Zone TEXT NOT NULL);
                 CREATE TABLE Dept (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL, RegionId INTEGER NULL);
-                CREATE TABLE Emp (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, DeptId INTEGER NULL);
+                CREATE TABLE Emp (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, DeptId INTEGER NULL, BackupDeptId INTEGER NULL);
                 INSERT INTO Region VALUES (1, 'EU');
                 INSERT INTO Dept VALUES (1, 'Eng', 1), (2, 'Ops', NULL);
-                INSERT INTO Emp VALUES (1, 'ann', 1), (2, 'bob', NULL), (3, 'cid', 2);
+                INSERT INTO Emp VALUES (1, 'ann', 1, 1), (2, 'bob', NULL, NULL), (3, 'cid', 2, 1);
                 """;
             cmd.ExecuteNonQuery();
         }
@@ -254,6 +256,34 @@ public class ReferenceNavigationScalarTests
         var labels = ctx.Query<Emp>().OrderBy(e => e.Id)
             .Select(e => e.DeptId == null ? "orphan" : "parented").ToList();
         Assert.Equal(new[] { "parented", "orphan", "parented" }, labels);
+    }
+
+    [Fact]
+    public void Nav_vs_nav_comparison_compares_fk_values()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // ann: dept 1 == backup 1; bob: both null (C# null == null is true);
+        // cid: dept 2 != backup 1.
+        var same = ctx.Query<Emp>().Where(e => e.Dept == e.BackupDept).Select(e => e.Id).OrderBy(i => i).ToList();
+        Assert.Equal(new[] { 1, 2 }, same);
+        var diff = ctx.Query<Emp>().Where(e => e.Dept != e.BackupDept).Select(e => e.Id).OrderBy(i => i).ToList();
+        Assert.Equal(new[] { 3 }, diff);
+    }
+
+    [Fact]
+    public void Two_navs_to_same_principal_resolve_their_own_fk()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // cid: Dept=Ops (2), BackupDept=Eng (1) — a type-name FK match would read
+        // BOTH navigations through DeptId and return Ops twice.
+        var rows = ctx.Query<Emp>().Where(e => e.Id == 3)
+            .Select(e => new { Main = e.Dept!.Title, Backup = e.BackupDept!.Title }).ToList();
+        Assert.Equal("Ops", rows[0].Main);
+        Assert.Equal("Eng", rows[0].Backup);
     }
 
     [Fact]

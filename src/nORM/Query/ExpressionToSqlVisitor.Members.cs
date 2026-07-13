@@ -319,6 +319,16 @@ namespace nORM.Query
             else if (TryResolveNavigationFkValueSql(node.Right, out fkSql)) valueSide = node.Left;
             else return false;
 
+            // Navigation vs navigation (e.Boss == e.Mentor): both sides reduce to
+            // their FK values, null-safe so two orphan sides compare like C# nulls.
+            if (TryResolveNavigationFkValueSql(valueSide, out var otherFkSql))
+            {
+                _sql.Append(node.NodeType == ExpressionType.Equal
+                    ? _provider.NullSafeEqual(fkSql, otherFkSql)
+                    : _provider.NullSafeNotEqual(fkSql, otherFkSql));
+                return true;
+            }
+
             var stripped = valueSide;
             while (stripped is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
                 stripped = u.Operand;
@@ -355,21 +365,40 @@ namespace nORM.Query
         internal static Column? FindReferenceNavForeignKey(
             TableMapping ownerMap, string navName, Type principalType, TableMapping principalMap)
         {
+            // Navigation-NAME matches bind tightest: with two navigations to the
+            // same principal (Dept + BackupDept), a type-name match would resolve
+            // BOTH to the first Dept-typed FK and silently compare the wrong
+            // column. Type-name and relation fallbacks only apply when unambiguous.
             foreach (var c in ownerMap.Columns)
             {
                 if (c.ForeignKeyPrincipalTypeName != null
-                    && (string.Equals(c.ForeignKeyPrincipalTypeName, navName, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(c.ForeignKeyPrincipalTypeName, principalType.Name, StringComparison.OrdinalIgnoreCase)))
+                    && string.Equals(c.ForeignKeyPrincipalTypeName, navName, StringComparison.OrdinalIgnoreCase))
                     return c;
             }
             if (ownerMap.ColumnsByName.TryGetValue(navName + "Id", out var conventional))
                 return conventional;
+            Column? byTypeName = null;
+            foreach (var c in ownerMap.Columns)
+            {
+                if (c.ForeignKeyPrincipalTypeName != null
+                    && string.Equals(c.ForeignKeyPrincipalTypeName, principalType.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (byTypeName != null) { byTypeName = null; break; }
+                    byTypeName = c;
+                }
+            }
+            if (byTypeName != null)
+                return byTypeName;
+            Column? byRelation = null;
             foreach (var rel in principalMap.Relations.Values)
             {
                 if (rel.DependentType == ownerMap.Type && !rel.IsComposite)
-                    return rel.ForeignKey;
+                {
+                    if (byRelation != null) return null;
+                    byRelation = rel.ForeignKey;
+                }
             }
-            return null;
+            return byRelation;
         }
 
         protected override Expression VisitConstant(ConstantExpression node)
