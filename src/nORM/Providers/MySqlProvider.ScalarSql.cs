@@ -288,6 +288,13 @@ namespace nORM.Providers
         internal override string FloatingToIntegralTruncatingSql(string sql, bool asLong)
             => GetIntCastSql($"TRUNCATE({sql}, 0)", asLong);
 
+        /// <summary>
+        /// only_full_group_by rejects a SELECT-side key repeating a correlated
+        /// subquery; LATERAL (8.0.14+) exposes it as a groupable column.
+        /// </summary>
+        internal override string? AppliedScalarColumnClause(string scalarSql, string escapedAlias, string escapedColumn)
+            => $" CROSS JOIN LATERAL (SELECT {scalarSql} AS {escapedColumn}) AS {escapedAlias}";
+
         /// <summary>MySQL TIME to fractional seconds: whole seconds plus the microsecond tail.</summary>
         internal override string TimeSpanOperandToSecondsSql(string sql)
             => $"(TIME_TO_SEC({sql}) + MICROSECOND({sql}) / 1000000.0)";

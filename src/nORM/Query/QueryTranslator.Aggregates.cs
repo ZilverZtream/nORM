@@ -233,6 +233,18 @@ namespace nORM.Query
                     if (keyType == typeof(DateTimeOffset)
                         && _provider.CanonicalizeDateTimeOffsetGroupKey(groupBySql) is { } canonicalKey)
                         groupBySql = canonicalKey;
+                    // A navigation-member key translates to a correlated scalar subquery,
+                    // which SQL Server rejects inside GROUP BY and MySQL's
+                    // only_full_group_by rejects on the SELECT side. Those providers
+                    // expose the key as an applied lateral column and group by THAT —
+                    // the dual-purpose _groupBy then serves both the clause and the
+                    // SELECT-side key resolution with the applied column.
+                    if (keySelectorLambda.Body is MemberExpression { Expression: MemberExpression }
+                        && _provider.AppliedScalarColumnClause(groupBySql, EscapeAlias("GK0"), _provider.Escape("GK")) is { } appliedClause)
+                    {
+                        _fromSuffix = (_fromSuffix ?? string.Empty) + appliedClause;
+                        groupBySql = $"{EscapeAlias("GK0")}.{_provider.Escape("GK")}";
+                    }
                     _groupBy.Add(groupBySql);
                     // Ordinal string grouping on CI-collation providers: extra binary key (see
                     // the composite-key path above for the rationale and the extras-list note).

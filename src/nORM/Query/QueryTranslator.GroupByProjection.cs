@@ -272,6 +272,11 @@ namespace nORM.Query
                         _sql.AppendFragment(sourceFromSql);
                     else
                         _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
+                    // Applied lateral columns (a navigation-member GROUP BY key exposed
+                    // as a groupable column on providers that reject subqueries in
+                    // GROUP BY) attach directly after the source table.
+                    if (_fromSuffix != null)
+                        _sql.AppendFragment(_fromSuffix);
                 }
             }
             finally

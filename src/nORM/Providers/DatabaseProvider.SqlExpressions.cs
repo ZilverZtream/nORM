@@ -120,6 +120,17 @@ namespace nORM.Providers
         internal virtual string BooleanPredicateAsValue(string predicateSql) => predicateSql;
 
         /// <summary>
+        /// A FROM-clause suffix exposing a correlated scalar as a named column the
+        /// query can GROUP BY. SQL Server rejects subqueries inside GROUP BY and
+        /// MySQL's only_full_group_by rejects a SELECT-side key that repeats the
+        /// subquery, so those dialects group by an applied lateral column instead.
+        /// Null means the dialect accepts the subquery directly in GROUP BY
+        /// (SQLite, PostgreSQL) and no rewrite is needed.
+        /// </summary>
+        internal virtual string? AppliedScalarColumnClause(string scalarSql, string escapedAlias, string escapedColumn)
+            => null;
+
+        /// <summary>
         /// SQL for a C# EXPLICIT cast from floating point/decimal to an integer type,
         /// which truncates toward zero ((int)2.7 is 2, (int)-2.7 is -2). A bare CAST
         /// already truncates on SQLite and SQL Server; MySQL's CAST rounds half away

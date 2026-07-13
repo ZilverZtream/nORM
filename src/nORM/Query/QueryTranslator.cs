@@ -165,6 +165,7 @@ namespace nORM.Query
         private int? _take { get => _clauses.Take; set => _clauses.Take = value; }
         private int? _skip { get => _clauses.Skip; set => _clauses.Skip = value; }
         private string? _takeParam { get => _clauses.TakeParam; set => _clauses.TakeParam = value; }
+        internal string? _fromSuffix { get => _clauses.FromSuffix; set => _clauses.FromSuffix = value; }
         private string? _skipParam { get => _clauses.SkipParam; set => _clauses.SkipParam = value; }
         // True when _take was set by a terminal operator (First / FirstOrDefault / Single /
         // SingleOrDefault / Last / LastOrDefault / ElementAt / ElementAtOrDefault) rather

@@ -25,6 +25,10 @@ namespace nORM.Query
         public int? Take { get; set; }
         public int? Skip { get; set; }
         public string? TakeParam { get; set; }
+        // Appended verbatim after the FROM clause's table alias: carries applied
+        // lateral columns (CROSS APPLY / CROSS JOIN LATERAL) that expose a
+        // correlated-subquery GROUP BY key as a groupable column.
+        public string? FromSuffix { get; set; }
         public string? SkipParam { get; set; }
         // True when Take was set by a terminal operator (First/Single/Last/ElementAt)
         // rather than a user-facing .Take() / .Skip(). Lets the post-Take/Skip pin

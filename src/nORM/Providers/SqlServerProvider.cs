@@ -158,6 +158,10 @@ namespace nORM.Providers
         public override string BuildCorrelatedTopOneSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql)
             => $"(SELECT TOP 1 {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql})";
 
+        /// <summary>T-SQL rejects subqueries inside GROUP BY; CROSS APPLY exposes the key as a column.</summary>
+        internal override string? AppliedScalarColumnClause(string scalarSql, string escapedAlias, string escapedColumn)
+            => $" CROSS APPLY (SELECT {scalarSql} AS {escapedColumn}) {escapedAlias}";
+
         /// <summary>T-SQL cannot select a bare predicate; CASE-to-BIT materializes it as bool.</summary>
         internal override string BooleanPredicateAsValue(string predicateSql)
             => $"CAST(CASE WHEN {predicateSql} THEN 1 ELSE 0 END AS BIT)";

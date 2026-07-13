@@ -421,6 +421,7 @@ namespace nORM.Query
                         {
                             prefix.Append("SELECT ").Append(distinct).Append(select).Append(" FROM ").Append(fromClause);
                             if (alias != null) prefix.Append(' ').Append(alias);
+                            if (_t._fromSuffix != null) prefix.Append(_t._fromSuffix);
                             _t._sql.Insert(0, prefix.ToString());
                         }
                         finally
