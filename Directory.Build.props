@@ -1,8 +1,8 @@
-<Project>
+﻿<Project>
   <PropertyGroup>
     <LangVersion>12.0</LangVersion>
     <Nullable>enable</Nullable>
-    <NormVersion>1.0.0-rc.3</NormVersion>
+    <NormVersion>1.0.0-rc.4</NormVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
   </PropertyGroup>
