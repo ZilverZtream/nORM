@@ -62,20 +62,28 @@ namespace nORM.Query
     internal static class JoinBuilder
     {
         /// <summary>
-        /// Composes the join's key-equality condition. C# joins string keys ordinally, so on
-        /// providers whose default collation folds case (MySQL, SQL Server) a string-keyed join
-        /// emits the sargable ordinal form — the plain <c>=</c> keeps hash/merge join
-        /// eligibility, the binary term filters the case variants exactly. Callers that do not
-        /// supply the provider/key type keep the plain equality.
+        /// Composes the join's key-equality condition, matching LINQ's key comparer per type:
+        /// string keys join ordinally (providers whose default collation folds case — MySQL,
+        /// SQL Server — emit the sargable ordinal form; plain <c>=</c> keeps hash/merge join
+        /// eligibility, the binary term filters case variants exactly); decimal keys join
+        /// scale-insensitively (SQLite TEXT storage would treat '10.5' and '10.50' as
+        /// different keys — the canonical decimal text keys them together at full
+        /// precision); DateTimeOffset keys join by INSTANT (SQLite's offset-suffixed TEXT
+        /// would compare wall-clock text). Callers that do not supply the provider/key type
+        /// keep the plain equality.
         /// </summary>
         internal static string BuildOnEquality(
             string outerKeySql, string innerKeySql,
             nORM.Providers.DatabaseProvider? provider = null, Type? keyClrType = null)
         {
             var t = keyClrType == null ? null : Nullable.GetUnderlyingType(keyClrType) ?? keyClrType;
-            return provider != null && t == typeof(string) && provider.DefaultStringEqualityIsCaseInsensitive
-                ? provider.OrdinalStringEqualSql(outerKeySql, innerKeySql)
-                : $"{outerKeySql} = {innerKeySql}";
+            if (provider != null && t == typeof(string) && provider.DefaultStringEqualityIsCaseInsensitive)
+                return provider.OrdinalStringEqualSql(outerKeySql, innerKeySql);
+            if (provider != null && t == typeof(decimal))
+                return $"{provider.ExactDecimalKeySql(outerKeySql)} = {provider.ExactDecimalKeySql(innerKeySql)}";
+            if (provider != null && t == typeof(DateTimeOffset))
+                return $"{provider.NormalizeDateTimeOffsetForCompare(outerKeySql)} = {provider.NormalizeDateTimeOffsetForCompare(innerKeySql)}";
+            return $"{outerKeySql} = {innerKeySql}";
         }
 
         public static string BuildJoinClause(
