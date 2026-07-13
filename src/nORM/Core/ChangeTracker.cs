@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
@@ -626,6 +626,39 @@ namespace nORM.Core
                 _ => new ConcurrentDictionary<object, EntityEntry>());
             typeDict.TryAdd(pk, entry);
             PropagateGeneratedKeyToChildren(entity, mapping);
+            ResolvePendingReferenceKeyFixups(entity);
+        }
+
+        // Dependents whose reference navigation points at a principal with a still-default
+        // DB-generated key. The collection direction walks the principal's collections in
+        // PropagateGeneratedKeyToChildren; a reference navigation has no back-collection to
+        // walk, so the pair is recorded at fixup time and resolved when the principal's
+        // INSERT hydrates its key.
+        private List<(object Principal, object Dependent, Column ForeignKey, Column PrincipalKey)>? _pendingReferenceKeyFixups;
+
+        /// <summary>
+        /// Defers a dependent's FK assignment until the referenced principal's DB-generated
+        /// key is hydrated by its INSERT (see <see cref="ResolvePendingReferenceKeyFixups"/>).
+        /// </summary>
+        internal void RegisterPendingReferenceKeyFixup(object principal, object dependent, Column foreignKey, Column principalKey)
+            => (_pendingReferenceKeyFixups ??= new()).Add((principal, dependent, foreignKey, principalKey));
+
+        /// <summary>Drops all deferred FK assignments; called when relationship fixup restarts and after a save completes.</summary>
+        internal void ClearPendingReferenceKeyFixups() => _pendingReferenceKeyFixups = null;
+
+        private void ResolvePendingReferenceKeyFixups(object insertedPrincipal)
+        {
+            var pending = _pendingReferenceKeyFixups;
+            if (pending == null || pending.Count == 0)
+                return;
+            for (int i = pending.Count - 1; i >= 0; i--)
+            {
+                var (principal, dependent, foreignKey, principalKey) = pending[i];
+                if (!ReferenceEquals(principal, insertedPrincipal))
+                    continue;
+                foreignKey.Setter(dependent, principalKey.Getter(insertedPrincipal));
+                pending.RemoveAt(i);
+            }
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -151,8 +151,10 @@ namespace nORM.Core
             // Only detect changes if requested - DetectChanges is O(entities x properties).
             if (detectChanges)
             {
-                ChangeTracker.DetectAllChanges();
+                // Fixup first: the reference direction assigns FK scalars on already-tracked
+                // dependents, and detection must see those assignments to mark the rows Modified.
                 FixupNavigationChildren();
+                ChangeTracker.DetectAllChanges();
             }
             var changedEntries = ChangeTracker.Entries
                 .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
@@ -460,9 +462,11 @@ namespace nORM.Core
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup reflects over navigation properties; trimming may remove the required members.")]
         private void FixupNavigationChildren()
         {
+            ChangeTracker.ClearPendingReferenceKeyFixups();
             var queue = new Queue<EntityEntry>();
             foreach (var e in ChangeTracker.Entries)
-                if (e.Entity != null && e.State != EntityState.Deleted && e.Mapping.Relations.Count > 0)
+                if (e.Entity != null && e.State != EntityState.Deleted
+                    && (e.Mapping.Relations.Count > 0 || e.Mapping.ReferenceNavigations.Length > 0))
                     queue.Enqueue(e);
             if (queue.Count == 0)
                 return;
@@ -493,10 +497,107 @@ namespace nORM.Core
                         for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
                             relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
 
-                        if (childEntry.Mapping.Relations.Count > 0)
+                        if (childEntry.Mapping.Relations.Count > 0 || childEntry.Mapping.ReferenceNavigations.Length > 0)
                             queue.Enqueue(childEntry);
                     }
                 }
+
+                FixupReferenceNavigations(entry, queue);
+            }
+        }
+
+        /// <summary>
+        /// The reference direction of relationship fixup: <c>dependent.Principal = entity</c>.
+        /// An untracked principal is discovered and tracked as Added, and the dependent's FK
+        /// scalar is aligned with the principal's primary key so the assignment persists. A
+        /// null navigation is a no-op — a plain query leaves navigations null while the FK
+        /// holds a value, so null cannot mean "sever" without a navigation snapshot; clearing
+        /// the FK scalar is the severing gesture. A deliberately edited FK scalar outranks a
+        /// stale navigation reference (the navigation may still point at the previously
+        /// included principal).
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Relationship fixup reads navigation properties and resolves principal mappings via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup reflects over navigation properties; trimming may remove the required members.")]
+        private void FixupReferenceNavigations(EntityEntry entry, Queue<EntityEntry> queue)
+        {
+            var navProps = entry.Mapping.ReferenceNavigations;
+            if (navProps.Length == 0)
+                return;
+            var dependent = entry.Entity!;
+
+            foreach (var navProp in navProps)
+            {
+                object? principal;
+                try
+                {
+                    principal = navProp.GetValue(dependent);
+                }
+                catch
+                {
+                    continue;
+                }
+                if (principal == null)
+                    continue;
+
+                TableMapping principalMap;
+                try
+                {
+                    principalMap = GetMapping(navProp.PropertyType);
+                }
+                catch
+                {
+                    continue;
+                }
+                if (principalMap.KeyColumns.Length != 1)
+                    continue;
+                var fk = global::nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(
+                    entry.Mapping, navProp.Name, navProp.PropertyType, principalMap);
+                if (fk == null)
+                    continue;
+
+                var principalEntry = ChangeTracker.GetEntryOrDefault(principal);
+                if (principalEntry == null)
+                {
+                    principalEntry = ChangeTracker.Track(principal, EntityState.Added, principalMap);
+                    if (principalEntry.Mapping.Relations.Count > 0 || principalEntry.Mapping.ReferenceNavigations.Length > 0)
+                        queue.Enqueue(principalEntry);
+                }
+                else if (principalEntry.State == EntityState.Deleted)
+                {
+                    continue;
+                }
+
+                var pkColumn = principalMap.KeyColumns[0];
+                if (pkColumn.IsDbGenerated && principalEntry.State == EntityState.Added
+                    && IsDefaultDbGeneratedKey(principal, principalMap))
+                {
+                    // The key does not exist yet; link after the principal's INSERT hydrates it.
+                    ChangeTracker.RegisterPendingReferenceKeyFixup(principal, dependent, fk, pkColumn);
+                    if (entry.State is EntityState.Unchanged or EntityState.Modified)
+                    {
+                        // The FK write lands during SaveChanges itself (after the principal's
+                        // insert), which is after change detection — mark the row now or its
+                        // UPDATE is skipped and the link is silently lost.
+                        entry.State = EntityState.Modified;
+                        entry.MarkExplicitlyModified();
+                    }
+                    continue;
+                }
+
+                var pkValue = pkColumn.Getter(principal);
+                var fkValue = fk.Getter(dependent);
+                if (Equals(fkValue, pkValue))
+                    continue;
+                if (entry.State != EntityState.Added)
+                {
+                    if (fk.IsKey)
+                        continue;
+                    if (entry.HasColumnValueChanged(fk))
+                        continue;
+                    entry.State = EntityState.Modified;
+                    entry.MarkExplicitlyModified();
+                }
+                fk.Setter(dependent, pkValue);
             }
         }
 

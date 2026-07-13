@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -101,6 +101,56 @@ namespace nORM.Mapping
 
         /// <summary>Gets the owned collection mappings for this entity type.</summary>
         public List<OwnedCollectionMapping> OwnedCollections { get; } = new();
+
+        private PropertyInfo[]? _referenceNavigations;
+
+        /// <summary>
+        /// Writable entity-typed properties that reach another table through a scalar FK
+        /// (reference navigations, e.g. <c>Order.Customer</c>). Excludes mapped columns
+        /// (a value converter can map a class-typed property to a provider value),
+        /// collections, and owned navigations, whose values live in the owner's own
+        /// table. Discovery is shape-only; FK resolution happens per use because it
+        /// needs the principal's mapping.
+        /// </summary>
+        internal PropertyInfo[] ReferenceNavigations
+        {
+            get
+            {
+                var cached = _referenceNavigations;
+                if (cached != null)
+                    return cached;
+
+                List<PropertyInfo>? list = null;
+                foreach (var prop in Type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                {
+                    if (!prop.CanRead || !prop.CanWrite)
+                        continue;
+                    var propertyType = prop.PropertyType;
+                    if (!propertyType.IsClass || propertyType == typeof(string) || propertyType == typeof(object))
+                        continue;
+                    if (typeof(System.Collections.IEnumerable).IsAssignableFrom(propertyType))
+                        continue;
+                    if (ColumnsByName.ContainsKey(prop.Name))
+                        continue;
+                    var isOwned = false;
+                    if (_fluentConfig != null)
+                    {
+                        foreach (var owned in _fluentConfig.OwnedNavigations)
+                        {
+                            if (owned.Key.Name == prop.Name)
+                            {
+                                isOwned = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isOwned)
+                        continue;
+                    (list ??= new List<PropertyInfo>()).Add(prop);
+                }
+                return _referenceNavigations = list?.ToArray() ?? Array.Empty<PropertyInfo>();
+            }
+        }
 
         /// <summary>Gets the many-to-many join table mappings for this entity type.</summary>
         public List<JoinTableMapping> ManyToManyJoins { get; } = new();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -456,7 +456,7 @@ namespace nORM.Core
         private static IEnumerable<TableMapping> TopologicalSortMappings(IEnumerable<TableMapping> mappings)
         {
             var all = mappings.ToList();
-            var deps = all.ToDictionary(
+            var hardDeps = all.ToDictionary(
                 m => m,
                 // A self-referential type (Category→Parent, Employee→Manager) is never its own
                 // *type-level* dependency: it sorts to a single position and any parent-before-child
@@ -470,34 +470,76 @@ namespace nORM.Core
                     MatchesPrincipalType(c.ForeignKeyPrincipalTypeName, other.Type)) ||
                     HasExplicitRelationshipDependency(m, other))).ToList());
 
-            var result = new List<TableMapping>();
+            // Reference navigations (Order.Customer) impose the same principal-first write
+            // order as FK-marker columns, but only the navigation property knows the
+            // principal TYPE when the FK column's marker carries the navigation NAME
+            // (e.g. a BackupDept navigation to a Dept principal). These are soft edges: a
+            // model where two types reference each other is legal, so a cycle introduced
+            // by soft edges falls back to the hard-edge order instead of failing the save.
+            var softDeps = all.ToDictionary(
+                m => m,
+                m => hardDeps[m].Concat(all.Where(other => other != m
+                        && !hardDeps[m].Contains(other)
+                        && Array.Exists(m.ReferenceNavigations, nav => nav.PropertyType == other.Type)))
+                    .ToList());
+
+            if (TrySortTopologically(all, softDeps, out var softOrder, out _))
+                return softOrder;
+            if (TrySortTopologically(all, hardDeps, out var hardOrder, out var cyclePath))
+                return hardOrder;
+
+            const int maxCycleDisplay = 5;
+            var displayNames = cyclePath!.Count <= maxCycleDisplay + 1
+                ? cyclePath.Select(m => m.Type.Name)
+                : cyclePath.Take(maxCycleDisplay).Select(m => m.Type.Name).Append("...");
+            throw new NormConfigurationException(
+                $"Circular FK dependency detected: {string.Join(" -> ", displayNames)}");
+        }
+
+        private static bool TrySortTopologically(
+            List<TableMapping> all,
+            Dictionary<TableMapping, List<TableMapping>> deps,
+            out List<TableMapping> result,
+            out List<TableMapping>? cyclePath)
+        {
+            var sorted = new List<TableMapping>();
             var visited = new HashSet<TableMapping>();
             var inProgress = new HashSet<TableMapping>();
+            List<TableMapping>? cycle = null;
 
-            void Visit(TableMapping node, List<TableMapping> path)
+            bool Visit(TableMapping node, List<TableMapping> path)
             {
                 if (inProgress.Contains(node))
                 {
                     var cycleStart = path.IndexOf(node);
-                    var cyclePath = path.Skip(cycleStart).Append(node).ToList();
-                    const int maxCycleDisplay = 5;
-                    var displayNames = cyclePath.Count <= maxCycleDisplay + 1
-                        ? cyclePath.Select(m => m.Type.Name)
-                        : cyclePath.Take(maxCycleDisplay).Select(m => m.Type.Name).Append("...");
-                    throw new NormConfigurationException(
-                        $"Circular FK dependency detected: {string.Join(" -> ", displayNames)}");
+                    cycle = path.Skip(cycleStart).Append(node).ToList();
+                    return false;
                 }
-                if (!visited.Add(node)) return;
+                if (!visited.Add(node)) return true;
                 inProgress.Add(node);
                 path.Add(node);
-                foreach (var dep in deps[node]) Visit(dep, path);
+                foreach (var dep in deps[node])
+                    if (!Visit(dep, path))
+                        return false;
                 path.RemoveAt(path.Count - 1);
                 inProgress.Remove(node);
-                result.Add(node);
+                sorted.Add(node);
+                return true;
             }
 
-            foreach (var m in all) Visit(m, new List<TableMapping>());
-            return result;
+            foreach (var m in all)
+            {
+                if (!Visit(m, new List<TableMapping>()))
+                {
+                    result = sorted;
+                    cyclePath = cycle;
+                    return false;
+                }
+            }
+
+            result = sorted;
+            cyclePath = null;
+            return true;
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -335,6 +335,23 @@ namespace nORM.Core
                 _originalHashes![i] = ContentHashCode(val);
                 _changedProperties![i] = false;
             }
+        }
+
+        /// <summary>
+        /// True when the given column's current entity value differs from the value
+        /// captured when the entity was attached. Relationship fixup uses this to give a
+        /// deliberately edited FK scalar precedence over a stale navigation reference.
+        /// Key columns are not snapshot-tracked and always report unchanged.
+        /// </summary>
+        internal bool HasColumnValueChanged(Column column)
+        {
+            UpgradeToFullTracking();
+            var entity = Entity;
+            if (entity is null || _propertyIndex is null)
+                return false;
+            if (!_propertyIndex.TryGetValue(column.Prop.Name, out var idx))
+                return false;
+            return !ValuesEqual(_getValues![idx](entity), _originalValues![idx]);
         }
 
         /// <summary>
