@@ -32,20 +32,23 @@ namespace nORM.Migration
             { typeof(int).FullName!, "INT" },
             { typeof(long).FullName!, "BIGINT" },
             { typeof(short).FullName!, "SMALLINT" },
-            { typeof(byte).FullName!, "TINYINT" },
+            // byte is unsigned in .NET (0..255); signed TINYINT overflows above 127.
+            { typeof(byte).FullName!, "TINYINT UNSIGNED" },
             { typeof(bool).FullName!, "TINYINT(1)" },
             { typeof(string).FullName!, "LONGTEXT" },
-            { typeof(DateTime).FullName!, "DATETIME" },
+            // Temporal types carry (6): bare DATETIME/TIME hold whole seconds only and
+            // MySQL ROUNDS fractional seconds on write, silently changing the stored
+            // instant. The query layer also assumes microsecond DATETIME(6) storage.
+            { typeof(DateTime).FullName!, "DATETIME(6)" },
             { typeof(decimal).FullName!, "DECIMAL(18,2)" },
             { typeof(double).FullName!, "DOUBLE" },
             { typeof(float).FullName!, "FLOAT" },
             { typeof(Guid).FullName!, "CHAR(36)" },
-            // X2: expanded type map
             { typeof(byte[]).FullName!, "BLOB" },
             { typeof(DateOnly).FullName!, "DATE" },
-            { typeof(TimeOnly).FullName!, "TIME" },
-            { typeof(DateTimeOffset).FullName!, "DATETIME" },
-            { typeof(TimeSpan).FullName!, "TIME" },
+            { typeof(TimeOnly).FullName!, "TIME(6)" },
+            { typeof(DateTimeOffset).FullName!, "DATETIME(6)" },
+            { typeof(TimeSpan).FullName!, "TIME(6)" },
             { typeof(char).FullName!, "CHAR(1)" },
             { typeof(sbyte).FullName!, "TINYINT" },
             { typeof(ushort).FullName!, "SMALLINT UNSIGNED" },
@@ -202,7 +205,7 @@ namespace nORM.Migration
                 // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
                 if (IsImplicitUniqueColumn(oldCol) && !IsImplicitUniqueColumn(newCol))
                     up.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, oldCol))} ON {EscTable(table.Name)}");
-                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(newCol.DefaultValue)}" : "";
+                var newDefault = newCol.DefaultValue != null ? $" DEFAULT {FormatDefaultValue(newCol)}" : "";
                 var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {newDef}");
                 if (!IsImplicitUniqueColumn(oldCol) && IsImplicitUniqueColumn(newCol))
@@ -219,7 +222,7 @@ namespace nORM.Migration
                     if (IsComputedColumn(c))
                         return BuildComputedColumnDefinition(c);
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        ? $" DEFAULT {FormatDefaultValue(c)}"
                         : "";
                     var identityPart = c.IsIdentity ? " AUTO_INCREMENT" : "";
                     return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
@@ -266,7 +269,7 @@ namespace nORM.Migration
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
+                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {FormatDefaultValue(column)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
             }
@@ -335,7 +338,7 @@ namespace nORM.Migration
 
                 if (IsImplicitUniqueColumn(newCol) && !IsImplicitUniqueColumn(oldCol))
                     down.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, newCol))} ON {EscTable(table.Name)}");
-                var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {DefaultValueValidator.Validate(oldCol.DefaultValue)}" : "";
+                var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {FormatDefaultValue(oldCol)}" : "";
                 var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldDefault}";
                 down.Add($"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {oldDef}");
                 if (!IsImplicitUniqueColumn(newCol) && IsImplicitUniqueColumn(oldCol))
@@ -355,7 +358,7 @@ namespace nORM.Migration
                 }
 
                 var restoreDefault = column.DefaultValue != null
-                    ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
+                    ? $" DEFAULT {FormatDefaultValue(column)}"
                     : "";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
@@ -378,7 +381,7 @@ namespace nORM.Migration
                     if (IsComputedColumn(c))
                         return BuildComputedColumnDefinition(c);
                     var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                        ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
+                        ? $" DEFAULT {FormatDefaultValue(c)}"
                         : "";
                     var identityPart = c.IsIdentity ? " AUTO_INCREMENT" : "";
                     return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
@@ -514,6 +517,29 @@ namespace nORM.Migration
                 ? $"DECIMAL({precision},{column.Scale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)})"
                 : $"DECIMAL({precision})";
             return true;
+        }
+
+        /// <summary>
+        /// Validates a column default and aligns zero-argument temporal function
+        /// defaults with the column's fractional-seconds precision. MySQL requires a
+        /// temporal default's precision to MATCH the column's exactly, so a bare
+        /// <c>CURRENT_TIMESTAMP</c> (or <c>NOW()</c>/<c>LOCALTIME</c>/<c>LOCALTIMESTAMP</c>)
+        /// default is rejected on the DATETIME(6)/TIME(6) columns this generator emits
+        /// ("Invalid default value") and must become <c>CURRENT_TIMESTAMP(6)</c>.
+        /// </summary>
+        private static string FormatDefaultValue(ColumnSchema column)
+        {
+            var validated = DefaultValueValidator.Validate(column.DefaultValue!) ?? string.Empty;
+            if (!GetSqlType(column).EndsWith("(6)", StringComparison.Ordinal))
+                return validated;
+
+            var trimmed = validated.Trim();
+            var name = trimmed.EndsWith("()", StringComparison.Ordinal) ? trimmed[..^2] : trimmed;
+            return name.ToUpperInvariant() switch
+            {
+                "CURRENT_TIMESTAMP" or "NOW" or "LOCALTIME" or "LOCALTIMESTAMP" => $"{name}(6)",
+                _ => validated,
+            };
         }
 
         private static bool IsComputedColumn(ColumnSchema column) => column.ComputedColumnSql is not null;

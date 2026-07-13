@@ -206,7 +206,7 @@ public class MigrationScalarRoundTripTests
     [Theory]
     [InlineData("sqlite", "TEXT")]
     [InlineData("sqlserver", "TIME")]
-    [InlineData("mysql", "TIME")]
+    [InlineData("mysql", "TIME(6)")]
     [InlineData("postgres", "TIME")]
     public void TimeOnly_Column_MapsToCorrectType(string provider, string expectedType)
     {
@@ -219,7 +219,7 @@ public class MigrationScalarRoundTripTests
     [Theory]
     [InlineData("sqlite", "TEXT")]
     [InlineData("sqlserver", "TIME")]
-    [InlineData("mysql", "TIME")]
+    [InlineData("mysql", "TIME(6)")]
     [InlineData("postgres", "TIME")]
     public void TimeOnly_RoundTrip_SnapshotDiffGeneratePreservesType(string provider, string expectedType)
     {
@@ -237,7 +237,7 @@ public class MigrationScalarRoundTripTests
     [Theory]
     [InlineData("sqlite", "TEXT")]
     [InlineData("sqlserver", "DATETIMEOFFSET")]
-    [InlineData("mysql", "DATETIME")]
+    [InlineData("mysql", "DATETIME(6)")]
     [InlineData("postgres", "TIMESTAMPTZ")]
     public void DateTimeOffset_Column_MapsToCorrectType(string provider, string expectedType)
     {
@@ -250,7 +250,7 @@ public class MigrationScalarRoundTripTests
     [Theory]
     [InlineData("sqlite", "TEXT")]
     [InlineData("sqlserver", "DATETIMEOFFSET")]
-    [InlineData("mysql", "DATETIME")]
+    [InlineData("mysql", "DATETIME(6)")]
     [InlineData("postgres", "TIMESTAMPTZ")]
     public void DateTimeOffset_RoundTrip_SnapshotDiffGeneratePreservesType(string provider, string expectedType)
     {
@@ -268,7 +268,7 @@ public class MigrationScalarRoundTripTests
     [Theory]
     [InlineData("sqlite", "TEXT")]
     [InlineData("sqlserver", "TIME")]
-    [InlineData("mysql", "TIME")]
+    [InlineData("mysql", "TIME(6)")]
     [InlineData("postgres", "INTERVAL")]
     public void TimeSpan_Column_MapsToCorrectType(string provider, string expectedType)
     {
@@ -281,7 +281,7 @@ public class MigrationScalarRoundTripTests
     [Theory]
     [InlineData("sqlite", "TEXT")]
     [InlineData("sqlserver", "TIME")]
-    [InlineData("mysql", "TIME")]
+    [InlineData("mysql", "TIME(6)")]
     [InlineData("postgres", "INTERVAL")]
     public void TimeSpan_RoundTrip_SnapshotDiffGeneratePreservesType(string provider, string expectedType)
     {
@@ -507,9 +507,9 @@ public class MigrationScalarRoundTripTests
         {
             ["byte[]"] = "BLOB",
             ["DateOnly"] = "DATE",
-            ["TimeOnly"] = "TIME",
-            ["DateTimeOffset"] = "DATETIME",
-            ["TimeSpan"] = "TIME",
+            ["TimeOnly"] = "TIME(6)",
+            ["DateTimeOffset"] = "DATETIME(6)",
+            ["TimeSpan"] = "TIME(6)",
             ["Enum"] = "INT"
         },
         "postgres" => new Dictionary<string, string>

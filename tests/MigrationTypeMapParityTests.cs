@@ -210,7 +210,8 @@ public class MigrationTypeMapParityTests
     {
         var gen = new MySqlMigrationSqlGenerator();
         var result = gen.GenerateSql(MakeSingleColumnDiff(typeof(TimeOnly).FullName!));
-        Assert.Equal("TIME", ExtractColType(result, "Col"));
+        // (6) so fractional seconds are stored instead of being rounded away.
+        Assert.Equal("TIME(6)", ExtractColType(result, "Col"));
     }
 
     [Fact]
