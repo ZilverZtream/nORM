@@ -282,6 +282,71 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Binds a captured entity INSTANCE by its primary key: the extractor
+        /// supplies the entity object at execution time and this converter maps it
+        /// to the key value, so `e.Dept == someDept` stays plan-cache-safe across
+        /// different captured instances. A null instance passes through (the
+        /// binder skips converters for nulls), and the null-safe comparison then
+        /// matches orphans exactly like C# `null == null`.
+        /// </summary>
+        private sealed class EntityKeyValueConverter : nORM.Mapping.IValueConverter
+        {
+            private readonly Type _entityType;
+            private readonly System.Reflection.PropertyInfo _keyProp;
+            public EntityKeyValueConverter(Type entityType, System.Reflection.PropertyInfo keyProp)
+            {
+                _entityType = entityType;
+                _keyProp = keyProp;
+            }
+            public Type ModelType => _entityType;
+            public Type ProviderType => _keyProp.PropertyType;
+            public object? ConvertToProvider(object? modelValue)
+                => modelValue == null ? null : _keyProp.GetValue(modelValue);
+            public object? ConvertFromProvider(object? providerValue) => providerValue;
+        }
+
+        /// <summary>
+        /// Whole-entity navigation vs a captured entity instance: compares the
+        /// dependent's FOREIGN KEY to the instance's PRIMARY KEY through the
+        /// compiled-parameter converter pipeline. Null-safe both ways so a missing
+        /// parent and a null captured instance follow C# equality.
+        /// </summary>
+        private bool TryEmitNavigationEntityComparison(BinaryExpression node)
+        {
+            string fkSql;
+            Expression valueSide;
+            if (TryResolveNavigationFkValueSql(node.Left, out fkSql)) valueSide = node.Right;
+            else if (TryResolveNavigationFkValueSql(node.Right, out fkSql)) valueSide = node.Left;
+            else return false;
+
+            var stripped = valueSide;
+            while (stripped is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                stripped = u.Operand;
+            var navSideType = System.Nullable.GetUnderlyingType(
+                (TryResolveNavigationFkValueSql(node.Left, out _) ? node.Left : node.Right).Type)
+                ?? (TryResolveNavigationFkValueSql(node.Left, out _) ? node.Left : node.Right).Type;
+            if (!navSideType.IsAssignableFrom(stripped.Type) && !stripped.Type.IsAssignableFrom(navSideType))
+                return false;
+            // Only captured/constant instances: mapped-parameter members fail evaluation.
+            if (!TryGetConstantValue(valueSide, out _))
+                return false;
+
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navSideType); }
+            catch { return false; }
+            if (principalMap.KeyColumns.Length != 1) return false;
+
+            var paramName = $"{_provider.ParamPrefix}cp{_compiledParams.Count}";
+            _params[paramName] = DBNull.Value;
+            _compiledParams.Add(paramName);
+            _paramConverters[paramName] = new EntityKeyValueConverter(navSideType, principalMap.KeyColumns[0].Prop);
+            _sql.Append(node.NodeType == ExpressionType.Equal
+                ? _provider.NullSafeEqual(fkSql, paramName)
+                : _provider.NullSafeNotEqual(fkSql, paramName));
+            return true;
+        }
+
+        /// <summary>
         /// Resolves the dependent-side FK column backing a reference navigation:
         /// the [ForeignKey]/convention marker (which stores the navigation or
         /// principal-type name), the <c>NavNameId</c> convention, or the fluent

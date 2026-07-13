@@ -75,6 +75,11 @@ namespace nORM.Query
                     return node;
                 }
 
+                // Whole-entity navigation vs a captured entity instance:
+                // compare the dependent's FK to the instance's primary key.
+                if (TryEmitNavigationEntityComparison(node))
+                    return node;
+
                 // Inline boolean literals (true/false) as SQL literals instead of parameterizing.
                 // Parameterized booleans (WHERE col = @p0 with @p0=1) deprive query planners of
                 // column selectivity statistics. Providers that prefer bare boolean predicates get

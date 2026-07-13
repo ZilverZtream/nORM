@@ -184,6 +184,43 @@ public class ReferenceNavigationScalarTests
     }
 
     [Fact]
+    public void Nav_equals_entity_instance_compares_fk_to_pk()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        var eng = new Dept { Id = 1, Title = "Eng" };
+        var ids = ctx.Query<Emp>().Where(e => e.Dept == eng).Select(e => e.Id).ToList();
+        Assert.Equal(new[] { 1 }, ids);
+    }
+
+    [Fact]
+    public void Nav_equals_entity_instance_rebinds_key_across_cached_plans()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // The captured instance binds through a converter that extracts the PK at
+        // execution time, so a cached plan serves a different instance correctly.
+        var dept = new Dept { Id = 1, Title = "Eng" };
+        Assert.Equal(new[] { 1 }, ctx.Query<Emp>().Where(e => e.Dept == dept).Select(e => e.Id).ToList());
+        dept = new Dept { Id = 2, Title = "Ops" };
+        Assert.Equal(new[] { 3 }, ctx.Query<Emp>().Where(e => e.Dept == dept).Select(e => e.Id).ToList());
+    }
+
+    [Fact]
+    public void Nav_not_equals_entity_instance_keeps_orphans()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        var eng = new Dept { Id = 1, Title = "Eng" };
+        var ids = ctx.Query<Emp>().Where(e => e.Dept != eng).Select(e => e.Id).OrderBy(i => i).ToList();
+        // bob's missing parent is a null value: null != eng is TRUE (C# null semantics).
+        Assert.Equal(new[] { 2, 3 }, ids);
+    }
+
+    [Fact]
     public void Nav_member_in_string_method_translates()
     {
         var (cn, ctx) = Setup();
