@@ -115,6 +115,20 @@ namespace nORM.Providers
         public virtual string ForceCaseSensitiveStringComparison(string sql) => sql;
 
         /// <summary>
+        /// Wraps a string operand so RELATIONAL comparisons (&lt;, &gt;, and the
+        /// string.CompareOrdinal / Compare(..., Ordinal) CASE sentinel built on them)
+        /// order by code point. Equality case-sensitivity and relational ordering
+        /// diverge on PostgreSQL: its equality is byte-exact (so
+        /// <see cref="ForceCaseSensitiveStringComparison"/> is identity there), but the
+        /// database's locale/ICU collation interleaves 'M' and 'm' for ordering —
+        /// C#'s ordinal comparison puts all uppercase ASCII first. The default
+        /// reuses the case-sensitivity wrap, which is already a binary COLLATION on
+        /// SQL Server/MySQL and identity on SQLite (BINARY collation by default).
+        /// </summary>
+        internal virtual string OrdinalRelationalStringOperand(string sql)
+            => ForceCaseSensitiveStringComparison(sql);
+
+        /// <summary>
         /// Returns SQL that XORs two integer expressions. SQL Server and MySQL accept the
         /// `^` operator; PostgreSQL uses `#`; SQLite has no XOR operator and falls back to
         /// `(a | b) - (a &amp; b)` - algebraically equivalent on integers.

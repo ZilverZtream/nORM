@@ -152,8 +152,11 @@ namespace nORM.Query
                 }
                 else if (forceCaseSensitive)
                 {
-                    lhs = _provider.ForceCaseSensitiveStringComparison(lhs);
-                    rhs = _provider.ForceCaseSensitiveStringComparison(rhs);
+                    // Relational-ordinal wrap, not the equality wrap: PostgreSQL's
+                    // equality is already byte-exact but its locale collation orders
+                    // 'M'/'m' interleaved, so ordinal ORDERING needs COLLATE "C" there.
+                    lhs = _provider.OrdinalRelationalStringOperand(lhs);
+                    rhs = _provider.OrdinalRelationalStringOperand(rhs);
                 }
                 _sql.Append("(CASE WHEN ").Append(lhs).Append(" < ").Append(rhs)
                     .Append(" THEN -1 WHEN ").Append(lhs).Append(" > ").Append(rhs)

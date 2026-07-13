@@ -177,6 +177,13 @@ namespace nORM.Providers
             return $"\"{id.Replace("\"", "\"\"")}\"";
         }
 
+        /// <summary>
+        /// PostgreSQL's default locale/ICU collation interleaves case for ordering;
+        /// the "C" collation orders by byte (code point), matching C# ordinal
+        /// relational comparison. Value-preserving — only the comparison changes.
+        /// </summary>
+        internal override string OrdinalRelationalStringOperand(string sql) => $"({sql} COLLATE \"C\")";
+
         /// <summary>PostgreSQL errors on a negative LIMIT; clamp to zero for LINQ's empty-window semantics.</summary>
         internal override string ClampNonNegativeLimitExpression(string expr) => $"GREATEST({expr}, 0)";
 
