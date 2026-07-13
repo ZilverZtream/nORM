@@ -187,10 +187,12 @@ namespace nORM.Query
                 onSqlOverride: gjCompositeOnSql);
             // Insert outer-key sort at the front of _orderBy so it is always first. Composite
             // keys order by each member so streaming group segmentation stays contiguous.
+            var keyOrderEntryCount = 1;
             if (gjCompositeOnSql != null)
             {
                 for (int oi = gjCompositeOuterMemberSqls.Count - 1; oi >= 0; oi--)
                     _orderBy.Insert(0, (gjCompositeOuterMemberSqls[oi], true));
+                keyOrderEntryCount = gjCompositeOuterMemberSqls.Count;
             }
             else
                 _orderBy.Insert(0, (outerKeySql, true));
@@ -199,7 +201,33 @@ namespace nORM.Query
             // segmentation. Order by the binary key second so byte-equal rows stay contiguous.
             if ((Nullable.GetUnderlyingType(sqlOuterKeySelector.Body.Type) ?? sqlOuterKeySelector.Body.Type) == typeof(string)
                 && _provider.DefaultStringEqualityIsCaseInsensitive)
+            {
                 _orderBy.Insert(1, (_provider.ForceCaseSensitiveStringComparison(outerKeySql), true));
+                keyOrderEntryCount++;
+            }
+            // GroupJoin yields one result per outer ELEMENT, so distinct outers sharing a key
+            // value must not fuse: order by the outer's primary key inside each key tie so
+            // every outer row's block is contiguous, and segment on that identity at runtime.
+            // Skip a PK column that already IS the join key — SQL Server rejects duplicate
+            // ORDER BY columns.
+            if (groupJoinOuterIsEntity && _mapping.KeyColumns.Length > 0)
+            {
+                for (int ki = _mapping.KeyColumns.Length - 1; ki >= 0; ki--)
+                {
+                    var pkSql = $"{outerAlias}.{_mapping.KeyColumns[ki].EscCol}";
+                    var alreadyOrdered = false;
+                    for (int existing = 0; existing < keyOrderEntryCount; existing++)
+                    {
+                        if (string.Equals(_orderBy[existing].Item1, pkSql, StringComparison.Ordinal))
+                        {
+                            alreadyOrdered = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyOrdered)
+                        _orderBy.Insert(keyOrderEntryCount, (pkSql, true));
+                }
+            }
             var outerType = runtimeResultSelector.Parameters[0].Type;
             var innerType = innerKeySelector.Parameters[0].Type;
             var resultType = runtimeResultSelector.Body.Type;
@@ -213,10 +241,27 @@ namespace nORM.Query
                 : innerKeySelector.Body;
             var innerKeyColumn = innerMapping.Columns.FirstOrDefault(c =>
                 ExtractPropertyName(innerKeyProbeBody) == c.PropName);
+            // A navigation-member key (e.Dept.Title) is not an inner column, but the probe
+            // only answers "did this LEFT JOIN row match?" — the inner PRIMARY KEY answers
+            // that for any key shape: a matched row always carries a non-null PK while an
+            // unmatched row is all-NULL. Without a probe the plan silently lacked
+            // GroupJoinInfo and materialization crashed casting entities to the projection.
+            innerKeyColumn ??= innerMapping.KeyColumns.FirstOrDefault();
             if (innerKeyColumn != null)
             {
                 var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
                 var resultSelectorFunc = CompileGroupJoinResultSelector(runtimeResultSelector);
+                // Segmentation identity: the outer's PK getters, matching the PK tiebreak
+                // ordering above. Also spares navigation-member keys (e.Dept.Title) from
+                // client evaluation — the materialized outer has null navigations.
+                Func<object, object?>? outerIdentityFunc = null;
+                if (groupJoinOuterIsEntity && _mapping.KeyColumns.Length > 0)
+                {
+                    var idCols = _mapping.KeyColumns;
+                    outerIdentityFunc = idCols.Length == 1
+                        ? idCols[0].Getter
+                        : o => new GroupJoinOuterIdentity(Array.ConvertAll(idCols, c => c.Getter(o)));
+                }
                 _groupJoinInfo = new GroupJoinInfo(
                     outerType,
                     innerType,
@@ -225,7 +270,8 @@ namespace nORM.Query
                     innerKeyColumn,
                     resultSelectorFunc,
                     groupJoinOuterIsEntity,
-                    groupJoinOuterColumnCount
+                    groupJoinOuterColumnCount,
+                    OuterIdentitySelector: outerIdentityFunc
                 );
             }
             return node;

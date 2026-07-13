@@ -135,8 +135,49 @@ namespace nORM.Query
         Column InnerKeyColumn,
         Func<object, IEnumerable<object>, object> ResultSelector,
         bool OuterIsEntity = true,
-        int OuterColumnCount = -1
+        int OuterColumnCount = -1,
+        // Per-OUTER-ROW segmentation identity (the outer's primary key). GroupJoin yields
+        // one result per outer ELEMENT, so segmenting the flattened LEFT JOIN stream by the
+        // join KEY would fuse distinct outers that share a key value (and lets a
+        // navigation-member key, unreadable from the materialized entity, avoid client
+        // evaluation entirely). Null falls back to OuterKeySelector — correct for scalar
+        // outers, which are DISTINCT keys by construction.
+        Func<object, object?>? OuterIdentitySelector = null
     );
+
+    /// <summary>
+    /// Structural equality wrapper for a composite outer identity in GroupJoin
+    /// segmentation: two flattened rows belong to the same outer element only when
+    /// every key component matches.
+    /// </summary>
+    internal sealed class GroupJoinOuterIdentity : IEquatable<GroupJoinOuterIdentity>
+    {
+        private readonly object?[] _values;
+
+        public GroupJoinOuterIdentity(object?[] values) => _values = values;
+
+        public bool Equals(GroupJoinOuterIdentity? other)
+        {
+            if (other is null || other._values.Length != _values.Length)
+                return false;
+            for (var i = 0; i < _values.Length; i++)
+            {
+                if (!Equals(_values[i], other._values[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        public override bool Equals(object? obj) => Equals(obj as GroupJoinOuterIdentity);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            foreach (var value in _values)
+                hash.Add(value);
+            return hash.ToHashCode();
+        }
+    }
 
     /// <summary>
     /// Defines a secondary query for fetching dependent collection data in split query scenarios.

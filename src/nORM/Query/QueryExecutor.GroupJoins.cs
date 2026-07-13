@@ -109,11 +109,14 @@ namespace nORM.Query
 
                 // Use sync materializer to avoid per-row Task allocation, consistent with MaterializeAsync.
                 var syncMaterializer = plan.SyncMaterializer;
+                // Segment per OUTER ROW (PK identity) when available; the join key would fuse
+                // distinct outers that share a key value.
+                var segmentSelector = info.OuterIdentitySelector ?? info.OuterKeySelector;
 
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
                     var outer = syncMaterializer(reader);
-                    var key = info.OuterKeySelector(outer) ?? DBNull.Value;
+                    var key = segmentSelector(outer) ?? DBNull.Value;
 
                     if (currentOuter == null || !Equals(currentKey, key))
                     {
@@ -237,11 +240,13 @@ namespace nORM.Query
             List<object> currentChildren = [];
 
             var syncMaterializer = plan.SyncMaterializer;
+            // Segment per OUTER ROW (PK identity) when available — see MaterializeGroupJoinAsync.
+            var segmentSelector = info.OuterIdentitySelector ?? info.OuterKeySelector;
 
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 var outer = syncMaterializer(reader);
-                var key = info.OuterKeySelector(outer) ?? DBNull.Value;
+                var key = segmentSelector(outer) ?? DBNull.Value;
 
                 if (currentOuter == null || !Equals(currentKey, key))
                 {
@@ -348,11 +353,14 @@ namespace nORM.Query
                 object? currentKey = null;
                 List<object> currentChildren = [];
 
+                // Segment per OUTER ROW (PK identity) when available — see MaterializeGroupJoinAsync.
+                var segmentSelector = info.OuterIdentitySelector ?? info.OuterKeySelector;
+
                 while (reader.Read())
                 {
                     // Use sync materializer - no GetAwaiter().GetResult().
                     var outer = plan.SyncMaterializer(reader);
-                    var key = info.OuterKeySelector(outer) ?? DBNull.Value;
+                    var key = segmentSelector(outer) ?? DBNull.Value;
 
                     if (currentOuter == null || !Equals(currentKey, key))
                     {
