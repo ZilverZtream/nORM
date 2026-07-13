@@ -184,6 +184,15 @@ namespace nORM.Query
                     if (partType == typeof(DateTimeOffset)
                         && _provider.CanonicalizeDateTimeOffsetGroupKey(partSql) is { } canonicalPart)
                         partSql = canonicalPart;
+                    // Navigation-member composite parts translate to correlated scalar
+                    // subqueries; providers that reject those in GROUP BY expose each
+                    // part as its own applied lateral column (see the single-key path).
+                    if (compositeKey.Arguments[i] is MemberExpression { Expression: MemberExpression }
+                        && _provider.AppliedScalarColumnClause(partSql, EscapeAlias("GK" + i), _provider.Escape("GK")) is { } appliedPartClause)
+                    {
+                        _fromSuffix = (_fromSuffix ?? string.Empty) + appliedPartClause;
+                        partSql = $"{EscapeAlias("GK" + i)}.{_provider.Escape("GK")}";
+                    }
                     parts.Add(partSql);
                     _groupBy.Add(partSql);
                     // C# groups string keys ordinally; on CI-collation providers (MySQL,

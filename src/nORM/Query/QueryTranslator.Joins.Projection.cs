@@ -169,6 +169,11 @@ namespace nORM.Query
             if (_projection == null
                 || _groupJoinInfo != null
                 || _isAggregate
+                // A grouped projection is not a join projection: its SELECT was built
+                // by the GroupBy machinery (key members resolve through the composite
+                // key map, not the join visitors), and the " JOIN " sniff below would
+                // false-positive on an applied lateral column's CROSS JOIN LATERAL.
+                || _groupBy.Count > 0
                 || _sql.Length == 0)
             {
                 return;
