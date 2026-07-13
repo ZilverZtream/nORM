@@ -436,8 +436,12 @@ public class DocumentationContractTests
         Assert.Contains("SupportsNativeBulkInsert", contract, StringComparison.Ordinal);
         Assert.Contains("`ExecuteUpdateAsync` Set Values", contract, StringComparison.Ordinal);
         Assert.Contains("precomputed captured local values", contract, StringComparison.Ordinal);
-        Assert.Contains("inline computed values", contract, StringComparison.Ordinal);
-        Assert.Contains("Server-side computed updates are a post-v1 feature", contract, StringComparison.Ordinal);
+        // The contract documents server-side computed assignments as supported
+        // (member access, constants, arithmetic, Convert) plus navigation
+        // aggregates; only shapes outside that surface throw.
+        Assert.Contains("server-side computed expressions", contract, StringComparison.Ordinal);
+        Assert.Contains("navigation-collection aggregates", contract, StringComparison.Ordinal);
+        Assert.Contains("NormUnsupportedFeatureException", contract, StringComparison.Ordinal);
     }
 
     [Fact]
