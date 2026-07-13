@@ -37,7 +37,7 @@ namespace nORM.Providers
 
         private const int SqlBulkCopySmallBatchThreshold = 512;
 
-        private static readonly ConcurrentLruCache<Type, DataTable> _keyTableSchemas = new(maxSize: KeyTableSchemaCacheSize);
+        private static readonly ConcurrentLruCache<TableMapping, DataTable> _keyTableSchemas = new(maxSize: KeyTableSchemaCacheSize);
 
         /// <summary>
         /// SQL Server ROWVERSION columns are server-managed and cannot receive explicit values on INSERT.

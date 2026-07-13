@@ -254,7 +254,12 @@ namespace nORM.Providers
                     var batchCount = 0;
                     foreach (var entity in entities)
                     {
-                        table.Rows.Add(m.KeyColumns.Select(c => c.Getter(entity) ?? DBNull.Value).ToArray());
+                        table.Rows.Add(m.KeyColumns.Select(c =>
+                        {
+                            var raw = c.Getter(entity);
+                            var value = c.Converter != null ? c.Converter.ConvertToProvider(raw) : raw;
+                            return value ?? DBNull.Value;
+                        }).ToArray());
                         batchCount++;
                         if (batchCount >= ctx.Options.BulkBatchSize)
                         {
@@ -406,17 +411,26 @@ namespace nORM.Providers
             return escapedIdentifier;
         }
 
+        /// <summary>
+        /// Key rows are staged post-conversion so the temp-table join compares the
+        /// PROVIDER representation the destination actually stores — a model-typed
+        /// key column made the delete join match nothing for converter keys and the
+        /// bulk delete silently removed zero rows. Cached per mapping because two
+        /// contexts can map the same entity with different converters.
+        /// </summary>
         [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072",
             Justification = "Key column types are mapped entity property types rooted by TableMapping registration; DataColumn only needs the type identity for TVP schema definition.")]
         private static DataTable GetKeyTable(TableMapping m)
         {
-            var schema = _keyTableSchemas.GetOrAdd(m.Type, _ =>
+            var schema = _keyTableSchemas.GetOrAdd(m, static mapping =>
             {
                 var dt = new DataTable();
-                foreach (var c in m.KeyColumns)
+                foreach (var c in mapping.KeyColumns)
                 {
-                    var propType = c.Prop.PropertyType;
-                    dt.Columns.Add(c.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
+                    var effective = c.Converter?.ProviderType ?? c.Prop.PropertyType;
+                    var columnType = Nullable.GetUnderlyingType(effective) ?? effective;
+                    if (columnType.IsEnum) columnType = Enum.GetUnderlyingType(columnType);
+                    dt.Columns.Add(c.PropName, columnType);
                 }
                 return dt;
             });

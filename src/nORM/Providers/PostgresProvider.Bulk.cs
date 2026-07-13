@@ -346,7 +346,14 @@ namespace nORM.Providers
                 for (int i = 0; i < entityList.Count; i += batchSize)
                 {
                     var batch = entityList.GetRange(i, Math.Min(batchSize, entityList.Count - i));
-                    var keys = CreateTypedArray(batch.Select(e => keyCol.Getter(e)).ToArray());
+                    // Convert key values like every other write path: the destination stores
+                    // the PROVIDER representation, so matching on raw model values would
+                    // silently delete zero rows for converter-typed keys.
+                    var keys = CreateTypedArray(batch.Select(e =>
+                    {
+                        var raw = keyCol.Getter(e);
+                        return keyCol.Converter != null ? keyCol.Converter.ConvertToProvider(raw) : raw;
+                    }).ToArray());
                     await using var cmd = ctx.CreateCommand();
                     cmd.Transaction = transaction;
                     cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;

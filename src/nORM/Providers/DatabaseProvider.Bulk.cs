@@ -169,6 +169,16 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Binds a column value the way every write path must: through the column's
+        /// value converter, so the parameter carries the PROVIDER representation the
+        /// destination stores. Binding the raw model value silently persists the
+        /// wrong value (updates) or matches no rows at all (converter-typed keys in
+        /// UPDATE/DELETE predicates).
+        /// </summary>
+        private protected static object? ToProviderValue(Column c, object? raw)
+            => c.Converter != null ? c.Converter.ConvertToProvider(raw) : raw;
+
+        /// <summary>
         /// Performs a bulk update across the provided entities. Providers without a
         /// native implementation fall back to batched updates when enabled.
         /// </summary>
@@ -234,18 +244,18 @@ namespace nORM.Providers
                             m.TimestampColumn.Setter(entity, nORM.Core.ConcurrencyTokenGenerator.Next(m.TimestampColumn, bulkOldToken));
                     }
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp && !(batchHasTenant && ReferenceEquals(c, m.TenantColumn))))
-                        cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
+                        cmd.AddParam(ParamPrefix + col.PropName, ToProviderValue(col, col.Getter(entity)));
                     if (m.TimestampColumn != null)
                     {
                         var tc = m.TimestampColumn;
                         if (m.ClientManagedConcurrencyToken)
                         {
-                            cmd.AddParam(ParamPrefix + tc.PropName, tc.Getter(entity));        // SET @Token = new
-                            cmd.AddParam(ParamPrefix + tc.PropName + "_orig", bulkOldToken);   // WHERE @Token_orig = old
+                            cmd.AddParam(ParamPrefix + tc.PropName, ToProviderValue(tc, tc.Getter(entity)));      // SET @Token = new
+                            cmd.AddParam(ParamPrefix + tc.PropName + "_orig", ToProviderValue(tc, bulkOldToken)); // WHERE @Token_orig = old
                         }
                         else
                         {
-                            cmd.AddParam(ParamPrefix + tc.PropName, bulkOldToken);             // WHERE @Token = old
+                            cmd.AddParam(ParamPrefix + tc.PropName, ToProviderValue(tc, bulkOldToken));           // WHERE @Token = old
                         }
                     }
                     // X1: bind tenant param to match the WHERE predicate added when batchHasTenant is true.
@@ -341,7 +351,7 @@ namespace nORM.Providers
                         {
                             var pName = $"{ParamPrefix}p{paramIndex++}";
                             paramNames.Add(pName);
-                            cmd.AddParam(pName, keyCol.Getter(batch[j]));
+                            cmd.AddParam(pName, ToProviderValue(keyCol, keyCol.Getter(batch[j])));
                         }
                         whereClause = $"{keyCol.EscCol} IN ({string.Join(",", paramNames)})";
                     }
@@ -358,13 +368,13 @@ namespace nORM.Providers
                             foreach (var c in keyColumns)
                             {
                                 var pName = $"{ParamPrefix}p{paramIndex++}";
-                                cmd.AddParam(pName, c.Getter(batch[j]));
+                                cmd.AddParam(pName, ToProviderValue(c, c.Getter(batch[j])));
                                 conds.Add($"{c.EscCol} = {pName}");
                             }
                             if (timestampCol != null)
                             {
                                 var tpName = $"{ParamPrefix}p{paramIndex++}";
-                                cmd.AddParam(tpName, timestampCol.Getter(batch[j]));
+                                cmd.AddParam(tpName, ToProviderValue(timestampCol, timestampCol.Getter(batch[j])));
                                 conds.Add($"({timestampCol.EscCol} = {tpName} OR ({timestampCol.EscCol} IS NULL AND {tpName} IS NULL))");
                             }
                             orConditions.Add($"({string.Join(" AND ", conds)})");
