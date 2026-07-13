@@ -192,6 +192,10 @@ namespace nORM.Providers
         internal override string TimeSpanOperandToSecondsSql(string sql)
             => $"EXTRACT(EPOCH FROM {sql})";
 
+        /// <summary>PostgreSQL's ::int rounds half to even; TRUNC restores C#'s toward-zero cast.</summary>
+        internal override string FloatingToIntegralTruncatingSql(string sql, bool asLong)
+            => GetIntCastSql($"TRUNC({sql})", asLong);
+
         /// <summary>PostgreSQL MAKE_TIMESTAMP builds a TIMESTAMP from int parts.</summary>
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"MAKE_TIMESTAMP({yearSql}, {monthSql}, {daySql}, 0, 0, 0)";

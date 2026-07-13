@@ -111,6 +111,18 @@ namespace nORM.Providers
             => NormalizeTimeSpanForCompare(sql);
 
         /// <summary>
+        /// SQL for a C# EXPLICIT cast from floating point/decimal to an integer type,
+        /// which truncates toward zero ((int)2.7 is 2, (int)-2.7 is -2). A bare CAST
+        /// already truncates on SQLite and SQL Server; MySQL's CAST rounds half away
+        /// from zero and PostgreSQL's rounds half to even, so those providers
+        /// truncate explicitly before casting. Distinct from
+        /// <see cref="ConvertFloatingToIntegralSql"/>, which implements
+        /// Convert.ToIntXX's round-half-to-even.
+        /// </summary>
+        internal virtual string FloatingToIntegralTruncatingSql(string sql, bool asLong)
+            => GetIntCastSql(sql, asLong);
+
+        /// <summary>
         /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation -
         /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
         /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native

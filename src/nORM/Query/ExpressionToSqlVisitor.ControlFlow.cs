@@ -46,6 +46,13 @@ namespace nORM.Query
             _sql.Append(paramName);
             return node;
         }
+        private static bool IsFloatingType(Type t)
+            => t == typeof(double) || t == typeof(float) || t == typeof(decimal);
+
+        private static bool IsIntegralTargetType(Type t)
+            => t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte)
+               || t == typeof(sbyte) || t == typeof(uint) || t == typeof(ulong) || t == typeof(ushort);
+
         protected override Expression VisitUnary(UnaryExpression node)
         {
             if (node.NodeType == ExpressionType.Not)
@@ -93,6 +100,18 @@ namespace nORM.Query
                     || targetUnderlying == typeof(decimal) || targetUnderlying == typeof(string);
                 if (operandIsPrimitive && targetIsPrimitive)
                 {
+                    // A NARROWING floating->integral cast has real semantics: C#
+                    // truncates toward zero, and the raw column value would reach
+                    // the materializer as a double (InvalidCastException on strict
+                    // drivers). Anything else (widening, enum lifts) is a no-op in
+                    // SQL and passes through.
+                    if (IsFloatingType(operandUnderlying) && IsIntegralTargetType(targetUnderlying))
+                    {
+                        var castOperandSql = GetSql(node.Operand);
+                        _sql.Append(_provider.FloatingToIntegralTruncatingSql(
+                            castOperandSql, targetUnderlying == typeof(long) || targetUnderlying == typeof(ulong)));
+                        return node;
+                    }
                     Visit(node.Operand);
                     return node;
                 }

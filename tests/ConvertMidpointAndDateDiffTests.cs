@@ -97,6 +97,28 @@ public class ConvertMidpointAndDateDiffTests
     }
 
     [Fact]
+    public void Explicit_int_cast_truncates_toward_zero()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // C# explicit casts truncate: (int)2.5 -> 2, (int)3.5 -> 3, (int)-2.5 -> -2
+        // (unlike Convert.ToInt32's round-half-to-even above).
+        var actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => (int)r.Val).ToList();
+        Assert.Equal(new[] { 2, 3, -2 }, actual);
+    }
+
+    [Fact]
+    public void Explicit_long_cast_truncates_toward_zero()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        var actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => (long)r.Val).ToList();
+        Assert.Equal(new long[] { 2, 3, -2 }, actual);
+    }
+
+    [Fact]
     public void DateTime_subtraction_is_tick_exact()
     {
         var (cn, ctx) = Setup();

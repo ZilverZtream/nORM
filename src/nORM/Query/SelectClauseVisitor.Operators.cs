@@ -486,9 +486,28 @@ namespace nORM.Query
 
         protected override Expression VisitUnary(UnaryExpression node)
         {
-            // Numeric / enum / primitive Convert: the SQL value is the operand itself.
+            // Numeric / enum / primitive Convert: the SQL value is the operand itself,
+            // EXCEPT a narrowing floating->integral cast, which truncates toward zero
+            // in C# and must emit a truncating SQL cast (the raw double column would
+            // crash strict drivers' integer readers at materialization).
             if (node.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
             {
+                var castSrc = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
+                var castDst = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
+                if ((castSrc == typeof(double) || castSrc == typeof(float) || castSrc == typeof(decimal))
+                    && (castDst == typeof(int) || castDst == typeof(long) || castDst == typeof(short)
+                        || castDst == typeof(byte) || castDst == typeof(sbyte) || castDst == typeof(uint)
+                        || castDst == typeof(ulong) || castDst == typeof(ushort)))
+                {
+                    var sbCast = EnsureBuilder();
+                    var castStart = sbCast.Length;
+                    Visit(node.Operand);
+                    var castSql = sbCast.ToString(castStart, sbCast.Length - castStart);
+                    sbCast.Length = castStart;
+                    sbCast.Append(_provider.FloatingToIntegralTruncatingSql(
+                        castSql, castDst == typeof(long) || castDst == typeof(ulong)));
+                    return node;
+                }
                 Visit(node.Operand);
                 return node;
             }

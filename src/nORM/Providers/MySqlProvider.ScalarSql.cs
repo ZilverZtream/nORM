@@ -284,6 +284,10 @@ namespace nORM.Providers
         /// <summary>MySQL's integral CAST target keyword (CAST(x AS INT) is a syntax error).</summary>
         internal override string IntegerCastTypeName => "SIGNED";
 
+        /// <summary>MySQL CAST rounds half away from zero; TRUNCATE(x, 0) restores C#'s toward-zero cast.</summary>
+        internal override string FloatingToIntegralTruncatingSql(string sql, bool asLong)
+            => GetIntCastSql($"TRUNCATE({sql}, 0)", asLong);
+
         /// <summary>MySQL TIME to fractional seconds: whole seconds plus the microsecond tail.</summary>
         internal override string TimeSpanOperandToSecondsSql(string sql)
             => $"(TIME_TO_SEC({sql}) + MICROSECOND({sql}) / 1000000.0)";
