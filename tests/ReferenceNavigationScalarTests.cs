@@ -221,6 +221,42 @@ public class ReferenceNavigationScalarTests
     }
 
     [Fact]
+    public void Bool_projection_of_nav_null_test()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        var rows = ctx.Query<Emp>().OrderBy(e => e.Id)
+            .Select(e => new { e.Id, IsOrphan = e.Dept == null }).ToList();
+        Assert.Equal(new[] { false, true, false }, rows.Select(r => r.IsOrphan).ToArray());
+    }
+
+    [Fact]
+    public void Bool_projection_of_column_null_test()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // Previously emitted `col = NULL` — always UNKNOWN — and silently
+        // materialized false for every row.
+        var rows = ctx.Query<Emp>().OrderBy(e => e.Id)
+            .Select(e => new { e.Id, NoDept = e.DeptId == null }).ToList();
+        Assert.Equal(new[] { false, true, false }, rows.Select(r => r.NoDept).ToArray());
+    }
+
+    [Fact]
+    public void Conditional_over_null_test_keeps_predicate_position()
+    {
+        var (cn, ctx) = Setup();
+        using var _ = cn; using var __ = ctx;
+
+        // Inside a CASE WHEN test the null check must stay a bare predicate.
+        var labels = ctx.Query<Emp>().OrderBy(e => e.Id)
+            .Select(e => e.DeptId == null ? "orphan" : "parented").ToList();
+        Assert.Equal(new[] { "parented", "orphan", "parented" }, labels);
+    }
+
+    [Fact]
     public void Nav_member_in_string_method_translates()
     {
         var (cn, ctx) = Setup();

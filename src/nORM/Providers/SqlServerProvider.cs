@@ -158,6 +158,10 @@ namespace nORM.Providers
         public override string BuildCorrelatedTopOneSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql)
             => $"(SELECT TOP 1 {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql})";
 
+        /// <summary>T-SQL cannot select a bare predicate; CASE-to-BIT materializes it as bool.</summary>
+        internal override string BooleanPredicateAsValue(string predicateSql)
+            => $"CAST(CASE WHEN {predicateSql} THEN 1 ELSE 0 END AS BIT)";
+
         /// <summary>
         /// Adds SQL Server paging clauses to the SQL builder using <c>OFFSET</c> and <c>FETCH</c>.
         /// </summary>

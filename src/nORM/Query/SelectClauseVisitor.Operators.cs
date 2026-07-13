@@ -16,11 +16,21 @@ namespace nORM.Query
 {
     internal sealed partial class SelectClauseVisitor
     {
+        /// <summary>
+        /// True while visiting a position that expects a boolean PREDICATE (a CASE
+        /// WHEN test); value positions wrap predicates through the provider's
+        /// BooleanPredicateAsValue instead (T-SQL cannot select a bare predicate).
+        /// </summary>
+        private bool _inPredicatePosition;
+
         protected override Expression VisitConditional(ConditionalExpression node)
         {
             var sb = EnsureBuilder();
             sb.Append("(CASE WHEN ");
+            var savedPredicatePosition = _inPredicatePosition;
+            _inPredicatePosition = true;
             Visit(node.Test);
+            _inPredicatePosition = savedPredicatePosition;
             sb.Append(" THEN ");
             Visit(node.IfTrue);
             sb.Append(" ELSE ");
@@ -58,6 +68,28 @@ namespace nORM.Query
         protected override Expression VisitBinary(BinaryExpression node)
         {
             var sb = EnsureBuilder();
+            // A boolean binary in a VALUE position (a projected member like
+            // `Big = r.Score > 5`, `IsOrphan = r.Dept == null`, or a && chain) must
+            // render as a selectable value: T-SQL rejects a bare predicate in the
+            // SELECT list ('Incorrect syntax near ...'), while the other dialects
+            // select predicates directly (identity hook). Re-entering with the
+            // predicate flag set makes every inner branch emit the bare predicate,
+            // which the provider hook then wraps once at the outermost level.
+            bool isBoolPredicate = node.Type == typeof(bool) && node.NodeType is ExpressionType.Equal
+                or ExpressionType.NotEqual or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                or ExpressionType.AndAlso or ExpressionType.OrElse;
+            if (isBoolPredicate && !_inPredicatePosition)
+            {
+                var wrapStart = sb.Length;
+                _inPredicatePosition = true;
+                try { VisitBinary(node); }
+                finally { _inPredicatePosition = false; }
+                var predicateSql = sb.ToString(wrapStart, sb.Length - wrapStart);
+                sb.Length = wrapStart;
+                sb.Append(_provider.BooleanPredicateAsValue(predicateSql));
+                return node;
+            }
             // `a ?? b` in a projection lowers to COALESCE(a, b) — emit as a function call so
             // it composes inside `new { Name = r.Name ?? "anon" }` projections.
             if (node.NodeType == ExpressionType.Coalesce)
@@ -69,6 +101,42 @@ namespace nORM.Query
                 sb.Append(')');
                 return node;
             }
+            // Null tests in projections: `x == null` must emit IS NULL — the generic
+            // path would render `col = NULL`, which is always UNKNOWN and silently
+            // materializes false for every row. A whole-entity navigation operand
+            // tests its FOREIGN KEY value (e.Dept == null is orphan-ness).
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                static bool IsNullConst(Expression e)
+                {
+                    while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                        e = u.Operand;
+                    return e is ConstantExpression { Value: null };
+                }
+                bool leftIsNull = IsNullConst(node.Left);
+                bool rightIsNull = IsNullConst(node.Right);
+                if (leftIsNull ^ rightIsNull)
+                {
+                    var operand = leftIsNull ? node.Right : node.Left;
+                    string operandSql;
+                    if (TryResolveScvNavigationFkValueSql(operand, out var navFkSql))
+                    {
+                        operandSql = navFkSql;
+                    }
+                    else
+                    {
+                        var opStart = sb.Length;
+                        Visit(operand);
+                        operandSql = sb.ToString(opStart, sb.Length - opStart);
+                        sb.Length = opStart;
+                    }
+                    // Bare predicate: the top-of-method wrapper handles value positions.
+                    sb.Append('(').Append(operandSql)
+                      .Append(node.NodeType == ExpressionType.Equal ? " IS NULL)" : " IS NOT NULL)");
+                    return node;
+                }
+            }
+
             // C# `+` on string operands is concatenation, not arithmetic. Emit
             // the provider's concat SQL (`||` on SQLite, `CONCAT(...)` on
             // SQL Server/MySQL) so projections like `Select(p => p.First + " " + p.Last)`

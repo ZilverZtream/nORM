@@ -111,6 +111,15 @@ namespace nORM.Providers
             => NormalizeTimeSpanForCompare(sql);
 
         /// <summary>
+        /// Renders a boolean PREDICATE as a selectable VALUE. Most dialects allow a
+        /// predicate directly in the SELECT list (SQLite/MySQL yield 0/1, PostgreSQL
+        /// boolean); T-SQL rejects it ('Incorrect syntax near IS') and needs the
+        /// CASE-to-BIT form. Only for value positions — inside CASE WHEN tests the
+        /// bare predicate is required.
+        /// </summary>
+        internal virtual string BooleanPredicateAsValue(string predicateSql) => predicateSql;
+
+        /// <summary>
         /// SQL for a C# EXPLICIT cast from floating point/decimal to an integer type,
         /// which truncates toward zero ((int)2.7 is 2, (int)-2.7 is -2). A bare CAST
         /// already truncates on SQLite and SQL Server; MySQL's CAST rounds half away

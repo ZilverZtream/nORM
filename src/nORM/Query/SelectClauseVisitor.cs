@@ -419,6 +419,50 @@ namespace nORM.Query
         /// mapping/alias) and nests one subquery per additional hop. Null when the
         /// receiver is not a mapped single-key reference navigation.
         /// </summary>
+        /// <summary>
+        /// SQL for a whole-entity navigation receiver's FK VALUE (projection side):
+        /// the dependent's FK column for a root receiver, or the nested subquery
+        /// fetching the FK through a deeper chain. Used by null tests in projections.
+        /// </summary>
+        private bool TryResolveScvNavigationFkValueSql(Expression expr, out string fkValueSql)
+        {
+            fkValueSql = string.Empty;
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (expr is not MemberExpression navExpr || _ctx == null)
+                return false;
+            var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+            if (!navType.IsClass || navType == typeof(string))
+                return false;
+            TableMapping principalMap;
+            try { principalMap = _ctx.GetMapping(navType); }
+            catch { return false; }
+            if (principalMap.KeyColumns.Length != 1)
+                return false;
+            if (navExpr.Expression is ParameterExpression)
+            {
+                var fkCol = ExpressionToSqlVisitor.FindReferenceNavForeignKey(_mapping, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return false;
+                fkValueSql = $"{_outerAlias}.{fkCol.EscCol}";
+                return true;
+            }
+            if (navExpr.Expression is MemberExpression parentNav)
+            {
+                var ownerType = System.Nullable.GetUnderlyingType(parentNav.Type) ?? parentNav.Type;
+                if (!ownerType.IsClass || ownerType == typeof(string)) return false;
+                TableMapping ownerMap;
+                try { ownerMap = _ctx.GetMapping(ownerType); }
+                catch { return false; }
+                var fkCol = ExpressionToSqlVisitor.FindReferenceNavForeignKey(ownerMap, navExpr.Member.Name, navType, principalMap);
+                if (fkCol == null) return false;
+                var nested = BuildScvReferenceNavigationScalarSql(parentNav, fkCol.PropName, depth: 0);
+                if (nested == null) return false;
+                fkValueSql = nested;
+                return true;
+            }
+            return false;
+        }
+
         private string? BuildScvReferenceNavigationScalarSql(MemberExpression navExpr, string targetMemberName, int depth)
         {
             var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
