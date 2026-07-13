@@ -71,8 +71,9 @@ dotnet run --project samples/nORM.Sample.Store -- --provider sqlite
 The same app can target SQL Server, PostgreSQL, or MySQL by setting
 `NORM_SAMPLE_*` or `NORM_TEST_*` connection strings and changing only
 `--provider`. The sample demonstrates generated-path tenant boundaries,
-representative LINQ, bulk insert, compiled query, `Include().AsSplitQuery()`,
-and nORM-managed temporal `AsOf(tag)`. See
+representative LINQ, bulk insert, compiled query, `Include()` eager loading
+(`AsSplitQuery()` is accepted for EF compatibility), and nORM-managed temporal
+`AsOf(tag)`. See
 [samples/nORM.Sample.Store/README.md](samples/nORM.Sample.Store/README.md),
 [Tenant Boundary](docs/tenant-boundary.md), and
 [Temporal Versioning](docs/temporal-versioning.md).

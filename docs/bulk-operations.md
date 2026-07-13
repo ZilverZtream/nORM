@@ -37,15 +37,20 @@ The v1 `ExecuteUpdateAsync` assignment contract is intentionally narrow:
 - Supported: literal constants, `null`, and precomputed captured local values.
 - Supported: chained `SetProperty` calls that each target a mapped scalar
   property.
-- Unsupported: method calls in the assignment value, inline computed values such
-  as `prefix + suffix`, column-based updates such as `x => x.Count + 1`, and
-  provider/server expressions.
+- Supported: server-side computed expressions over the row being updated, such
+  as `SetProperty(x => x.Count, x => x.Count + 1)` — member access, constants,
+  arithmetic (`+`/`-`/`*`/`/`/`%`), and `Convert` translate to a server-side
+  `SET column = <expression>`.
+- Supported: navigation-collection aggregates as the assignment value, such as
+  `SetProperty(p => p.Total, p => p.Items.Sum(i => i.Amount))`, which translate
+  to a correlated subquery.
+- Unsupported: other method calls in the assignment value and provider/server
+  expressions outside the translatable surface above.
 
-Unsupported assignment values throw `NormUnsupportedFeatureException` before
-the update command executes. If an application needs a computed value in v1,
-compute it into a local variable first and pass that local variable to
-`SetProperty`. Server-side computed updates are a post-v1 feature, not part of
-the stable v1 contract.
+Assignment values outside the translatable surface throw
+`NormUnsupportedFeatureException` before the update command executes; computing
+such a value into a local variable first and passing the local to `SetProperty`
+remains a valid fallback.
 
 ## Transactions and Partial Failures
 

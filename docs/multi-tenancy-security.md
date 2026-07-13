@@ -31,9 +31,9 @@ must independently verify tenant identity.
 
 | Boundary | Protected by nORM | Bypass-capable APIs | Required control |
 | --- | --- | --- | --- |
-| ORM-generated reads | `Query<T>()`, compiled queries, includes, split queries, result cache keys | `FromSqlRawAsync<T>`, `QueryUnchangedAsync<T>`, direct `DbCommand` | Add tenant predicates manually or use database row-level security for caller-authored SQL. |
+| ORM-generated reads | `Query<T>()`, compiled queries, eager-loaded includes, result cache keys | `FromSqlRawAsync<T>`, `QueryUnchangedAsync<T>`, direct `DbCommand` | Add tenant predicates manually or use database row-level security for caller-authored SQL. |
 | ORM-generated writes | `SaveChangesAsync`, direct writes, bulk update/delete, owned/many-to-many maintenance | direct `DbCommand`, migrations, admin CLI commands | Restrict privileged write paths and review tenant predicates in hand-authored SQL. |
-| Relationship loading | mapped `Include`, `ThenInclude`, split-query loaders | raw SQL joins, stored procedures | Verify related tables carry tenant columns or enforce tenancy in database code. |
+| Relationship loading | mapped `Include`, `ThenInclude` eager loading | raw SQL joins, stored procedures | Verify related tables carry tenant columns or enforce tenancy in database code. |
 | Cache isolation | query/result cache keys include tenant state where nORM owns the key | external cache providers, application-level cache keys | Prefix external keys/tags with tenant identity. |
 | Operational tooling | none; tooling is administrative | migrations, scaffolding, database drop/update commands | Run tooling only with deployment/admin permissions and disposable or approved targets. |
 
@@ -46,7 +46,7 @@ mapped entity has the tenant column:
 | --- | --- |
 | LINQ queries from `Query<T>()` | A tenant predicate is added before SQL generation. The tenant value is parameterized and coerced to the mapped tenant property type. |
 | Compiled queries | Compiled query cache keys include tenant state, and execution still binds the current tenant value. |
-| `Include` and split-query loading | Child and join-table loaders add tenant predicates where the related mapping has a tenant column. |
+| `Include` eager loading | Child and join-table loaders add tenant predicates where the related mapping has a tenant column. |
 | `SaveChangesAsync` inserts | Entity tenant values are validated against the current tenant. nORM does not auto-fill a missing tenant value for non-null tenants. |
 | `SaveChangesAsync` updates/deletes | Generated `WHERE` clauses include the current tenant predicate. Optimistic-concurrency verification is also tenant-scoped. |
 | `InsertAsync`, `UpdateAsync`, `DeleteAsync` | Direct entity writes validate tenant values and scope updates/deletes by tenant. |
