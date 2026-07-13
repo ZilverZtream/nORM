@@ -119,6 +119,12 @@ namespace nORM.Query
             {
                 cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}";
             }
+            // The right entity's global filters (soft-delete) restrict which related rows
+            // are visible — the same rule the regular include levels apply. Without this,
+            // filtered-out rows leak into the loaded collections.
+            var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+            if (rightGlobalFilter != null)
+                cmd2.CommandText += $" AND {rightGlobalFilter}";
             cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
             var rightEntitiesByPk = new Dictionary<object, object>();
@@ -266,6 +272,12 @@ namespace nORM.Query
             {
                 cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}";
             }
+            // The right entity's global filters (soft-delete) restrict which related rows
+            // are visible — the same rule the regular include levels apply. Without this,
+            // filtered-out rows leak into the loaded collections.
+            var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+            if (rightGlobalFilter != null)
+                cmd2.CommandText += $" AND {rightGlobalFilter}";
             cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
             var rightEntitiesByPk = new Dictionary<object, object>();
