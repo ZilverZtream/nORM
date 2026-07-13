@@ -143,6 +143,27 @@ namespace nORM.Providers
         public virtual string NormalizeDecimalForCompare(string sql) => sql;
 
         /// <summary>
+        /// Canonical decimal TEXT for EXACT equality / grouping / dedup on providers
+        /// that store decimal as text. <see cref="NormalizeDecimalForCompare"/>'s REAL
+        /// coercion is right for ordering and arithmetic but is IEEE-754 double, so two
+        /// decimals that differ beyond ~15-17 significant digits collapse to the same
+        /// key -- silently merging rows in equality predicates, GROUP BY, and DISTINCT.
+        /// The canonical text (trailing fraction zeros stripped, negative zero folded)
+        /// is unique per numeric value at full 28-digit precision AND stays a parseable
+        /// decimal, so it can serve as a SELECT-side group key. Null means the
+        /// provider's native DECIMAL comparisons are already exact.
+        /// </summary>
+        internal virtual string? CanonicalDecimalTextForExactCompare(string sql) => null;
+
+        /// <summary>
+        /// The expression to use where a decimal participates as an exact KEY
+        /// (GROUP BY, DISTINCT, set-op dedup): the canonical text when the provider
+        /// needs it, otherwise the ordinary comparison normalization.
+        /// </summary>
+        internal string ExactDecimalKeySql(string sql)
+            => CanonicalDecimalTextForExactCompare(sql) ?? NormalizeDecimalForCompare(sql);
+
+        /// <summary>
         /// Wraps a SQL operand for numeric TimeSpan comparison. SQL Server / Postgres /
         /// MySQL store TimeSpan in native TIME / INTERVAL types whose comparison operators
         /// already use numeric ordering - the default is identity. SQLite stores TimeSpan

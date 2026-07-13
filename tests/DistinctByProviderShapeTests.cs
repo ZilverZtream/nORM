@@ -36,7 +36,10 @@ public sealed class DistinctByProviderShapeTests : TestBase
     }
 
     [Theory]
-    [InlineData(ProviderKind.Sqlite, "CAST")]
+    // SQLite partitions on the canonical decimal TEXT (trailing-zero-stripped),
+    // which dedups exactly at full decimal precision -- CAST AS REAL would merge
+    // values differing beyond double's ~15-17 significant digits.
+    [InlineData(ProviderKind.Sqlite, "rtrim(rtrim(")]
     [InlineData(ProviderKind.SqlServer, "Amount")]
     [InlineData(ProviderKind.Postgres, "Amount")]
     [InlineData(ProviderKind.MySql, "Amount")]

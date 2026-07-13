@@ -306,12 +306,24 @@ namespace nORM.Query
             bool rightIsDecimal = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
             if (isDecimalComparable && (leftIsDecimal || rightIsDecimal))
             {
-                // Route through the provider hook: SqliteProvider wraps with
-                // CAST AS REAL (TEXT storage needs numeric coercion); other
-                // providers' native DECIMAL is precise so the hook is identity
-                // and the SQL shape stays `(left op right)`.
-                var leftSqlD = _provider.NormalizeDecimalForCompare(GetSql(node.Left));
-                var rightSqlD = _provider.NormalizeDecimalForCompare(GetSql(node.Right));
+                // Route through the provider hooks. Equality uses the canonical
+                // decimal TEXT where available: the REAL coercion is double
+                // precision, so decimals differing beyond ~15-17 significant
+                // digits would compare equal. Relational operators and
+                // arithmetic keep the numeric REAL form (text cannot order or
+                // compute). Other providers' native DECIMAL is precise so both
+                // hooks are identity/null and the shape stays `(left op right)`.
+                // Canonical text applies only when BOTH operands are raw storage
+                // (column / constant / parameter): a computed operand (Truncate,
+                // arithmetic) renders as a NUMBER, and SQLite compares numbers
+                // and text by storage class -- never equal. Computed operands
+                // stay in the numeric REAL domain on both sides.
+                bool exactEqualityOp = (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+                    && IsRawStorageOperand(node.Left) && IsRawStorageOperand(node.Right);
+                string WrapDecimal(string sql)
+                    => exactEqualityOp ? _provider.ExactDecimalKeySql(sql) : _provider.NormalizeDecimalForCompare(sql);
+                var leftSqlD = WrapDecimal(GetSql(node.Left));
+                var rightSqlD = WrapDecimal(GetSql(node.Right));
                 _sql.Append('(').Append(leftSqlD);
                 _sql.Append(node.NodeType switch
                 {
@@ -845,6 +857,20 @@ namespace nORM.Query
             var columnSql = GetSql(member);
             _sql.Append(_provider.FormatBooleanPredicate(columnSql, expectedValue));
             return true;
+        }
+
+        /// <summary>
+        /// True when the operand is raw decimal storage -- a column member, an
+        /// inline constant, or a compiled-query parameter -- whose SQL fragment
+        /// renders the stored TEXT (or its parameter). Computed expressions
+        /// (Truncate, arithmetic) render numeric storage classes instead, and
+        /// the canonical-text equality form must not apply to them.
+        /// </summary>
+        private static bool IsRawStorageOperand(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            return e is MemberExpression or ConstantExpression or ParameterExpression;
         }
     }
 }

@@ -285,8 +285,13 @@ namespace nORM.Query
             bool rightIsDec = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(decimal);
             if (isDecCmpArith && (leftIsDec || rightIsDec))
             {
-                // Provider hook: SqliteProvider wraps with CAST AS REAL,
-                // others identity (native DECIMAL).
+                // Provider hooks: equality uses the exact canonical text
+                // (REAL is double precision and merges decimals beyond ~15-17
+                // significant digits); relational/arithmetic keep REAL.
+                // Same raw-storage gating as the predicate translator: computed
+                // operands render numbers, which never text-equal the canonical form.
+                bool exactDecEquality = (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+                    && IsRawStorageOperandScv(node.Left) && IsRawStorageOperandScv(node.Right);
                 var decLeftStart = sb.Length;
                 Visit(node.Left);
                 var decLeftSql = sb.ToString(decLeftStart, sb.Length - decLeftStart);
@@ -295,7 +300,9 @@ namespace nORM.Query
                 Visit(node.Right);
                 var decRightSql = sb.ToString(decRightStart, sb.Length - decRightStart);
                 sb.Length = decRightStart;
-                sb.Append('(').Append(_provider.NormalizeDecimalForCompare(decLeftSql))
+                string WrapDec(string sqlFrag)
+                    => exactDecEquality ? _provider.ExactDecimalKeySql(sqlFrag) : _provider.NormalizeDecimalForCompare(sqlFrag);
+                sb.Append('(').Append(WrapDec(decLeftSql))
                   .Append(' ').Append(node.NodeType switch
                 {
                     ExpressionType.Equal => "=",
@@ -310,7 +317,7 @@ namespace nORM.Query
                     ExpressionType.Divide => "/",
                     ExpressionType.Modulo => "%",
                     _ => throw new InvalidOperationException()
-                }).Append(' ').Append(_provider.NormalizeDecimalForCompare(decRightSql)).Append(')');
+                }).Append(' ').Append(WrapDec(decRightSql)).Append(')');
                 return node;
             }
 
@@ -558,6 +565,18 @@ namespace nORM.Query
                 }
             }
             return node;
+        }
+
+        /// <summary>
+        /// True when the operand renders raw decimal TEXT storage (column member,
+        /// inline constant, or compiled parameter) rather than a computed number;
+        /// mirrors the predicate translator's gating for canonical-text equality.
+        /// </summary>
+        private static bool IsRawStorageOperandScv(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            return e is MemberExpression or ConstantExpression or ParameterExpression;
         }
     }
 }

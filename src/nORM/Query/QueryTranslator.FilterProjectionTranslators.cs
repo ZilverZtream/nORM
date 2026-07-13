@@ -649,7 +649,19 @@ namespace nORM.Query
                         && t.ProjectionContainsMember(projectedMember.Member.Name))
                     {
                         var ascendingAlias = !node.Method.Name.Contains("Descending");
-                        t._orderBy.Add((t._provider.Escape(projectedMember.Member.Name), ascendingAlias));
+                        // The alias references the projected expression verbatim, so the
+                        // type-sensitive ordering coercions CoerceOrderKey applies to
+                        // direct keys (decimal / TimeSpan / DateTimeOffset TEXT storage
+                        // lex-sorts wrong) must wrap the alias too. The hooks are
+                        // identity on providers with native types, so the standard
+                        // bare-alias ORDER BY survives there; SQLite resolves aliases
+                        // inside ORDER BY expressions.
+                        var aliasSql = t._provider.Escape(projectedMember.Member.Name);
+                        var aliasType = Nullable.GetUnderlyingType(projectedMember.Type) ?? projectedMember.Type;
+                        if (aliasType == typeof(decimal)) aliasSql = t._provider.NormalizeDecimalForCompare(aliasSql);
+                        else if (aliasType == typeof(TimeSpan)) aliasSql = t._provider.NormalizeTimeSpanForCompare(aliasSql);
+                        else if (aliasType == typeof(DateTimeOffset)) aliasSql = t._provider.NormalizeDateTimeOffsetForCompare(aliasSql);
+                        t._orderBy.Add((aliasSql, ascendingAlias));
                         return source;
                     }
 

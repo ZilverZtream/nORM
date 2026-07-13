@@ -157,6 +157,18 @@ namespace nORM.Providers
         public override string NormalizeDecimalForCompare(string sql) => $"CAST({sql} AS REAL)";
 
         /// <summary>
+        /// Exact decimal key for TEXT-stored decimals: strip trailing fraction zeros
+        /// (so '10.50' and '10.5' compare equal, matching decimal's scale-insensitive
+        /// equality) and fold negative zero. Values without a '.' are already
+        /// canonical -- rtrim must not run on them ('100' would become '1').
+        /// </summary>
+        internal override string? CanonicalDecimalTextForExactCompare(string sql)
+        {
+            var trimmed = $"rtrim(rtrim({sql}, '0'), '.')";
+            return $"(CASE WHEN instr({sql}, '.') = 0 THEN {sql} WHEN {trimmed} = '-0' THEN '0' ELSE {trimmed} END)";
+        }
+
+        /// <summary>
         /// SQLite stores TimeSpan as canonical 'c' TEXT ("d.hh:mm:ss.fffffff").
         /// Lex-comparison of the TEXT column gives wrong order for multi-day durations
         /// ("10.00:00:00" &lt; "9.23:59:59" lex but 10 days &gt; 9 days 23 hours).

@@ -335,10 +335,13 @@ namespace nORM.Query
                 var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
                 if (CoerceDecimalProjectionsToReal && memberType == typeof(decimal))
                 {
-                    // Provider hook: SqliteProvider wraps with CAST AS REAL,
-                    // others identity. Decimal projections from set ops /
-                    // DISTINCT need numeric dedup on SQLite (TEXT storage).
-                    sb.Append(_provider.NormalizeDecimalForCompare(col.EscCol));
+                    // Provider hook: SqliteProvider emits the canonical decimal
+                    // text, others identity. Decimal projections from set ops /
+                    // DISTINCT need scale-insensitive EXACT dedup on SQLite
+                    // (TEXT storage; REAL would merge values differing beyond
+                    // double precision), and the canonical text still
+                    // materializes as the decimal value.
+                    sb.Append(_provider.ExactDecimalKeySql(col.EscCol));
                 }
                 else if (ForceOrdinalStringProjections && memberType == typeof(string)
                          && _provider.OrdinalComparableStringProjection(col.EscCol) is { } ordinalSql)
