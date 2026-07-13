@@ -233,17 +233,10 @@ namespace nORM.Query
             // selector projects an unmapped shape that rewrite cannot express, so the filter
             // goes into the ON clause here (ON, not WHERE, so a DefaultIfEmpty LEFT JOIN
             // keeps its unmatched rows).
-            if (resultSelector != null && _ctx != null
-                && GlobalFilterFragment.Combine(_ctx, relation.DependentType) is { } childGlobalFilter)
+            if (resultSelector != null
+                && RenderSelectManyInnerGlobalFilterSql(innerMapping, innerAlias) is { } childFilterSql)
             {
-                var gfParam = childGlobalFilter.Parameters[0];
-                var vctxGf = new VisitorContext(_ctx, innerMapping, _provider, gfParam, innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
-                var gfVisitor = FastExpressionVisitorPool.Get(in vctxGf);
-                var gfSql = gfVisitor.Translate(childGlobalFilter.Body);
-                foreach (var kvp in gfVisitor.GetParameters())
-                    _params[kvp.Key] = kvp.Value;
-                FastExpressionVisitorPool.Return(gfVisitor);
-                _sql.Append(" AND (").Append(gfSql).Append(')');
+                _sql.Append(" AND (").Append(childFilterSql).Append(')');
             }
 
             if (filterPredicate != null)
@@ -333,6 +326,13 @@ namespace nORM.Query
             AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
             _sql.Append("INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
             _sql.Append("ON ").Append(corrPredSql);
+            // See TryHandleNavigationSelectMany: a result selector's unmapped projection
+            // shape means the provider-level rewrite cannot carry the inner's filter.
+            if (resultSelector != null
+                && RenderSelectManyInnerGlobalFilterSql(corrInnerMapping, corrInnerAlias) is { } corrFilterSql)
+            {
+                _sql.Append(" AND (").Append(corrFilterSql).Append(')');
+            }
 
             if (resultSelector != null)
             {
@@ -395,10 +395,26 @@ namespace nORM.Query
             else
                 crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
 
+            // See TryHandleNavigationSelectMany: a result selector's unmapped projection
+            // shape means the provider-level rewrite cannot carry the inner's filter. A
+            // filtered CROSS JOIN becomes an INNER JOIN on the filter — same rowset.
+            var crossFilterSql = resultSelector != null
+                ? RenderSelectManyInnerGlobalFilterSql(crossMapping, crossAlias)
+                : null;
             if (useLeftJoin)
+            {
                 crossSql.Append($"LEFT JOIN {crossMapping.EscTable} {crossAlias} ON 1=1");
+                if (crossFilterSql != null)
+                    crossSql.Append($" AND ({crossFilterSql})");
+            }
+            else if (crossFilterSql != null)
+            {
+                crossSql.Append($"INNER JOIN {crossMapping.EscTable} {crossAlias} ON ({crossFilterSql})");
+            }
             else
+            {
                 crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
+            }
 
             _sql.Clear();
             _sql.Append(crossSql.ToSqlString());
@@ -413,6 +429,35 @@ namespace nORM.Query
             else
             {
                 _mapping = crossMapping;
+            }
+        }
+
+        /// <summary>
+        /// Translates the inner entity's combined global filter against the join alias.
+        /// Every SelectMany arm needs this when a result selector is present: the
+        /// provider-level filter rewrite wraps only queries whose RESULT element type is
+        /// the (mapped) inner entity, and it never descends into the lambda arguments
+        /// where correlated/cross query sources live.
+        /// </summary>
+        private string? RenderSelectManyInnerGlobalFilterSql(TableMapping innerMapping, string innerAlias)
+        {
+            if (_ctx == null)
+                return null;
+            var combined = GlobalFilterFragment.Combine(_ctx, innerMapping.Type);
+            if (combined == null)
+                return null;
+            var vctx = new VisitorContext(_ctx, innerMapping, _provider, combined.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            try
+            {
+                var sql = visitor.Translate(combined.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                return sql;
+            }
+            finally
+            {
+                FastExpressionVisitorPool.Return(visitor);
             }
         }
 
