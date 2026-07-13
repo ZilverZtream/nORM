@@ -134,11 +134,11 @@ namespace nORM.Core
             if (upperSql.Contains("UNION") && upperSql.Contains("SELECT"))
             {
                 // Allow legitimate UNION queries but check for suspicious patterns
-                var unionIndex = upperSql.IndexOf("UNION");
+                var unionIndex = upperSql.IndexOf("UNION", StringComparison.Ordinal);
                 var beforeUnion = upperSql.Substring(0, unionIndex);
 
                 // Suspicious if there's a single quote near UNION (likely injected)
-                if (beforeUnion.LastIndexOf('\'') > Math.Max(beforeUnion.LastIndexOf("WHERE"), 0))
+                if (beforeUnion.LastIndexOf('\'') > Math.Max(beforeUnion.LastIndexOf("WHERE", StringComparison.Ordinal), 0))
                 {
                     throw new NormUsageException(
                         "Potential SQL injection detected: UNION with embedded quotes. " +
@@ -157,7 +157,7 @@ namespace nORM.Core
             // looks like "outside a string" to the parity check). A full SQL lexer would
             // be needed to handle all edge cases. The semicolon requirement provides an
             // additional safety gate that reduces false negatives from this limitation.
-            var doubleHyphenIndex = sql.IndexOf("--");
+            var doubleHyphenIndex = sql.IndexOf("--", StringComparison.Ordinal);
             if (doubleHyphenIndex >= 0)
             {
                 var beforeComment = sql.Substring(0, doubleHyphenIndex);
@@ -176,8 +176,8 @@ namespace nORM.Core
             // Pattern 3: Block comments used for injection
             if (sql.Contains("/*") && sql.Contains("*/"))
             {
-                var commentStart = sql.IndexOf("/*");
-                var commentEnd = sql.IndexOf("*/", commentStart);
+                var commentStart = sql.IndexOf("/*", StringComparison.Ordinal);
+                var commentEnd = sql.IndexOf("*/", commentStart, StringComparison.Ordinal);
 
                 if (commentEnd < 0)
                     throw new NormUsageException(
@@ -199,7 +199,7 @@ namespace nORM.Core
             }
 
             // Pattern 4: Embedded quotes without proper parameterization
-            var whereIndex = upperSql.IndexOf("WHERE");
+            var whereIndex = upperSql.IndexOf("WHERE", StringComparison.Ordinal);
 
             if (whereIndex >= 0)
             {
@@ -262,8 +262,8 @@ namespace nORM.Core
             if (trimmed.Length == 0) return;
 
             var upper = trimmed.ToUpperInvariant();
-            if (upper.StartsWith("DROP ") || upper.StartsWith("ALTER ") ||
-                upper.StartsWith("CREATE ") || upper.StartsWith("EXEC "))
+            if (upper.StartsWith("DROP ", StringComparison.Ordinal) || upper.StartsWith("ALTER ", StringComparison.Ordinal) ||
+                upper.StartsWith("CREATE ", StringComparison.Ordinal) || upper.StartsWith("EXEC ", StringComparison.Ordinal))
             {
                 throw new NormUsageException(
                     "Potential SQL injection detected: Multiple statements with DDL/EXEC commands. " +
@@ -418,7 +418,7 @@ namespace nORM.Core
                     return true;
 
                 // Suspicious: URL-like pattern
-                if (literal.Contains("://") || literal.StartsWith("http"))
+                if (literal.Contains("://", StringComparison.Ordinal) || literal.StartsWith("http", StringComparison.Ordinal))
                     return true;
 
                 // Suspicious: very long strings (likely user input, not constants)

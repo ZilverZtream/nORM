@@ -325,7 +325,7 @@ namespace nORM.Query
             protected override Expression VisitNew(NewExpression node)
             {
                 // Anonymous types and simple constructors are OK
-                if (node.Type.Name.StartsWith("<>"))
+                if (node.Type.Name.StartsWith("<>", StringComparison.Ordinal))
                 {
                     // Anonymous type - this is fine
                     return base.VisitNew(node);

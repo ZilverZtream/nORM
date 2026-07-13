@@ -72,7 +72,7 @@ namespace nORM.Query
             }
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
-                             !plan.ElementType.Name.StartsWith("<>") &&
+                             !plan.ElementType.Name.StartsWith("<>", StringComparison.Ordinal) &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
                              _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
             if (trackable)

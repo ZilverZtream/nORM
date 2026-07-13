@@ -49,7 +49,7 @@ namespace nORM.Providers
                 sb.Append(", ");
 
                 // Skip first segment (root '$') if present
-                int startIndex = jsonPath.StartsWith("$.") ? 2 : (jsonPath.StartsWith("$") ? 1 : 0);
+                int startIndex = jsonPath.StartsWith("$.", StringComparison.Ordinal) ? 2 : (jsonPath.StartsWith('$') ? 1 : 0);
                 if (startIndex > 0 && startIndex < jsonPath.Length && jsonPath[startIndex] == '.')
                     startIndex++;
 

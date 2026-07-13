@@ -212,9 +212,9 @@ namespace nORM.Core
             string inner;
 
             // Strip single pair of delimiters
-            if ((part.StartsWith("[") && part.EndsWith("]")) ||
-                (part.StartsWith("\"") && part.EndsWith("\"")) ||
-                (part.StartsWith("`") && part.EndsWith("`")))
+            if ((part.StartsWith('[') && part.EndsWith(']')) ||
+                (part.StartsWith('"') && part.EndsWith('"')) ||
+                (part.StartsWith('`') && part.EndsWith('`')))
             {
                 if (part.Length < 3)
                     return false; // empty delimiter pair

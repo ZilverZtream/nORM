@@ -164,7 +164,7 @@ namespace nORM.Query
                 bool constrained = _constrainedQueryableCache.GetOrAdd(t, static t2 =>
                 {
                     if (!t2.IsClass) return false;
-                    if (t2.Name.StartsWith("<>")) return false;
+                    if (t2.Name.StartsWith("<>", StringComparison.Ordinal)) return false;
                     return t2.GetConstructor(Type.EmptyTypes) != null;
                 });
 

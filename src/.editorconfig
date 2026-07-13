@@ -1,0 +1,9 @@
+root = true
+
+[*.cs]
+# Culture-sensitive string APIs silently change behavior under non-invariant
+# thread cultures (the Turkish-I problem, ignorable-character comparisons).
+# Every comparison and case conversion in this codebase must state its intent:
+# StringComparison.Ordinal(IgnoreCase) or the Invariant variants.
+dotnet_diagnostic.CA1304.severity = error  # ToUpper/ToLower without CultureInfo
+dotnet_diagnostic.CA1310.severity = error  # StartsWith/EndsWith/IndexOf/Compare without StringComparison

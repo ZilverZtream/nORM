@@ -404,7 +404,7 @@ namespace nORM.Providers
                 return escapedIdentifier;
 
             // Remove outer brackets only if present
-            if (escapedIdentifier.StartsWith("[") && escapedIdentifier.EndsWith("]") && escapedIdentifier.Length >= 2)
+            if (escapedIdentifier.StartsWith('[') && escapedIdentifier.EndsWith(']') && escapedIdentifier.Length >= 2)
             {
                 var inner = escapedIdentifier.Substring(1, escapedIdentifier.Length - 2);
                 // Reverse the ]] escape applied by Escape()
