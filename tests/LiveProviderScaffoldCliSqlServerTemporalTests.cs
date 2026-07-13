@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.IO;
@@ -84,7 +84,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.Equal("provider-native-temporal", historyMetadata.GetProperty("reason").GetString());
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {

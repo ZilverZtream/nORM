@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.IO;
@@ -79,7 +79,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             AssertFeatureMetadataHasNoProviderOwnedDiagnostics(warningJsonPath, tableName);
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {
@@ -159,7 +159,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             AssertFeatureMetadataHasNoProviderOwnedDiagnostics(warningJsonPath, tableName);
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {
@@ -228,7 +228,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.DoesNotContain("[Index(\"Code\"", entityCode, StringComparison.OrdinalIgnoreCase);
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {

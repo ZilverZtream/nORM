@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.Data.Common;
@@ -58,7 +58,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.Contains("MissingPrimaryKey", File.ReadAllText(Path.Combine(output, "nORM.ScaffoldWarnings.md")), StringComparison.Ordinal);
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {

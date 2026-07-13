@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -125,7 +125,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {
@@ -263,7 +263,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.False(File.Exists(Path.Combine(output, "nORM.ScaffoldWarnings.json")));
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {

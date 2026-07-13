@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.Data.Common;
@@ -86,7 +86,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
             Assert.False(metadata.GetProperty("hasNullsNotDistinct").GetBoolean());
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {

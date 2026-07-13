@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.Data.Common;
@@ -71,7 +71,7 @@ public sealed partial class LiveProviderScaffoldCliParityTests
                 item.GetProperty("table").GetString() == "dbo." + synonymName);
 
             WriteConsumerProject(root, output);
-            RunDotNet("build -c Release --nologo", output);
+            ScaffoldCompileVerification.AssertCompiles(output);
         }
         finally
         {
