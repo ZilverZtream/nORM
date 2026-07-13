@@ -127,6 +127,8 @@ public class LinqParityFuzzLiveTests
             LinqParityFuzzTests.RunFuzz(ctx, seed: 42, cases: 250);
             LinqParityFuzzTests.RunJoinFuzz(ctx, seed: 20260713, cases: 100);
             LinqParityFuzzTests.RunJoinFuzz(ctx, seed: 42, cases: 100);
+            LinqParityFuzzTests.RunSelectManyFuzz(ctx, seed: 20260713, cases: 80);
+            LinqParityFuzzTests.RunSelectManyFuzz(ctx, seed: 42, cases: 80);
         }
         finally
         {

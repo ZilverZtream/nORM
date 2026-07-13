@@ -137,6 +137,11 @@ namespace nORM.Query
         // reshaped sequence; the post-materialize transform reduces the rows to a
         // single boxed value and the executor unwraps it as the query result.
         private bool _clientScalarResult;
+        // Set when a SelectMany(... DefaultIfEmpty()) flatten with no result selector
+        // makes the inner ENTITY the query result: unmatched outer rows come back with
+        // every inner column NULL and must materialize as null list elements (LINQ
+        // DefaultIfEmpty semantics), not crash the non-null column readers.
+        private bool _flattenedLeftJoinEntityResult;
         // Stored by HandleGroupBy when a 2-arg GroupBy with no downstream result selector
         // is detected. Generate() inspects this after visiting the full expression tree: if
         // no projection was set (streaming case), _groupBy is cleared and a client-side

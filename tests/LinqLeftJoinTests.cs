@@ -79,6 +79,19 @@ public class LinqLeftJoinTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SelectMany_navigation_DefaultIfEmpty_entity_result_materializes_null_elements()
+    {
+        var children = await _ctx.Query<LjParent>()
+            .SelectMany(p => p.Children.DefaultIfEmpty())
+            .ToListAsync();
+
+        // 3 children + a null element for the childless parent.
+        Assert.Equal(4, children.Count);
+        Assert.Equal(1, children.Count(c => c == null));
+        Assert.Equal(3, children.Count(c => c != null));
+    }
+
+    [Fact]
     public async Task QuerySyntax_GroupJoin_SelectMany_DefaultIfEmpty_emits_LEFT_JOIN_with_pair_projection()
     {
         // Project the child Tag (string, nullable by default) so the LEFT JOIN NULL row for

@@ -145,6 +145,40 @@ namespace nORM.Query
                     materializer = _t._materializerFactory.CreateMaterializer(_t._mapping, materializerType, null);
                 }
 
+                // LEFT JOIN flatten (SelectMany ... DefaultIfEmpty, no result selector)
+                // with the inner entity as the result: unmatched outer rows carry NULL
+                // in every inner column. A real row never has NULL key columns, so an
+                // all-NULL key marks "no match" and the element materializes as null
+                // (DefaultIfEmpty semantics). Wraps here rather than inside the factory
+                // so cached materializers for the same mapping stay guard-free.
+                if (_t._flattenedLeftJoinEntityResult && _t._projection == null && _t._groupJoinInfo == null
+                    && materializerType == _t._mapping.Type && _t._mapping.KeyColumns.Length > 0)
+                {
+                    var keyOrdinals = _t._mapping.KeyColumns
+                        .Select(k => Array.IndexOf(_t._mapping.Columns, k))
+                        .Where(o => o >= 0)
+                        .ToArray();
+                    if (keyOrdinals.Length > 0)
+                    {
+                        var baseSync = syncMaterializer;
+                        var baseAsync = materializer;
+                        syncMaterializer = reader =>
+                        {
+                            foreach (var ordinal in keyOrdinals)
+                                if (!reader.IsDBNull(ordinal))
+                                    return baseSync(reader);
+                            return null!;
+                        };
+                        materializer = (reader, ct) =>
+                        {
+                            foreach (var ordinal in keyOrdinals)
+                                if (!reader.IsDBNull(ordinal))
+                                    return baseAsync(reader, ct);
+                            return Task.FromResult<object>(null!);
+                        };
+                    }
+                }
+
                 var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
                 if (isScalar)
                 {

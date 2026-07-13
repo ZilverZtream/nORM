@@ -127,6 +127,7 @@ namespace nORM.Query
                 _postMaterializeElementType = null;
                 _postReverseResult = false;
                 _clientScalarResult = false;
+                _flattenedLeftJoinEntityResult = false;
                 // Capture the configured recursion depth limit at Reset time.
                 _maxRecursionDepth = ctx.Options.MaxRecursionDepth;
             }
@@ -180,6 +181,7 @@ namespace nORM.Query
                 _postMaterializeElementType = null;
                 _postReverseResult = false;
                 _clientScalarResult = false;
+                _flattenedLeftJoinEntityResult = false;
             }
         }
         /// <summary>

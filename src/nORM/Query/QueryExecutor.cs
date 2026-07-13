@@ -516,6 +516,10 @@ namespace nORM.Query
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         private object ProcessEntity(object entity, bool trackable, TableMapping? entityMap, bool isReadOnly)
         {
+            // Null elements are legitimate results of a LEFT JOIN flatten
+            // (SelectMany ... DefaultIfEmpty) — nothing to track or proxy.
+            if (entity is null)
+                return entity!;
             if (!trackable)
                 return entity;
 

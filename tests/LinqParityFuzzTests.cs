@@ -247,6 +247,7 @@ public class LinqParityFuzzTests
         await SeedChildrenAsync(ctx);
         RunFuzz(ctx, seed, cases: 400);
         RunJoinFuzz(ctx, seed, cases: 150);
+        RunSelectManyFuzz(ctx, seed, cases: 120);
     }
 
     /// <summary>Inserts the shared dataset through the context under test.</summary>
@@ -378,6 +379,120 @@ public class LinqParityFuzzTests
 
         Assert.True(unsupported < cases / 5,
             $"{unsupported}/{cases} join shapes were declined as unsupported (seed {seed}).");
+    }
+
+    /// <summary>
+    /// Runs generated SelectMany flatten shapes (correlated inner join, filtered
+    /// correlation, cross join, correlated DefaultIfEmpty left join in both
+    /// projected and entity-result forms) against the context and the
+    /// LINQ-to-Objects oracle. A coin flip windows the outer source with
+    /// OrderBy/Skip/Take first so the derived-table outer branch gets fuzzed too.
+    /// </summary>
+    internal static void RunSelectManyFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var unsupported = 0;
+
+        for (var i = 0; i < cases; i++)
+        {
+            var predicate = GeneratePredicate(rng);
+            var kind = rng.Next(5);
+            var caseRng = new Random(rng.Next());
+
+            IQueryable<Row> parents = ctx.Query<Row>().Where(predicate);
+            IQueryable<Row> oracleParents = Rows.AsQueryable().Where(predicate);
+
+            var windowed = caseRng.Next(3) == 0;
+            if (windowed)
+            {
+                var skip = caseRng.Next(0, 10);
+                var take = caseRng.Next(1, 20);
+                parents = parents.OrderBy(p => p.Id).Skip(skip).Take(take);
+                oracleParents = oracleParents.OrderBy(p => p.Id).Skip(skip).Take(take);
+            }
+
+            try
+            {
+                switch (kind)
+                {
+                    case 0: // correlated flatten, entity result
+                    {
+                        var db = parents.SelectMany(p => ctx.Query<Child>().Where(c => c.ParentId == p.Id))
+                            .ToList().Select(c => (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        var oracle = oracleParents.SelectMany(p => Children.AsQueryable().Where(c => c.ParentId == p.Id))
+                            .ToList().Select(c => (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"correlated flatten mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 1: // filtered correlation with result selector
+                    {
+                        var k = caseRng.Next(-3, 3);
+                        var db = parents.SelectMany(
+                                p => ctx.Query<Child>().Where(c => c.ParentId == p.Id && c.ChildVal > k),
+                                (p, c) => new JoinRow(p.Id, c.Id, p.IntVal + c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.SelectMany(
+                                p => Children.AsQueryable().Where(c => c.ParentId == p.Id && c.ChildVal > k),
+                                (p, c) => new JoinRow(p.Id, c.Id, p.IntVal + c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"filtered correlation mismatch seed={seed} case={i} windowed={windowed} k={k}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 2: // cross join (outer capped to bound the row explosion)
+                    {
+                        var db = parents.Where(p => p.Id <= 6)
+                            .SelectMany(p => ctx.Query<Child>(), (p, c) => new JoinRow(p.Id, c.Id, p.IntVal - c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.Where(p => p.Id <= 6)
+                            .SelectMany(p => Children.AsQueryable(), (p, c) => new JoinRow(p.Id, c.Id, p.IntVal - c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"cross join mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 3: // correlated DefaultIfEmpty left join, null-safe projection
+                    {
+                        var db = parents.SelectMany(
+                                p => ctx.Query<Child>().Where(c => c.ParentId == p.Id).DefaultIfEmpty(),
+                                (p, c) => new { p.Id, CId = c == null ? (int?)null : (int?)c.Id, V = c == null ? 0 : c.ChildVal })
+                            .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.SelectMany(
+                                p => Children.AsQueryable().Where(c => c.ParentId == p.Id).DefaultIfEmpty(),
+                                (p, c) => new { p.Id, CId = c == null ? (int?)null : (int?)c.Id, V = c == null ? 0 : c.ChildVal })
+                            .ToList().OrderBy(x => x.Id).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"left join flatten mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    default: // correlated DefaultIfEmpty left join, entity result (null elements)
+                    {
+                        var db = parents.SelectMany(
+                                p => ctx.Query<Child>().Where(c => c.ParentId == p.Id).DefaultIfEmpty())
+                            .ToList().Select(c => c == null ? (0, 0, 0) : (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        var oracle = oracleParents.SelectMany(
+                                p => Children.AsQueryable().Where(c => c.ParentId == p.Id).DefaultIfEmpty())
+                            .ToList().Select(c => c == null ? (0, 0, 0) : (c.Id, c.ParentId, c.ChildVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"left join entity flatten mismatch seed={seed} case={i} windowed={windowed}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                }
+            }
+            catch (NormUnsupportedFeatureException)
+            {
+                unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"selectmany shape threw (seed={seed} case={i} kind={kind} windowed={windowed})\npredicate: {predicate}", ex);
+            }
+        }
+
+        Assert.True(unsupported < cases / 5,
+            $"{unsupported}/{cases} SelectMany shapes were declined as unsupported (seed {seed}).");
     }
 
     /// <summary>

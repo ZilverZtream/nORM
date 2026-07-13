@@ -44,7 +44,7 @@ public class LinqCorrelatedSelectManyTests : IAsyncLifetime
         cmd.CommandText = """
             CREATE TABLE CsmParent (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
             CREATE TABLE CsmChild  (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Tag TEXT NOT NULL);
-            INSERT INTO CsmParent VALUES (1,'Alpha'),(2,'Beta'),(3,'Gamma');
+            INSERT INTO CsmParent VALUES (1,'Alpha'),(2,'Beta'),(3,'Gamma'),(4,'Lone');
             INSERT INTO CsmChild  VALUES (1,1,'A1'),(2,1,'A2'),(3,2,'B1'),(4,3,'C1'),(5,3,'C2'),(6,3,'C3');
             """;
         await cmd.ExecuteNonQueryAsync();
@@ -118,6 +118,35 @@ public class LinqCorrelatedSelectManyTests : IAsyncLifetime
         Assert.Contains(results, r => r.ParentName == "Alpha" && r.ChildTag == "A2");
         Assert.Contains(results, r => r.ParentName == "Beta"  && r.ChildTag == "B1");
         Assert.Contains(results, r => r.ParentName == "Gamma" && r.ChildTag == "C3");
+    }
+
+    [Fact]
+    public async Task CorrelatedSelectMany_DefaultIfEmpty_keeps_unmatched_parents()
+    {
+        var rows = await _ctx.Query<CsmParent>()
+            .SelectMany(
+                p => _ctx.Query<CsmChild>().Where(c => c.ParentId == p.Id).DefaultIfEmpty(),
+                (p, c) => new { ParentName = p.Name, ChildId = c == null ? (int?)null : c.Id })
+            .ToListAsync();
+
+        // 6 children + the childless parent with a null child side = 7 rows.
+        Assert.Equal(7, rows.Count);
+        Assert.Contains(rows, r => r.ParentName == "Lone" && r.ChildId == null);
+        Assert.Contains(rows, r => r.ParentName == "Alpha" && r.ChildId == 1);
+        Assert.Contains(rows, r => r.ParentName == "Gamma" && r.ChildId == 6);
+    }
+
+    [Fact]
+    public async Task CorrelatedSelectMany_DefaultIfEmpty_entity_result_materializes_null_elements()
+    {
+        var entities = await _ctx.Query<CsmParent>()
+            .SelectMany(p => _ctx.Query<CsmChild>().Where(c => c.ParentId == p.Id).DefaultIfEmpty())
+            .ToListAsync();
+
+        // DefaultIfEmpty semantics: the childless parent contributes a null element.
+        Assert.Equal(7, entities.Count);
+        Assert.Equal(1, entities.Count(e => e == null));
+        Assert.Equal(6, entities.Count(e => e != null));
     }
 
     [Fact]

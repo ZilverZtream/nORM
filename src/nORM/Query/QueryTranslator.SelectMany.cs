@@ -151,7 +151,7 @@ namespace nORM.Query
             if (TryHandleNavigationSelectMany(outerMapping, outerAlias, collectionBody, resultSelector, useLeftJoin, smOuterFromOverride))
                 return node;
 
-            if (TryHandleCorrelatedSelectMany(outerMapping, outerAlias, collectionBody, resultSelector, smOuterFromOverride))
+            if (TryHandleCorrelatedSelectMany(outerMapping, outerAlias, collectionBody, resultSelector, useLeftJoin, smOuterFromOverride))
                 return node;
 
             HandleCrossSelectMany(outerMapping, outerAlias, collectionSelector, resultSelector, useLeftJoin, smOuterFromOverride);
@@ -271,6 +271,8 @@ namespace nORM.Query
                 _sql.Append(" FROM (").Append(flattened).Append(") AS ").Append(outerAlias);
                 _mapping = innerMapping;
                 _rootType = innerMapping.Type;
+                if (useLeftJoin)
+                    _flattenedLeftJoinEntityResult = true;
                 // Downstream operators auto-register their lambda parameters against
                 // T{_joinCounter}; the derived table collapsed the join back into the
                 // default root alias, so the counter must say so.
@@ -285,6 +287,7 @@ namespace nORM.Query
             string outerAlias,
             Expression collectionBody,
             LambdaExpression? resultSelector,
+            bool useLeftJoin,
             string? outerFromOverride)
         {
             if (collectionBody is not MethodCallExpression corrWhereCall
@@ -306,12 +309,61 @@ namespace nORM.Query
             if (!_correlatedParams.ContainsKey(corrInnerParam))
                 _correlatedParams[corrInnerParam] = (corrInnerMapping, corrInnerAlias);
 
+            // The collection source (`ctx.Query<Child>()` / a captured IQueryable local)
+            // roots in closure member accesses that ParameterValueExtractor collects at
+            // execution time. Translation consumes the source structurally without
+            // visiting it, so matching placeholder slots must be reserved here or every
+            // later @cp binding shifts onto the wrong closure value.
+            ReserveClosureSlots(corrWhereCall.Arguments[0]);
+
             var vctxCorr = new VisitorContext(_ctx, corrInnerMapping, _provider, corrInnerParam, corrInnerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var corrPredVisitor = FastExpressionVisitorPool.Get(in vctxCorr);
             var corrPredSql = corrPredVisitor.Translate(corrPredLambda.Body);
             foreach (var kvp in corrPredVisitor.GetParameters())
                 _params[kvp.Key] = kvp.Value;
             FastExpressionVisitorPool.Return(corrPredVisitor);
+
+            if (resultSelector != null && CanEmitSelectManyProjectionSql(resultSelector))
+            {
+                // The projection emits one SQL item per selector member (computed
+                // members become expressions, null-guard conditionals strip to the
+                // member or a COALESCE — the LEFT JOIN already NULLs the unmatched
+                // side), so the positional constructor materializer lines up by
+                // construction. The needed-columns emission it replaces produced a
+                // SELECT list that diverged from the constructor arguments as soon
+                // as a member was computed.
+                var rewriter = new QuerySyntaxLeftJoinRewriter(
+                    resultSelector.Parameters[0], resultSelector.Parameters[1],
+                    string.Empty, resultSelector.Parameters[0], resultSelector.Parameters[1]);
+                var rewrittenSelector = Expression.Lambda(rewriter.Visit(resultSelector.Body)!, resultSelector.Parameters);
+
+                var corrFilterSql = RenderSelectManyInnerGlobalFilterSql(corrInnerMapping, corrInnerAlias);
+                var transparentExpansion = ComposeTransparentIdentifierSelector(resultSelector);
+                JoinBuilder.SetupJoinProjection(rewrittenSelector, outerMapping, corrInnerMapping, outerAlias, corrInnerAlias, _correlatedParams, ref _projection);
+                _transparentIdentifier = transparentExpansion;
+                RegisterTransparentIdentifierTail(transparentExpansion, corrInnerMapping, corrInnerAlias);
+
+                _sql.Clear();
+                JoinBuilder.BuildJoinClauseInto(
+                    _sql,
+                    _projection,
+                    outerMapping,
+                    outerAlias,
+                    corrInnerMapping,
+                    corrInnerAlias,
+                    useLeftJoin ? "LEFT JOIN" : "INNER JOIN",
+                    outerKeySql: "1",
+                    innerKeySql: "1",
+                    distinct: _isDistinct,
+                    outerFromOverride: outerFromOverride != null ? "(" + outerFromOverride + ") AS " + outerAlias : null,
+                    additionalOnConditions: corrFilterSql != null ? "(" + corrFilterSql + ")" : null,
+                    translateProjectionExpression: TranslateJoinProjectionExpression,
+                    escapeProjectionAlias: _provider.Escape,
+                    provider: _provider,
+                    keyClrType: null,
+                    onSqlOverride: corrPredSql);
+                return true;
+            }
 
             _sql.Clear();
             _sql.AppendSelect(ReadOnlySpan<char>.Empty);
@@ -324,14 +376,14 @@ namespace nORM.Query
 
             _sql.Append(' ');
             AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
-            _sql.Append("INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
+            _sql.Append(useLeftJoin ? "LEFT JOIN " : "INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
             _sql.Append("ON ").Append(corrPredSql);
             // See TryHandleNavigationSelectMany: a result selector's unmapped projection
             // shape means the provider-level rewrite cannot carry the inner's filter.
             if (resultSelector != null
-                && RenderSelectManyInnerGlobalFilterSql(corrInnerMapping, corrInnerAlias) is { } corrFilterSql)
+                && RenderSelectManyInnerGlobalFilterSql(corrInnerMapping, corrInnerAlias) is { } corrWholeFilterSql)
             {
-                _sql.Append(" AND (").Append(corrFilterSql).Append(')');
+                _sql.Append(" AND (").Append(corrWholeFilterSql).Append(')');
             }
 
             if (resultSelector != null)
@@ -346,10 +398,23 @@ namespace nORM.Query
             {
                 _mapping = corrInnerMapping;
                 _rootType = corrInnerMapping.Type;
+                if (useLeftJoin)
+                    _flattenedLeftJoinEntityResult = true;
             }
 
             return true;
         }
+
+        /// <summary>
+        /// A SelectMany result selector routes through the join projection emission
+        /// (one translated SQL item per member) only when every member is an
+        /// expression the SQL visitor can render. Bare entity parameters
+        /// (`(p, c) => new { p, c }`) keep the legacy whole-entity column emission.
+        /// </summary>
+        private static bool CanEmitSelectManyProjectionSql(LambdaExpression resultSelector)
+            => resultSelector.Body is NewExpression newExpr
+               && newExpr.Arguments.Count > 0
+               && newExpr.Arguments.All(a => a is not ParameterExpression);
 
         private void HandleCrossSelectMany(
             TableMapping outerMapping,
@@ -364,6 +429,49 @@ namespace nORM.Query
             var crossAlias = EscapeAlias("T" + (++_joinCounter));
 
             RegisterSelectManyResultSelectorParameters(resultSelector, outerMapping, outerAlias, crossMapping, crossAlias);
+            // See TryHandleCorrelatedSelectMany: the captured queryable source's closure
+            // members need placeholder compiled-param slots for extractor alignment.
+            ReserveClosureSlots(collectionSelector.Body);
+
+            if (resultSelector != null && CanEmitSelectManyProjectionSql(resultSelector))
+            {
+                // See TryHandleCorrelatedSelectMany: computed selector members emit as
+                // translated SQL items so the positional materializer lines up. A cross
+                // join is an inner join on a tautology; DefaultIfEmpty keeps unmatched
+                // outers via LEFT JOIN on the same tautology.
+                var crossRewriter = new QuerySyntaxLeftJoinRewriter(
+                    resultSelector.Parameters[0], resultSelector.Parameters[1],
+                    string.Empty, resultSelector.Parameters[0], resultSelector.Parameters[1]);
+                var rewrittenCrossSelector = Expression.Lambda(crossRewriter.Visit(resultSelector.Body)!, resultSelector.Parameters);
+
+                var crossJoinFilterSql = RenderSelectManyInnerGlobalFilterSql(crossMapping, crossAlias);
+                var crossTransparent = ComposeTransparentIdentifierSelector(resultSelector);
+                JoinBuilder.SetupJoinProjection(rewrittenCrossSelector, outerMapping, crossMapping, outerAlias, crossAlias, _correlatedParams, ref _projection);
+                _transparentIdentifier = crossTransparent;
+                RegisterTransparentIdentifierTail(crossTransparent, crossMapping, crossAlias);
+
+                _sql.Clear();
+                JoinBuilder.BuildJoinClauseInto(
+                    _sql,
+                    _projection,
+                    outerMapping,
+                    outerAlias,
+                    crossMapping,
+                    crossAlias,
+                    useLeftJoin ? "LEFT JOIN" : "INNER JOIN",
+                    outerKeySql: "1",
+                    innerKeySql: "1",
+                    distinct: _isDistinct,
+                    outerFromOverride: outerFromOverride != null ? "(" + outerFromOverride + ") AS " + outerAlias : null,
+                    additionalOnConditions: crossJoinFilterSql != null ? "(" + crossJoinFilterSql + ")" : null,
+                    translateProjectionExpression: TranslateJoinProjectionExpression,
+                    escapeProjectionAlias: _provider.Escape,
+                    provider: _provider,
+                    keyClrType: null,
+                    onSqlOverride: "1=1");
+                return;
+            }
+
             using var crossSql = new OptimizedSqlBuilder(CrossJoinSqlInitialCapacity);
             var crossComposedProjection = ComposeSelectManyProjection(resultSelector);
 
@@ -429,6 +537,8 @@ namespace nORM.Query
             else
             {
                 _mapping = crossMapping;
+                if (useLeftJoin)
+                    _flattenedLeftJoinEntityResult = true;
             }
         }
 
@@ -651,6 +761,40 @@ namespace nORM.Query
             crossSql.AppendSelect(ReadOnlySpan<char>.Empty);
             crossSql.AppendJoin(", ", neededColumns);
             crossSql.Append(' ');
+        }
+
+        /// <summary>
+        /// Reserves one unused compiled-param placeholder per closure member access in
+        /// <paramref name="expression"/>. ParameterValueExtractor walks every closure
+        /// member in the query tree at execution time; an expression that translation
+        /// consumes structurally (a SelectMany collection source like
+        /// <c>ctx.Query&lt;Child&gt;()</c> or a captured IQueryable local) never gets
+        /// visited by the SQL visitor, so without placeholders the extracted value
+        /// list shifts and later @cp parameters bind the wrong closure values.
+        /// </summary>
+        private void ReserveClosureSlots(Expression expression)
+            => new ClosureSlotReserver(this).Visit(expression);
+
+        private sealed class ClosureSlotReserver : ExpressionVisitor
+        {
+            private readonly QueryTranslator _t;
+            public ClosureSlotReserver(QueryTranslator t) => _t = t;
+
+            protected override Expression VisitConstant(ConstantExpression node) => node;
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                // Mirrors ParameterValueExtractor.VisitMember: one slot per closure
+                // member, no descent into its children.
+                if (TryGetConstantValue(node, out _))
+                {
+                    var placeholder = $"{_t._provider.ParamPrefix}cp{_t._compiledParams.Count}_unused";
+                    _t._params[placeholder] = DBNull.Value;
+                    _t._compiledParams.Add(placeholder);
+                    return node;
+                }
+                return base.VisitMember(node);
+            }
         }
     }
 }
