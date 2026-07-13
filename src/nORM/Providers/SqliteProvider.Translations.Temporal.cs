@@ -51,6 +51,23 @@ namespace nORM.Providers
                    $"(CASE WHEN length({dateTimeSql}) > 20 THEN CAST(substr({dateTimeSql} || '0000000', 21, 7) AS INTEGER) ELSE 0 END)), '0'), '.'))";
         }
 
+        /// <summary>
+        /// DateTimeOffset TEXT is 'yyyy-MM-dd HH:mm:ss[.fffffff]zzz' with a fixed
+        /// trailing 6-char offset ('+HH:MM'/'-HH:MM'). .NET DateTimeOffset.Add*
+        /// keeps the offset and shifts the CLOCK portion, so the arithmetic runs
+        /// on the offset-stripped clock text and the original offset is
+        /// re-attached verbatim.
+        /// </summary>
+        private static string DtoClock(string dtoSql) => $"substr({dtoSql}, 1, length({dtoSql}) - 6)";
+
+        private static string DtoOffset(string dtoSql) => $"substr({dtoSql}, length({dtoSql}) - 5)";
+
+        private static string AddTicksToDateTimeOffsetText(string dtoSql, string ticksDeltaSql)
+            => $"({AddTicksToDateTimeText(DtoClock(dtoSql), ticksDeltaSql)} || {DtoOffset(dtoSql)})";
+
+        private static string CalendarAddToDateTimeOffsetText(string dtoSql, string modifierSql)
+            => $"({CalendarAddPreservingFraction(DtoClock(dtoSql), modifierSql)} || {DtoOffset(dtoSql)})";
+
         private static string? TryTranslateDateTimeFunction(string name, Type declaringType, string[] args)
         {
             if (declaringType != typeof(DateTime) && declaringType != typeof(DateTimeOffset))
@@ -163,12 +180,23 @@ namespace nORM.Providers
                     CalendarAddPreservingFraction(args[0], $"(({args[1]}) || ' months')"),
                 nameof(DateTime.AddYears) when args.Length == 2 && declaringType == typeof(DateTime) =>
                     CalendarAddPreservingFraction(args[0], $"(({args[1]}) || ' years')"),
-                nameof(DateTime.AddDays) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' days')",
-                nameof(DateTime.AddMonths) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' months')",
-                nameof(DateTime.AddYears) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' years')",
-                nameof(DateTime.AddHours) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' hours')",
-                nameof(DateTime.AddMinutes) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' minutes')",
-                nameof(DateTime.AddSeconds) when args.Length == 2 => $"datetime({args[0]}, ({args[1]}) || ' seconds')",
+                // DateTimeOffset receivers (the DateTime arms above short-circuit):
+                // same tick-exact arithmetic on the offset-stripped clock text, with
+                // the stored offset re-attached. The previous datetime() forms
+                // converted to the MACHINE-LOCAL offset (DST-dependent) and dropped
+                // sub-second precision.
+                nameof(DateTime.AddDays) when args.Length == 2 =>
+                    AddTicksToDateTimeOffsetText(args[0], $"CAST(({args[1]}) * 864000000000 AS INTEGER)"),
+                nameof(DateTime.AddMonths) when args.Length == 2 =>
+                    CalendarAddToDateTimeOffsetText(args[0], $"(({args[1]}) || ' months')"),
+                nameof(DateTime.AddYears) when args.Length == 2 =>
+                    CalendarAddToDateTimeOffsetText(args[0], $"(({args[1]}) || ' years')"),
+                nameof(DateTime.AddHours) when args.Length == 2 =>
+                    AddTicksToDateTimeOffsetText(args[0], $"CAST(({args[1]}) * 36000000000 AS INTEGER)"),
+                nameof(DateTime.AddMinutes) when args.Length == 2 =>
+                    AddTicksToDateTimeOffsetText(args[0], $"CAST(({args[1]}) * 600000000 AS INTEGER)"),
+                nameof(DateTime.AddSeconds) when args.Length == 2 =>
+                    AddTicksToDateTimeOffsetText(args[0], $"CAST(({args[1]}) * 10000000 AS INTEGER)"),
                 // AddMilliseconds needs sub-second precision. SQLite's modifier
                 // syntax accepts fractional seconds ('+0.5 seconds'), so scale
                 // the int delta with /1000.0. Default datetime() drops fractional
@@ -181,7 +209,8 @@ namespace nORM.Providers
                 // round-trip silently mis-matches.
                 nameof(DateTime.AddMilliseconds) when args.Length == 2 && declaringType == typeof(DateTime) =>
                     AddTicksToDateTimeText(args[0], $"CAST(({args[1]}) * 10000 AS INTEGER)"),
-                nameof(DateTime.AddMilliseconds) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 1000.0) || ' seconds'), '0'), '.')",
+                nameof(DateTime.AddMilliseconds) when args.Length == 2 =>
+                    AddTicksToDateTimeOffsetText(args[0], $"CAST(({args[1]}) * 10000 AS INTEGER)"),
                 // AddTicks is the finest-grained Add* (1 tick = 100ns). Same
                 // strftime + RTRIM trim shape as AddMilliseconds; the divisor
                 // is 1e7 (10_000_000 ticks per second). SQLite's modifier
@@ -191,7 +220,8 @@ namespace nORM.Providers
                 // match Microsoft.Data.Sqlite's FFFFFFF DateTime binding.
                 nameof(DateTime.AddTicks) when args.Length == 2 && declaringType == typeof(DateTime) =>
                     AddTicksToDateTimeText(args[0], args[1]),
-                nameof(DateTime.AddTicks) when args.Length == 2 => $"RTRIM(RTRIM(strftime('%Y-%m-%d %H:%M:%f', {args[0]}, (({args[1]}) / 10000000.0) || ' seconds'), '0'), '.')",
+                nameof(DateTime.AddTicks) when args.Length == 2 =>
+                    AddTicksToDateTimeOffsetText(args[0], args[1]),
                 // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
                 nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
                 // DateTime/DateTimeOffset.Parse(string) -- SQLite stores DateTime
