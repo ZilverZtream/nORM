@@ -11,6 +11,44 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        /// <summary>
+        /// Builds the eager-load relation for a REFERENCE navigation (dependent → principal,
+        /// e.g. <c>Order.Customer</c>). The <see cref="IncludeProcessor"/> operations are
+        /// direction-symmetric, so loading principals reuses them with the roles inverted:
+        /// the loaded level's "foreign key" is the principal's primary key (driving the
+        /// WHERE/EXISTS predicates and the child-grouping getter) while the "principal key"
+        /// read from the parent entities is the dependent's FK column. Returns null when the
+        /// property is not a resolvable single-column reference navigation.
+        /// </summary>
+        private static TableMapping.Relation? TryBuildReferenceIncludeRelation(
+            QueryTranslator t, TableMapping ownerMap, MemberInfo navMember)
+        {
+            if (navMember is not PropertyInfo prop)
+                return null;
+            var principalType = prop.PropertyType;
+            if (principalType == typeof(string) || principalType == typeof(object) || !principalType.IsClass
+                || typeof(System.Collections.IEnumerable).IsAssignableFrom(principalType))
+                return null;
+
+            TableMapping principalMap;
+            try
+            {
+                principalMap = t.TrackMapping(principalType);
+            }
+            catch
+            {
+                return null;
+            }
+            if (principalMap.KeyColumns.Length != 1)
+                return null;
+
+            var fk = ExpressionToSqlVisitor.FindReferenceNavForeignKey(ownerMap, prop.Name, principalType, principalMap);
+            if (fk == null)
+                return null;
+
+            return new TableMapping.Relation(prop, principalType, fk, principalMap.KeyColumns[0], false);
+        }
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class IncludeTranslator : IMethodCallTranslator
@@ -64,6 +102,10 @@ namespace nORM.Query
                                 t._m2mIncludes.Add(new M2MIncludePlan(jtm));
                                 t.TrackMapping(jtm.RightType);
                             }
+                            else if (TryBuildReferenceIncludeRelation(t, t._mapping, member.Member) is { } refRelation)
+                            {
+                                t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { refRelation }));
+                            }
                         }
                     }
                 }
@@ -103,6 +145,10 @@ namespace nORM.Query
                             {
                                 lastInclude.Path.Add(relation);
                                 t.TrackMapping(relation.DependentType);
+                            }
+                            else if (TryBuildReferenceIncludeRelation(t, parentMap, member.Member) is { } refRelation)
+                            {
+                                lastInclude.Path.Add(refRelation);
                             }
                         }
                     }
