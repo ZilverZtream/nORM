@@ -150,13 +150,14 @@ public class LiveProviderIncludeParityTests
             await SetupAsync(ctx, kind);
             try
             {
+                // Include() alone eager-loads; AsSplitQuery() is not a prerequisite.
                 var withoutSplit = await ((INormQueryable<IncludeLiveAuthor>)ctx.Query<IncludeLiveAuthor>())
                     .Include(a => a.Books)
                     .OrderBy(a => a.Id)
                     .ToListAsync();
 
                 Assert.Equal(2, withoutSplit.Count);
-                Assert.All(withoutSplit, a => Assert.Empty(a.Books));
+                Assert.All(withoutSplit, a => Assert.NotEmpty(a.Books));
 
                 var authors = (await ((INormQueryable<IncludeLiveAuthor>)ctx.Query<IncludeLiveAuthor>())
                     .Include(a => a.Books)

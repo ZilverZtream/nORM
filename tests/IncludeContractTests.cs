@@ -20,9 +20,11 @@ namespace nORM.Tests;
 /// 1. Reference-navigation (many-to-one) single Include returns the related entity.
 /// 2. Collection Include (one-to-many) returns all children.
 /// 3. Composite-key dependent Include throws NormUnsupportedFeatureException.
-/// 4. Include WITHOUT AsSplitQuery() silently skips eager loading — children stay empty.
-///    nORM requires AsSplitQuery() as an explicit opt-in; omitting it must never silently
-///    return partial data that looks correct on a small dataset and breaks under load.
+/// 4. Include WITHOUT AsSplitQuery() eager-loads all the same: Include is itself the
+///    request for related data, and split-query loading is the engine's strategy, not
+///    an opt-in. Requiring the extra call left navigations silently null — exactly the
+///    partial-data trap this contract exists to prevent. AsSplitQuery() remains as an
+///    explicit no-op.
 /// </summary>
 [Xunit.Trait("Category", "Fast")]
 public class IncludeContractTests
@@ -123,14 +125,13 @@ public class IncludeContractTests
         Assert.All(customers[0].Orders, o => Assert.Equal(1, o.CustomerId));
     }
 
-    // ── 2. Collection Include without AsSplitQuery — eager loading is silently skipped ─
+    // ── 2. Collection Include without AsSplitQuery — eager loading still happens ─
 
     [Fact]
-    public async Task CollectionInclude_WithoutAsSplitQuery_ChildrenAreEmpty()
+    public async Task CollectionInclude_WithoutAsSplitQuery_LoadsChildren()
     {
-        // nORM requires AsSplitQuery() as an explicit opt-in for eager loading.
-        // Without it, EagerLoadAsync is never invoked and children remain at their
-        // default empty-collection value. This is a contract: callers must opt in.
+        // Include() is itself the request for related data; the extra AsSplitQuery()
+        // call must not be required for the navigation to populate.
         using var cn = OpenDb();
         using var ctx = CreateCtx(cn);
 
@@ -142,9 +143,8 @@ public class IncludeContractTests
             .Include(c => c.Orders)
             .ToListAsync();
 
-        // Customers are returned but their Orders collection is not populated.
         Assert.Single(customers);
-        Assert.Empty(customers[0].Orders);
+        Assert.Single(customers[0].Orders);
     }
 
     [Fact]
@@ -293,10 +293,10 @@ public class IncludeContractTests
         Assert.Single(customers[0].Orders);
     }
 
-    // ── 6. Sync Include without AsSplitQuery — children are empty ────────────
+    // ── 6. Sync Include without AsSplitQuery — children still load ───────────
 
     [Fact]
-    public void CollectionInclude_Sync_WithoutAsSplitQuery_ChildrenAreEmpty()
+    public void CollectionInclude_Sync_WithoutAsSplitQuery_LoadsChildren()
     {
         using var cn = OpenDb();
         using var ctx = CreateCtx(cn);
@@ -310,7 +310,7 @@ public class IncludeContractTests
             .ToList();
 
         Assert.Single(customers);
-        Assert.Empty(customers[0].Orders);
+        Assert.Single(customers[0].Orders);
     }
 }
 

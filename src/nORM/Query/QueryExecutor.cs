@@ -212,7 +212,10 @@ namespace nORM.Query
 
                 await reader.DisposeAsync().ConfigureAwait(false);
 
-                if (plan.SplitQuery)
+                // Include() itself requests the related data; split-query loading is the
+                // engine's (only) strategy, not an opt-in — gating on AsSplitQuery left the
+                // navigations silently null. AsSplitQuery remains as an explicit no-op.
+                if (plan.Includes.Count > 0)
                 {
                     // Convert to IList for EagerLoadAsync compatibility
                     IList iList = list;
@@ -319,7 +322,8 @@ namespace nORM.Query
 
                 await reader.DisposeAsync().ConfigureAwait(false);
 
-                if (plan.SplitQuery)
+                // Include() alone triggers eager loading (see the ExecuteToList overload).
+                if (plan.Includes.Count > 0)
                 {
                     foreach (var include in plan.Includes)
                     {
@@ -423,7 +427,8 @@ namespace nORM.Query
 
                 reader.Dispose();
 
-                if (plan.SplitQuery)
+                // Include() alone triggers eager loading (see the ExecuteToList overload).
+                if (plan.Includes.Count > 0)
                 {
                     foreach (var include in plan.Includes)
                     {
