@@ -398,22 +398,16 @@ namespace nORM.Query
             var depTable = GetTableName(depType);
             var depAlias = _provider.Escape("__nav");
 
-            // Resolve the selector to a column name. Only a simple member access is supported
-            // here (matching efba58f scope) — `c => c.X` not `c => c.X + 1`.
-            string selectorSql;
-            if (selectorLambda.Body is MemberExpression me)
-            {
-                var colAttr = me.Member.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.ColumnAttribute), inherit: false)
-                    .Cast<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>().FirstOrDefault();
-                var colName = colAttr?.Name ?? me.Member.Name;
-                selectorSql = $"{depAlias}.{_provider.Escape(colName)}";
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    "Navigation aggregate Select(c => …).Sum/Min/Max/Average in a projection currently supports only a bare member access selector (`c => c.X`). " +
-                    "Computed selectors (e.g. `c => c.A + c.B`) aren't yet routed through the correlated subquery emit — wrap with `ClientEvaluationPolicy.Allow` or aggregate after materialising.");
-            }
+            // Resolve the selector: a member on the dependent element (optionally
+            // Convert-wrapped, e.g. `(int?)c.X` for nullable aggregation) or a
+            // reference-navigation chain (`c.Dept.Bonus`), rendered as the nested
+            // correlated scalar the reference-nav feature uses everywhere else.
+            var selectorSql = TryRenderDependentSelector(selectorLambda.Body, selectorLambda.Parameters[0], depAlias, depType)
+                ?? throw new InvalidOperationException(
+                    "Navigation aggregate Select(c => …).Sum/Min/Max/Average in a projection supports member selectors, " +
+                    "including reference-navigation chains (`c => c.Dept.Bonus`) and nullable casts. Computed selectors " +
+                    "(e.g. `c => c.A + c.B`) aren't yet routed through the correlated subquery emit — wrap with " +
+                    "`ClientEvaluationPolicy.Allow` or aggregate after materialising.");
 
             var sqlAgg = methodName switch
             {
@@ -452,6 +446,121 @@ namespace nORM.Query
                 sb.Append(" AND ").Append(filterSql);
             }
             sb.Append(')');
+        }
+
+        /// <summary>
+        /// Renders an aggregate-selector member against the aggregated element: a bare
+        /// column (resolved via the element's mapping, so [Column] renames apply), or a
+        /// reference-navigation chain of any depth emitted as nested correlated scalars
+        /// (the same shape the reference-nav feature uses in projections). Convert
+        /// wrappers (nullable casts) are transparent. Returns null for computed
+        /// selectors, which the caller reports.
+        /// </summary>
+        private string? TryRenderDependentSelector(Expression body, ParameterExpression elementParam, string elementAlias, Type elementType)
+        {
+            while (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                body = convert.Operand;
+            if (body is not MemberExpression member)
+                return null;
+
+            TableMapping elementMapping;
+            if (_ctx == null)
+                return null;
+            try
+            {
+                elementMapping = _ctx.GetMapping(elementType);
+            }
+            catch
+            {
+                return null;
+            }
+
+            return RenderElementColumnSql(member, elementParam, elementAlias, elementMapping, depth: 0);
+        }
+
+        private string? RenderElementColumnSql(MemberExpression member, ParameterExpression elementParam, string elementAlias, TableMapping elementMapping, int depth)
+        {
+            if (depth > 4)
+                return null;
+
+            var owner = member.Expression;
+            while (owner is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                owner = convert.Operand;
+
+            if (owner == elementParam)
+            {
+                return elementMapping.ColumnsByName.TryGetValue(member.Member.Name, out var column)
+                    ? $"{elementAlias}.{column.EscCol}"
+                    : null;
+            }
+
+            // A navigation hop: the member lives on a principal reached through the owner
+            // chain. Emit `(SELECT p.Col FROM Principal p WHERE p.PK = <fk value>)` where
+            // the FK value renders recursively against the element (nested chains nest
+            // the subqueries, mirroring the reference-nav scalar emit).
+            if (owner is not MemberExpression navMember || _ctx == null)
+                return null;
+            var principalType = navMember.Type;
+            if (!principalType.IsClass || principalType == typeof(string))
+                return null;
+            TableMapping principalMap;
+            try
+            {
+                principalMap = _ctx.GetMapping(principalType);
+            }
+            catch
+            {
+                return null;
+            }
+            if (principalMap.KeyColumns.Length != 1)
+                return null;
+            if (!principalMap.ColumnsByName.TryGetValue(member.Member.Name, out var targetColumn))
+                return null;
+
+            var navOwner = navMember.Expression;
+            while (navOwner is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                navOwner = convert.Operand;
+            TableMapping navOwnerMapping;
+            if (navOwner == elementParam)
+            {
+                navOwnerMapping = elementMapping;
+            }
+            else if (navOwner is MemberExpression deeperNav && deeperNav.Type.IsClass && deeperNav.Type != typeof(string))
+            {
+                try
+                {
+                    navOwnerMapping = _ctx.GetMapping(deeperNav.Type);
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                return null;
+            }
+
+            var fk = ExpressionToSqlVisitor.FindReferenceNavForeignKey(navOwnerMapping, navMember.Member.Name, principalType, principalMap);
+            if (fk == null)
+                return null;
+
+            var fkMember = Expression.MakeMemberAccess(navOwner == elementParam ? elementParam : navOwner, fk.Prop);
+            string? fkValueSql;
+            if (navOwner == elementParam)
+            {
+                fkValueSql = $"{elementAlias}.{fk.EscCol}";
+            }
+            else
+            {
+                fkValueSql = RenderElementColumnSql((MemberExpression)fkMember, elementParam, elementAlias, elementMapping, depth + 1);
+            }
+            if (fkValueSql == null)
+                return null;
+
+            var principalAlias = _provider.Escape("__navp" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return $"(SELECT {principalAlias}.{targetColumn.EscCol} FROM {principalMap.EscTable} {principalAlias} " +
+                   $"WHERE {principalAlias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
         }
     }
 }
