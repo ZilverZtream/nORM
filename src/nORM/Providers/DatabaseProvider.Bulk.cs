@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -231,7 +231,7 @@ namespace nORM.Providers
                     {
                         bulkOldToken = m.TimestampColumn.Getter(entity);
                         if (m.ClientManagedConcurrencyToken)
-                            m.TimestampColumn.Setter(entity, nORM.Core.DbContext.GenerateConcurrencyToken(m.TimestampColumn, bulkOldToken));
+                            m.TimestampColumn.Setter(entity, nORM.Core.ConcurrencyTokenGenerator.Next(m.TimestampColumn, bulkOldToken));
                     }
                     foreach (var col in m.Columns.Where(c => !c.IsTimestamp && !(batchHasTenant && ReferenceEquals(c, m.TenantColumn))))
                         cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));

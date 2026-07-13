@@ -102,54 +102,51 @@ namespace nORM.Mapping
         /// <summary>Gets the owned collection mappings for this entity type.</summary>
         public List<OwnedCollectionMapping> OwnedCollections { get; } = new();
 
-        private PropertyInfo[]? _referenceNavigations;
+        private readonly PropertyInfo[] _referenceNavigations;
 
         /// <summary>
         /// Writable entity-typed properties that reach another table through a scalar FK
         /// (reference navigations, e.g. <c>Order.Customer</c>). Excludes mapped columns
         /// (a value converter can map a class-typed property to a provider value),
         /// collections, and owned navigations, whose values live in the owner's own
-        /// table. Discovery is shape-only; FK resolution happens per use because it
-        /// needs the principal's mapping.
+        /// table. Discovery is shape-only and happens in the constructor; FK resolution
+        /// happens per use because it needs the principal's mapping.
         /// </summary>
-        internal PropertyInfo[] ReferenceNavigations
-        {
-            get
-            {
-                var cached = _referenceNavigations;
-                if (cached != null)
-                    return cached;
+        internal PropertyInfo[] ReferenceNavigations => _referenceNavigations;
 
-                List<PropertyInfo>? list = null;
-                foreach (var prop in Type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Reflects over entity properties; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Reflects over entity properties; trimming may remove the required members.")]
+        private PropertyInfo[] DiscoverReferenceNavigations()
+        {
+            List<PropertyInfo>? list = null;
+            foreach (var prop in Type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!prop.CanRead || !prop.CanWrite)
+                    continue;
+                var propertyType = prop.PropertyType;
+                if (!propertyType.IsClass || propertyType == typeof(string) || propertyType == typeof(object))
+                    continue;
+                if (typeof(System.Collections.IEnumerable).IsAssignableFrom(propertyType))
+                    continue;
+                if (ColumnsByName.ContainsKey(prop.Name))
+                    continue;
+                var isOwned = false;
+                if (_fluentConfig != null)
                 {
-                    if (!prop.CanRead || !prop.CanWrite)
-                        continue;
-                    var propertyType = prop.PropertyType;
-                    if (!propertyType.IsClass || propertyType == typeof(string) || propertyType == typeof(object))
-                        continue;
-                    if (typeof(System.Collections.IEnumerable).IsAssignableFrom(propertyType))
-                        continue;
-                    if (ColumnsByName.ContainsKey(prop.Name))
-                        continue;
-                    var isOwned = false;
-                    if (_fluentConfig != null)
+                    foreach (var owned in _fluentConfig.OwnedNavigations)
                     {
-                        foreach (var owned in _fluentConfig.OwnedNavigations)
+                        if (owned.Key.Name == prop.Name)
                         {
-                            if (owned.Key.Name == prop.Name)
-                            {
-                                isOwned = true;
-                                break;
-                            }
+                            isOwned = true;
+                            break;
                         }
                     }
-                    if (isOwned)
-                        continue;
-                    (list ??= new List<PropertyInfo>()).Add(prop);
                 }
-                return _referenceNavigations = list?.ToArray() ?? Array.Empty<PropertyInfo>();
+                if (isOwned)
+                    continue;
+                (list ??= new List<PropertyInfo>()).Add(prop);
             }
+            return list?.ToArray() ?? Array.Empty<PropertyInfo>();
         }
 
         /// <summary>Gets the many-to-many join table mappings for this entity type.</summary>
@@ -335,6 +332,11 @@ namespace nORM.Mapping
                 if (col.IsShadow) sfp = HashCode.Combine(sfp, col.Name);
             ShadowFingerprint = sfp;
             SqlShapeKey = BuildSqlShapeKey();
+
+            // Shape-only discovery (no related mappings needed), so it can run eagerly here
+            // inside the annotated constructor — a lazy property getter would trip the AOT
+            // gate's IL2075 on Type.GetProperties from unannotated call paths.
+            _referenceNavigations = DiscoverReferenceNavigations();
 
             // Relationship discovery is deferred to EnsureRelationshipsInitialized so that a
             // mapping is fully present in the context cache BEFORE it resolves any related

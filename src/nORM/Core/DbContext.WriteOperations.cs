@@ -387,7 +387,7 @@ namespace nORM.Core
                         var tc = map.TimestampColumn;
                         whereTokenDirect = originalToken ?? tc.Getter(entity);
                         if (map.ClientManagedConcurrencyToken)
-                            tc.Setter(entity, GenerateConcurrencyToken(tc, whereTokenDirect));
+                            tc.Setter(entity, ConcurrencyTokenGenerator.Next(tc, whereTokenDirect));
                     }
                     foreach (var col in map.UpdateColumns)
                     {
@@ -784,7 +784,7 @@ namespace nORM.Core
                         var tc = map.TimestampColumn;
                         whereTokenBatched = originalToken ?? tc.Getter(entity);
                         if (map.ClientManagedConcurrencyToken)
-                            tc.Setter(entity, GenerateConcurrencyToken(tc, whereTokenBatched));
+                            tc.Setter(entity, ConcurrencyTokenGenerator.Next(tc, whereTokenBatched));
                     }
                     foreach (var col in map.UpdateColumns)
                     {
