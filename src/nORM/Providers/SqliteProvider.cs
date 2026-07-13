@@ -449,13 +449,27 @@ namespace nORM.Providers
         public override string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
             => $"regexp_replace({inputSql}, {patternLiteral}, {replacementLiteral})";
 
-        /// <summary>SQLite uses strftime with an 'N months' modifier on the DateOnly TEXT column.</summary>
-        public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
-            => $"strftime('%Y-%m-%d', {dateOnlySql}, ({monthsSqlFragment}) || ' months')";
+        /// <summary>
+        /// SQLite's 'months'/'years' modifiers normalize an overflowed day forward
+        /// ('Feb 31' becomes Mar 2/3) while .NET clamps to the last day of the
+        /// intended month. A rolled-over result always has a SMALLER day-of-month
+        /// than the source (1..3 vs 29..31), so the CASE detects overflow and backs
+        /// up to 'start of month, -1 day'. Same shape as the DateTime calendar add.
+        /// </summary>
+        private static string CalendarAddDateOnly(string dateOnlySql, string modifierSql)
+        {
+            var cand = $"strftime('%Y-%m-%d', {dateOnlySql}, {modifierSql})";
+            return $"(CASE WHEN CAST(strftime('%d', {cand}) AS INTEGER) < CAST(strftime('%d', {dateOnlySql}) AS INTEGER) " +
+                   $"THEN date({cand}, 'start of month', '-1 day') ELSE {cand} END)";
+        }
 
-        /// <summary>SQLite uses strftime with an 'N years' modifier on the DateOnly TEXT column.</summary>
+        /// <summary>SQLite 'N months' modifier on the DateOnly TEXT column, day-clamped like .NET.</summary>
+        public override string? AddMonthsToDateOnlySql(string dateOnlySql, string monthsSqlFragment)
+            => CalendarAddDateOnly(dateOnlySql, $"({monthsSqlFragment}) || ' months'");
+
+        /// <summary>SQLite 'N years' modifier on the DateOnly TEXT column, day-clamped like .NET.</summary>
         public override string? AddYearsToDateOnlySql(string dateOnlySql, string yearsSqlFragment)
-            => $"strftime('%Y-%m-%d', {dateOnlySql}, ({yearsSqlFragment}) || ' years')";
+            => CalendarAddDateOnly(dateOnlySql, $"({yearsSqlFragment}) || ' years'");
 
         /// <summary>
         /// SQLite TimeOnly is 'HH:mm:ss' text. strftime needs a date prefix to
