@@ -272,7 +272,7 @@ namespace nORM.Query
                 if (node.Method.Name != nameof(Queryable.Concat)
                     && t._provider.DefaultStringEqualityIsCaseInsensitive
                     && node.Method.GetGenericArguments() is { Length: 1 } setElem
-                    && setElem[0] == typeof(string))
+                    && (setElem[0] == typeof(string) || ElementCarriesStringMember(setElem[0])))
                 {
                     t._forceOrdinalStringProjections = true;
                 }
@@ -626,6 +626,22 @@ namespace nORM.Query
                 var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
                 return idx < 0 ? sql : sql[..idx];
             }
+        }
+
+
+        /// <summary>
+        /// True when a set-operation element type (an anonymous or DTO shape) exposes
+        /// a string member: its dedup then needs the same value-preserving ordinal
+        /// projection wrap the scalar-string arms get, or UNION / INTERSECT / EXCEPT
+        /// on CI-collation providers would merge and cross-match case variants.
+        /// </summary>
+        private static bool ElementCarriesStringMember(Type elementType)
+        {
+            if (elementType.IsPrimitive || elementType == typeof(string) || elementType.IsEnum)
+                return false;
+            foreach (var prop in elementType.GetProperties())
+                if (prop.PropertyType == typeof(string)) return true;
+            return false;
         }
 
     }
