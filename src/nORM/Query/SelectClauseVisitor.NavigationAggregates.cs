@@ -559,8 +559,15 @@ namespace nORM.Query
                 return null;
 
             var principalAlias = _provider.Escape("__navp" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            // Same visibility rule as the scalar nav emits: a filtered-out principal
+            // reads as missing, so its values never enter the aggregate.
+            string? principalFilterSql = null;
+            var combinedFilter = GlobalFilterFragment.Combine(_ctx!, principalMap.Type);
+            if (combinedFilter != null)
+                principalFilterSql = RenderNavigationFilter(combinedFilter, principalAlias);
             return $"(SELECT {principalAlias}.{targetColumn.EscCol} FROM {principalMap.EscTable} {principalAlias} " +
-                   $"WHERE {principalAlias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
+                   $"WHERE {principalAlias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql}" +
+                   (principalFilterSql != null ? $" AND {principalFilterSql}" : string.Empty) + ")";
         }
     }
 }

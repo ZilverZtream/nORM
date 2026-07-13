@@ -500,8 +500,16 @@ namespace nORM.Query
             }
 
             var alias = _provider.Escape("NR" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            // The principal's global filters (soft-delete, tenant) gate visibility through
+            // the navigation too: a filtered-out parent must read as a MISSING parent
+            // (NULL member), or its data leaks into projections. Mirrors the ETSV emit.
+            string? globalFilterSql = null;
+            var combinedFilter = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
+            if (combinedFilter != null)
+                globalFilterSql = RenderNavigationFilter(combinedFilter, alias);
             return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
-                   $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
+                   $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql}" +
+                   (globalFilterSql != null ? $" AND {globalFilterSql}" : string.Empty) + ")";
         }
     }
 }

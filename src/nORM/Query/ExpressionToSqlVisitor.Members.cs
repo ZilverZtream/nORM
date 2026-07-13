@@ -219,8 +219,41 @@ namespace nORM.Query
                 return null;
 
             var alias = _provider.Escape("NR" + depth.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            // The principal's global filters (soft-delete, tenant) gate visibility through
+            // the navigation too: a filtered-out parent must read as a MISSING parent
+            // (NULL member), or its data leaks through predicates and projections.
+            var globalFilterSql = RenderPrincipalGlobalFilterSql(principalMap, alias);
             return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
-                   $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql})";
+                   $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql}" +
+                   (globalFilterSql != null ? $" AND {globalFilterSql}" : string.Empty) + ")";
+        }
+
+        /// <summary>
+        /// Translates the combined global filter of a navigation principal against the
+        /// correlated subquery's alias. Same sub-visitor pattern as the aggregate
+        /// selector branches (paramIndexStart offset prevents @pN collisions).
+        /// </summary>
+        private string? RenderPrincipalGlobalFilterSql(TableMapping principalMap, string alias)
+        {
+            if (_ctx == null)
+                return null;
+            var combined = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
+            if (combined == null)
+                return null;
+            var vctx = new VisitorContext(_ctx, principalMap, _provider, combined.Parameters[0], alias, _parameterMappings, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _paramIndex);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            try
+            {
+                var sql = visitor.Translate(combined.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                _paramIndex = visitor.ParamIndex;
+                return sql;
+            }
+            finally
+            {
+                FastExpressionVisitorPool.Return(visitor);
+            }
         }
 
         /// <summary>
