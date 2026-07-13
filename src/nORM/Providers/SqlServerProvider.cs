@@ -65,6 +65,13 @@ namespace nORM.Providers
         internal override bool PrefersSyncCompiledQueryExecution => true;
 
         /// <summary>
+        /// T-SQL has no boolean value type, so a predicate used as a comparable
+        /// value converts through CASE to BIT.
+        /// </summary>
+        internal override string BooleanPredicateAsValueSql(string predicateSql)
+            => $"CAST(CASE WHEN {predicateSql} THEN 1 ELSE 0 END AS BIT)";
+
+        /// <summary>
         /// SqlCommand.Prepare requires explicit Size/Scale metadata on every
         /// variable-length and temporal parameter and throws when any is missing,
         /// while SQL Server's ad-hoc plan cache already parameterizes batched

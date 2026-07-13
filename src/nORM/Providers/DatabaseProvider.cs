@@ -88,6 +88,15 @@ namespace nORM.Providers
         internal virtual bool PrefersSyncCompiledQueryExecution => PrefersSyncExecution;
 
         /// <summary>
+        /// Renders a boolean predicate as a value expression that can participate in
+        /// an equality comparison (composite join keys with boolean members compare
+        /// two predicate-form sides). Providers where boolean expressions already are
+        /// values only need parentheses; SQL Server has no boolean value type and
+        /// overrides with a CASE conversion to BIT.
+        /// </summary>
+        internal virtual string BooleanPredicateAsValueSql(string predicateSql) => $"({predicateSql})";
+
+        /// <summary>
         /// Indicates whether multi-statement write batches benefit from DbCommand.Prepare.
         /// SQL Server overrides this to false: SqlCommand.Prepare demands explicit Size/Scale
         /// metadata on every variable-length and temporal parameter (throwing otherwise), and

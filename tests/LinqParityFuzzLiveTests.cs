@@ -75,7 +75,7 @@ public class LinqParityFuzzLiveTests
                 Price DOUBLE NOT NULL,
                 Flag TINYINT(1) NOT NULL,
                 Created DATETIME(6) NOT NULL)
-            """,
+            """ + "; CREATE TABLE FuzzChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, ChildVal INT NOT NULL, Tag VARCHAR(16) NOT NULL)",
         "postgres" => """
             CREATE TABLE "FuzzRow_Test" (
                 "Id" INT PRIMARY KEY,
@@ -86,7 +86,7 @@ public class LinqParityFuzzLiveTests
                 "Price" DOUBLE PRECISION NOT NULL,
                 "Flag" BOOLEAN NOT NULL,
                 "Created" TIMESTAMP NOT NULL)
-            """,
+            """ + "; CREATE TABLE \"FuzzChild_Test\" (\"Id\" INT PRIMARY KEY, \"ParentId\" INT NOT NULL, \"ChildVal\" INT NOT NULL, \"Tag\" TEXT NOT NULL)",
         _ => """
             CREATE TABLE FuzzRow_Test (
                 Id INT PRIMARY KEY,
@@ -97,14 +97,14 @@ public class LinqParityFuzzLiveTests
                 Price FLOAT NOT NULL,
                 Flag BIT NOT NULL,
                 Created DATETIME2 NOT NULL)
-            """,
+            """ + "; CREATE TABLE FuzzChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, ChildVal INT NOT NULL, Tag NVARCHAR(16) NOT NULL)",
     };
 
     private static string DropTableSql(string kind) => kind switch
     {
-        "postgres" => "DROP TABLE IF EXISTS \"FuzzRow_Test\"",
-        "sqlserver" => "IF OBJECT_ID('FuzzRow_Test') IS NOT NULL DROP TABLE FuzzRow_Test",
-        _ => "DROP TABLE IF EXISTS FuzzRow_Test",
+        "postgres" => "DROP TABLE IF EXISTS \"FuzzRow_Test\"; DROP TABLE IF EXISTS \"FuzzChild_Test\"",
+        "sqlserver" => "IF OBJECT_ID('FuzzRow_Test') IS NOT NULL DROP TABLE FuzzRow_Test; IF OBJECT_ID('FuzzChild_Test') IS NOT NULL DROP TABLE FuzzChild_Test",
+        _ => "DROP TABLE IF EXISTS FuzzRow_Test; DROP TABLE IF EXISTS FuzzChild_Test",
     };
 
     [Theory]
@@ -122,8 +122,11 @@ public class LinqParityFuzzLiveTests
         {
             await using var ctx = new DbContext(factory!(), provider!);
             await LinqParityFuzzTests.SeedAsync(ctx);
+            await LinqParityFuzzTests.SeedChildrenAsync(ctx);
             LinqParityFuzzTests.RunFuzz(ctx, seed: 20260713, cases: 250);
             LinqParityFuzzTests.RunFuzz(ctx, seed: 42, cases: 250);
+            LinqParityFuzzTests.RunJoinFuzz(ctx, seed: 20260713, cases: 100);
+            LinqParityFuzzTests.RunJoinFuzz(ctx, seed: 42, cases: 100);
         }
         finally
         {

@@ -232,14 +232,21 @@ public class LinqParityFuzzTests
                     Amount TEXT NOT NULL,
                     Price REAL NOT NULL,
                     Flag INTEGER NOT NULL,
-                    Created TEXT NOT NULL)
+                    Created TEXT NOT NULL);
+                CREATE TABLE FuzzChild_Test (
+                    Id INTEGER PRIMARY KEY,
+                    ParentId INTEGER NOT NULL,
+                    ChildVal INTEGER NOT NULL,
+                    Tag TEXT NOT NULL)
                 """;
             cmd.ExecuteNonQuery();
         }
 
         using var ctx = new DbContext(cn, new SqliteProvider());
         await SeedAsync(ctx);
+        await SeedChildrenAsync(ctx);
         RunFuzz(ctx, seed, cases: 400);
+        RunJoinFuzz(ctx, seed, cases: 150);
     }
 
     /// <summary>Inserts the shared dataset through the context under test.</summary>
@@ -247,6 +254,130 @@ public class LinqParityFuzzTests
     {
         foreach (var row in Rows) ctx.Add(row);
         await ctx.SaveChangesAsync();
+    }
+
+    // ── Join fuzzing ─────────────────────────────────────────────────────────
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("FuzzChild_Test")]
+    private class Child
+    {
+        public int Id { get; set; }
+        public int ParentId { get; set; }
+        public int ChildVal { get; set; }
+        public string Tag { get; set; } = string.Empty;
+    }
+
+    private static readonly Child[] Children = BuildChildren();
+
+    private static Child[] BuildChildren()
+    {
+        // Parents 1..40; children cover none/one/many per parent, keys past the
+        // parent range (unmatched), and duplicate tags for grouped shapes.
+        var tags = new[] { "x", "y", "x", "z", "" };
+        var children = new List<Child>();
+        for (var i = 0; i < 70; i++)
+        {
+            children.Add(new Child
+            {
+                Id = i + 1,
+                ParentId = (i * 7) % 50 + 1,          // some point past 40 → unmatched
+                ChildVal = (i % 9) - 4,
+                Tag = tags[i % tags.Length],
+            });
+        }
+        return children.ToArray();
+    }
+
+    /// <summary>Inserts the join dataset through the context under test.</summary>
+    internal static async System.Threading.Tasks.Task SeedChildrenAsync(DbContext ctx)
+    {
+        foreach (var child in Children) ctx.Add(child);
+        await ctx.SaveChangesAsync();
+    }
+
+    private sealed record JoinRow(int PId, int CId, int V);
+
+    /// <summary>
+    /// Runs generated join shapes (inner join, GroupJoin aggregate) against the
+    /// context and the LINQ-to-Objects oracle. Both query roots are swapped for
+    /// their in-memory counterparts so the identical tree runs on the oracle.
+    /// </summary>
+    internal static void RunJoinFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var unsupported = 0;
+
+        for (var i = 0; i < cases; i++)
+        {
+            var predicate = GeneratePredicate(rng);
+            var joinKind = rng.Next(3);
+            var caseRng = new Random(rng.Next());
+
+            IQueryable<Row> parents = ctx.Query<Row>().Where(predicate);
+            IQueryable<Child> children = ctx.Query<Child>();
+            var oracleParents = Rows.AsQueryable().Where(predicate);
+            var oracleChildren = Children.AsQueryable();
+
+            try
+            {
+                switch (joinKind)
+                {
+                    case 0: // inner join on Id = ParentId with computed projection
+                    {
+                        var k = caseRng.Next(1, 4);
+                        var db = parents.Join(children, p => p.Id, c => c.ParentId,
+                                (p, c) => new JoinRow(p.Id, c.Id, p.IntVal + c.ChildVal * 1))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.Join(oracleChildren, p => p.Id, c => c.ParentId,
+                                (p, c) => new JoinRow(p.Id, c.Id, p.IntVal + c.ChildVal * 1))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"join mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 1: // composite anonymous join key
+                    {
+                        var db = parents.Join(children,
+                                p => new { A = p.Id % 5, B = p.Flag },
+                                c => new { A = c.ParentId % 5, B = c.ChildVal > 0 },
+                                (p, c) => new JoinRow(p.Id, c.Id, c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.Join(oracleChildren,
+                                p => new { A = p.Id % 5, B = p.Flag },
+                                c => new { A = c.ParentId % 5, B = c.ChildVal > 0 },
+                                (p, c) => new JoinRow(p.Id, c.Id, c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"composite join mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    default: // GroupJoin with per-parent aggregate
+                    {
+                        var db = parents.GroupJoin(children, p => p.Id, c => c.ParentId,
+                                (p, cs) => new { p.Id, N = cs.Count(), S = cs.Sum(c => (int?)c.ChildVal) ?? 0 })
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        var oracle = oracleParents.GroupJoin(oracleChildren, p => p.Id, c => c.ParentId,
+                                (p, cs) => new { p.Id, N = cs.Count(), S = cs.Sum(c => (int?)c.ChildVal) ?? 0 })
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"groupjoin mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                }
+            }
+            catch (NormUnsupportedFeatureException)
+            {
+                unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"join shape threw (seed={seed} case={i} kind={joinKind})\npredicate: {predicate}", ex);
+            }
+        }
+
+        Assert.True(unsupported < cases / 5,
+            $"{unsupported}/{cases} join shapes were declined as unsupported (seed {seed}).");
     }
 
     /// <summary>

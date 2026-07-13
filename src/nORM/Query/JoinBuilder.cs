@@ -83,6 +83,12 @@ namespace nORM.Query
                 return $"{provider.ExactDecimalKeySql(outerKeySql)} = {provider.ExactDecimalKeySql(innerKeySql)}";
             if (provider != null && t == typeof(DateTimeOffset))
                 return $"{provider.NormalizeDateTimeOffsetForCompare(outerKeySql)} = {provider.NormalizeDateTimeOffsetForCompare(innerKeySql)}";
+            // Boolean key members render as PREDICATES (e.g. `[Flag] = 1`,
+            // `(ChildVal > @p)`), so gluing them with `=` produces a chained
+            // equality — invalid on SQL Server and PostgreSQL. Each side goes
+            // through the provider's predicate-to-value conversion first.
+            if (provider != null && t == typeof(bool))
+                return $"{provider.BooleanPredicateAsValueSql(outerKeySql)} = {provider.BooleanPredicateAsValueSql(innerKeySql)}";
             return $"{outerKeySql} = {innerKeySql}";
         }
 
