@@ -597,10 +597,17 @@ namespace nORM.Query
             if (node.Method.DeclaringType == typeof(Convert) && node.Arguments.Count == 1)
             {
                 var inner = GetSql(node.Arguments[0]);
+                // .NET Convert.ToIntXX over floating/decimal sources rounds half to
+                // even; a bare CAST truncates (SQLite/SQL Server) or rounds half away
+                // (MySQL). Integral/string sources keep the plain cast.
+                var convSrc = Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type;
+                var convSrcIsFloating = convSrc == typeof(double) || convSrc == typeof(float) || convSrc == typeof(decimal);
                 var convertSql = node.Method.Name switch
                 {
-                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte) => _provider.GetIntCastSql(inner),
-                    nameof(Convert.ToInt64) => _provider.GetIntCastSql(inner, asLong: true),
+                    nameof(Convert.ToInt32) or nameof(Convert.ToInt16) or nameof(Convert.ToByte) or nameof(Convert.ToSByte)
+                        => convSrcIsFloating ? _provider.ConvertFloatingToIntegralSql(inner, asLong: false) : _provider.GetIntCastSql(inner),
+                    nameof(Convert.ToInt64)
+                        => convSrcIsFloating ? _provider.ConvertFloatingToIntegralSql(inner, asLong: true) : _provider.GetIntCastSql(inner, asLong: true),
                     nameof(Convert.ToString) => _provider.GetToStringSql(inner),
                     nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => _provider.GetRealCastSql(inner),
                     nameof(Convert.ToDecimal) => _provider.GetRealCastSql(inner, asDecimal: true),

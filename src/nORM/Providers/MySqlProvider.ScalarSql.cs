@@ -281,6 +281,13 @@ namespace nORM.Providers
         public override string GetIntCastSql(string innerSql, bool asLong = false)
             => $"CAST({innerSql} AS SIGNED)";
 
+        /// <summary>MySQL's integral CAST target keyword (CAST(x AS INT) is a syntax error).</summary>
+        internal override string IntegerCastTypeName => "SIGNED";
+
+        /// <summary>MySQL TIME to fractional seconds: whole seconds plus the microsecond tail.</summary>
+        internal override string TimeSpanOperandToSecondsSql(string sql)
+            => $"(TIME_TO_SEC({sql}) + MICROSECOND({sql}) / 1000000.0)";
+
         /// <summary>MySQL requires SIGNED as the integer cast target and TRUNCATE for toward-zero semantics.</summary>
         public override string GetTruncateToIntSql(string numericSql)
             => $"CAST(TRUNCATE({numericSql}, 0) AS SIGNED)";

@@ -619,13 +619,16 @@ namespace nORM.Providers
         }
 
         /// <summary>
-        /// SQLite has no native interval type. Convert both timestamps to Julian-day numbers
-        /// (a fractional REAL) and multiply by 86400 to get seconds.
+        /// SQLite has no native interval type. julianday subtraction is a REAL whose
+        /// float error reaches microseconds ('00:01:30' differences came back as
+        /// 89.9999946s), so the difference works in integer epoch ticks — exact to
+        /// the tick — and divides once at the end for the seconds-as-REAL contract
+        /// (exact below 2^53 ticks, about 29,000 years of span).
         /// </summary>
         /// <param name="endSql">SQL fragment evaluating the later timestamp.</param>
         /// <param name="startSql">SQL fragment evaluating the earlier timestamp.</param>
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
-            => $"((julianday({endSql}) - julianday({startSql})) * 86400.0)";
+            => $"(CAST({DateTimeTextEpochTicks(endSql)} - {DateTimeTextEpochTicks(startSql)} AS REAL) / 10000000.0)";
 
         /// <summary>
         /// SQLite has no DATEFROMPARTS; build the canonical 'yyyy-MM-dd HH:mm:ss'

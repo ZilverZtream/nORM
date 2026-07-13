@@ -19,10 +19,22 @@ namespace nORM.Providers
         /// removed). Division/modulo are floored explicitly so negative epochs
         /// (pre-1970) keep the correct fraction.
         /// </summary>
-        private static string AddTicksToDateTimeText(string dateTimeSql, string ticksDeltaSql)
+        /// <summary>
+        /// Integer epoch ticks (100ns since 1970, floor semantics) of a canonical
+        /// DateTime TEXT value: floor-epoch seconds from strftime('%s') plus the
+        /// parsed 7-digit fractional tail. Integer math end to end, so consumers
+        /// (tick shifts, differences) stay exact where julianday's REAL would
+        /// drift by microseconds.
+        /// </summary>
+        internal static string DateTimeTextEpochTicks(string dateTimeSql)
         {
             var frac = $"(CASE WHEN length({dateTimeSql}) > 20 THEN CAST(substr({dateTimeSql} || '0000000', 21, 7) AS INTEGER) ELSE 0 END)";
-            var tot = $"(strftime('%s', {dateTimeSql}) * 10000000 + {frac} + ({ticksDeltaSql}))";
+            return $"(strftime('%s', {dateTimeSql}) * 10000000 + {frac})";
+        }
+
+        private static string AddTicksToDateTimeText(string dateTimeSql, string ticksDeltaSql)
+        {
+            var tot = $"({DateTimeTextEpochTicks(dateTimeSql)} + ({ticksDeltaSql}))";
             var secs = $"(({tot} / 10000000) - (CASE WHEN {tot} % 10000000 < 0 THEN 1 ELSE 0 END))";
             var fracPos = $"((({tot} % 10000000) + 10000000) % 10000000)";
             return $"(strftime('%Y-%m-%d %H:%M:%S', {secs}, 'unixepoch') || RTRIM(RTRIM('.' || printf('%07d', {fracPos}), '0'), '.'))";

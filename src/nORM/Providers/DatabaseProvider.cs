@@ -311,18 +311,41 @@ namespace nORM.Providers
                     return unscale($"CEILING({scaled})");
                 case System.MidpointRounding.ToEven:
                 default:
-                    // Banker's: integer-part-via-truncate plus +1 only when the
-                    // half-tie's integer part is odd. Sign reapplied via the
-                    // leading CASE so negatives round symmetrically.
-                    return unscale(
-                        $"((CASE WHEN {scaled} >= 0 THEN 1 ELSE -1 END) * " +
-                        $"(FLOOR(ABS({scaled})) + " +
-                        $"CASE " +
-                        $"WHEN ABS({scaled}) - FLOOR(ABS({scaled})) > 0.5 THEN 1 " +
-                        $"WHEN ABS({scaled}) - FLOOR(ABS({scaled})) < 0.5 THEN 0 " +
-                        $"ELSE (CAST(FLOOR(ABS({scaled})) AS {integerCastType}) % 2) END))");
+                    return unscale(BankersRoundIntegralSql(scaled, integerCastType));
             }
         }
+
+        /// <summary>
+        /// Round-half-to-even (banker's) of a numeric SQL expression, .NET's default
+        /// midpoint mode for Math.Round AND for Convert.ToInt32/ToInt64(double/
+        /// float/decimal) — where a bare CAST diverges per dialect (SQLite/SQL Server
+        /// truncate, MySQL rounds half away from zero). Integer-part-via-FLOOR plus
+        /// +1 only when the half-tie's integer part is odd; sign reapplied via the
+        /// leading CASE so negatives round symmetrically. Identity for values that
+        /// are already integral (the fraction terms evaluate to zero).
+        /// </summary>
+        internal static string BankersRoundIntegralSql(string x, string? integerCastType = null)
+        {
+            integerCastType ??= "BIGINT";
+            return $"((CASE WHEN {x} >= 0 THEN 1 ELSE -1 END) * " +
+                   $"(FLOOR(ABS({x})) + " +
+                   $"CASE " +
+                   $"WHEN ABS({x}) - FLOOR(ABS({x})) > 0.5 THEN 1 " +
+                   $"WHEN ABS({x}) - FLOOR(ABS({x})) < 0.5 THEN 0 " +
+                   $"ELSE (CAST(FLOOR(ABS({x})) AS {integerCastType}) % 2) END))";
+        }
+
+        /// <summary>
+        /// SQL for Convert.ToIntXX over a floating-point/decimal source: .NET rounds
+        /// half to even before narrowing, so compose the banker's round with the
+        /// provider's integer cast (the cast of an integral-valued number is exact
+        /// on every dialect, sidestepping their divergent raw-cast rounding).
+        /// </summary>
+        internal string ConvertFloatingToIntegralSql(string x, bool asLong)
+            => GetIntCastSql(BankersRoundIntegralSql(x, IntegerCastTypeName), asLong);
+
+        /// <summary>The dialect's integral CAST target for modulo arithmetic in shared emits.</summary>
+        internal virtual string IntegerCastTypeName => "BIGINT";
 
         /// <summary>
         /// Builds SQL for <c>new DateTimeOffset(year, month, day, hour, minute, second, offset)</c>

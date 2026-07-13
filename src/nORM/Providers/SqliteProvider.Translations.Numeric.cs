@@ -207,16 +207,15 @@ namespace nORM.Providers
                 return null;
             }
 
-            // Convert.ToXyz overloads from-string are the canonical sister
-            // of int.Parse / bool.Parse and emit identical SQL. The from-
-            // string shape is what tests pin here; the from-numeric
-            // overloads (ToInt32(double), etc.) would also be valid but
-            // require more careful semantics around rounding (Convert
-            // .ToInt32(double) rounds-to-even while CAST truncates).
+            // Convert.ToXyz overloads from-string are the canonical sister of
+            // int.Parse / bool.Parse. The integral converts fold through banker's
+            // rounding first: .NET Convert.ToIntXX(double/decimal) rounds half to
+            // even while CAST truncates, and the round is identity for values that
+            // are already integral (from-string and from-int callers unaffected).
             return name switch
             {
-                "ToInt32" when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
-                "ToInt64" when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
+                "ToInt32" when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
+                "ToInt64" when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
                 "ToDouble" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
                 "ToDecimal" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
                 // Convert.ToBoolean(string) -- .NET semantics are case-

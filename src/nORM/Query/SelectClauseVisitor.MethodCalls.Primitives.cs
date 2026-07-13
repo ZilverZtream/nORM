@@ -11,6 +11,29 @@ namespace nORM.Query
         // Convert.ChangeType(value, typeof(T)) carries the target type as a
         // constant Type; route it through provider CAST hooks when the target is
         // known at translation time.
+        // Convert.ToIntXX(floating/decimal) in a projection: .NET rounds half to
+        // even before narrowing, while raw casts diverge per dialect. Handled here
+        // so every provider gets the same emit (the fallthrough would route to
+        // per-provider TranslateFunction tables that only SQLite populates).
+        private bool TryVisitConvertToIntegral(MethodCallExpression node, StringBuilder sb)
+        {
+            if (node.Method.DeclaringType != typeof(Convert)
+                || node.Arguments.Count != 1
+                || node.Method.Name is not (nameof(Convert.ToInt32) or nameof(Convert.ToInt16)
+                    or nameof(Convert.ToByte) or nameof(Convert.ToSByte) or nameof(Convert.ToInt64)))
+                return false;
+            var src = Nullable.GetUnderlyingType(node.Arguments[0].Type) ?? node.Arguments[0].Type;
+            if (src != typeof(double) && src != typeof(float) && src != typeof(decimal))
+                return false;
+
+            var innerStart = sb.Length;
+            Visit(node.Arguments[0]);
+            var innerSql = sb.ToString(innerStart, sb.Length - innerStart);
+            sb.Length = innerStart;
+            sb.Append(_provider.ConvertFloatingToIntegralSql(innerSql, asLong: node.Method.Name == nameof(Convert.ToInt64)));
+            return true;
+        }
+
         private bool TryVisitConvertChangeType(MethodCallExpression node, StringBuilder sb)
         {
             if (node.Method.DeclaringType != typeof(Convert)

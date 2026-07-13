@@ -99,6 +99,18 @@ namespace nORM.Providers
         internal virtual string ClampNonNegativeLimitExpression(string expr) => expr;
 
         /// <summary>
+        /// Converts a TimeSpan-typed operand to fractional SECONDS for comparison
+        /// against a DateTime/TimeOnly difference (which the difference hooks emit
+        /// as seconds). Distinct from <see cref="NormalizeTimeSpanForCompare"/>:
+        /// that one is identity on providers whose native TIME/INTERVAL compare
+        /// against each other, but a seconds-vs-native comparison needs an explicit
+        /// conversion everywhere. The base reuses the normalize hook, which is the
+        /// text-to-seconds parse on SQLite.
+        /// </summary>
+        internal virtual string TimeSpanOperandToSecondsSql(string sql)
+            => NormalizeTimeSpanForCompare(sql);
+
+        /// <summary>
         /// Returns SQL that converts <paramref name="innerSql"/> to its textual representation -
         /// used by the translator for LINQ <c>x.ToString()</c> calls on non-string columns.
         /// Default uses ANSI <c>CAST(x AS VARCHAR)</c>; providers override with their native

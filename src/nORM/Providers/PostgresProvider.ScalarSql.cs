@@ -188,6 +188,10 @@ namespace nORM.Providers
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
             => $"EXTRACT(EPOCH FROM ({endSql} - {startSql}))";
 
+        /// <summary>PostgreSQL INTERVAL to fractional seconds via EPOCH extraction.</summary>
+        internal override string TimeSpanOperandToSecondsSql(string sql)
+            => $"EXTRACT(EPOCH FROM {sql})";
+
         /// <summary>PostgreSQL MAKE_TIMESTAMP builds a TIMESTAMP from int parts.</summary>
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"MAKE_TIMESTAMP({yearSql}, {monthSql}, {daySql}, 0, 0, 0)";

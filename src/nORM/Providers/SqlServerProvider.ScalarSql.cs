@@ -227,6 +227,10 @@ namespace nORM.Providers
         public override string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
             => $"(CAST(DATEDIFF_BIG(MICROSECOND, {startSql}, {endSql}) AS FLOAT) / 1000000.0)";
 
+        /// <summary>SQL Server TIME to fractional seconds, microsecond precision from midnight.</summary>
+        internal override string TimeSpanOperandToSecondsSql(string sql)
+            => $"(CAST(DATEDIFF_BIG(MICROSECOND, CAST('00:00:00' AS TIME), {sql}) AS FLOAT) / 1000000.0)";
+
         /// <summary>T-SQL DATETIME2FROMPARTS with precision 7 matches .NET DateTime ticks.</summary>
         public override string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => $"DATETIME2FROMPARTS({yearSql}, {monthSql}, {daySql}, 0, 0, 0, 0, 7)";

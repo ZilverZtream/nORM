@@ -409,10 +409,42 @@ namespace nORM.Query
             bool rightIsTs = rightTsType == typeof(TimeSpan);
             if (isOrderOrEqualCmp && (leftIsTs || rightIsTs))
             {
-                var leftSqlTs = GetSql(node.Left);
-                var rightSqlTs = GetSql(node.Right);
-                var leftNorm  = leftIsTs  ? _provider.NormalizeTimeSpanForCompare(leftSqlTs)  : leftSqlTs;
-                var rightNorm = rightIsTs ? _provider.NormalizeTimeSpanForCompare(rightSqlTs) : rightSqlTs;
+                // A DateTime/TimeOnly SUBTRACTION operand is not TimeSpan storage: a
+                // raw SQL minus of two datetime TEXTs coerces to garbage on SQLite,
+                // and the text-parsing normalizer cannot run over a number. Route
+                // those operands through the provider's difference-in-seconds hooks
+                // (tick-exact) so `(a - b) == span` compares seconds to seconds.
+                static bool IsDateSubtractionOperand(Expression e)
+                {
+                    while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                        e = u.Operand;
+                    return e is BinaryExpression { NodeType: ExpressionType.Subtract } b
+                        && (IsDateTimeLike(b.Left.Type) || IsTimeOnly(b.Left.Type));
+                }
+                bool anyDiffOperand = IsDateSubtractionOperand(node.Left) || IsDateSubtractionOperand(node.Right);
+                string EmitTimeSpanOperand(Expression e, bool operandIsTs)
+                {
+                    var stripped = e;
+                    while (stripped is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                        stripped = u.Operand;
+                    if (stripped is BinaryExpression { NodeType: ExpressionType.Subtract } diff)
+                    {
+                        if (IsDateTimeLike(diff.Left.Type))
+                            return _provider.GetDateTimeDifferenceSecondsSql(GetSql(diff.Left), GetSql(diff.Right));
+                        if (IsTimeOnly(diff.Left.Type))
+                            return _provider.GetTimeOnlyDifferenceSecondsSql(GetSql(diff.Left), GetSql(diff.Right));
+                    }
+                    var sqlFrag = GetSql(e);
+                    if (!operandIsTs) return sqlFrag;
+                    // Against a difference the comparison domain is SECONDS on every
+                    // provider; between two stored TimeSpans the native domain wins
+                    // (normalize is identity off-SQLite).
+                    return anyDiffOperand
+                        ? _provider.TimeSpanOperandToSecondsSql(sqlFrag)
+                        : _provider.NormalizeTimeSpanForCompare(sqlFrag);
+                }
+                var leftNorm  = EmitTimeSpanOperand(node.Left, leftIsTs);
+                var rightNorm = EmitTimeSpanOperand(node.Right, rightIsTs);
                 _sql.Append('(').Append(leftNorm);
                 _sql.Append(node.NodeType switch
                 {
