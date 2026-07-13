@@ -57,7 +57,7 @@ namespace nORM.Providers
         /// <summary>Maximum number of cached DataTable schemas used for bulk insert data tables.</summary>
         private const int TableSchemaCacheSize = 100;
 
-        private static readonly ConcurrentLruCache<Type, DataTable> _tableSchemas = new(maxSize: TableSchemaCacheSize);
+        private static readonly ConcurrentLruCache<TableMapping, DataTable> _tableSchemas = new(maxSize: TableSchemaCacheSize);
         private static readonly ConcurrentDictionary<string, bool> _bulkCopyUnavailable = new(StringComparer.Ordinal);
         private static readonly ConcurrentDictionary<Type, Func<DbCommand, object?>> _lastInsertedIdAccessors = new();
         private readonly IDbParameterFactory _parameterFactory;

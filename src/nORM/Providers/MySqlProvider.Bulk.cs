@@ -63,7 +63,7 @@ namespace nORM.Providers
                     for (int i = 0; i < entityList.Count; i += sizing.OptimalBatchSize)
                     {
                         var batch = entityList.GetRange(i, Math.Min(sizing.OptimalBatchSize, entityList.Count - i));
-                        using var table = GetDataTable(m, insertableCols);
+                        using var table = GetDataTable(m);
                         LoadBulkInsertRows(table, insertableCols, batch);
 
                         var batchSw = Stopwatch.StartNew();
@@ -372,7 +372,11 @@ namespace nORM.Providers
         /// </summary>
         private static string GetStagingSqlType(Mapping.Column c, TableMapping m)
         {
-            var underlying = Nullable.GetUnderlyingType(c.Prop.PropertyType) ?? c.Prop.PropertyType;
+            // Values are staged post-conversion (ConvertToProvider), so the staging
+            // column must be typed for the PROVIDER representation, not the CLR
+            // property (e.g. an enum stored as string must stage as text).
+            var effective = c.Converter?.ProviderType ?? c.Prop.PropertyType;
+            var underlying = Nullable.GetUnderlyingType(effective) ?? effective;
             if (underlying == typeof(decimal))
             {
                 if (m.FluentConfiguration?.Precisions is { } precisions
@@ -382,41 +386,67 @@ namespace nORM.Providers
                 }
                 return "DECIMAL(38,18)";
             }
-            return GetSqlType(c.Prop.PropertyType);
+            return GetSqlType(underlying);
         }
 
         /// <summary>
-        /// Maps a CLR type to its corresponding MySQL column type.
+        /// Maps a CLR type to its corresponding MySQL column type. Staged values are
+        /// written back into the destination by UPDATE ... JOIN, so every mapping must
+        /// preserve the full value: DATETIME/TIME carry (6) because the bare types
+        /// round fractional seconds away (a bare DATETIME turned 12:30:15.7 into
+        /// 12:30:16 — silently persisted), strings/blobs use the LONG variants because
+        /// TEXT/BLOB cap at 64KB, and every numeric type maps natively rather than
+        /// falling through to a text column.
         /// </summary>
         private static string GetSqlType(Type t)
         {
             t = Nullable.GetUnderlyingType(t) ?? t;
+            if (t.IsEnum) t = Enum.GetUnderlyingType(t);
             if (t == typeof(int)) return "INT";
             if (t == typeof(long)) return "BIGINT";
-            if (t == typeof(string)) return "TEXT";
-            if (t == typeof(DateTime)) return "DATETIME";
-            if (t == typeof(bool)) return "BIT";
-            if (t == typeof(decimal)) return "DECIMAL(18,2)";
+            if (t == typeof(short)) return "SMALLINT";
+            if (t == typeof(byte)) return "TINYINT UNSIGNED";
+            if (t == typeof(sbyte)) return "TINYINT";
+            if (t == typeof(ushort)) return "SMALLINT UNSIGNED";
+            if (t == typeof(uint)) return "INT UNSIGNED";
+            if (t == typeof(ulong)) return "BIGINT UNSIGNED";
+            if (t == typeof(string)) return "LONGTEXT";
+            if (t == typeof(DateTime)) return "DATETIME(6)";
+            if (t == typeof(DateTimeOffset)) return "DATETIME(6)";
+            if (t == typeof(DateOnly)) return "DATE";
+            if (t == typeof(TimeOnly)) return "TIME(6)";
+            if (t == typeof(TimeSpan)) return "TIME(6)";
+            if (t == typeof(bool)) return "TINYINT(1)";
+            if (t == typeof(decimal)) return "DECIMAL(38,18)";
+            if (t == typeof(double)) return "DOUBLE";
+            if (t == typeof(float)) return "FLOAT";
             if (t == typeof(Guid)) return "CHAR(36)";
-            if (t == typeof(byte[])) return "BLOB";
-            return "TEXT";
+            if (t == typeof(byte[])) return "LONGBLOB";
+            if (t == typeof(char)) return "CHAR(1)";
+            return "LONGTEXT";
         }
 
         /// <summary>
         /// Returns a cloned DataTable with the schema matching the specified columns.
-        /// Caches the schema per entity type to avoid repeated reflection.
+        /// Rows are loaded post-conversion (ConvertToProvider), so each column is typed
+        /// for the PROVIDER representation — typing by the CLR property would make
+        /// DataTable reject or coerce converted values (e.g. a DateTime stored as
+        /// BIGINT ticks). Cached per mapping (not per CLR type) because two contexts
+        /// can map the same entity with different converters.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2072",
             Justification = "Column types are mapped entity property types rooted by TableMapping registration; DataColumn only needs the type identity for bulk-load schema definition.")]
-        private static DataTable GetDataTable(TableMapping m, List<Column> cols)
+        private static DataTable GetDataTable(TableMapping m)
         {
-            var schema = _tableSchemas.GetOrAdd(m.Type, _ =>
+            var schema = _tableSchemas.GetOrAdd(m, static mapping =>
             {
                 var dt = new DataTable();
-                foreach (var c in cols)
+                foreach (var c in mapping.Columns.Where(c => !c.IsDbGenerated))
                 {
-                    var propType = c.Prop.PropertyType;
-                    dt.Columns.Add(c.PropName, Nullable.GetUnderlyingType(propType) ?? propType);
+                    var effective = c.Converter?.ProviderType ?? c.Prop.PropertyType;
+                    var columnType = Nullable.GetUnderlyingType(effective) ?? effective;
+                    if (columnType.IsEnum) columnType = Enum.GetUnderlyingType(columnType);
+                    dt.Columns.Add(c.PropName, columnType);
                 }
                 return dt;
             });
