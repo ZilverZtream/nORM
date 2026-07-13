@@ -69,8 +69,10 @@ namespace nORM.Query
             resultMethodName = null;
             if (_ctx.Options.GlobalFilters.Count > 0 || _ctx.Options.TenantProvider != null)
                 return false;
-            // Traverse to find root query and optional Where predicate
-            MethodCallExpression? whereCall = null;
+            // Traverse to find root query and optional predicate (a single Where,
+            // or the First/FirstOrDefault predicate overload -- same slot, since
+            // First(source, predicate) is Where(source, predicate).First()).
+            LambdaExpression? whereLambda = null;
             Expression current = expr;
             // Unwrap result operators like First/Single/Take and skip AsNoTracking
             while (current is MethodCallExpression mc)
@@ -79,18 +81,22 @@ namespace nORM.Query
                 {
                     if (mc.Method.Name == nameof(Queryable.Where))
                     {
-                        if (whereCall != null) return false; // only support single Where
-                        whereCall = mc;
+                        if (whereLambda != null) return false; // only support a single predicate
+                        whereLambda = StripQuotes(mc.Arguments[1]) as LambdaExpression;
+                        if (whereLambda == null) return false;
                         current = mc.Arguments[0];
                     }
                     else if (mc.Method.Name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault))
                     {
-                        // The predicate overload First(source, predicate) carries its filter in
-                        // Arguments[1]; this fast path only reads Arguments[0], so accepting it would
-                        // silently DROP the predicate and return the first row of the whole table.
-                        // Fall through to the full translator, which handles the predicate correctly.
                         if (mc.Arguments.Count > 1)
-                            return false;
+                        {
+                            // First(source, predicate) folds into the same single-predicate
+                            // slot Where uses. The traversal sees First BEFORE an upstream
+                            // Where, so a later Where hitting the occupied slot declines --
+                            // two predicates go to the full translator.
+                            whereLambda = StripQuotes(mc.Arguments[1]) as LambdaExpression;
+                            if (whereLambda == null) return false;
+                        }
                         resultMethodName = mc.Method.Name;
                         current = mc.Arguments[0];
                     }
@@ -124,15 +130,7 @@ namespace nORM.Query
                 return false;
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
-            string whereKey;
-            if (whereCall == null)
-                whereKey = "";
-            else
-            {
-                var wLambda = StripQuotes(whereCall.Arguments[1]) as LambdaExpression;
-                if (wLambda == null) return false;
-                whereKey = BuildSimpleWhereCacheKey(wLambda);
-            }
+            var whereKey = whereLambda == null ? "" : BuildSimpleWhereCacheKey(whereLambda);
             var cacheKey = string.Concat("SIMPLE:", elementType.FullName, ":", resultMethodName ?? "", ":", whereKey);
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))
             {
@@ -141,9 +139,9 @@ namespace nORM.Query
                 var columnList = string.Join(", ", map.Columns.Select(c => c.EscCol));
                 string whereClause = "";
 
-                if (whereCall != null)
+                if (whereLambda != null)
                 {
-                    var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                    var lambda = whereLambda;
                     // Support boolean member: u => u.IsActive
                     if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
                     {
@@ -203,10 +201,10 @@ namespace nORM.Query
                 return true;
             }
             sql = cachedSql!;
-            // SQL cached; still need parameter value if where present
-            if (whereCall != null)
+            // SQL cached; still need parameter value if a predicate is present
+            if (whereLambda != null)
             {
-                var lambda = (LambdaExpression)StripQuotes(whereCall.Arguments[1]);
+                var lambda = whereLambda;
                 if ((lambda.Body is MemberExpression boolMember2 && boolMember2.Type == typeof(bool))
                     || (lambda.Body is UnaryExpression { NodeType: ExpressionType.Not } notExpr3
                         && notExpr3.Operand is MemberExpression negBm && negBm.Type == typeof(bool)))
