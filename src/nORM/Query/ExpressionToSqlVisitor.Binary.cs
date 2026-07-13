@@ -742,14 +742,18 @@ namespace nORM.Query
                 or ExpressionType.LessThan or ExpressionType.LessThanOrEqual))
                 return false;
 
-            var leftIsColumn = TryGetConverterColumn(node.Left, out var leftColumn);
-            var rightIsColumn = TryGetConverterColumn(node.Right, out var rightColumn);
+            var leftIsColumn = TryGetConverterColumn(node.Left, out var leftColumn, out var leftViaNav);
+            var rightIsColumn = TryGetConverterColumn(node.Right, out var rightColumn, out var rightViaNav);
             if (leftIsColumn == rightIsColumn)
                 return false; // neither is a converter column, or a column-vs-column comparison
 
             var memberSide = leftIsColumn ? node.Left : node.Right;
             var valueSide = leftIsColumn ? node.Right : node.Left;
             var column = leftIsColumn ? leftColumn : rightColumn;
+            // A navigation-resolved member is nullable regardless of the principal
+            // column's nullability: a missing parent yields SQL NULL, and C# null
+            // semantics must keep those rows for != comparisons.
+            var memberIsNullable = column.IsNullable || (leftIsColumn ? leftViaNav : rightViaNav);
 
             // Classify the value side before writing anything so an unhandled shape declines cleanly.
             var stripped = StripConvert(valueSide);
@@ -788,7 +792,7 @@ namespace nORM.Query
                 _sql.TruncateTo(vs);
                 if (op == ExpressionType.Equal)
                     _sql.Append(_provider.OrdinalStringEqualSql(colSqlOrd, valSql));
-                else if (column.IsNullable)
+                else if (memberIsNullable)
                     _sql.Append($"({colSqlOrd} IS NULL OR {_provider.OrdinalStringNotEqualSql(colSqlOrd, valSql)})");
                 else
                     _sql.Append(_provider.OrdinalStringNotEqualSql(colSqlOrd, valSql));
@@ -796,7 +800,7 @@ namespace nORM.Query
             }
 
             _sql.Append('(');
-            if (op == ExpressionType.NotEqual && column.IsNullable)
+            if (op == ExpressionType.NotEqual && memberIsNullable)
             {
                 // Preserve C# `col != value` semantics for a nullable column: NULL rows must be
                 // included (SQL `NULL <> @p` is UNKNOWN, i.e. excluded).
@@ -861,17 +865,45 @@ namespace nORM.Query
         }
 
         private bool TryGetConverterColumn(Expression expr, out Column column)
+            => TryGetConverterColumn(expr, out column, out _);
+
+        private bool TryGetConverterColumn(Expression expr, out Column column, out bool viaNavigation)
         {
             column = null!;
+            viaNavigation = false;
             expr = StripConvert(expr);
-            if (expr is MemberExpression me
-                && TableMapping.TryGetMemberAccessRoot(me, out var root)
+            if (expr is not MemberExpression me)
+                return false;
+            if (TableMapping.TryGetMemberAccessRoot(me, out var root)
                 && _parameterMappings.TryGetValue(root, out var info)
                 && info.Mapping.TryGetColumnForMemberAccess(me, out var col)
                 && col.Converter != null)
             {
                 column = col;
                 return true;
+            }
+            // Navigation-member receiver (e.Dept.Status): the converter lives on the
+            // PRINCIPAL's column. Only claim it when the chain actually resolves to a
+            // scalar subquery, so the member-side emit is guaranteed to succeed.
+            if (me.Expression is MemberExpression navExpr && _ctx != null)
+            {
+                var navType = System.Nullable.GetUnderlyingType(navExpr.Type) ?? navExpr.Type;
+                if (navType.IsClass && navType != typeof(string))
+                {
+                    try
+                    {
+                        var principal = _ctx.GetMapping(navType);
+                        if (principal.ColumnsByName.TryGetValue(me.Member.Name, out var navCol)
+                            && navCol.Converter != null
+                            && BuildReferenceNavigationScalarSql(navExpr, me.Member.Name, 0) != null)
+                        {
+                            column = navCol;
+                            viaNavigation = true;
+                            return true;
+                        }
+                    }
+                    catch { }
+                }
             }
             return false;
         }
