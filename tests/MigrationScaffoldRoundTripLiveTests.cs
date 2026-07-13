@@ -104,8 +104,12 @@ public class MigrationScaffoldRoundTripLiveTests
             foreach (var sql in statements.Up)
                 Exec(factory!, sql);
 
+            // Scope the scaffold to this test's table: the live database is shared and
+            // concurrent tests create/drop their own tables mid-run, so scaffolding
+            // everything races against their cleanup.
+            var options = new ScaffoldOptions { Tables = new[] { "MigScaffoldRoundTrip_Test" } };
             using (var cn = factory!())
-                await DatabaseScaffolder.ScaffoldAsync(cn, provider!, dir, "RoundTripNs", "RoundTripCtx");
+                await DatabaseScaffolder.ScaffoldAsync(cn, provider!, dir, "RoundTripNs", "RoundTripCtx", options);
 
             var entityFile = Directory.GetFiles(dir, "*.cs")
                 .SingleOrDefault(f => Path.GetFileNameWithoutExtension(f).StartsWith("Migscaffoldroundtrip", StringComparison.OrdinalIgnoreCase));
