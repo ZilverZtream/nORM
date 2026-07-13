@@ -131,7 +131,13 @@ namespace nORM.Query
             operand = StripBoolConvert(operand);
             switch (operand)
             {
-                // !!a == a
+                // !!a == a. A bare boolean member still needs the boolean-comparison
+                // emitter (`col = 1` on providers without boolean expressions).
+                case UnaryExpression { NodeType: ExpressionType.Not } inner
+                    when StripBoolConvert(inner.Operand) is MemberExpression innerMember
+                        && innerMember.Type == typeof(bool):
+                    EmitBoolComparison(innerMember, boolVal: true, ExpressionType.Equal);
+                    return;
                 case UnaryExpression { NodeType: ExpressionType.Not } inner:
                     Visit(StripBoolConvert(inner.Operand));
                     return;
@@ -194,8 +200,16 @@ namespace nORM.Query
                     _sql.Append(')');
                     return;
 
-                // Method calls (StartsWith, other Contains shapes, …), boolean columns, and anything
-                // else fall back to a straight NOT(...) — correct for non-nullable operands, and no
+                // A negated bare boolean column routes through the boolean-comparison
+                // emitter as `col == false`: SQL Server has no boolean expressions, so
+                // `NOT([Flag])` over a BIT column is a syntax error, while providers
+                // preferring bare booleans still get their `NOT col` form from the hook.
+                case MemberExpression member when member.Type == typeof(bool):
+                    EmitBoolComparison(member, boolVal: false, ExpressionType.Equal);
+                    return;
+
+                // Method calls (StartsWith, other Contains shapes, …), and anything else
+                // fall back to a straight NOT(...) — correct for non-nullable operands, and no
                 // worse than the previous behaviour for the rare nullable ones.
                 default:
                     _sql.Append("(NOT(");

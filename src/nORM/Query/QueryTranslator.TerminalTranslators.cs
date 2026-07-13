@@ -560,6 +560,11 @@ namespace nORM.Query
                 // that aren't relevant to the row-count.
                 if (!t._isDistinct)
                     t._projection = null;
+                // COUNT collapses to a single row, so the source ordering is meaningless —
+                // and a surviving ORDER BY over source columns is invalid SQL on
+                // Postgres/SQL Server ("column ... invalid in ORDER BY because it is not
+                // contained in either an aggregate function or the GROUP BY clause").
+                t._orderBy.Clear();
                 t._methodName = node.Method.Name;
                 if (node.Arguments.Count > 1)
                 {

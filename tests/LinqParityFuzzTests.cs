@@ -24,6 +24,7 @@ namespace nORM.Tests;
 [Trait("Category", "Fast")]
 public class LinqParityFuzzTests
 {
+    [System.ComponentModel.DataAnnotations.Schema.Table("FuzzRow_Test")]
     private class Row
     {
         public int Id { get; set; }
@@ -223,7 +224,7 @@ public class LinqParityFuzzTests
         using (var cmd = cn.CreateCommand())
         {
             cmd.CommandText = """
-                CREATE TABLE Row (
+                CREATE TABLE FuzzRow_Test (
                     Id INTEGER PRIMARY KEY,
                     IntVal INTEGER NOT NULL,
                     NullableInt INTEGER NULL,
@@ -237,12 +238,26 @@ public class LinqParityFuzzTests
         }
 
         using var ctx = new DbContext(cn, new SqliteProvider());
+        await SeedAsync(ctx);
+        RunFuzz(ctx, seed, cases: 400);
+    }
+
+    /// <summary>Inserts the shared dataset through the context under test.</summary>
+    internal static async System.Threading.Tasks.Task SeedAsync(DbContext ctx)
+    {
         foreach (var row in Rows) ctx.Add(row);
         await ctx.SaveChangesAsync();
+    }
 
+    /// <summary>
+    /// Runs <paramref name="cases"/> generated query shapes against the context
+    /// and the LINQ-to-Objects oracle. Shared by the SQLite fast test and the
+    /// live-provider variant so the same shapes exercise every dialect.
+    /// </summary>
+    internal static void RunFuzz(DbContext ctx, int seed, int cases)
+    {
         var rng = new Random(seed);
         var unsupported = 0;
-        const int cases = 400;
 
         for (var i = 0; i < cases; i++)
         {
@@ -263,6 +278,12 @@ public class LinqParityFuzzTests
             catch (NormUnsupportedFeatureException)
             {
                 unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"shape execution threw (seed={seed} case={i} ordered={ordered})\npredicate: {predicate}\nsecond: {secondPredicate}\npipeline: {pagedDb.Expression}",
+                    ex);
             }
         }
 
@@ -287,10 +308,13 @@ public class LinqParityFuzzTests
         var swapped = new RootSwapper(oracleRoot.Expression).Visit(db.Expression)!;
         var oracle = oracleRoot.Provider.CreateQuery<Row>(swapped);
 
+        var terminal = caseRng.Next(7);
         string Describe() =>
-            $"seed={seed} case={caseIndex} ordered={ordered}\npredicate: {predicate}\nsecond: {secondPredicate}\npipeline: {db.Expression}";
+            $"seed={seed} case={caseIndex} ordered={ordered} terminal={terminal}\npredicate: {predicate}\nsecond: {secondPredicate}\npipeline: {db.Expression}";
 
-        switch (caseRng.Next(7))
+        try
+        {
+        switch (terminal)
         {
             case 0: // materialize
                 var dbRows = db.Select(r => r.Id).ToList();
@@ -346,6 +370,11 @@ public class LinqParityFuzzTests
                 Assert.True(dbDistinct.SequenceEqual(orDistinct),
                     $"Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbDistinct)}]\noracle: [{string.Join(",", orDistinct)}]");
                 break;
+        }
+        }
+        catch (Exception ex) when (ex is not Xunit.Sdk.XunitException and not NormUnsupportedFeatureException)
+        {
+            throw new InvalidOperationException("terminal threw: " + Describe(), ex);
         }
     }
 

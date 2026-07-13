@@ -103,6 +103,11 @@ namespace nORM.Query
             {
                 Visit(sourceQuery);
                 alias = EscapeAlias("T" + _joinCounter);
+                // Ordering before GroupBy is not preserved by LINQ, and a surviving
+                // ORDER BY over ungrouped source columns is invalid SQL on
+                // Postgres/MySQL (42803 / ONLY_FULL_GROUP_BY). Ordering applied to
+                // the grouped projection is visited later and re-populates the list.
+                _orderBy.Clear();
             }
             if (sourceQuery is MethodCallExpression selectSource
                 && selectSource.Method.Name == nameof(Queryable.Select)
@@ -356,6 +361,10 @@ namespace nORM.Query
                 return visitedSource;
             ThrowIfClientTailReshapePending(this, node.Method.Name);
             _methodName = node.Method.Name;
+            // An aggregate collapses to a single row, so the source ordering is
+            // meaningless — and a surviving ORDER BY over source columns is invalid
+            // SQL on Postgres (42803: column must appear in GROUP BY or aggregate).
+            _orderBy.Clear();
 
             if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)
             {

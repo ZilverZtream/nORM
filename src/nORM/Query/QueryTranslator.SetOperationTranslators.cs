@@ -60,6 +60,11 @@ namespace nORM.Query
                 // duplicates.
                 t._isDistinct = true;
                 var source = t.Visit(node.Arguments[0]);
+                // LINQ Distinct does not preserve the source ordering, and a surviving
+                // ORDER BY over non-projected columns is invalid SQL under DISTINCT on
+                // MySQL/Postgres ("ORDER BY not in SELECT list"). Any OrderBy applied
+                // AFTER Distinct is visited later and re-populates the list.
+                t._orderBy.Clear();
                 return source;
             }
 
