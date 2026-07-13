@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Data.Sqlite;
@@ -73,7 +73,17 @@ public class SelectManyTests : TestBase
             $"{t1}.{provider.Escape("Active")}"
         });
 
-        var expected = $"SELECT {postCols} FROM {blogTable} {t0} INNER JOIN {postTable} {t1} ON {t0}.{provider.Escape("Id")} = {t1}.{provider.Escape("BlogId")}";
+        // The flatten join is wrapped as a derived table under the default alias so the
+        // child element is the query's root: downstream Select/Where/OrderBy resolve its
+        // members against T0 without knowing a join happened.
+        var flattenedCols = string.Join(", ", new[]
+        {
+            $"{t0}.{provider.Escape("Id")}",
+            $"{t0}.{provider.Escape("BlogId")}",
+            $"{t0}.{provider.Escape("Title")}",
+            $"{t0}.{provider.Escape("Active")}"
+        });
+        var expected = $"SELECT {flattenedCols} FROM (SELECT {postCols} FROM {blogTable} {t0} INNER JOIN {postTable} {t1} ON {t0}.{provider.Escape("Id")} = {t1}.{provider.Escape("BlogId")}) AS {t0}";
 
         Assert.Equal(expected, sql);
         Assert.Empty(parameters);

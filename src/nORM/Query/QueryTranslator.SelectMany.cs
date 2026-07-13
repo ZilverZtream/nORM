@@ -236,8 +236,33 @@ namespace nORM.Query
             }
             else
             {
+                // The flattened element becomes the query's root, but downstream operators
+                // (Select/Where/OrderBy/aggregates) resolve members against the DEFAULT
+                // alias — which is the OUTER table here, producing references like T0.What
+                // for a Chore column. Wrap the flatten join as a derived table under the
+                // default alias so the element genuinely is the root. Predicates
+                // accumulated so far (the outer source's Where and the navigation filter)
+                // reference the join's aliases and must fold inside the wrapper.
+                if (_where.Length > 0)
+                {
+                    _sql.Append(" WHERE ").Append(_where.ToString());
+                    _where.Clear();
+                }
+                var flattened = _sql.ToString();
+                _sql.Clear();
+                _sql.AppendSelect(ReadOnlySpan<char>.Empty);
+                for (int i = 0; i < innerMapping.Columns.Length; i++)
+                {
+                    if (i > 0) _sql.Append(", ");
+                    _sql.Append(outerAlias).Append('.').Append(innerMapping.Columns[i].EscCol);
+                }
+                _sql.Append(" FROM (").Append(flattened).Append(") AS ").Append(outerAlias);
                 _mapping = innerMapping;
                 _rootType = innerMapping.Type;
+                // Downstream operators auto-register their lambda parameters against
+                // T{_joinCounter}; the derived table collapsed the join back into the
+                // default root alias, so the counter must say so.
+                _joinCounter = 0;
             }
 
             return true;
