@@ -1,12 +1,18 @@
-{
+﻿{
   "schemaVersion": 1,
   "description": "v1 RC benchmark budgets. Ratios compare the target method to the fastest available baseline method for the same provider.",
   "rules": [
     {
       "name": "Simple runtime stays within Dapper or optimized Raw ADO range",
       "provider": "*",
-      "targetMethods": [ "Query_Simple_nORM" ],
-      "baselineMethods": [ "Query_Simple_Dapper", "Query_Simple_RawAdo_Optimized", "Query_Simple_RawAdo_TypedNoBox" ],
+      "targetMethods": [
+        "Query_Simple_nORM"
+      ],
+      "baselineMethods": [
+        "Query_Simple_Dapper",
+        "Query_Simple_RawAdo_Optimized",
+        "Query_Simple_RawAdo_TypedNoBox"
+      ],
       "maxMeanRatio": 1.5,
       "maxAllocatedRatio": 3.0,
       "required": true,
@@ -15,8 +21,14 @@
     {
       "name": "Simple compiled stays within prepared Raw ADO range",
       "provider": "*",
-      "targetMethods": [ "Query_Simple_nORM_Compiled" ],
-      "baselineMethods": [ "Query_Simple_RawAdo_PreparedOptimized", "Query_Simple_RawAdo_PreparedTypedNoBox", "Query_Simple_Dapper" ],
+      "targetMethods": [
+        "Query_Simple_nORM_Compiled"
+      ],
+      "baselineMethods": [
+        "Query_Simple_RawAdo_PreparedOptimized",
+        "Query_Simple_RawAdo_PreparedTypedNoBox",
+        "Query_Simple_Dapper"
+      ],
       "maxMeanRatio": 1.35,
       "maxAllocatedRatio": 3.0,
       "required": true,
@@ -25,8 +37,14 @@
     {
       "name": "Complex runtime stays within Dapper or optimized Raw ADO range",
       "provider": "*",
-      "targetMethods": [ "Query_Complex_nORM" ],
-      "baselineMethods": [ "Query_Complex_Dapper", "Query_Complex_RawAdo_Optimized", "Query_Complex_RawAdo_TypedNoBox" ],
+      "targetMethods": [
+        "Query_Complex_nORM"
+      ],
+      "baselineMethods": [
+        "Query_Complex_Dapper",
+        "Query_Complex_RawAdo_Optimized",
+        "Query_Complex_RawAdo_TypedNoBox"
+      ],
       "maxMeanRatio": 1.6,
       "maxAllocatedRatio": 3.0,
       "required": true,
@@ -35,8 +53,14 @@
     {
       "name": "Complex compiled stays within prepared Raw ADO range",
       "provider": "*",
-      "targetMethods": [ "Query_Complex_nORM_Compiled" ],
-      "baselineMethods": [ "Query_Complex_RawAdo_PreparedOptimized", "Query_Complex_RawAdo_PreparedTypedNoBox", "Query_Complex_Dapper" ],
+      "targetMethods": [
+        "Query_Complex_nORM_Compiled"
+      ],
+      "baselineMethods": [
+        "Query_Complex_RawAdo_PreparedOptimized",
+        "Query_Complex_RawAdo_PreparedTypedNoBox",
+        "Query_Complex_Dapper"
+      ],
       "maxMeanRatio": 1.4,
       "maxAllocatedRatio": 3.0,
       "required": true,
@@ -45,8 +69,13 @@
     {
       "name": "Compiled join stays competitive with typed Dapper and optimized Raw ADO",
       "provider": "*",
-      "targetMethods": [ "Query_Join_nORM_Compiled" ],
-      "baselineMethods": [ "Query_Join_Dapper", "Query_Join_RawAdo_Optimized" ],
+      "targetMethods": [
+        "Query_Join_nORM_Compiled"
+      ],
+      "baselineMethods": [
+        "Query_Join_Dapper",
+        "Query_Join_RawAdo_Optimized"
+      ],
       "maxMeanRatio": 1.25,
       "maxAllocatedRatio": 3.0,
       "required": true,
@@ -55,8 +84,13 @@
     {
       "name": "Runtime join stays within Dapper or optimized Raw ADO range",
       "provider": "*",
-      "targetMethods": [ "Query_Join_nORM" ],
-      "baselineMethods": [ "Query_Join_Dapper", "Query_Join_RawAdo_Optimized" ],
+      "targetMethods": [
+        "Query_Join_nORM"
+      ],
+      "baselineMethods": [
+        "Query_Join_Dapper",
+        "Query_Join_RawAdo_Optimized"
+      ],
       "maxMeanRatio": 1.5,
       "maxAllocatedRatio": 3.0,
       "required": true,
@@ -65,28 +99,43 @@
     {
       "name": "Count stays within Dapper or optimized Raw ADO range",
       "provider": "*",
-      "targetMethods": [ "Count_nORM" ],
-      "baselineMethods": [ "Count_Dapper", "Count_RawAdo_Optimized" ],
+      "targetMethods": [
+        "Count_nORM"
+      ],
+      "baselineMethods": [
+        "Count_Dapper",
+        "Count_RawAdo_Optimized"
+      ],
       "maxMeanRatio": 1.25,
       "maxAllocatedRatio": 2.0,
       "required": true,
       "rationale": "Count is a core LINQ aggregate and has a dedicated fast path. It should remain within a tight 1.25x budget against typed Dapper or optimized Raw ADO for the same provider, and preferably beat them on providers where pooled scalar execution is effective."
     },
     {
-      "name": "Single insert stays within Raw ADO, Dapper, or EF range",
+      "name": "Single insert stays within Raw ADO or Dapper range",
       "provider": "*",
-      "targetMethods": [ "Insert_Single_nORM" ],
-      "baselineMethods": [ "Insert_Single_RawAdo", "Insert_Single_Dapper", "Insert_Single_EfCore" ],
+      "targetMethods": [
+        "Insert_Single_nORM"
+      ],
+      "baselineMethods": [
+        "Insert_Single_RawAdo",
+        "Insert_Single_Dapper"
+      ],
       "maxMeanRatio": 1.25,
       "maxAllocatedRatio": 2.0,
       "required": true,
-      "rationale": "Single-row inserts are a public unit-of-work path and were a prior SQL Server regression cluster. The 1.25x ceiling allows provider roundtrip variance while ensuring nORM stays competitive with the fastest comparable raw ADO, Dapper, or EF Core insert for the same provider and keeps allocation below the general-purpose ORM baselines."
+      "rationale": "Single-row inserts are a public unit-of-work path and were a prior SQL Server regression cluster. The 1.25x ceiling allows provider roundtrip variance while ensuring nORM stays competitive with the fastest raw-path insert (Raw ADO or Dapper) doing the same wire work for the same provider, and keeps allocation below the general-purpose baselines. EF Core is deliberately NOT a baseline here: its SaveChanges pipeline measures bimodally on shared-server MySQL (observed mean 2.7ms with median 1.8ms and SD 1.7ms against a 5.3ms raw-ADO round-trip floor), and a lucky-window EF mean fails even Raw ADO itself by 2x. EF remains in the benchmark suite for reporting."
     },
     {
       "name": "BulkInsertAsync stays within EF or Dapper transaction range",
       "provider": "*",
-      "targetMethods": [ "BulkInsert_Idiomatic_nORM" ],
-      "baselineMethods": [ "BulkInsert_Idiomatic_EfCore", "BulkInsert_Idiomatic_Dapper" ],
+      "targetMethods": [
+        "BulkInsert_Idiomatic_nORM"
+      ],
+      "baselineMethods": [
+        "BulkInsert_Idiomatic_EfCore",
+        "BulkInsert_Idiomatic_Dapper"
+      ],
       "maxMeanRatio": 1.0,
       "maxAllocatedRatio": 2.0,
       "required": true,
@@ -95,8 +144,12 @@
     {
       "name": "Native bulk insert is not slower than batched when available",
       "provider": "*",
-      "targetMethods": [ "BulkInsert_Native_nORM" ],
-      "baselineMethods": [ "BulkInsert_Batched_nORM" ],
+      "targetMethods": [
+        "BulkInsert_Native_nORM"
+      ],
+      "baselineMethods": [
+        "BulkInsert_Batched_nORM"
+      ],
       "maxMeanRatio": 1.0,
       "maxAllocatedRatio": 2.0,
       "required": false,
