@@ -78,7 +78,8 @@ public class CrudStateMachineFuzzLiveTests
             CREATE TABLE RelChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, Val INT NOT NULL);
             CREATE TABLE OccFuzz_Test (Id INT PRIMARY KEY, Val INT NOT NULL, Token VARBINARY(8));
             CREATE TABLE MixTok_Test (Id INT PRIMARY KEY, Val INT NOT NULL, Token VARBINARY(8));
-            CREATE TABLE MixPlain_Test (Id INT PRIMARY KEY, Val INT NOT NULL)
+            CREATE TABLE MixPlain_Test (Id INT PRIMARY KEY, Val INT NOT NULL);
+            CREATE TABLE BulkCud_Test (Id INT PRIMARY KEY, IntVal INT NOT NULL, Name VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL, Flag TINYINT(1) NOT NULL)
             """,
         "postgres" => """
             CREATE TABLE "MutRow_Test" ("Id" INT PRIMARY KEY, "IntVal" INT NOT NULL, "Name" TEXT NOT NULL, "Amount" DECIMAL(18,6) NOT NULL, "Flag" BOOLEAN NOT NULL);
@@ -87,7 +88,8 @@ public class CrudStateMachineFuzzLiveTests
             CREATE TABLE "RelChild_Test" ("Id" INT PRIMARY KEY, "ParentId" INT NOT NULL, "Val" INT NOT NULL);
             CREATE TABLE "OccFuzz_Test" ("Id" INT PRIMARY KEY, "Val" INT NOT NULL, "Token" BYTEA);
             CREATE TABLE "MixTok_Test" ("Id" INT PRIMARY KEY, "Val" INT NOT NULL, "Token" BYTEA);
-            CREATE TABLE "MixPlain_Test" ("Id" INT PRIMARY KEY, "Val" INT NOT NULL)
+            CREATE TABLE "MixPlain_Test" ("Id" INT PRIMARY KEY, "Val" INT NOT NULL);
+            CREATE TABLE "BulkCud_Test" ("Id" INT PRIMARY KEY, "IntVal" INT NOT NULL, "Name" TEXT NOT NULL, "Flag" BOOLEAN NOT NULL)
             """,
         _ => """
             CREATE TABLE MutRow_Test (Id INT PRIMARY KEY, IntVal INT NOT NULL, Name NVARCHAR(64) NOT NULL, Amount DECIMAL(18,6) NOT NULL, Flag BIT NOT NULL);
@@ -96,7 +98,8 @@ public class CrudStateMachineFuzzLiveTests
             CREATE TABLE RelChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, Val INT NOT NULL);
             CREATE TABLE OccFuzz_Test (Id INT PRIMARY KEY, Val INT NOT NULL, Token ROWVERSION);
             CREATE TABLE MixTok_Test (Id INT PRIMARY KEY, Val INT NOT NULL, Token ROWVERSION);
-            CREATE TABLE MixPlain_Test (Id INT PRIMARY KEY, Val INT NOT NULL)
+            CREATE TABLE MixPlain_Test (Id INT PRIMARY KEY, Val INT NOT NULL);
+            CREATE TABLE BulkCud_Test (Id INT PRIMARY KEY, IntVal INT NOT NULL, Name NVARCHAR(64) NOT NULL, Flag BIT NOT NULL)
             """,
     };
 
@@ -106,7 +109,8 @@ public class CrudStateMachineFuzzLiveTests
             DROP TABLE IF EXISTS "MutRow_Test"; DROP TABLE IF EXISTS "MutGen_Test";
             DROP TABLE IF EXISTS "RelParent_Test"; DROP TABLE IF EXISTS "RelChild_Test";
             DROP TABLE IF EXISTS "OccFuzz_Test";
-            DROP TABLE IF EXISTS "MixTok_Test"; DROP TABLE IF EXISTS "MixPlain_Test"
+            DROP TABLE IF EXISTS "MixTok_Test"; DROP TABLE IF EXISTS "MixPlain_Test";
+            DROP TABLE IF EXISTS "BulkCud_Test"
             """,
         "sqlserver" => """
             IF OBJECT_ID('MutRow_Test') IS NOT NULL DROP TABLE MutRow_Test;
@@ -115,13 +119,15 @@ public class CrudStateMachineFuzzLiveTests
             IF OBJECT_ID('RelChild_Test') IS NOT NULL DROP TABLE RelChild_Test;
             IF OBJECT_ID('OccFuzz_Test') IS NOT NULL DROP TABLE OccFuzz_Test;
             IF OBJECT_ID('MixTok_Test') IS NOT NULL DROP TABLE MixTok_Test;
-            IF OBJECT_ID('MixPlain_Test') IS NOT NULL DROP TABLE MixPlain_Test
+            IF OBJECT_ID('MixPlain_Test') IS NOT NULL DROP TABLE MixPlain_Test;
+            IF OBJECT_ID('BulkCud_Test') IS NOT NULL DROP TABLE BulkCud_Test
             """,
         _ => """
             DROP TABLE IF EXISTS MutRow_Test; DROP TABLE IF EXISTS MutGen_Test;
             DROP TABLE IF EXISTS RelParent_Test; DROP TABLE IF EXISTS RelChild_Test;
             DROP TABLE IF EXISTS OccFuzz_Test;
-            DROP TABLE IF EXISTS MixTok_Test; DROP TABLE IF EXISTS MixPlain_Test
+            DROP TABLE IF EXISTS MixTok_Test; DROP TABLE IF EXISTS MixPlain_Test;
+            DROP TABLE IF EXISTS BulkCud_Test
             """,
     };
 
@@ -166,6 +172,10 @@ public class CrudStateMachineFuzzLiveTests
                 ? "DELETE FROM \"MixTok_Test\"; DELETE FROM \"MixPlain_Test\""
                 : "DELETE FROM MixTok_Test; DELETE FROM MixPlain_Test");
             await MixedTokenOccFuzzTests.RunMixedOccMachineAsync(OpenMixCtx, mixInjector, seed: 42, steps: 100);
+
+            await BulkCudOracleFuzzTests.RunBulkCudMachineAsync(OpenCtx, seed: 20260714, steps: 80);
+            Exec(factory!, kind == "postgres" ? "DELETE FROM \"BulkCud_Test\"" : "DELETE FROM BulkCud_Test");
+            await BulkCudOracleFuzzTests.RunBulkCudMachineAsync(OpenCtx, seed: 42, steps: 80);
         }
         finally
         {
