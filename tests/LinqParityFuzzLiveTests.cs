@@ -136,6 +136,8 @@ public class LinqParityFuzzLiveTests
             LinqParityFuzzTests.RunNavFlattenFuzz(ctx, seed: 42, cases: 80);
             LinqParityFuzzTests.RunSetOpFuzz(ctx, seed: 20260713, cases: 80);
             LinqParityFuzzTests.RunSetOpFuzz(ctx, seed: 42, cases: 80);
+            LinqParityFuzzTests.RunKeyedOpFuzz(ctx, seed: 20260713, cases: 70);
+            LinqParityFuzzTests.RunKeyedOpFuzz(ctx, seed: 42, cases: 70);
         }
         finally
         {

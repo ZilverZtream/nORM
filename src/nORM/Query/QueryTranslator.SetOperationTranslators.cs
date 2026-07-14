@@ -318,7 +318,14 @@ namespace nORM.Query
                         var okVisitor = FastExpressionVisitorPool.Get(in vctxOk);
                         var okSql = okVisitor.Translate(keyLambda.Body);
                         FastExpressionVisitorPool.Return(okVisitor);
-                        t._orderBy.Add((okSql, !asc));
+                        // Re-derived keys need the same treatment the forward OrderBy
+                        // applied: null rank (flip-safe — rank and key flip together)
+                        // and the TEXT-storage value coercions.
+                        var okType = keyLambda.Body.Type;
+                        if (t._provider.RequiresExplicitNullOrderingForNullableKeys
+                            && (!okType.IsValueType || Nullable.GetUnderlyingType(okType) != null))
+                            t._orderBy.Add(($"({okSql} IS NOT NULL)", !asc));
+                        t._orderBy.Add((t.CoerceOrderKeySql(okSql, okType), !asc));
                     }
                 }
                 else

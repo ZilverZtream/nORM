@@ -122,22 +122,24 @@ public class LinqMinByMaxByTests : IAsyncLifetime
         Assert.Equal(30, row.IntVal);
     }
 
-    // ── 7: MinBy empty throws ─────────────────────────────────────────────────
+    // ── 7: MinBy empty returns null ───────────────────────────────────────────
+    // LINQ MinBy/MaxBy return null for an empty sequence of reference-type
+    // elements; only non-nullable value types throw.
 
     [Fact]
-    public async Task MinBy_on_empty_sequence_throws_InvalidOperationException()
+    public async Task MinBy_on_empty_sequence_returns_null_for_reference_elements()
     {
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ctx.Query<MbRow>().Where(r => r.IntVal > 9999).MinByAsync(r => r.IntVal));
+        var row = await _ctx.Query<MbRow>().Where(r => r.IntVal > 9999).MinByAsync(r => r.IntVal);
+        Assert.Null(row);
     }
 
-    // ── 8: MaxBy empty throws ─────────────────────────────────────────────────
+    // ── 8: MaxBy empty returns null ───────────────────────────────────────────
 
     [Fact]
-    public async Task MaxBy_on_empty_sequence_throws_InvalidOperationException()
+    public async Task MaxBy_on_empty_sequence_returns_null_for_reference_elements()
     {
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ctx.Query<MbRow>().Where(r => r.IntVal > 9999).MaxByAsync(r => r.IntVal));
+        var row = await _ctx.Query<MbRow>().Where(r => r.IntVal > 9999).MaxByAsync(r => r.IntVal);
+        Assert.Null(row);
     }
 
     // ── 9: MinBy result is different from MaxBy result ────────────────────────

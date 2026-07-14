@@ -85,7 +85,14 @@ namespace nORM.Query
                     {
                         result = plan.MethodName switch
                         {
-                            "First" or "MinBy" or "MaxBy" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            "First" => list.Count > 0 ? list[0] : throw new InvalidOperationException("Sequence contains no elements"),
+                            // LINQ MinBy/MaxBy return null for an empty sequence of reference-type
+                            // or nullable elements; only non-nullable value types throw.
+                            "MinBy" or "MaxBy" => list.Count > 0
+                                ? list[0]
+                                : plan.ElementType.IsValueType && Nullable.GetUnderlyingType(plan.ElementType) == null
+                                    ? throw new InvalidOperationException("Sequence contains no elements")
+                                    : null,
                             "FirstOrDefault" => list.Count > 0 ? list[0] : null,
                             "Single" => list.Count == 1 ? list[0] : list.Count == 0 ? throw new InvalidOperationException("Sequence contains no elements") : throw new InvalidOperationException("Sequence contains more than one element"),
                             "SingleOrDefault" => list.Count == 0 ? null : list.Count == 1 ? list[0] : throw new InvalidOperationException("Sequence contains more than one element"),

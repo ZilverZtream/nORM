@@ -69,13 +69,27 @@ namespace nORM.Query
                 if (keyLambda.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                 {
                     foreach (var arg in newKey.Arguments)
-                        parts.Add(BuildSql(t, keyLambda.Parameters[0], arg, mapping, alias));
+                        parts.Add(OrdinalPartitionKey(t, BuildSql(t, keyLambda.Parameters[0], arg, mapping, alias), arg.Type));
                 }
                 else
                 {
-                    parts.Add(BuildSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias));
+                    parts.Add(OrdinalPartitionKey(t, BuildSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias), keyLambda.Body.Type));
                 }
                 return string.Join(", ", parts);
+            }
+
+            /// <summary>
+            /// C# keyed operators compare string keys ordinally, but PARTITION BY on a
+            /// CI-collation provider partitions by the column collation — fusing
+            /// "abc"/"ABC" into one group. Wrap string keys in the value-preserving
+            /// binary collation; identity elsewhere.
+            /// </summary>
+            internal static string OrdinalPartitionKey(QueryTranslator t, string sql, Type keyType)
+            {
+                var underlying = Nullable.GetUnderlyingType(keyType) ?? keyType;
+                if (underlying == typeof(string) && t._provider.DefaultStringEqualityIsCaseInsensitive)
+                    return t._provider.ForceCaseSensitiveStringComparison(sql);
+                return sql;
             }
 
             private static List<(string col, bool asc)> BuildDistinctByOrderSql(
@@ -268,11 +282,11 @@ namespace nORM.Query
                 if (keyLambda.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                 {
                     foreach (var arg in newKey.Arguments)
-                        parts.Add(BuildUnionSql(t, keyLambda.Parameters[0], arg, mapping, alias));
+                        parts.Add(DistinctByTranslator.OrdinalPartitionKey(t, BuildUnionSql(t, keyLambda.Parameters[0], arg, mapping, alias), arg.Type));
                 }
                 else
                 {
-                    parts.Add(BuildUnionSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias));
+                    parts.Add(DistinctByTranslator.OrdinalPartitionKey(t, BuildUnionSql(t, keyLambda.Parameters[0], keyLambda.Body, mapping, alias), keyLambda.Body.Type));
                 }
                 return string.Join(", ", parts);
             }

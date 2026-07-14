@@ -304,6 +304,7 @@ public class LinqParityFuzzTests
         RunSelectManyFuzz(ctx, seed, cases: 120);
         RunNavFlattenFuzz(ctx, seed, cases: 120);
         RunSetOpFuzz(ctx, seed, cases: 120);
+        RunKeyedOpFuzz(ctx, seed, cases: 100);
     }
 
     /// <summary>
@@ -679,6 +680,114 @@ public class LinqParityFuzzTests
 
         Assert.True(unsupported < cases / 5,
             $"{unsupported}/{cases} join shapes were declined as unsupported (seed {seed}).");
+    }
+
+    /// <summary>
+    /// Runs generated keyed-operator shapes (DistinctBy, UnionBy with a local
+    /// second sequence, ExceptBy/IntersectBy with local key sequences, and
+    /// MinBy/MaxBy) against the context and the LINQ-to-Objects oracle. Sources
+    /// are ordered by Id so first-per-key representative selection is
+    /// deterministic on both systems; MinBy/MaxBy compare the winning KEY (ties
+    /// make the winning element unspecified in SQL).
+    /// </summary>
+    internal static void RunKeyedOpFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var unsupported = 0;
+
+        for (var i = 0; i < cases; i++)
+        {
+            var predicate = GeneratePredicate(rng);
+            var kind = rng.Next(5);
+            var caseRng = new Random(rng.Next());
+
+            IQueryable<Row> a = ctx.Query<Row>().Where(predicate).OrderBy(r => r.Id);
+            IQueryable<Row> oa = Rows.AsQueryable().Where(predicate).OrderBy(r => r.Id);
+
+            try
+            {
+                switch (kind)
+                {
+                    case 0: // DistinctBy int key — first element per key in source order
+                    {
+                        var db = a.DistinctBy(r => r.IntVal).ToList().Select(r => (r.Id, r.IntVal)).OrderBy(x => x).ToList();
+                        var oracle = oa.DistinctBy(r => r.IntVal).ToList().Select(r => (r.Id, r.IntVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"DistinctBy int mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: [{string.Join(" ", db)}]\noracle: [{string.Join(" ", oracle)}]");
+                        break;
+                    }
+                    case 1: // DistinctBy nullable string key (null key group + ordinal case variants)
+                    {
+                        var db = a.DistinctBy(r => r.Nick).ToList().Select(r => (r.Id, r.Nick)).OrderBy(x => x.Id).ToList();
+                        var oracle = oa.DistinctBy(r => r.Nick).ToList().Select(r => (r.Id, r.Nick)).OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"DistinctBy string mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: [{string.Join(" ", db)}]\noracle: [{string.Join(" ", oracle)}]");
+                        break;
+                    }
+                    case 2: // UnionBy with a local second sequence
+                    {
+                        var locals = Rows.Skip(caseRng.Next(0, 25)).Take(caseRng.Next(1, 12)).ToList();
+                        var db = a.UnionBy(locals, r => r.IntVal).ToList().Select(r => (r.Id, r.IntVal)).OrderBy(x => x).ToList();
+                        var oracle = oa.UnionBy(locals, r => r.IntVal).ToList().Select(r => (r.Id, r.IntVal)).OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"UnionBy mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: [{string.Join(" ", db)}]\noracle: [{string.Join(" ", oracle)}]");
+                        break;
+                    }
+                    case 3: // ExceptBy / IntersectBy with local key sequences (int or case-variant string keys)
+                    {
+                        var except = caseRng.Next(2) == 0;
+                        if (caseRng.Next(2) == 0)
+                        {
+                            var keys = new[] { caseRng.Next(-3, 4), caseRng.Next(-3, 4), caseRng.Next(-3, 4) };
+                            var db = (except ? a.ExceptBy(keys, r => r.IntVal) : a.IntersectBy(keys, r => r.IntVal))
+                                .ToList().Select(r => (r.Id, r.IntVal)).OrderBy(x => x).ToList();
+                            var oracle = (except ? oa.ExceptBy(keys, r => r.IntVal) : oa.IntersectBy(keys, r => r.IntVal))
+                                .ToList().Select(r => (r.Id, r.IntVal)).OrderBy(x => x).ToList();
+                            Assert.True(db.SequenceEqual(oracle),
+                                $"{(except ? "ExceptBy" : "IntersectBy")} int mismatch seed={seed} case={i} keys=[{string.Join(",", keys)}]\npredicate: {predicate}\ndb: [{string.Join(" ", db)}]\noracle: [{string.Join(" ", oracle)}]");
+                        }
+                        else
+                        {
+                            var pool = new[] { "alpha", "ALPHA", "beta", "b", "Gamma", "" };
+                            var keys = new[] { pool[caseRng.Next(pool.Length)], pool[caseRng.Next(pool.Length)] };
+                            var db = (except ? a.ExceptBy(keys, r => r.Nick) : a.IntersectBy(keys, r => r.Nick))
+                                .ToList().Select(r => (r.Id, r.Nick)).OrderBy(x => x.Id).ToList();
+                            var oracle = (except ? oa.ExceptBy(keys, r => r.Nick) : oa.IntersectBy(keys, r => r.Nick))
+                                .ToList().Select(r => (r.Id, r.Nick)).OrderBy(x => x.Id).ToList();
+                            Assert.True(db.SequenceEqual(oracle),
+                                $"{(except ? "ExceptBy" : "IntersectBy")} string mismatch seed={seed} case={i} keys=[{string.Join(",", keys)}]\npredicate: {predicate}\ndb: [{string.Join(" ", db)}]\noracle: [{string.Join(" ", oracle)}]");
+                        }
+                        break;
+                    }
+                    default: // MinBy / MaxBy — compare the winning key
+                    {
+                        var max = caseRng.Next(2) == 0;
+                        var dbRow = max ? a.MaxBy(r => r.Amount) : a.MinBy(r => r.Amount);
+                        var orRow = max ? oa.MaxBy(r => r.Amount) : oa.MinBy(r => r.Amount);
+                        Assert.True((dbRow == null) == (orRow == null),
+                            $"{(max ? "MaxBy" : "MinBy")} null mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: {dbRow?.Id.ToString() ?? "null"} oracle: {orRow?.Id.ToString() ?? "null"}");
+                        if (dbRow != null && orRow != null)
+                        {
+                            Assert.True(dbRow.Amount == orRow.Amount,
+                                $"{(max ? "MaxBy" : "MinBy")} key mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: {dbRow.Amount} oracle: {orRow.Amount}");
+                        }
+                        break;
+                    }
+                }
+            }
+            catch (NormUnsupportedFeatureException)
+            {
+                unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"keyed-op shape threw (seed={seed} case={i} kind={kind})\npredicate: {predicate}", ex);
+            }
+        }
+
+        Assert.True(unsupported < cases / 4,
+            $"{unsupported}/{cases} keyed-op shapes were declined as unsupported (seed {seed}).");
     }
 
     private static IQueryable<T> ApplySetOp<T>(IQueryable<T> a, IQueryable<T> b, int op) => op switch

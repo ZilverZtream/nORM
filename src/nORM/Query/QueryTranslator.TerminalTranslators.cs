@@ -436,7 +436,16 @@ namespace nORM.Query
                     if (t._params.Count > t._parameterManager.Index)
                         t._parameterManager.Index = t._params.Count;
                     FastExpressionVisitorPool.Return(visitor);
-                    t._orderBy.Add((keySql, ascending));
+                    // Same ordering-key treatment as OrderByTranslator: nullable keys
+                    // rank nulls first on providers that default nulls-last (C# treats
+                    // null as the smallest key), and TEXT-stored decimal/TimeSpan/DTO
+                    // keys coerce to value ordering — a raw decimal key made MinBy
+                    // return the LEXICAL minimum on SQLite.
+                    var keyType = keySelector.Body.Type;
+                    if (t._provider.RequiresExplicitNullOrderingForNullableKeys
+                        && (!keyType.IsValueType || Nullable.GetUnderlyingType(keyType) != null))
+                        t._orderBy.Add(($"({keySql} IS NOT NULL)", ascending));
+                    t._orderBy.Add((t.CoerceOrderKeySql(keySql, keyType), ascending));
                 }
                 t._take = 1;
                 var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;

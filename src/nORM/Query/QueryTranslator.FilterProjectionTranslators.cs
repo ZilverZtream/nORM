@@ -502,6 +502,24 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Type-sensitive ordering-key normalization shared by every ORDER-BY-emitting
+        /// site (OrderBy/ThenBy, MinBy/MaxBy, windowed Reverse). Decimal, TimeSpan,
+        /// and DateTimeOffset store as TEXT on SQLite and mis-sort lexically; the
+        /// provider hooks coerce to numeric/instant ordering (identity on providers
+        /// with native types). Plain DateTime is deliberately not coerced — its
+        /// fixed-width offset-free text sorts chronologically, and wrapping it in
+        /// datetime() would overflow on DateTime.MaxValue's .9999999 fraction.
+        /// </summary>
+        private string CoerceOrderKeySql(string sql, Type keyType)
+        {
+            var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
+            if (u == typeof(decimal)) return _provider.NormalizeDecimalForCompare(sql);
+            if (u == typeof(TimeSpan)) return _provider.NormalizeTimeSpanForCompare(sql);
+            if (u == typeof(DateTimeOffset)) return _provider.NormalizeDateTimeOffsetForCompare(sql);
+            return sql;
+        }
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class OrderByTranslator : IMethodCallTranslator
@@ -759,14 +777,7 @@ namespace nORM.Query
                     // already sorts by instant). Plain DateTime is deliberately NOT coerced: its
                     // fixed-width offset-free text already sorts chronologically, and wrapping it in
                     // datetime() would overflow on DateTime.MaxValue's .9999999 fraction.
-                    string CoerceOrderKey(string sql, Type keyType)
-                    {
-                        var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
-                        if (u == typeof(decimal)) return t._provider.NormalizeDecimalForCompare(sql);
-                        if (u == typeof(TimeSpan)) return t._provider.NormalizeTimeSpanForCompare(sql);
-                        if (u == typeof(DateTimeOffset)) return t._provider.NormalizeDateTimeOffsetForCompare(sql);
-                        return sql;
-                    }
+                    string CoerceOrderKey(string sql, Type keyType) => t.CoerceOrderKeySql(sql, keyType);
                     // C# sorts null keys as SMALLEST (first ascending, last descending). PostgreSQL
                     // defaults to the opposite, so nullable keys there get a leading null-rank
                     // entry `(key IS NOT NULL)` with the same direction — false(null) < true, and
