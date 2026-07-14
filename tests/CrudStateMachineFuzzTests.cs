@@ -398,6 +398,7 @@ public class CrudStateMachineFuzzTests
         [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
         public int ParentId { get; set; }
         public int Val { get; set; }
+        public RelParent? Parent { get; set; }
     }
 
     /// <summary>
@@ -466,17 +467,25 @@ public class CrudStateMachineFuzzTests
         // context-tracked, so FK edits target only tracked children, and undoing
         // a pending nav child means removing it from the parent's collection.
         var pendingNavChildren = new Dictionary<int, int>(); // childId -> parentId
+        // Reference-navigation windows since the last save: FK edits and nav
+        // retargets are mutually exclusive per child per window (the fixup
+        // contract resolves conflicts by "deliberate FK edit outranks stale
+        // nav", which the machine tests deliberately, not accidentally).
+        var fkEdited = new HashSet<int>();
+        var navRetargeted = new HashSet<int>();
+        var pendingRefChildren = new HashSet<int>();
+        var pendingPrincipals = new HashSet<int>();
         var nextParentKey = 1;
         var nextChildKey = 1;
         var trace = new List<string>();
-        string Tail() => "\nops:\n" + string.Join("\n", trace.TakeLast(50));
+        string Tail() => "\nops:\n" + string.Join("\n", trace);
 
         var ctx = openCtx();
         try
         {
             for (var step = 0; step < steps; step++)
             {
-                switch (rng.Next(12))
+                switch (rng.Next(15))
                 {
                     case 0: // add a childless parent
                     {
@@ -540,17 +549,23 @@ public class CrudStateMachineFuzzTests
                         trace.Add($"{step}: direct add child {ck} -> parent {pk}");
                         break;
                     }
-                    case 6: // FK edit: move a CONTEXT-tracked child to another parent
+                    case 6: // FK edit: move a CONTEXT-tracked child to another parent.
+                            // A stale Parent navigation may still point at the old
+                            // principal — the deliberately edited FK must outrank it.
                     {
                         if (parents.Count == 0) break;
                         var editable = trackedChildren.Keys
-                            .Where(ck => children.ContainsKey(ck) && !pendingNavChildren.ContainsKey(ck))
+                            .Where(ck => children.ContainsKey(ck)
+                                && !pendingNavChildren.ContainsKey(ck)
+                                && !pendingRefChildren.Contains(ck)
+                                && !navRetargeted.Contains(ck))
                             .ToList();
                         if (editable.Count == 0) break;
                         var ckEdit = editable[rng.Next(editable.Count)];
                         var pk = parents.Keys.ElementAt(rng.Next(parents.Count));
                         trackedChildren[ckEdit].ParentId = pk;
                         children[ckEdit] = (pk, children[ckEdit].Val);
+                        fkEdited.Add(ckEdit);
                         trace.Add($"{step}: fk edit child {ckEdit} -> parent {pk}");
                         break;
                     }
@@ -559,6 +574,9 @@ public class CrudStateMachineFuzzTests
                         if (trackedChildren.Count == 0) break;
                         var ck = trackedChildren.Keys.ElementAt(rng.Next(trackedChildren.Count));
                         if (!children.ContainsKey(ck)) break;
+                        // A pending ref-nav child carries its principal's discovery;
+                        // removing it pre-save would strand the modelled principal.
+                        if (pendingRefChildren.Contains(ck)) break;
                         if (pendingNavChildren.TryGetValue(ck, out var navParent))
                         {
                             if (trackedParents.TryGetValue(navParent, out var parent))
@@ -578,7 +596,9 @@ public class CrudStateMachineFuzzTests
                     case 8: // delete a childless tracked parent
                     {
                         var childless = trackedParents.Keys
-                            .Where(pk => parents.ContainsKey(pk) && !children.Values.Any(c => c.ParentId == pk))
+                            .Where(pk => parents.ContainsKey(pk)
+                                && !pendingPrincipals.Contains(pk)
+                                && !children.Values.Any(c => c.ParentId == pk))
                             .ToList();
                         if (childless.Count == 0) break;
                         var pk = childless[rng.Next(childless.Count)];
@@ -592,13 +612,21 @@ public class CrudStateMachineFuzzTests
                     {
                         await ctx.SaveChangesAsync();
                         pendingNavChildren.Clear();
+                        fkEdited.Clear();
+                        navRetargeted.Clear();
+                        pendingRefChildren.Clear();
+                        pendingPrincipals.Clear();
                         committedParents = new Dictionary<int, string>(parents);
                         committedChildren = new Dictionary<int, (int, int)>(children);
                         trace.Add($"{step}: save");
-                        await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} step={step} (after save){Tail()}");
+                        // Verify through a throwaway context: the main context's
+                        // identity map would return tracked instances (in-memory
+                        // values), not what actually reached the database.
+                        using (var verifyCtx = openCtx())
+                            await VerifyRelAsync(verifyCtx, committedParents, committedChildren, $"seed={seed} step={step} (after save){Tail()}");
                         break;
                     }
-                    default: // discard
+                    case 11: // discard
                     {
                         ctx.Dispose();
                         parents = new Dictionary<int, string>(committedParents);
@@ -606,6 +634,10 @@ public class CrudStateMachineFuzzTests
                         trackedParents.Clear();
                         trackedChildren.Clear();
                         pendingNavChildren.Clear();
+                        fkEdited.Clear();
+                        navRetargeted.Clear();
+                        pendingRefChildren.Clear();
+                        pendingPrincipals.Clear();
                         ctx = openCtx();
                         trace.Add($"{step}: discard");
                         await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} step={step} (fresh context after discard){Tail()}");
@@ -613,6 +645,60 @@ public class CrudStateMachineFuzzTests
                             trackedParents[p.Id] = p;
                         foreach (var c in await ctx.Query<RelChild>().ToListAsync())
                             trackedChildren[c.Id] = c;
+                        break;
+                    }
+                    case 12: // reference-nav add: child linked via Parent to a tracked principal
+                    {
+                        var candidates = trackedParents.Keys.Where(pk => parents.ContainsKey(pk)).ToList();
+                        if (candidates.Count == 0) break;
+                        var pk = candidates[rng.Next(candidates.Count)];
+                        var ck = nextChildKey++;
+                        var val = rng.Next(-50, 50);
+                        var child = new RelChild { Id = ck, Val = val, Parent = trackedParents[pk] };
+                        ctx.Add(child);
+                        trackedChildren[ck] = child;
+                        pendingRefChildren.Add(ck);
+                        children[ck] = (pk, val);
+                        trace.Add($"{step}: refnav add child {ck} -> parent {pk}");
+                        break;
+                    }
+                    case 13: // nav retarget: point a saved child's Parent at another principal
+                             // (FK scalar is stale-unchanged, so the navigation drives the move)
+                    {
+                        var candidates = trackedChildren.Keys
+                            .Where(ck => children.ContainsKey(ck)
+                                && !pendingNavChildren.ContainsKey(ck)
+                                && !pendingRefChildren.Contains(ck)
+                                && !fkEdited.Contains(ck))
+                            .ToList();
+                        var targets = trackedParents.Keys
+                            .Where(pk => parents.ContainsKey(pk) && !pendingPrincipals.Contains(pk))
+                            .ToList();
+                        if (candidates.Count == 0 || targets.Count == 0) break;
+                        var ck = candidates[rng.Next(candidates.Count)];
+                        var pk = targets[rng.Next(targets.Count)];
+                        trackedChildren[ck].Parent = trackedParents[pk];
+                        children[ck] = (pk, children[ck].Val);
+                        navRetargeted.Add(ck);
+                        trace.Add($"{step}: nav retarget child {ck} -> parent {pk}");
+                        break;
+                    }
+                    default: // reference-nav add with an UNTRACKED new principal (graph discovery)
+                    {
+                        var pk = nextParentKey++;
+                        var name = NamePool[rng.Next(NamePool.Length)];
+                        var principal = new RelParent { Id = pk, Name = name }; // never ctx.Add'ed
+                        var ck = nextChildKey++;
+                        var val = rng.Next(-50, 50);
+                        var child = new RelChild { Id = ck, Val = val, Parent = principal };
+                        ctx.Add(child);
+                        trackedParents[pk] = principal;
+                        trackedChildren[ck] = child;
+                        pendingPrincipals.Add(pk);
+                        pendingRefChildren.Add(ck);
+                        parents[pk] = name;
+                        children[ck] = (pk, val);
+                        trace.Add($"{step}: refnav add child {ck} -> NEW principal {pk}");
                         break;
                     }
                 }

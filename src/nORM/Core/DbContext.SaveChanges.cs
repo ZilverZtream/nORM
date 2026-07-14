@@ -644,7 +644,21 @@ namespace nORM.Core
                     if (fk.IsKey)
                         continue;
                     if (entry.HasColumnValueChanged(fk))
+                    {
+                        // The deliberately edited FK outranks the stale navigation —
+                        // and the navigation must be reconciled NOW: left pointing at
+                        // the old principal, it would silently re-assert itself on
+                        // the NEXT save, where the accepted baseline equals the
+                        // edited FK and the edit is no longer visible. Point it at
+                        // the tracked principal the FK now references, or null it.
+                        var editedFk = fk.Getter(dependent);
+                        object? editedPrincipal = editedFk != null
+                            ? ChangeTracker.GetEntryByKey(principalMap.Type, editedFk)?.Entity
+                            : null;
+                        try { navProp.SetValue(dependent, editedPrincipal); }
+                        catch { /* read-only navigation — leave the stale reference */ }
                         continue;
+                    }
                     entry.State = EntityState.Modified;
                     entry.MarkExplicitlyModified();
                 }

@@ -480,6 +480,17 @@ namespace nORM.Core
             _entriesByReference.TryGetValue(entity, out var entry) ? entry : null;
 
         /// <summary>
+        /// Returns the tracked entry for the given entity type and primary key value,
+        /// or null. Relationship fixup uses this to re-point a stale navigation at
+        /// the principal a deliberately edited FK now references.
+        /// </summary>
+        internal EntityEntry? GetEntryByKey(Type entityType, object key) =>
+            _entriesByKey.TryGetValue(entityType, out var typeEntries)
+                && typeEntries.TryGetValue(key, out var entry)
+                ? entry
+                : null;
+
+        /// <summary>
         /// Detects changes only for entities that were explicitly marked dirty via
         /// <see cref="MarkDirty"/>. For snapshot-based detection of all non-INPC entities,
         /// use <see cref="DetectAllChanges"/> (called internally from SaveChanges).
