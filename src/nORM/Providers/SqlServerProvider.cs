@@ -200,7 +200,7 @@ namespace nORM.Providers
         /// With an offset (ElementAt) it uses <c>OFFSET n ROWS FETCH NEXT 1 ROWS ONLY</c>, which
         /// relies on the inner ORDER BY the ElementAt path guarantees.
         /// </summary>
-        public override string BuildScalarLimitedSubquery(string innerSelectSql, string? offsetSql)
+        internal override string BuildScalarLimitedSubquery(string innerSelectSql, string? offsetSql)
         {
             if (offsetSql != null)
                 return $"({innerSelectSql} OFFSET {offsetSql} ROWS FETCH NEXT 1 ROWS ONLY)";

@@ -248,7 +248,7 @@ namespace nORM.Providers
         /// default appends <c>LIMIT 1</c> (SQLite/PostgreSQL/MySQL); SQL Server overrides with an
         /// injected <c>TOP 1</c>.
         /// </summary>
-        public virtual string BuildScalarLimitedSubquery(string innerSelectSql)
+        internal virtual string BuildScalarLimitedSubquery(string innerSelectSql)
             => BuildScalarLimitedSubquery(innerSelectSql, null);
 
         /// <summary>
@@ -257,7 +257,7 @@ namespace nORM.Providers
         /// <c>LIMIT 1 OFFSET n</c>; SQL Server overrides with <c>OFFSET n ROWS FETCH NEXT 1 ROWS ONLY</c>
         /// (which requires the inner ORDER BY the caller guarantees for ElementAt).
         /// </summary>
-        public virtual string BuildScalarLimitedSubquery(string innerSelectSql, string? offsetSql)
+        internal virtual string BuildScalarLimitedSubquery(string innerSelectSql, string? offsetSql)
             => offsetSql == null
                 ? $"({innerSelectSql} LIMIT 1)"
                 : $"({innerSelectSql} LIMIT 1 OFFSET {offsetSql})";
