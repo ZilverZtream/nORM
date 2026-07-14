@@ -122,6 +122,10 @@ public class SqliteMigrationDataPreservationFuzzTests
 
         // ── Optional FK child table (parent recreates must not orphan it) ──
         var withChild = rng.Next(2) == 0;
+        // Sometimes the CHILD mutates in the same migration (Val tightens to
+        // NOT NULL, forcing a child recreate alongside the parent's) — both
+        // rebuilds share one FK-off window and the child's FK must survive.
+        var mutateChild = withChild && rng.Next(2) == 0;
 
         // Index NAMES stay keyed to the baseline column so a rename keeps the
         // index identity while pointing it at the renamed column.
@@ -280,7 +284,8 @@ public class SqliteMigrationDataPreservationFuzzTests
             dropped.Add(d0);
         }
 
-        if (added.Count == 0 && dropped.Count == 0 && renames.Count == 0 && !TargetDiffers(baseline, target, previousNames))
+        if (added.Count == 0 && dropped.Count == 0 && renames.Count == 0 && !mutateChild
+            && !TargetDiffers(baseline, target, previousNames))
             return; // no-op case
 
         // Post-mutation index map: dropped columns lose their index; renamed
@@ -299,7 +304,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         if (childTable != null)
         {
             oldSnapshot.Tables.Add(childTable);
-            newSnapshot.Tables.Add(BuildChildTable());
+            newSnapshot.Tables.Add(BuildChildTable(valNullable: !mutateChild));
         }
         var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
         var sql = gen.GenerateSql(diff);
@@ -321,6 +326,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         AssertIndexes(cn, targetIndexes, withUnique, detail + " (after Up)");
         if (withCheck) AssertCheckEnforced(cn, detail + " (after Up)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Up)");
+        if (mutateChild) AssertChildValNullability(cn, expectNotNull: true, detail + " (after Up)");
         if (withDefault && !dropDefaultCol) AssertDefaultApplied(cn, detail + " (after Up)");
         var afterUp = Snapshot(cn, target.Select(c => c.Name));
         Assert.True(before.Count == afterUp.Count, $"row count changed on Up: {detail} — {before.Count} -> {afterUp.Count}");
@@ -355,6 +361,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         AssertIndexes(cn, baselineIndexes, withUnique, detail + " (after Down)");
         if (withCheck) AssertCheckEnforced(cn, detail + " (after Down)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Down)");
+        if (mutateChild) AssertChildValNullability(cn, expectNotNull: false, detail + " (after Down)");
         if (withDefault) AssertDefaultApplied(cn, detail + " (after Down)");
         var afterDown = Snapshot(cn, baseline.Select(c => c.Name));
         Assert.True(before.Count == afterDown.Count, $"row count changed on Down: {detail} — {before.Count} -> {afterDown.Count}");
@@ -423,12 +430,12 @@ public class SqliteMigrationDataPreservationFuzzTests
 
     private static string IndexName(string columnName) => $"IX_FuzzMig_{columnName}";
 
-    private static TableSchema BuildChildTable()
+    private static TableSchema BuildChildTable(bool valNullable = true)
     {
         var t = new TableSchema { Name = "FuzzMigChild" };
         t.Columns.Add(new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true, IsIdentity = true });
         t.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName! });
-        t.Columns.Add(new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true });
+        t.Columns.Add(new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = valNullable });
         t.ForeignKeys.Add(new ForeignKeySchema
         {
             ConstraintName = "FK_FuzzMigChild_FuzzMig_ParentId",
@@ -525,6 +532,15 @@ public class SqliteMigrationDataPreservationFuzzTests
             checkViolation = ex.Message.Contains("CHECK", StringComparison.OrdinalIgnoreCase);
         }
         Assert.True(checkViolation, $"CHECK constraint no longer enforced {detail} — violating insert accepted");
+    }
+
+    private static void AssertChildValNullability(SqliteConnection cn, bool expectNotNull, string detail)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT \"notnull\" FROM pragma_table_info('FuzzMigChild') WHERE name = 'Val'";
+        var notNull = Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        Assert.True(notNull == (expectNotNull ? 1 : 0),
+            $"child Val nullability wrong {detail}: expected notnull={(expectNotNull ? 1 : 0)} got {notNull}");
     }
 
     private static void AssertDefaultApplied(SqliteConnection cn, string detail)
