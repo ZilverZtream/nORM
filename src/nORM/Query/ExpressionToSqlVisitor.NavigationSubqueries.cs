@@ -213,6 +213,7 @@ namespace nORM.Query
             // Materialize any `NormQueryable.Query<T>(ctx)` calls inside the source into
             // ConstantExpression(IQueryable) so the sub-translator's VisitConstant picks up
             // the query as the entity source instead of emitting `@p<n>` for the ctx instance.
+            source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
@@ -248,6 +249,25 @@ namespace nORM.Query
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
         }
+        /// <summary>
+        /// Applies the context's global/tenant filters to the subquery's ROOT (the
+        /// provider's top-level filter rewrite never reaches roots inside lambdas —
+        /// without this a correlated subquery reads ACROSS tenants). When the injected
+        /// filter had to inline closure-dependent values, a `_gf_unused` compiled name
+        /// marks the plan fold-no-cache through the established `_unused` channel.
+        /// </summary>
+        private Expression ApplySubqueryRootFiltersWithFoldSignal(Expression source)
+        {
+            var filtered = QueryTranslator.ApplySubqueryRootFilters(_ctx, source, out var folded);
+            if (folded)
+            {
+                var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_gf_unused";
+                _params[placeholder] = DBNull.Value;
+                _compiledParams.Add(placeholder);
+            }
+            return filtered;
+        }
+
         private void BuildScalarCountSubquery(Expression source, LambdaExpression? predicate)
         {
             ThrowIfUnsupportedScalarAggregateSource(source, "Count");
@@ -257,6 +277,7 @@ namespace nORM.Query
                 var et = GetElementType(source);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
             }
+            source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
             var (head, tail) = TranslateScalarAggregateSource(source, "Count");
 
@@ -306,6 +327,7 @@ namespace nORM.Query
             {
                 operandType = GetElementType(source);
             }
+            source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
             var (head, tail) = TranslateScalarAggregateSource(source, aggregateName);
 
@@ -470,6 +492,7 @@ namespace nORM.Query
             // type nORM.Core.DbContext"). Without this, `Where(p => ctx.Query<O>().Select(o
             // => o.Id).Contains(p.Id))` — the semi-join-via-Contains idiom — silently
             // fails to translate.
+            source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
 
             // Compile-time null: ConstantExpression{null} OR Convert(null, T?) (UnaryExpression).

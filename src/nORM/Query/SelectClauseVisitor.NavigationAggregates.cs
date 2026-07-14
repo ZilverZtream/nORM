@@ -494,6 +494,16 @@ namespace nORM.Query
             }
 
             ReserveQueryRootClosureSlot(node.Arguments[0]);
+            // Global/tenant filters must reach the subquery root — the provider's
+            // top-level rewrite never descends into projection lambdas, and an
+            // unfiltered subquery aggregates ACROSS tenants.
+            source = QueryTranslator.ApplySubqueryRootFilters(_ctx, source, out var foldedFilterValues);
+            if (foldedFilterValues)
+            {
+                var placeholder = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}_gf_unused";
+                SharedParams[placeholder] = DBNull.Value;
+                SharedCompiledParams.Add(placeholder);
+            }
             source = ExpressionToSqlVisitor.QueryCallMaterializer.Materialize(source);
 
             var mapping = _ctx.GetMapping(elementType);
