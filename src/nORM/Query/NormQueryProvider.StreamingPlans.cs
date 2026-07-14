@@ -410,12 +410,34 @@ namespace nORM.Query
                     $"closure MemberExpression without calling ReserveCompiledParamSlotIfClosure -- see " +
                     $"the audit thread (407e03d, eeff6e7, cf39b61, 04a0003, 7d6d7ac, c6c4710) for the fix " +
                     $"shape.");
-                var count = Math.Min(plan.CompiledParameters.Count, parameterValues.Count);
                 var converters = plan.ParameterConverters;
-                for (int i = 0; i < count; i++)
+                var ordinals = plan.CompiledParameterOrdinals;
+                // Slots with a recorded document ordinal bind values[ordinal] directly;
+                // the rest consume the unclaimed ordinals in ascending order — the
+                // legacy positional stream. Projection-rendered slots register at
+                // Build time (after every clause slot), so registration order alone
+                // can diverge from the extractor's document order.
+                HashSet<int>? claimed = null;
+                if (ordinals != null && ordinals.Count > 0)
+                    claimed = new HashSet<int>(ordinals.Values);
+                var stream = 0;
+                for (int i = 0; i < plan.CompiledParameters.Count; i++)
                 {
                     var name = plan.CompiledParameters[i];
-                    var value = parameterValues[i];
+                    int valueIndex;
+                    if (ordinals != null && ordinals.TryGetValue(name, out var ordinal))
+                    {
+                        valueIndex = ordinal;
+                    }
+                    else
+                    {
+                        while (claimed != null && stream < parameterValues.Count && claimed.Contains(stream))
+                            stream++;
+                        valueIndex = stream++;
+                    }
+                    if (valueIndex >= parameterValues.Count)
+                        continue;
+                    var value = parameterValues[valueIndex];
                     // A closure value compared against a value-converter column binds its provider
                     // representation, matching the inline-constant and fast-path behavior.
                     if (value != null && converters != null && converters.TryGetValue(name, out var converter))

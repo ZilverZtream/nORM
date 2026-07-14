@@ -544,7 +544,8 @@ namespace nORM.Query
                     ParameterConverters: _t._paramConverters.Count > 0
                         ? new Dictionary<string, nORM.Mapping.IValueConverter>(_t._paramConverters)
                         : null,
-                    ClosureFoldedIntoSql: _t._closureFoldedIntoSql
+                    ClosureFoldedIntoSql: _t._closureFoldedIntoSql,
+                    CompiledParameterOrdinals: SnapshotSlotOrdinals(_t._compiledParams)
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

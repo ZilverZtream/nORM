@@ -115,7 +115,14 @@ namespace nORM.Query
         // against a sub-alias, where a second registration would shift positional bindings).
         // Such SQL is execution-specific: the plan translates fresh per execution and skips
         // both the plan cache and the pooled prepared-command cache.
-        bool ClosureFoldedIntoSql = false
+        bool ClosureFoldedIntoSql = false,
+        // Compiled-parameter name → document ordinal of the closure occurrence it binds.
+        // The value extractor produces one value per closure occurrence in document order;
+        // slots recorded here bind values[ordinal] directly, and the remaining slots consume
+        // the unclaimed ordinals in ascending order (the legacy positional stream). Needed
+        // because projection-rendered slots register at Build time — after clause slots —
+        // so registration order alone can diverge from document order.
+        IReadOnlyDictionary<string, int>? CompiledParameterOrdinals = null
     );
 
     internal sealed record BulkCudQueryShape(

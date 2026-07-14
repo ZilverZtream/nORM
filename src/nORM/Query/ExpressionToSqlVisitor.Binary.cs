@@ -891,9 +891,14 @@ namespace nORM.Query
             // Closure-captured value: emit a compiled parameter (mirroring the closure branch in
             // VisitMember so the ParameterValueExtractor's positional value aligns) and record the
             // converter so the plan applies it to the extracted value at execution time.
-            var paramName = $"{_provider.ParamPrefix}cp{_compiledParams.Count}";
-            _params[paramName] = DBNull.Value;
-            _compiledParams.Add(paramName);
+            var paramName = QueryTranslator.TryReuseClosureSlot(strippedValue)
+                ?? $"{_provider.ParamPrefix}cp{_compiledParams.Count}";
+            if (!_compiledParams.Contains(paramName))
+            {
+                _params[paramName] = DBNull.Value;
+                _compiledParams.Add(paramName);
+                QueryTranslator.RecordClosureSlot(strippedValue, paramName);
+            }
             _paramConverters[paramName] = converter;
             _sql.Append(paramName);
         }

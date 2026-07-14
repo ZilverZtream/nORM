@@ -223,10 +223,19 @@ namespace nORM.Query
         {
             lock (_syncRoot)
             {
-                return new TranslationBuilder(this, e)
-                    .Validate()
-                    .Setup()
-                    .Generate();
+                var ownsOrdinalScope = BeginClosureOrdinalScope(e);
+                try
+                {
+                    return new TranslationBuilder(this, e)
+                        .Validate()
+                        .Setup()
+                        .Generate();
+                }
+                finally
+                {
+                    if (ownsOrdinalScope)
+                        EndClosureOrdinalScope();
+                }
             }
         }
         private TableMapping TrackMapping(Type type)

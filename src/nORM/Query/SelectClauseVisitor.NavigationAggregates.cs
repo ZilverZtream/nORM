@@ -335,9 +335,13 @@ namespace nORM.Query
             {
                 if (SharedParams != null && SharedCompiledParams != null)
                 {
+                    var reused = QueryTranslator.TryReuseClosureSlot(closureMe);
+                    if (reused != null)
+                        return reused;
                     var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
                     SharedParams[paramName] = DBNull.Value;
                     SharedCompiledParams.Add(paramName);
+                    QueryTranslator.RecordClosureSlot(closureMe, paramName);
                     return paramName;
                 }
                 return FormatLiteral(closureVal);

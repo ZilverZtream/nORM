@@ -403,9 +403,19 @@ namespace nORM.Query
                 // freeze the FIRST run's captured value into the cached SQL.
                 if (SharedParams != null && SharedCompiledParams != null)
                 {
+                    // Reuse the slot already minted for this exact node (an ORDER BY key
+                    // expansion may render the projection fragment before Build does) —
+                    // the extractor produces ONE value per tree occurrence.
+                    var reused = QueryTranslator.TryReuseClosureSlot(node);
+                    if (reused != null)
+                    {
+                        sb.Append(reused);
+                        return node;
+                    }
                     var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
                     SharedParams[paramName] = DBNull.Value;
                     SharedCompiledParams.Add(paramName);
+                    QueryTranslator.RecordClosureSlot(node, paramName);
                     sb.Append(paramName);
                     return node;
                 }

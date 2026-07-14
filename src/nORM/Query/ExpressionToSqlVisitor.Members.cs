@@ -172,9 +172,18 @@ namespace nORM.Query
                 // parameter names are globally unique across all visitor instances within one
                 // query translation.  The "cp" prefix prevents collisions with inline-constant
                 // parameters which use the "p" prefix (visitor-local _paramIndex).
+                // Reuse the slot already minted for this exact node (clause expansions can
+                // render one tree occurrence more than once — one slot per occurrence).
+                var reusedName = QueryTranslator.TryReuseClosureSlot(node);
+                if (reusedName != null)
+                {
+                    _sql.Append(reusedName);
+                    return node;
+                }
                 var paramName = $"{_provider.ParamPrefix}cp{_compiledParams.Count}";
                 _params[paramName] = DBNull.Value; // placeholder; actual value supplied at execution time
                 _compiledParams.Add(paramName);
+                QueryTranslator.RecordClosureSlot(node, paramName);
                 _sql.Append(paramName);
                 return node;
             }

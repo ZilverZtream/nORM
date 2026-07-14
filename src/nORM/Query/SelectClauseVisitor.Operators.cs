@@ -489,9 +489,14 @@ namespace nORM.Query
             {
                 var closureOp = leftIsColumn ? node.NodeType : FlipScvComparison(node.NodeType);
                 var closureSb = EnsureBuilder();
-                var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
-                SharedParams[paramName] = DBNull.Value;
-                SharedCompiledParams.Add(paramName);
+                var paramName = QueryTranslator.TryReuseClosureSlot(stripped)
+                    ?? $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
+                if (!SharedCompiledParams.Contains(paramName))
+                {
+                    SharedParams[paramName] = DBNull.Value;
+                    SharedCompiledParams.Add(paramName);
+                    QueryTranslator.RecordClosureSlot(stripped, paramName);
+                }
                 SharedParamConverters[paramName] = column.Converter!;
                 closureSb.Append('(');
                 Visit(memberSide);

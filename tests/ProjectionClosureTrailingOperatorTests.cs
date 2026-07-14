@@ -180,4 +180,51 @@ public class ProjectionClosureTrailingOperatorTests
     }
 
     private static string Tag(int value, string tag) => $"{value}:{tag}";
+
+    [Fact]
+    public async Task Closure_order_key_after_projection_closure_stays_aligned()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, rows);
+
+        // The ORDER BY key re-expands the projection and mints its closure (mod)
+        // at clause time; the projection closure (add) mints at Build time —
+        // document order is the reverse. Ordered comparison so a mis-bound mod
+        // changes the sequence.
+        foreach (var (add, mod) in new[] { (100, 7), (3, 13) })
+        {
+            var expected = rows.Select(r => new { r.Id, V = r.IntVal + add })
+                .OrderBy(x => x.V % mod).ThenBy(x => x.Id)
+                .Select(x => x.V).ToList();
+            var actual = (await ctx.Query<Row>().Select(r => new { r.Id, V = r.IntVal + add })
+                    .OrderBy(x => x.V % mod).ThenBy(x => x.Id)
+                    .ToListAsync())
+                .Select(x => x.V).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"add={add},mod={mod}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
+    public async Task Closure_take_count_after_projection_closure_stays_aligned()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, rows);
+
+        // A captured Take count after a closure-bearing projection: a cross-bound
+        // pairing would use the projection delta as the row limit.
+        foreach (var (add, take) in new[] { (1000, 2), (5000, 4) })
+        {
+            var expected = rows.OrderBy(r => r.Id).Select(r => r.IntVal + add).Take(take).ToList();
+            var actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => r.IntVal + add).Take(take)
+                .AsEnumerable().ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"add={add},take={take}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+        await Task.CompletedTask;
+    }
 }

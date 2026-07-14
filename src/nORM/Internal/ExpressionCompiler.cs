@@ -131,7 +131,7 @@ namespace nORM.Internal
                 _queryParameter = queryParameter;
                 _expectedCount = expectedCount;
                 _closuresOnly = closuresOnly;
-                _sources = new List<CompiledParameterValueSource>(expectedCount);
+                _sources = new List<CompiledParameterValueSource>(Math.Min(expectedCount, 16));
             }
 
             public CompiledParameterValueSource[] Collect(Expression expression)
@@ -373,7 +373,7 @@ namespace nORM.Internal
                         fixedParams = fpList.ToArray();
                     }
                     var valueSources = BuildCompiledParameterValueSources(
-                        filtered, capturedExpr.Parameters[1], p.CompiledParameters);
+                        filtered, capturedExpr.Parameters[1], p.CompiledParameters, p.CompiledParameterOrdinals);
                     return (p, p.CompiledParameters, paramSet, fixedParams, valueSources);
                 });
 
@@ -600,7 +600,7 @@ namespace nORM.Internal
                         fixedParams = fpList.ToArray();
                     }
                     var valueSources = BuildCompiledParameterValueSources(
-                        filtered, capturedExpr.Parameters[1], p.CompiledParameters);
+                        filtered, capturedExpr.Parameters[1], p.CompiledParameters, p.CompiledParameterOrdinals);
                     return (p, p.CompiledParameters, paramSet, fixedParams, valueSources);
                 });
 
@@ -630,7 +630,8 @@ namespace nORM.Internal
         }
 
         private static CompiledParameterValueSource[] BuildCompiledParameterValueSources(
-            Expression filteredExpression, ParameterExpression queryParameter, IReadOnlyList<string> parameterNames)
+            Expression filteredExpression, ParameterExpression queryParameter, IReadOnlyList<string> parameterNames,
+            IReadOnlyDictionary<string, int>? closureOrdinals)
         {
             if (parameterNames.Count == 0)
                 return Array.Empty<CompiledParameterValueSource>();
@@ -642,39 +643,51 @@ namespace nORM.Internal
                     markedCount++;
             }
 
-            if (markedCount == 0)
+            if (markedCount == 0 && (closureOrdinals == null || closureOrdinals.Count == 0))
             {
                 return new CompiledParameterValueSourceCollector(queryParameter, parameterNames.Count)
                     .Collect(filteredExpression);
             }
 
-            // Marked slots (query-parameter sourced) resolve by name; the remaining slots
-            // are closure captures, paired positionally against the document-order closure
-            // stream. A resolution shortfall returns an empty array so the caller's legacy
-            // fallback handles the shape instead of silently cross-binding values.
+            // Marked slots (query-parameter sourced) resolve by name. The remaining slots
+            // are closure captures paired against the document-order closure stream —
+            // by recorded document ordinal when the plan has one for the slot, otherwise
+            // consuming the unclaimed ordinals in ascending order. A resolution shortfall
+            // returns an empty array so the caller's legacy fallback handles the shape
+            // instead of silently cross-binding values.
             var closureSources = new CompiledParameterValueSourceCollector(
-                    queryParameter, parameterNames.Count - markedCount, closuresOnly: true)
+                    queryParameter, int.MaxValue, closuresOnly: true)
                 .Collect(filteredExpression);
+            HashSet<int>? claimed = null;
+            if (closureOrdinals != null && closureOrdinals.Count > 0)
+                claimed = new HashSet<int>(closureOrdinals.Values);
             var sources = new CompiledParameterValueSource[parameterNames.Count];
             var closureIndex = 0;
             for (int i = 0; i < parameterNames.Count; i++)
             {
-                if (TryBuildMarkedValueSource(parameterNames[i], queryParameter.Type, out var marked))
+                var name = parameterNames[i];
+                if (TryBuildMarkedValueSource(name, queryParameter.Type, out var marked))
                 {
                     sources[i] = marked;
+                    continue;
                 }
-                else if (TryParseQueryParamMarker(parameterNames[i], out _))
-                {
+                if (TryParseQueryParamMarker(name, out _))
                     return Array.Empty<CompiledParameterValueSource>(); // marked but unresolvable member
-                }
-                else if (closureIndex < closureSources.Length)
+
+                int sourceIndex;
+                if (closureOrdinals != null && closureOrdinals.TryGetValue(name, out var ordinal))
                 {
-                    sources[i] = closureSources[closureIndex++];
+                    sourceIndex = ordinal;
                 }
                 else
                 {
-                    return Array.Empty<CompiledParameterValueSource>();
+                    while (claimed != null && closureIndex < closureSources.Length && claimed.Contains(closureIndex))
+                        closureIndex++;
+                    sourceIndex = closureIndex++;
                 }
+                if (sourceIndex >= closureSources.Length)
+                    return Array.Empty<CompiledParameterValueSource>();
+                sources[i] = closureSources[sourceIndex];
             }
             return sources;
         }
