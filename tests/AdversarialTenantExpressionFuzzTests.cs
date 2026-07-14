@@ -325,6 +325,30 @@ public class AdversarialTenantExpressionFuzzTests
             Assert.DoesNotContain(parents[0].Children, c => c.Data == "childB");
         }
 
+        // -- Correlated subquery isolation (explicit ctx.Query roots) --
+        // Parent 1 has one child per tenant: the tenant-provider predicate must
+        // reach INSIDE the subquery, or the count doubles and the >=2 predicate
+        // matches through the other tenant's child.
+        using (var ctxA = MakeTenantCtxWithInclude(cn, "A"))
+        {
+            var counts = (await ctxA.Query<AegParent>()
+                    .Select(p => new { p.Id, N = ctxA.Query<AegChild>().Count(c => c.ParentId == p.Id) })
+                    .ToListAsync())
+                .OrderBy(x => x.Id).ToList();
+            Assert.Single(counts);
+            Assert.Equal(1, counts[0].N);
+
+            var multiChild = await ctxA.Query<AegParent>()
+                .Where(p => ctxA.Query<AegChild>().Count(c => c.ParentId == p.Id) >= 2)
+                .ToListAsync();
+            Assert.Empty(multiChild);
+
+            var anyChild = await ctxA.Query<AegParent>()
+                .Where(p => ctxA.Query<AegChild>().Any(c => c.ParentId == p.Id))
+                .ToListAsync();
+            Assert.Single(anyChild);
+        }
+
         // -- Owned collection isolation --
         await InsertRawAsync(cn, "AEG_Owner", "Id, TenantId, Name", "@id, @t, @n",
             ("@id", 1), ("@t", "A"), ("@n", "ownerA"));
