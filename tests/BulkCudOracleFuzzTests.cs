@@ -34,6 +34,19 @@ public class BulkCudOracleFuzzTests
         public bool Flag { get; set; }
     }
 
+    /// <summary>
+    /// Immutable side table for correlated-aggregate bulk predicates. The machine
+    /// clears and reseeds it at start so repeated runs against a live server stay
+    /// deterministic; CUD ops never target it.
+    /// </summary>
+    [System.ComponentModel.DataAnnotations.Schema.Table("BulkCudChild_Test")]
+    public class Child
+    {
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public int ParentId { get; set; }
+        public int Weight { get; set; }
+    }
+
     [Theory]
     [InlineData(20260714)]
     [InlineData(42)]
@@ -47,7 +60,9 @@ public class BulkCudOracleFuzzTests
         keeper.Open();
         using (var cmd = keeper.CreateCommand())
         {
-            cmd.CommandText = "CREATE TABLE BulkCud_Test (Id INTEGER PRIMARY KEY, IntVal INTEGER NOT NULL, Name TEXT NOT NULL, Flag INTEGER NOT NULL)";
+            cmd.CommandText =
+                "CREATE TABLE BulkCud_Test (Id INTEGER PRIMARY KEY, IntVal INTEGER NOT NULL, Name TEXT NOT NULL, Flag INTEGER NOT NULL);" +
+                "CREATE TABLE BulkCudChild_Test (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Weight INTEGER NOT NULL)";
             cmd.ExecuteNonQuery();
         }
 
@@ -173,12 +188,27 @@ public class BulkCudOracleFuzzTests
             };
         }
 
+        // Immutable child fixture for correlated-aggregate predicates: clear and
+        // reseed so repeated live runs stay deterministic per seed.
+        var children = new List<Child>();
+        using (var childCtx = openCtx())
+        {
+            await childCtx.Query<Child>().ExecuteDeleteAsync();
+            for (var j = 0; j < 30; j++)
+            {
+                var child = new Child { Id = j + 1, ParentId = rng.Next(1, 31), Weight = rng.Next(-5, 10) };
+                childCtx.Add(child);
+                children.Add(child);
+            }
+            await childCtx.SaveChangesAsync();
+        }
+
         await SeedRowsAsync(12);
         await VerifyAsync($"seed={seed} (initial)");
 
         for (var step = 0; step < steps; step++)
         {
-            switch (rng.Next(12))
+            switch (rng.Next(13))
             {
                 case 0 or 1 or 2: // bulk update, one of several setter shapes
                 {
@@ -333,6 +363,45 @@ public class BulkCudOracleFuzzTests
                     Assert.True(affected == targetKeys.Count,
                         $"windowed update affected mismatch seed={seed} step={step}: db={affected} model={targetKeys.Count} window[{windowDesc}] pred[{desc}]{Tail()}");
                     await VerifyAsync($"seed={seed} step={step} (after windowed update)");
+                    break;
+                }
+                case 12: // correlated-aggregate predicate: the bulk op's target set is
+                         // defined by a Count over the side table, with closure bounds
+                {
+                    var k = rng.Next(-4, 5);
+                    var m = rng.Next(1, 4);
+                    var delta = rng.Next(-15, 15);
+                    var isDelete = rng.Next(2) == 0;
+                    int affected;
+                    List<int> matchedKeys;
+                    try
+                    {
+                        using var ctx = openCtx();
+                        matchedKeys = model.Values
+                            .Where(r => children.Count(c => c.ParentId == r.Id && c.Weight >= k) >= m)
+                            .Select(r => r.Id).ToList();
+                        affected = isDelete
+                            ? await ctx.Query<Row>()
+                                .Where(x => ctx.Query<Child>().Count(c => c.ParentId == x.Id && c.Weight >= k) >= m)
+                                .ExecuteDeleteAsync()
+                            : await ctx.Query<Row>()
+                                .Where(x => ctx.Query<Child>().Count(c => c.ParentId == x.Id && c.Weight >= k) >= m)
+                                .ExecuteUpdateAsync(s => s.SetProperty(x => x.IntVal, x => x.IntVal + delta));
+                    }
+                    catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+                    {
+                        throw new Xunit.Sdk.XunitException(
+                            $"correlated bulk op threw {ex.GetType().Name} seed={seed} step={step} k={k} m={m} isDelete={isDelete}: {ex.Message}{Tail()}", ex);
+                    }
+                    foreach (var key in matchedKeys)
+                    {
+                        if (isDelete) model.Remove(key);
+                        else model[key].IntVal += delta;
+                    }
+                    trace.Add($"{step}: correlated {(isDelete ? "delete" : "update")} k={k} m={m} delta={delta} matched={matchedKeys.Count} affected={affected}");
+                    Assert.True(affected == matchedKeys.Count,
+                        $"correlated bulk op affected mismatch seed={seed} step={step}: db={affected} model={matchedKeys.Count} k={k} m={m} isDelete={isDelete}{Tail()}");
+                    await VerifyAsync($"seed={seed} step={step} (after correlated bulk op)");
                     break;
                 }
                 default: // no-match update: a predicate selecting nothing must touch nothing
