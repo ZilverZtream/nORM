@@ -124,6 +124,33 @@ namespace nORM.Core
             }
         }
 
+        /// Names of reference navigations that held a non-null principal when the
+        /// entity was loaded. Lets fixup distinguish "the user cleared a loaded
+        /// reference nav" (so the FK must be nulled) from "the nav was never loaded"
+        /// (so a valid FK must be preserved). Null until first captured.
+        internal HashSet<string>? LoadedReferenceNavs { get; private set; }
+
+        /// <summary>
+        /// Records which reference navigations are currently non-null so a later
+        /// clear (nav set to null) is detected as a real disassociation.
+        /// </summary>
+        internal void CaptureReferenceNavSnapshots()
+        {
+            var navs = _mapping.ReferenceNavigations;
+            if (navs.Length == 0) return;
+            var entity = Entity;
+            if (entity == null) return;
+
+            foreach (var nav in navs)
+            {
+                object? value;
+                try { value = nav.GetValue(entity); }
+                catch { continue; }
+                if (value != null)
+                    (LoadedReferenceNavs ??= new HashSet<string>(StringComparer.Ordinal)).Add(nav.Name);
+            }
+        }
+
         /// Owned-collection content snapshots: per nav property, a multiset of each
         /// child's column-value signature captured when the collection was loaded.
         /// Used to detect owned-collection edits (add / remove / child-scalar change),
@@ -560,6 +587,10 @@ namespace nORM.Core
             CaptureOriginalValues();
             CaptureManyToManySnapshots();
             CaptureOwnedCollectionSnapshots();
+            // Reset then re-capture the loaded-reference-nav set so a cleared nav is
+            // not carried across a save as still-loaded.
+            LoadedReferenceNavs = null;
+            CaptureReferenceNavSnapshots();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.

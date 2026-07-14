@@ -609,8 +609,6 @@ namespace nORM.Core
                 {
                     continue;
                 }
-                if (principal == null)
-                    continue;
 
                 TableMapping principalMap;
                 try
@@ -627,6 +625,27 @@ namespace nORM.Core
                     entry.Mapping, navProp.Name, navProp.PropertyType, principalMap);
                 if (fk == null)
                     continue;
+
+                if (principal == null)
+                {
+                    // The user cleared a reference nav that was loaded non-null →
+                    // disassociate by nulling the FK. A never-loaded null nav is not
+                    // recorded, so its still-valid FK is left intact. Never touch a
+                    // key or already-null FK.
+                    if (entry.LoadedReferenceNavs?.Contains(navProp.Name) == true
+                        && !fk.IsKey
+                        && fk.Getter(dependent) != null
+                        && entry.State != EntityState.Added)
+                    {
+                        fk.Setter(dependent, null);
+                        if (entry.State is EntityState.Unchanged or EntityState.Modified)
+                        {
+                            entry.State = EntityState.Modified;
+                            entry.MarkExplicitlyModified();
+                        }
+                    }
+                    continue;
+                }
 
                 var principalEntry = ChangeTracker.GetEntryOrDefault(principal);
                 if (principalEntry == null)

@@ -259,6 +259,10 @@ namespace nORM.Query
                         ? c.FirstOrDefault()
                         : null;
                     relation.NavProp.SetValue(p, child);
+                    // Record the loaded principal so a later clear (nav = null) is
+                    // detected as a real disassociation and the FK is nulled on save.
+                    if (child != null)
+                        _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureReferenceNavSnapshots();
                 }
             }
 
@@ -608,6 +612,10 @@ namespace nORM.Query
                         ? c.FirstOrDefault()
                         : null;
                     relation.NavProp.SetValue(p, child);
+                    // Record the loaded principal so a later clear (nav = null) is
+                    // detected as a real disassociation and the FK is nulled on save.
+                    if (child != null)
+                        _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureReferenceNavSnapshots();
                 }
             }
 
