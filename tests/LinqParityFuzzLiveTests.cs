@@ -16,6 +16,7 @@ namespace nORM.Tests;
 /// temporal handling, paging emission) with LINQ-to-Objects as the oracle.
 /// </summary>
 [Trait("Category", TestCategory.LiveProvider)]
+[Collection(LiveFuzzTableCollection.Name)]
 public class LinqParityFuzzLiveTests
 {
     private static (Func<DbConnection>?, DatabaseProvider?, string?) OpenLive(string kind)

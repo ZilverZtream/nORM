@@ -18,6 +18,7 @@ namespace nORM.Tests;
 /// closure slot alignment exercised by per-case re-randomized captures.
 /// </summary>
 [Trait("Category", TestCategory.LiveProvider)]
+[Collection(LiveFuzzTableCollection.Name)]
 public class LiveProviderSubqueryFuzzParityTests
 {
     private static (Func<DbConnection>?, DatabaseProvider?, string?) OpenLive(string kind)
