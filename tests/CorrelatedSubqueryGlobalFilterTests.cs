@@ -61,6 +61,94 @@ public class CorrelatedSubqueryGlobalFilterTests
         return (keeper, new DbContext(cn, new SqliteProvider(), opts));
     }
 
+    [Table("CsgfParent_Test")]
+    public class NavParent
+    {
+        [Key] public int Id { get; set; }
+        public string Tenant { get; set; } = "";
+        public System.Collections.Generic.List<NavChild> Children { get; set; } = new();
+    }
+
+    [Table("CsgfChild_Test")]
+    public class NavChild
+    {
+        [Key] public int Id { get; set; }
+        public int NavParentId { get; set; }
+        public string Tenant { get; set; } = "";
+    }
+
+    private static (SqliteConnection Keeper, DbContext Ctx) CreateNavDb()
+    {
+        var cs = $"Data Source=file:csgfnav_{Guid.NewGuid():N}?mode=memory&cache=shared";
+        var keeper = new SqliteConnection(cs);
+        keeper.Open();
+        using (var cmd = keeper.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE CsgfParent_Test (Id INTEGER PRIMARY KEY, Tenant TEXT NOT NULL);
+                CREATE TABLE CsgfChild_Test (Id INTEGER PRIMARY KEY, NavParentId INTEGER NOT NULL, Tenant TEXT NOT NULL);
+                INSERT INTO CsgfParent_Test VALUES (1, 'T1'), (2, 'T1'), (3, 'T2');
+                -- Parent 1: two T1 children and one T2 child; parent 2: ONLY a T2 child.
+                INSERT INTO CsgfChild_Test VALUES (1, 1, 'T1'), (2, 1, 'T1'), (3, 1, 'T2'), (4, 2, 'T2'), (5, 3, 'T2');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        var cn = new SqliteConnection(cs);
+        cn.Open();
+        var opts = new DbContextOptions();
+        opts.AddGlobalFilter<NavParent>(p => p.Tenant == "T1");
+        opts.AddGlobalFilter<NavChild>(c => c.Tenant == "T1");
+        return (keeper, new DbContext(cn, new SqliteProvider(), opts));
+    }
+
+    [Fact]
+    public async Task Navigation_count_in_projection_respects_global_filters()
+    {
+        var (keeper, ctx) = CreateNavDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        var rows = (await ctx.Query<NavParent>()
+                .Select(p => new { p.Id, N = p.Children.Count() })
+                .ToListAsync())
+            .OrderBy(x => x.Id).ToList();
+
+        Assert.Equal(new[] { (1, 2), (2, 0) }, rows.Select(x => (x.Id, x.N)).ToArray());
+    }
+
+    [Fact]
+    public async Task Navigation_any_in_predicate_respects_global_filters()
+    {
+        var (keeper, ctx) = CreateNavDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        // Parent 2's only child is tenant T2 — Any must be false under the filter.
+        var ids = (await ctx.Query<NavParent>()
+                .Where(p => p.Children.Any())
+                .ToListAsync())
+            .Select(p => p.Id).OrderBy(i => i).ToList();
+
+        Assert.Equal(new[] { 1 }, ids);
+    }
+
+    [Fact]
+    public async Task Include_respects_child_global_filters()
+    {
+        var (keeper, ctx) = CreateNavDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        var parents = (await ((INormQueryable<NavParent>)ctx.Query<NavParent>())
+                .Include(p => p.Children)
+                .ToListAsync())
+            .OrderBy(p => p.Id).ToList();
+
+        Assert.Equal(new[] { 1, 2 }, parents.Select(p => p.Id).ToArray());
+        Assert.Equal(new[] { 1, 2 }, parents[0].Children.Select(c => c.Id).OrderBy(i => i).ToArray());
+        Assert.Empty(parents[1].Children);
+    }
+
     [Fact]
     public async Task Projection_correlated_count_respects_global_filters()
     {
