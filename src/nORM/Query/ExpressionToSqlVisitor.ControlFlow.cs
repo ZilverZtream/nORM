@@ -358,7 +358,15 @@ namespace nORM.Query
             {
                 return TranslateWithNullCheck(node);
             }
-            if (!IsNonDeterministicServerMethod(node.Method) && TryGetConstantValueSafe(node, out var constVal))
+            // A correlated scalar aggregate rooted at ctx.Query<T>() with no outer-row
+            // reference (its predicate compares only closures/constants) is technically
+            // constant-evaluable — but folding it EXECUTES a database query during
+            // translation, bakes the result as a literal parameter, and caches that:
+            // the next execution with a different closure replays the first value.
+            // Keep it as a server-side subquery so its closures re-bind per execution.
+            if (!IsNonDeterministicServerMethod(node.Method)
+                && !QueryTranslator.IsQueryRootedScalarAggregate(node)
+                && TryGetConstantValueSafe(node, out var constVal))
             {
                 return CreateSafeParameter(constVal);
             }

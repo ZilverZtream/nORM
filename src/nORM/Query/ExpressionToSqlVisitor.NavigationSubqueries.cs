@@ -245,9 +245,24 @@ namespace nORM.Query
                 if (!_compiledParams.Contains(compiled))
                     _compiledParams.Add(compiled);
             }
+            MergeSubPlanConverters(subPlan);
             _sql.Append(negate ? "NOT EXISTS(" : "EXISTS(");
             _sql.Append(subPlan.Sql);
             _sql.Append(")");
+        }
+
+        /// <summary>
+        /// Merges value-converter registrations the sub-translation minted for closure
+        /// values compared against converter columns inside the subquery. Dropping them
+        /// binds the raw CLR value instead of the provider representation (silent wrong
+        /// match). Mirrors the param and compiled-name copy-back.
+        /// </summary>
+        private void MergeSubPlanConverters(QueryPlan subPlan)
+        {
+            if (subPlan.ParameterConverters is not { Count: > 0 } converters)
+                return;
+            foreach (var kvp in converters)
+                _paramConverters[kvp.Key] = kvp.Value;
         }
         /// <summary>
         /// Applies the context's global/tenant filters to the subquery's ROOT (the
@@ -380,6 +395,7 @@ namespace nORM.Query
                 if (!_compiledParams.Contains(compiled))
                     _compiledParams.Add(compiled);
             }
+            MergeSubPlanConverters(subPlan);
 
             var sql = subPlan.Sql;
             var fromIdx = FindTopLevelFromIndex(sql);
@@ -538,6 +554,7 @@ namespace nORM.Query
                 if (!_compiledParams.Contains(compiled))
                     _compiledParams.Add(compiled);
             }
+            MergeSubPlanConverters(subPlan);
 
             // SQL NULL IN (...) is UNKNOWN (not TRUE); emit null-safe OR pattern for nullable value types.
             bool isNullable = !value.Type.IsValueType || Nullable.GetUnderlyingType(value.Type) != null;
@@ -628,6 +645,7 @@ namespace nORM.Query
                 if (!_compiledParams.Contains(compiled))
                     _compiledParams.Add(compiled);
             }
+            MergeSubPlanConverters(existsPlan);
             _sql.Append("EXISTS(");
             _sql.Append(existsPlan.Sql);
             _sql.Append(")");

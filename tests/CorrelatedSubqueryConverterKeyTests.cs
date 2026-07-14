@@ -156,20 +156,15 @@ public class CorrelatedSubqueryConverterKeyTests
         await using var __ = ctx;
 
         // Same closure-converter comparison, but the subquery aggregate is in a
-        // WHERE predicate (the ETSV route, not the SCV projection route).
-        foreach (var (region, expectedCount) in new[] { (Region.North, 3), (Region.South, 3), (Region.East, 3) })
+        // WHERE predicate (the ETSV route, not the SCV projection route). The
+        // threshold DISCRIMINATES: only North has >= 2 sales, so a mis-bound
+        // closure (count 0) would flip the surviving-dept count for North.
+        foreach (var (region, expectedCount) in new[] { (Region.North, 3), (Region.South, 0), (Region.East, 0) })
         {
-            // All 3 depts survive: the subquery counts sales in the CAPTURED
-            // region (a constant per iteration) and compares >= 0, which always
-            // holds when the closure binds correctly; a mis-bound closure would
-            // still count 0 but the >= 0 stays true — so assert on the COUNT via
-            // projection instead to actually observe the value.
             var counts = (await ctx.Query<Dept>()
-                    .Where(d => ctx.Query<Sale>().Count(s => s.Region == region) >= 1)
+                    .Where(d => ctx.Query<Sale>().Count(s => s.Region == region) >= 2)
                     .ToListAsync())
                 .Count;
-            // When the closure binds correctly there IS at least one sale in each
-            // seeded region, so every dept row survives the >= 1 filter.
             Assert.True(counts == expectedCount,
                 $"region={region}: expected {expectedCount} depts got {counts} — closure converter mis-bound in predicate subquery");
         }
