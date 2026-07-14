@@ -45,6 +45,38 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// True for ElementAt/ElementAtOrDefault over a query-rooted chain — the offset single-row
+        /// form the predicate translator lowers to a <c>LIMIT 1 OFFSET n</c> scalar subquery. Kept
+        /// separate from <see cref="IsQueryRootedScalarFirst"/> because the projection path cannot
+        /// yet apply the offset, so a projected ElementAt stays fail-closed rather than silently
+        /// returning the first element.
+        /// </summary>
+        internal static bool IsQueryRootedScalarElementAt(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType != typeof(Queryable))
+                return false;
+            if (node.Method.Name is not (nameof(Queryable.ElementAt) or nameof(Queryable.ElementAtOrDefault)))
+                return false;
+            return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
+        }
+
+        /// <summary>True when a queryable chain contains any OrderBy/OrderByDescending/ThenBy ordering.</summary>
+        internal static bool HasQueryableOrdering(Expression? source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                if (mce.Method.DeclaringType == typeof(Queryable)
+                    && mce.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                        or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending))
+                    return true;
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Rewrites a queryable chain so every ordering flips direction (OrderBy↔OrderByDescending,
         /// ThenBy↔ThenByDescending) — turning "the last ordered row" into "the first" so Last can be
         /// served by the same single-row subquery as First. <paramref name="hadOrdering"/> reports
@@ -103,7 +135,8 @@ namespace nORM.Query
             if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All)
                 or nameof(Queryable.Contains))
                 return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
-            return IsQueryRootedScalarAggregate(node) || IsQueryRootedScalarFirst(node);
+            return IsQueryRootedScalarAggregate(node) || IsQueryRootedScalarFirst(node)
+                || IsQueryRootedScalarElementAt(node);
         }
 
         private static bool HasQueryRootedSource(Expression? source)

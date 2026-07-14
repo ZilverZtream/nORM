@@ -401,6 +401,14 @@ namespace nORM.Query
                         BuildScalarFirstSubquery(node.Arguments[0], firstPredicate, node.Method.Name);
                         return node;
                     }
+                    case nameof(Queryable.ElementAt):
+                    case nameof(Queryable.ElementAtOrDefault):
+                    {
+                        if (node.Arguments.Count < 2)
+                            throw new NormQueryException($"{node.Method.Name}() requires an index argument.");
+                        BuildScalarFirstSubquery(node.Arguments[0], null, node.Method.Name, node.Arguments[1]);
+                        return node;
+                    }
                     default:
                         throw new NormUnsupportedFeatureException($"Queryable method '{node.Method.Name}' is not supported.");
                 }

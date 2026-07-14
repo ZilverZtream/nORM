@@ -197,9 +197,13 @@ namespace nORM.Providers
         /// <summary>
         /// SQL Server has no <c>LIMIT</c>; the single-row scalar subquery injects <c>TOP 1</c>
         /// after the leading <c>SELECT</c> (before any <c>DISTINCT</c>), keeping any ORDER BY.
+        /// With an offset (ElementAt) it uses <c>OFFSET n ROWS FETCH NEXT 1 ROWS ONLY</c>, which
+        /// relies on the inner ORDER BY the ElementAt path guarantees.
         /// </summary>
-        public override string BuildScalarLimitedSubquery(string innerSelectSql)
+        public override string BuildScalarLimitedSubquery(string innerSelectSql, string? offsetSql)
         {
+            if (offsetSql != null)
+                return $"({innerSelectSql} OFFSET {offsetSql} ROWS FETCH NEXT 1 ROWS ONLY)";
             const string sel = "SELECT ";
             return innerSelectSql.StartsWith(sel, StringComparison.OrdinalIgnoreCase)
                 ? $"(SELECT TOP 1 {innerSelectSql.Substring(sel.Length)})"

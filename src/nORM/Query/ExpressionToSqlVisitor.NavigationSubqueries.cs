@@ -422,7 +422,7 @@ namespace nORM.Query
         /// <c>TOP 1</c>). An empty subquery yields SQL NULL — matching the correlated-aggregate
         /// surface and EF's translation (LINQ-to-Objects would instead throw on First over empty).
         /// </summary>
-        private void BuildScalarFirstSubquery(Expression source, LambdaExpression? predicate, string methodName)
+        private void BuildScalarFirstSubquery(Expression source, LambdaExpression? predicate, string methodName, Expression? indexExpr = null)
         {
             ThrowIfUnsupportedScalarAggregateSource(source, methodName);
             ReserveQuerySourceRootClosureSlot(source);
@@ -440,6 +440,12 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(
                         $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.");
             }
+            // ElementAt/ElementAtOrDefault: skip N rows then take one. An index into an unordered
+            // set is undefined (and SQL Server's OFFSET/FETCH requires ORDER BY), so fail closed.
+            if (indexExpr != null && !QueryTranslator.HasQueryableOrdering(source))
+                throw new NormUnsupportedFeatureException(
+                    $"{methodName}() over a correlated subquery requires an OrderBy — element position is undefined without an ordering.");
+
             source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
 
@@ -455,7 +461,10 @@ namespace nORM.Query
                     $"{methodName}() over a correlated subquery requires a single scalar projection; " +
                     "project the value with Select(x => x.Member) first.");
 
-            _sql.Append(_provider.BuildScalarLimitedSubquery(sql));
+            // The offset (ElementAt) is a plain outer-context value; emit it after the subquery so
+            // its closure slot, if any, follows the subquery's in document order.
+            var offsetSql = indexExpr != null ? GetSql(indexExpr) : null;
+            _sql.Append(_provider.BuildScalarLimitedSubquery(sql, offsetSql));
         }
 
         /// <summary>
