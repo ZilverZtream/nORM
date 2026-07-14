@@ -60,6 +60,98 @@ namespace nORM.Query
             return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
         }
 
+        /// <summary>
+        /// For a projection lambda, resolves the value converter of each member whose value comes
+        /// from a correlated First/Last/Min/Max subquery over a converter column — keyed by the
+        /// projection member name (matching the shadow-column naming in ExtractColumnsFromProjection).
+        /// Returns null when no such member exists, so the materializer path is unchanged for every
+        /// ordinary projection. Requires the context to resolve the subquery element's mapping.
+        /// </summary>
+        internal static IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? ComputeProjectionSubqueryConverters(LambdaExpression projection, DbContext ctx)
+        {
+            Dictionary<string, nORM.Mapping.IValueConverter>? result = null;
+            void Consider(string name, Expression arg)
+            {
+                var e = StripConvert(arg);
+                if (e is not MethodCallExpression mce || !IsSubqueryScalarColumnOp(mce))
+                    return;
+                if (!TryResolveSubqueryProjectedMember(mce, out var elementType, out var member)
+                    || elementType == null || member == null)
+                    return;
+                try
+                {
+                    var mapping = ctx.GetMapping(elementType);
+                    if (mapping.TryGetColumnForMemberAccess(member, out var col) && col.Converter != null)
+                        (result ??= new Dictionary<string, nORM.Mapping.IValueConverter>(StringComparer.Ordinal))[name] = col.Converter;
+                }
+                catch { }
+            }
+
+            if (projection.Body is NewExpression ne)
+                for (int i = 0; i < ne.Arguments.Count; i++)
+                    Consider(ne.Members?[i]?.Name ?? $"Item{i + 1}", ne.Arguments[i]);
+            else if (projection.Body is MemberInitExpression mi)
+                foreach (var b in mi.Bindings)
+                    if (b is MemberAssignment ma)
+                        Consider(ma.Member.Name, ma.Expression);
+            return result;
+        }
+
+        /// <summary>A correlated subquery op whose scalar result carries the source column's type
+        /// (and therefore its converter): First/Last/FirstOrDefault/LastOrDefault, or Min/Max.
+        /// Sum/Average/Count produce a numeric aggregate, not the column's converted type.</summary>
+        private static bool IsSubqueryScalarColumnOp(MethodCallExpression mce)
+            => IsQueryRootedScalarFirst(mce)
+               || (mce.Method.DeclaringType == typeof(Queryable)
+                   && mce.Method.Name is nameof(Queryable.Min) or nameof(Queryable.Max)
+                   && IsQueryRootedScalarAggregate(mce));
+
+        /// <summary>
+        /// Finds the single scalar member a correlated subquery projects: an aggregate selector
+        /// (<c>Max(c =&gt; c.Member)</c>) or the innermost <c>Select(c =&gt; c.Member)</c> in the chain.
+        /// </summary>
+        private static bool TryResolveSubqueryProjectedMember(MethodCallExpression mce, out Type? elementType, out MemberExpression? member)
+        {
+            elementType = null;
+            member = null;
+            if (mce.Arguments.Count > 1 && StripQuotes(mce.Arguments[1]) is LambdaExpression aggSel
+                && aggSel.Parameters.Count == 1 && StripConvert(aggSel.Body) is MemberExpression aggMember)
+            {
+                elementType = aggSel.Parameters[0].Type;
+                member = aggMember;
+                return true;
+            }
+            var current = mce.Arguments.Count > 0 ? mce.Arguments[0] : null;
+            while (current is MethodCallExpression m)
+            {
+                if (m.Method.Name == nameof(Queryable.Select) && m.Arguments.Count == 2
+                    && StripQuotes(m.Arguments[1]) is LambdaExpression sel
+                    && sel.Parameters.Count == 1 && StripConvert(sel.Body) is MemberExpression selMember)
+                {
+                    elementType = sel.Parameters[0].Type;
+                    member = selMember;
+                    return true;
+                }
+                if (m.Arguments.Count == 0) break;
+                current = m.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>Stable-within-process fingerprint of a projection subquery-converter map for the
+        /// materializer cache key; 0 for null/empty so ordinary projections keep their existing key.</summary>
+        internal static long ProjectionSubqueryConverterFingerprint(IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? map)
+        {
+            if (map == null || map.Count == 0) return 0L;
+            long h = 17;
+            foreach (var kvp in map.OrderBy(k => k.Key, StringComparer.Ordinal))
+            {
+                h = h * 31 + kvp.Key.GetHashCode();
+                h = h * 31 + kvp.Value.GetType().GetHashCode();
+            }
+            return h;
+        }
+
         /// <summary>True when a queryable chain contains any OrderBy/OrderByDescending/ThenBy ordering.</summary>
         internal static bool HasQueryableOrdering(Expression? source)
         {

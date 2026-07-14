@@ -136,8 +136,12 @@ namespace nORM.Query
 
                 if (_t._projection != null && _t._groupJoinInfo == null)
                 {
-                    syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, _t._projection);
-                    materializer = _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection);
+                    // Resolve converters for projection members whose value comes from a correlated
+                    // First/Last/Min/Max subquery over a converter column, so the materializer maps
+                    // the provider value back (null/empty for ordinary projections — no change).
+                    var subqueryConverters = QueryTranslator.ComputeProjectionSubqueryConverters(_t._projection, _t._ctx);
+                    syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, _t._projection, projectionSubqueryConverters: subqueryConverters);
+                    materializer = _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection, projectionSubqueryConverters: subqueryConverters);
                 }
                 else
                 {

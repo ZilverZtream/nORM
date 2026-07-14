@@ -35,7 +35,7 @@ namespace nORM.Query
         /// returning all columns from the mapping. Callers that need richer projection support
         /// should extend this method accordingly.
         /// </remarks>
-        private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection)
+        private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection, IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null)
         {
             // MemberInit: `new TDto { A = r.A, B = r.B, ... }`. The MemberAssignment targets are
             // properties on the DTO; build a Column per assignment whose Setter binds to the DTO
@@ -64,6 +64,13 @@ namespace nORM.Query
                             && srcCol.Converter != null)
                         {
                             dtoCol.Converter = srcCol.Converter;
+                        }
+                        // A correlated subquery (First/Last/Min/Max) over a converter column: the
+                        // caller resolved the element mapping's converter for this member.
+                        else if (projectionSubqueryConverters != null
+                            && projectionSubqueryConverters.TryGetValue(dtoProp.Name, out var subConv))
+                        {
+                            dtoCol.Converter = subConv;
                         }
                         cols.Add(dtoCol);
                     }
@@ -150,7 +157,17 @@ namespace nORM.Query
                         // computed expressions: project as a shadow column named after the
                         // anonymous-type member, typed as the call's return type.
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                        cols.Add(new Column(memberName, mce.Type, mapping.Type, mapping.Provider, memberName));
+                        var mceCol = new Column(memberName, mce.Type, mapping.Type, mapping.Provider, memberName);
+                        // A correlated subquery (First/Last/Min/Max) over a converter column: apply
+                        // the element mapping's converter the caller resolved, so the materializer
+                        // maps the provider value back instead of blindly casting it (e.g. an enum
+                        // stored as its name would otherwise throw a FormatException).
+                        if (projectionSubqueryConverters != null
+                            && projectionSubqueryConverters.TryGetValue(memberName, out var mceConv))
+                        {
+                            mceCol.Converter = mceConv;
+                        }
+                        cols.Add(mceCol);
                     }
                     else if (arg is ConditionalExpression ce)
                     {
