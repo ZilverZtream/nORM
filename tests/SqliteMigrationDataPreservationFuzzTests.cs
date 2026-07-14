@@ -43,6 +43,16 @@ public class SqliteMigrationDataPreservationFuzzTests
         public bool Nullable;
     }
 
+    // Type changes whose value coercion round-trips losslessly through SQLite
+    // affinities in BOTH directions (Up coerce, Down coerce back).
+    private static readonly Dictionary<Type, Type[]> SafeConversions = new()
+    {
+        [typeof(int)] = new[] { typeof(long), typeof(double), typeof(string) },
+        [typeof(long)] = new[] { typeof(string) },
+        [typeof(double)] = new[] { typeof(string) },
+        [typeof(bool)] = new[] { typeof(int) },
+    };
+
     [Theory]
     [InlineData(20260714)]
     [InlineData(4242)]
@@ -86,10 +96,17 @@ public class SqliteMigrationDataPreservationFuzzTests
             indexedColumns.Add(col.Name);
         }
 
+        // ── Optional UNIQUE-indexed column (enforcement must survive) ─────
+        var withUnique = rng.Next(3) == 0;
+        if (withUnique)
+        {
+            baseline.Add(new ColSpec { Name = "U0", Clr = typeof(int), TypeIndex = 0, Nullable = false });
+        }
+
         // ── Optional FK child table (parent recreates must not orphan it) ──
         var withChild = rng.Next(2) == 0;
 
-        var baselineTable = BuildTable(baseline, indexedColumns: indexedColumns);
+        var baselineTable = BuildTable(baseline, indexedColumns: indexedColumns, uniqueColumn: withUnique ? "U0" : null);
         var childTable = withChild ? BuildChildTable() : null;
         var gen = new SqliteMigrationSqlGenerator();
         var createDiff = new SchemaDiff { AddedTables = { baselineTable } };
@@ -110,7 +127,11 @@ public class SqliteMigrationDataPreservationFuzzTests
             {
                 var col = baseline[idx];
                 object value;
-                if (col.Nullable && rng.Next(4) == 0)
+                if (col.Name == "U0")
+                {
+                    value = r * 131 + 7; // distinct per row — unique index must accept the seed
+                }
+                else if (col.Nullable && rng.Next(4) == 0)
                 {
                     value = DBNull.Value;
                     seededNulls.Add(col.Name);
@@ -152,14 +173,32 @@ public class SqliteMigrationDataPreservationFuzzTests
         var added = new List<string>();
         // Indexed columns keep their definitions this round — the indexes
         // themselves must ride through any recreate untouched.
-        var touched = new HashSet<string>(indexedColumns, StringComparer.Ordinal);
+        var touched = new HashSet<string>(indexedColumns, StringComparer.Ordinal) { "U0" };
+        var typeChanged = new HashSet<string>(StringComparer.Ordinal);
         var previousNames = new Dictionary<string, string>(StringComparer.Ordinal); // target col -> PreviousName
 
         var mutations = rng.Next(1, 4);
         for (var m = 0; m < mutations; m++)
         {
-            switch (rng.Next(4))
+            switch (rng.Next(5))
             {
+                case 4:
+                {
+                    // Safe type conversions only: the recreate INSERT..SELECT coerces
+                    // stored values through the new column's affinity, and these
+                    // round-trip losslessly through the Down recreate.
+                    var candidates = target.Where(c => !touched.Contains(c.Name) && !added.Contains(c.Name)
+                        && SafeConversions.ContainsKey(c.Clr)).ToList();
+                    if (candidates.Count == 0) break;
+                    var victim = candidates[rng.Next(candidates.Count)];
+                    var options = SafeConversions[victim.Clr];
+                    var newClr = options[rng.Next(options.Length)];
+                    victim.Clr = newClr;
+                    victim.TypeIndex = Array.FindIndex(ColumnTypePool, p => p.Clr == newClr);
+                    typeChanged.Add(victim.Name);
+                    touched.Add(victim.Name);
+                    break;
+                }
                 case 0:
                 {
                     var name = $"A{m}_{rng.Next(1000)}";
@@ -208,7 +247,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         if (added.Count == 0 && dropped.Count == 0 && renames.Count == 0 && !TargetDiffers(baseline, target, previousNames))
             return; // no-op case
 
-        var targetTable = BuildTable(target, previousNames, indexedColumns);
+        var targetTable = BuildTable(target, previousNames, indexedColumns, withUnique ? "U0" : null);
         var oldSnapshot = new SchemaSnapshot { Tables = { baselineTable } };
         var newSnapshot = new SchemaSnapshot { Tables = { targetTable } };
         if (childTable != null)
@@ -233,7 +272,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         }
 
         AssertSchema(cn, target, detail + " (after Up)");
-        AssertIndexes(cn, indexedColumns, detail + " (after Up)");
+        AssertIndexes(cn, indexedColumns, withUnique, detail + " (after Up)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Up)");
         var afterUp = Snapshot(cn, target.Select(c => c.Name));
         Assert.True(before.Count == afterUp.Count, $"row count changed on Up: {detail} — {before.Count} -> {afterUp.Count}");
@@ -244,7 +283,12 @@ public class SqliteMigrationDataPreservationFuzzTests
             {
                 var expected = added.Contains(col.Name) ? DBNull.Value : before[id][sourceName];
                 var actualVal = afterUp[id][col.Name];
-                Assert.True(StorageEquals(expected, actualVal),
+                // A type-changed column reads back in the NEW affinity's storage
+                // form (5 -> '5.0' etc.); compare numerically where possible.
+                var ok = typeChanged.Contains(col.Name)
+                    ? CoercedEquals(expected, actualVal)
+                    : StorageEquals(expected, actualVal);
+                Assert.True(ok,
                     $"value drift on Up col={col.Name} row={id}: {detail} — expected {Render(expected)} got {Render(actualVal)}");
             }
         }
@@ -260,7 +304,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         }
 
         AssertSchema(cn, baseline, detail + " (after Down)");
-        AssertIndexes(cn, indexedColumns, detail + " (after Down)");
+        AssertIndexes(cn, indexedColumns, withUnique, detail + " (after Down)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Down)");
         var afterDown = Snapshot(cn, baseline.Select(c => c.Name));
         Assert.True(before.Count == afterDown.Count, $"row count changed on Down: {detail} — {before.Count} -> {afterDown.Count}");
@@ -295,7 +339,7 @@ public class SqliteMigrationDataPreservationFuzzTests
     }
 
     private static TableSchema BuildTable(List<ColSpec> cols, Dictionary<string, string>? previousNames = null,
-        List<string>? indexedColumns = null)
+        List<string>? indexedColumns = null, string? uniqueColumn = null)
     {
         var t = new TableSchema { Name = "FuzzMig" };
         t.Columns.Add(new ColumnSchema
@@ -317,6 +361,8 @@ public class SqliteMigrationDataPreservationFuzzTests
                 schema.PreviousName = prev;
             if (indexedColumns != null && indexedColumns.Contains(c.Name))
                 schema.Indexes.Add(new ColumnIndexSchema { Name = IndexName(c.Name), IsUnique = false, Order = 0 });
+            if (uniqueColumn != null && c.Name == uniqueColumn)
+                schema.Indexes.Add(new ColumnIndexSchema { Name = IndexName(c.Name), IsUnique = true, Order = 0 });
             t.Columns.Add(schema);
         }
         return t;
@@ -340,20 +386,67 @@ public class SqliteMigrationDataPreservationFuzzTests
         return t;
     }
 
-    private static void AssertIndexes(SqliteConnection cn, List<string> indexedColumns, string detail)
+    private static void AssertIndexes(SqliteConnection cn, List<string> indexedColumns, bool withUnique, string detail)
     {
-        var live = new List<string>();
+        var live = new Dictionary<string, bool>(StringComparer.Ordinal);
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='FuzzMig' AND name NOT LIKE 'sqlite_%'";
+            cmd.CommandText = "SELECT name, \"unique\" FROM pragma_index_list('FuzzMig') WHERE origin = 'c'";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                live.Add(reader.GetString(0));
+                live[reader.GetString(0)] = reader.GetInt32(1) == 1;
         }
-        var expected = indexedColumns.Select(IndexName).OrderBy(x => x, StringComparer.Ordinal).ToList();
-        var actual = live.OrderBy(x => x, StringComparer.Ordinal).ToList();
+        var expected = indexedColumns.Select(IndexName)
+            .Concat(withUnique ? new[] { IndexName("U0") } : Array.Empty<string>())
+            .OrderBy(x => x, StringComparer.Ordinal).ToList();
+        var actual = live.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList();
         Assert.True(expected.SequenceEqual(actual),
             $"index drift {detail}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        if (withUnique)
+        {
+            Assert.True(live[IndexName("U0")],
+                $"unique index came back NON-unique {detail}");
+            // The rebuilt index must still ENFORCE uniqueness, not merely report it.
+            // Duplicate an EXISTING row wholesale (minus Id) so every NOT NULL
+            // column is satisfied and the only violation left is the unique one.
+            var insertCols = new List<string>();
+            using (var info = cn.CreateCommand())
+            {
+                info.CommandText = "SELECT name FROM pragma_table_info('FuzzMig') WHERE name <> 'Id'";
+                using var reader = info.ExecuteReader();
+                while (reader.Read())
+                    insertCols.Add(reader.GetString(0));
+            }
+            var colList = string.Join(", ", insertCols);
+            using var insert = cn.CreateCommand();
+            insert.CommandText = $"INSERT INTO FuzzMig ({colList}) SELECT {colList} FROM FuzzMig LIMIT 1";
+            var uniqueViolation = false;
+            try { insert.ExecuteNonQuery(); }
+            catch (SqliteException ex)
+            {
+                uniqueViolation = ex.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase);
+            }
+            Assert.True(uniqueViolation, $"unique index no longer enforced {detail} — duplicate U0 accepted");
+        }
+        foreach (var col in indexedColumns)
+        {
+            Assert.False(live[IndexName(col)],
+                $"non-unique index came back UNIQUE {detail} col={col}");
+        }
+    }
+
+    // Numeric-aware equality for type-changed columns: the new affinity's
+    // storage form may render differently ('5.0' vs 5) while the value is intact.
+    private static bool CoercedEquals(object expected, object actual)
+    {
+        if (expected is DBNull && actual is DBNull) return true;
+        if (expected is DBNull || actual is DBNull) return false;
+        var es = Convert.ToString(expected, CultureInfo.InvariantCulture);
+        var os = Convert.ToString(actual, CultureInfo.InvariantCulture);
+        if (double.TryParse(es, NumberStyles.Any, CultureInfo.InvariantCulture, out var ed)
+            && double.TryParse(os, NumberStyles.Any, CultureInfo.InvariantCulture, out var od))
+            return Math.Abs(ed - od) < 1e-9;
+        return string.Equals(es, os, StringComparison.Ordinal);
     }
 
     private static void AssertChildIntegrity(SqliteConnection cn, Dictionary<long, Dictionary<string, object>> childBefore, string detail)
