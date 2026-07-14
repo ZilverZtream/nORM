@@ -82,6 +82,29 @@ namespace nORM.Query
                 if (TryInlineBoolLiteral(node))
                     return node;
 
+                // Bool =/<> against a BOOLEAN EXPRESSION (e.g. x.Flag == (x.Id % 2 == 0)):
+                // the expression side renders as a PREDICATE, and providers without a
+                // boolean value type (SQL Server) reject `col = (pred)`. Convert each
+                // predicate-shaped side to a comparable value via the provider hook
+                // (same treatment as bool join keys); value-shaped sides (columns,
+                // parameters) compare bare.
+                if (node.Left.Type == typeof(bool) && node.Right.Type == typeof(bool)
+                    && (RendersAsBoolPredicate(node.Left) || RendersAsBoolPredicate(node.Right)))
+                {
+                    var lbSql = RendersAsBoolPredicate(node.Left)
+                        ? _provider.BooleanPredicateAsValueSql(GetSql(node.Left))
+                        : GetSql(node.Left);
+                    var rbSql = RendersAsBoolPredicate(node.Right)
+                        ? _provider.BooleanPredicateAsValueSql(GetSql(node.Right))
+                        : GetSql(node.Right);
+                    _sql.Append("(")
+                        .Append(lbSql)
+                        .Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ")
+                        .Append(rbSql)
+                        .Append(")");
+                    return node;
+                }
+
                 // Nullable column-vs-column comparison needs three-valued logic.
                 // A plain = or <> is incorrect when either side can be NULL at runtime.
                 // For Nullable<T> value types: always expand (runtime null possible).
@@ -515,6 +538,26 @@ namespace nORM.Query
             Visit(node.Right);
             _sql.Append(")");
             return node;
+        }
+
+        /// <summary>
+        /// True when a bool-typed operand translates to a SQL PREDICATE (comparison,
+        /// logical combination, negation, or a bool-returning method like Contains)
+        /// rather than a comparable value (a mapped column or bound parameter).
+        /// </summary>
+        private static bool RendersAsBoolPredicate(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            return e is BinaryExpression
+            {
+                NodeType: ExpressionType.Equal or ExpressionType.NotEqual
+                    or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                    or ExpressionType.AndAlso or ExpressionType.OrElse
+            }
+                or UnaryExpression { NodeType: ExpressionType.Not }
+                or MethodCallExpression;
         }
 
         /// <summary>
