@@ -73,6 +73,22 @@ namespace nORM.Query
             {
                 Visit(outerQuery);
             }
+            // A Select-projected outer (scalar, DTO or anonymous shape) without Distinct:
+            // GroupJoin still yields one result per outer ROW, and projected keys are NOT
+            // distinct, so the outer must materialize as the full entity (PK segmentation
+            // keeps duplicate-key outers from fusing) with the projection composed into
+            // the key and result selectors client-side.
+            LambdaExpression? outerProjection = null;
+            if (_projection is { Parameters.Count: 1 } proj
+                && proj.Body.Type == resultSelector.Parameters[0].Type
+                && proj.Body.Type != _mapping.Type)
+            {
+                outerProjection = proj;
+                _projection = null; // materialize the outer entity; project client-side
+                effectiveOuterKeySelector = ComposeThroughOuterProjection(proj, outerKeySelector);
+                runtimeResultSelector = ComposeThroughOuterProjection(proj, resultSelector);
+                sqlResultSelector = runtimeResultSelector;
+            }
             if (IsPostMaterializeTailMode
                 && CurrentPostMaterializeElementType == effectiveOuterKeySelector.Parameters[0].Type)
             {
@@ -261,7 +277,9 @@ namespace nORM.Query
                     "no primary key to use as the LEFT-JOIN match probe. Add [Key] or a fluent HasKey to the inner " +
                     "entity, or use a plain column as the inner key.");
 
-            var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
+            // A composed projected outer materializes the ENTITY, so the runtime key
+            // selector must be the entity-composed one, not the projection-typed original.
+            var outerKeyFunc = CreateObjectKeySelector(outerProjection != null ? effectiveOuterKeySelector : outerKeySelector);
             var (resultSelectorFunc, liftedSelector, closureSlots) = CompileGroupJoinResultSelector(runtimeResultSelector);
             // Segmentation identity: the outer's PK getters — or for a keyless
             // outer, the full column set (structural row identity) so distinct
@@ -290,6 +308,26 @@ namespace nORM.Query
                 ClosureSlotCount: closureSlots
             );
             return node;
+        }
+
+        /// <summary>
+        /// Rewrites a lambda whose FIRST parameter is a projected shape into one taking
+        /// the projection's source entity instead, by substituting the projection body
+        /// for that parameter. Remaining parameters (the GroupJoin inners) pass through.
+        /// </summary>
+        private static LambdaExpression ComposeThroughOuterProjection(
+            LambdaExpression projection,
+            LambdaExpression consumer)
+        {
+            var newBody = new ParameterReplacer(consumer.Parameters[0], projection.Body).Visit(consumer.Body)!;
+            // Simplify member accesses over the substituted projection shape
+            // (new { X = e.A }.X -> e.A) so the key translates to plain columns.
+            newBody = new ProjectionMemberReplacer().Visit(newBody)!;
+            var parameters = new ParameterExpression[consumer.Parameters.Count];
+            parameters[0] = projection.Parameters[0];
+            for (var i = 1; i < consumer.Parameters.Count; i++)
+                parameters[i] = consumer.Parameters[i];
+            return Expression.Lambda(newBody, parameters);
         }
 
         private static LambdaExpression CreateScalarGroupJoinSqlProjection(
