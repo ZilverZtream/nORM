@@ -70,29 +70,33 @@ public class LiveProviderSubqueryFuzzParityTests
     {
         "mysql" => """
             CREATE TABLE FuzzRow_Test (Id INT PRIMARY KEY, IntVal INT NOT NULL, NullableInt INT NULL, Name VARCHAR(64) CHARACTER SET utf8mb4 NOT NULL, Nick VARCHAR(64) CHARACTER SET utf8mb4 NULL, Amount DECIMAL(18,6) NOT NULL, Price DOUBLE NOT NULL, Flag TINYINT(1) NOT NULL, Created DATETIME(6) NOT NULL);
-            CREATE TABLE FuzzChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, ChildVal INT NOT NULL, Tag VARCHAR(16) CHARACTER SET utf8mb4 NOT NULL)
+            CREATE TABLE FuzzChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, ChildVal INT NOT NULL, Tag VARCHAR(16) CHARACTER SET utf8mb4 NOT NULL);
+            CREATE TABLE FuzzGrand_Test (Id INT PRIMARY KEY, ChildId INT NOT NULL, GVal INT NOT NULL)
             """,
         "postgres" => """
             CREATE TABLE "FuzzRow_Test" ("Id" INT PRIMARY KEY, "IntVal" INT NOT NULL, "NullableInt" INT NULL, "Name" TEXT NOT NULL, "Nick" TEXT NULL, "Amount" DECIMAL(18,6) NOT NULL, "Price" DOUBLE PRECISION NOT NULL, "Flag" BOOLEAN NOT NULL, "Created" TIMESTAMP NOT NULL);
-            CREATE TABLE "FuzzChild_Test" ("Id" INT PRIMARY KEY, "ParentId" INT NOT NULL, "ChildVal" INT NOT NULL, "Tag" TEXT NOT NULL)
+            CREATE TABLE "FuzzChild_Test" ("Id" INT PRIMARY KEY, "ParentId" INT NOT NULL, "ChildVal" INT NOT NULL, "Tag" TEXT NOT NULL);
+            CREATE TABLE "FuzzGrand_Test" ("Id" INT PRIMARY KEY, "ChildId" INT NOT NULL, "GVal" INT NOT NULL)
             """,
         _ => """
             CREATE TABLE FuzzRow_Test (Id INT PRIMARY KEY, IntVal INT NOT NULL, NullableInt INT NULL, Name NVARCHAR(64) NOT NULL, Nick NVARCHAR(64) NULL, Amount DECIMAL(18,6) NOT NULL, Price FLOAT NOT NULL, Flag BIT NOT NULL, Created DATETIME2 NOT NULL);
-            CREATE TABLE FuzzChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, ChildVal INT NOT NULL, Tag NVARCHAR(16) NOT NULL)
+            CREATE TABLE FuzzChild_Test (Id INT PRIMARY KEY, ParentId INT NOT NULL, ChildVal INT NOT NULL, Tag NVARCHAR(16) NOT NULL);
+            CREATE TABLE FuzzGrand_Test (Id INT PRIMARY KEY, ChildId INT NOT NULL, GVal INT NOT NULL)
             """,
     };
 
     private static string DropTablesSql(string kind) => kind switch
     {
         "postgres" => """
-            DROP TABLE IF EXISTS "FuzzRow_Test"; DROP TABLE IF EXISTS "FuzzChild_Test"
+            DROP TABLE IF EXISTS "FuzzRow_Test"; DROP TABLE IF EXISTS "FuzzChild_Test"; DROP TABLE IF EXISTS "FuzzGrand_Test"
             """,
         "sqlserver" => """
             IF OBJECT_ID('FuzzRow_Test') IS NOT NULL DROP TABLE FuzzRow_Test;
-            IF OBJECT_ID('FuzzChild_Test') IS NOT NULL DROP TABLE FuzzChild_Test
+            IF OBJECT_ID('FuzzChild_Test') IS NOT NULL DROP TABLE FuzzChild_Test;
+            IF OBJECT_ID('FuzzGrand_Test') IS NOT NULL DROP TABLE FuzzGrand_Test
             """,
         _ => """
-            DROP TABLE IF EXISTS FuzzRow_Test; DROP TABLE IF EXISTS FuzzChild_Test
+            DROP TABLE IF EXISTS FuzzRow_Test; DROP TABLE IF EXISTS FuzzChild_Test; DROP TABLE IF EXISTS FuzzGrand_Test
             """,
     };
 
@@ -109,15 +113,20 @@ public class LiveProviderSubqueryFuzzParityTests
         Exec(factory!, CreateTablesSql(kind));
         try
         {
-            using var seedCtx = new DbContext(factory!(), provider!);
-            await LinqParityFuzzTests.SeedAsync(seedCtx);
-            await LinqParityFuzzTests.SeedChildrenAsync(seedCtx);
+            using (var seedCtx = new DbContext(factory!(), provider!))
+            {
+                await LinqParityFuzzTests.SeedAsync(seedCtx);
+                await LinqParityFuzzTests.SeedChildrenAsync(seedCtx);
+                await LinqParityFuzzTests.SeedGrandsAsync(seedCtx);
+            }
 
             foreach (var seed in new[] { 20260714, 42 })
             {
-                using var ctx = new DbContext(factory!(), provider!);
+                using var ctx = new DbContext(factory!(), provider!, LinqParityFuzzTests.CreateFuzzOptions());
                 LinqParityFuzzTests.RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 80);
                 LinqParityFuzzTests.RunStringComparisonClosureFuzz(ctx, seed, cases: 60);
+                LinqParityFuzzTests.RunIncludeFuzz(ctx, seed, cases: 40);
+                LinqParityFuzzTests.RunThenIncludeFuzz(ctx, seed, cases: 30);
             }
         }
         finally
