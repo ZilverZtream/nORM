@@ -103,13 +103,20 @@ public class SqliteMigrationDataPreservationFuzzTests
             baseline.Add(new ColSpec { Name = "U0", Clr = typeof(int), TypeIndex = 0, Nullable = false });
         }
 
+        // ── Optional CHECK-constrained column (enforcement must survive) ──
+        var withCheck = rng.Next(4) == 0;
+        if (withCheck)
+        {
+            baseline.Add(new ColSpec { Name = "Ck0", Clr = typeof(int), TypeIndex = 0, Nullable = false });
+        }
+
         // ── Optional FK child table (parent recreates must not orphan it) ──
         var withChild = rng.Next(2) == 0;
 
         // Index NAMES stay keyed to the baseline column so a rename keeps the
         // index identity while pointing it at the renamed column.
         var baselineIndexes = indexedColumns.ToDictionary(c => c, IndexName, StringComparer.Ordinal);
-        var baselineTable = BuildTable(baseline, indexNamesByColumn: baselineIndexes, uniqueColumn: withUnique ? "U0" : null);
+        var baselineTable = BuildTable(baseline, indexNamesByColumn: baselineIndexes, uniqueColumn: withUnique ? "U0" : null, withCheck: withCheck);
         var childTable = withChild ? BuildChildTable() : null;
         var gen = new SqliteMigrationSqlGenerator();
         var createDiff = new SchemaDiff { AddedTables = { baselineTable } };
@@ -133,6 +140,10 @@ public class SqliteMigrationDataPreservationFuzzTests
                 if (col.Name == "U0")
                 {
                     value = r * 131 + 7; // distinct per row — unique index must accept the seed
+                }
+                else if (col.Name == "Ck0")
+                {
+                    value = rng.Next(1, 500); // strictly positive — satisfies CHECK (Ck0 > 0)
                 }
                 else if (col.Nullable && rng.Next(4) == 0)
                 {
@@ -177,7 +188,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         // Indexed columns participate in mutations: dropping one must drop its
         // index (a recreate re-emitting an index over a missing column is broken
         // SQL), and renaming one must carry the index to the new column name.
-        var touched = new HashSet<string>(StringComparer.Ordinal) { "U0" };
+        var touched = new HashSet<string>(StringComparer.Ordinal) { "U0", "Ck0" };
         var typeChanged = new HashSet<string>(StringComparer.Ordinal);
         var previousNames = new Dictionary<string, string>(StringComparer.Ordinal); // target col -> PreviousName
 
@@ -261,7 +272,7 @@ public class SqliteMigrationDataPreservationFuzzTests
             targetIndexes[renames.TryGetValue(col, out var renamed) ? renamed : col] = ixName;
         }
 
-        var targetTable = BuildTable(target, previousNames, targetIndexes, withUnique ? "U0" : null);
+        var targetTable = BuildTable(target, previousNames, targetIndexes, withUnique ? "U0" : null, withCheck);
         var oldSnapshot = new SchemaSnapshot { Tables = { baselineTable } };
         var newSnapshot = new SchemaSnapshot { Tables = { targetTable } };
         if (childTable != null)
@@ -287,6 +298,7 @@ public class SqliteMigrationDataPreservationFuzzTests
 
         AssertSchema(cn, target, detail + " (after Up)");
         AssertIndexes(cn, targetIndexes, withUnique, detail + " (after Up)");
+        if (withCheck) AssertCheckEnforced(cn, detail + " (after Up)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Up)");
         var afterUp = Snapshot(cn, target.Select(c => c.Name));
         Assert.True(before.Count == afterUp.Count, $"row count changed on Up: {detail} — {before.Count} -> {afterUp.Count}");
@@ -319,6 +331,7 @@ public class SqliteMigrationDataPreservationFuzzTests
 
         AssertSchema(cn, baseline, detail + " (after Down)");
         AssertIndexes(cn, baselineIndexes, withUnique, detail + " (after Down)");
+        if (withCheck) AssertCheckEnforced(cn, detail + " (after Down)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Down)");
         var afterDown = Snapshot(cn, baseline.Select(c => c.Name));
         Assert.True(before.Count == afterDown.Count, $"row count changed on Down: {detail} — {before.Count} -> {afterDown.Count}");
@@ -353,7 +366,7 @@ public class SqliteMigrationDataPreservationFuzzTests
     }
 
     private static TableSchema BuildTable(List<ColSpec> cols, Dictionary<string, string>? previousNames = null,
-        Dictionary<string, string>? indexNamesByColumn = null, string? uniqueColumn = null)
+        Dictionary<string, string>? indexNamesByColumn = null, string? uniqueColumn = null, bool withCheck = false)
     {
         var t = new TableSchema { Name = "FuzzMig" };
         t.Columns.Add(new ColumnSchema
@@ -379,6 +392,8 @@ public class SqliteMigrationDataPreservationFuzzTests
                 schema.Indexes.Add(new ColumnIndexSchema { Name = IndexName(c.Name), IsUnique = true, Order = 0 });
             t.Columns.Add(schema);
         }
+        if (withCheck)
+            t.CheckConstraints.Add(new CheckConstraintSchema { ConstraintName = "CK_FuzzMig_Ck0", Sql = "Ck0 > 0" });
         return t;
     }
 
@@ -459,6 +474,33 @@ public class SqliteMigrationDataPreservationFuzzTests
             Assert.False(live[ixName],
                 $"non-unique index came back UNIQUE {detail} index={ixName}");
         }
+    }
+
+    private static void AssertCheckEnforced(SqliteConnection cn, string detail)
+    {
+        // Copy an existing row wholesale but violate the CHECK column (and
+        // freshen the unique column when present) so the CHECK is the only
+        // constraint that can fire — a rebuild that silently dropped it would
+        // accept the row.
+        var insertCols = new List<string>();
+        using (var info = cn.CreateCommand())
+        {
+            info.CommandText = "SELECT name FROM pragma_table_info('FuzzMig') WHERE name <> 'Id'";
+            using var reader = info.ExecuteReader();
+            while (reader.Read())
+                insertCols.Add(reader.GetString(0));
+        }
+        var selectList = string.Join(", ", insertCols.Select(c =>
+            c == "Ck0" ? "-1" : c == "U0" ? "987654321" : c));
+        using var insert = cn.CreateCommand();
+        insert.CommandText = $"INSERT INTO FuzzMig ({string.Join(", ", insertCols)}) SELECT {selectList} FROM FuzzMig LIMIT 1";
+        var checkViolation = false;
+        try { insert.ExecuteNonQuery(); }
+        catch (SqliteException ex)
+        {
+            checkViolation = ex.Message.Contains("CHECK", StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.True(checkViolation, $"CHECK constraint no longer enforced {detail} — violating insert accepted");
     }
 
     // Numeric-aware equality for type-changed columns: the new affinity's
