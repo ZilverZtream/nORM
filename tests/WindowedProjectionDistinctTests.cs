@@ -54,6 +54,40 @@ public class WindowedProjectionDistinctTests
         Assert.Equal(4, rows.Count);
         Assert.Equal(new[] { (string?)null, "ALPHA", "alpha", "beta" }, rows.Select(x => x.Nick).ToArray());
     }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("WinDtoDis_Test")]
+    public class WinDtoDisRow
+    {
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public System.DateTimeOffset Stamp { get; set; }
+    }
+
+    [Fact]
+    public async Task Windowed_scalar_DateTimeOffset_distinct_dedups_by_instant()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE WinDtoDis_Test (Id INTEGER PRIMARY KEY, Stamp TEXT NOT NULL)";
+            cmd.ExecuteNonQuery();
+        }
+
+        using var ctx = new DbContext(cn, new SqliteProvider());
+        // Rows 1 and 2 are the SAME instant under different offsets.
+        ctx.Add(new WinDtoDisRow { Id = 1, Stamp = new System.DateTimeOffset(2026, 7, 14, 12, 0, 0, System.TimeSpan.Zero) });
+        ctx.Add(new WinDtoDisRow { Id = 2, Stamp = new System.DateTimeOffset(2026, 7, 14, 14, 0, 0, System.TimeSpan.FromHours(2)) });
+        ctx.Add(new WinDtoDisRow { Id = 3, Stamp = new System.DateTimeOffset(2026, 7, 14, 13, 0, 0, System.TimeSpan.Zero) });
+        await ctx.SaveChangesAsync();
+
+        var stamps = ctx.Query<WinDtoDisRow>().OrderBy(r => r.Id).Take(3)
+            .Select(r => r.Stamp)
+            .Distinct()
+            .ToList();
+
+        // C# Distinct over DateTimeOffset is instant-based: two distinct instants.
+        Assert.Equal(2, stamps.Count);
+    }
 }
 
 [Trait("Category", TestCategory.LiveProvider)]
@@ -104,6 +138,17 @@ public class WindowedProjectionDistinctLiveTests
                 .OrderBy(x => x.N, StringComparer.Ordinal).ThenBy(x => x.V).ToList();
             Assert.Equal(4, renamed.Count);
             Assert.Equal(new[] { (string?)null, "ALPHA", "alpha", "beta" }, renamed.Select(x => x.N).ToArray());
+
+            // Computed string member: the alias-based GROUP BY works for any
+            // projection shape, so case variants stay distinct here too.
+            var computed = (await ctx.Query<WinDisRow>().OrderBy(r => r.Id).Take(5)
+                    .Select(r => new { S = r.Nick + "!", r.V })
+                    .Distinct()
+                    .ToListAsync())
+                .OrderBy(x => x.S, StringComparer.Ordinal).ThenBy(x => x.V).ToList();
+            Assert.Equal(4, computed.Count);
+            Assert.Contains(computed, x => x.S == "ALPHA!");
+            Assert.Contains(computed, x => x.S == "alpha!");
         }
         finally
         {

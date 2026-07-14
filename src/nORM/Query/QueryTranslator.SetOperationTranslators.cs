@@ -108,9 +108,11 @@ namespace nORM.Query
                 var elementArgs = node.Arguments[0].Type.IsGenericType
                     ? node.Arguments[0].Type.GetGenericArguments()
                     : Type.EmptyTypes;
-                if (t._provider.DefaultStringEqualityIsCaseInsensitive
-                    && elementArgs.Length > 0
-                    && elementArgs[0] == typeof(string)
+                var elementType = elementArgs.Length > 0
+                    ? Nullable.GetUnderlyingType(elementArgs[0]) ?? elementArgs[0]
+                    : null;
+                if (elementType == typeof(string)
+                    && t._provider.DefaultStringEqualityIsCaseInsensitive
                     && TryGetSingleColumnSelectIdentifier(subPlanD.Sql, out var distinctCol))
                 {
                     t._sql.AppendFragment("SELECT ").Append(distinctCol)
@@ -121,31 +123,62 @@ namespace nORM.Query
                     return node;
                 }
 
-                // Anonymous / record shapes of plain member accesses: DISTINCT under a
-                // CI collation folds case in the string members, so group the wrap by
-                // every column with a binary extra per string member — the same
-                // byte-wise distinctness rewrite as the scalar branch, per column.
-                if (t._provider.DefaultStringEqualityIsCaseInsensitive
-                    && shapeLambda?.Body is NewExpression shapeNew
+                // Scalar DateTimeOffset: .NET dedups by INSTANT; offset-suffixed TEXT
+                // storage dedups by representation. Mirror of the flat-path rewrite —
+                // select and group the canonical form (it still materializes as a
+                // DateTimeOffset). Identity-hook providers skip this branch.
+                if (elementType == typeof(DateTimeOffset)
+                    && TryGetSingleColumnSelectIdentifier(subPlanD.Sql, out var dtoCol)
+                    && t._provider.CanonicalizeDateTimeOffsetGroupKey(dtoCol) is { } canonicalDto)
+                {
+                    t._sql.AppendFragment("SELECT ").Append(canonicalDto)
+                          .AppendFragment(" FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
+                    t._groupBy.Add(canonicalDto);
+                    t._isDistinct = true;
+                    return node;
+                }
+
+                // Anonymous / record shapes: DISTINCT dedups string members by the CI
+                // collation and DateTimeOffset members by representation. The
+                // sub-select aliases each output by the projection MEMBER name
+                // (computed members included), so the wrap selects and groups those
+                // aliases with type-appropriate extras per member.
+                if (shapeLambda?.Body is NewExpression shapeNew
                     && shapeNew.Members != null
                     && shapeNew.Members.Count == shapeNew.Arguments.Count
                     && shapeNew.Arguments.Count > 0
-                    && TryGetMemberAccessColumns(shapeNew, shapeLambda.Parameters[0], subMapD, out var shapeCols))
+                    && shapeNew.Arguments.Any(a =>
+                        NeedsDistinctKeyTreatment(t, Nullable.GetUnderlyingType(a.Type) ?? a.Type)))
                 {
-                    // The sub-select aliases each output by the projection MEMBER name
-                    // (`"Nick" AS "N"`), so wrap-scope references use member names.
                     t._sql.AppendFragment("SELECT ");
-                    for (var ci = 0; ci < shapeCols.Count; ci++)
-                    {
-                        if (ci > 0) t._sql.AppendFragment(", ");
-                        t._sql.Append(t._provider.Escape(shapeNew.Members[ci].Name));
-                    }
-                    t._sql.AppendFragment(" FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
-                    for (var ci = 0; ci < shapeCols.Count; ci++)
+                    for (var ci = 0; ci < shapeNew.Members.Count; ci++)
                     {
                         var outName = t._provider.Escape(shapeNew.Members[ci].Name);
+                        var memberType = Nullable.GetUnderlyingType(shapeNew.Arguments[ci].Type) ?? shapeNew.Arguments[ci].Type;
+                        if (ci > 0) t._sql.AppendFragment(", ");
+                        if (memberType == typeof(DateTimeOffset)
+                            && t._provider.CanonicalizeDateTimeOffsetGroupKey(outName) is { } canonicalMember)
+                        {
+                            t._sql.Append(canonicalMember).AppendFragment(" AS ").Append(outName);
+                        }
+                        else
+                        {
+                            t._sql.Append(outName);
+                        }
+                    }
+                    t._sql.AppendFragment(" FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
+                    for (var ci = 0; ci < shapeNew.Members.Count; ci++)
+                    {
+                        var outName = t._provider.Escape(shapeNew.Members[ci].Name);
+                        var memberType = Nullable.GetUnderlyingType(shapeNew.Arguments[ci].Type) ?? shapeNew.Arguments[ci].Type;
+                        if (memberType == typeof(DateTimeOffset)
+                            && t._provider.CanonicalizeDateTimeOffsetGroupKey(outName) is { } canonicalMember)
+                        {
+                            t._groupBy.Add(canonicalMember);
+                            continue;
+                        }
                         t._groupBy.Add(outName);
-                        if (shapeCols[ci].Prop.PropertyType == typeof(string))
+                        if (memberType == typeof(string) && t._provider.DefaultStringEqualityIsCaseInsensitive)
                             t._groupByOrdinalExtras.Add(t._provider.ForceCaseSensitiveStringComparison(outName));
                     }
                     t._isDistinct = true;
@@ -156,6 +189,15 @@ namespace nORM.Query
                 t._isDistinct = true;
                 return node;
             }
+
+            /// <summary>
+            /// True when a projected member of this type dedups incorrectly under a
+            /// plain DISTINCT on the current provider (CI-collated strings; text-stored
+            /// DateTimeOffset instants).
+            /// </summary>
+            private static bool NeedsDistinctKeyTreatment(QueryTranslator t, Type memberType)
+                => (memberType == typeof(string) && t._provider.DefaultStringEqualityIsCaseInsensitive)
+                   || (memberType == typeof(DateTimeOffset) && t._provider.CanonicalizeDateTimeOffsetGroupKey("x") != null);
 
             /// <summary>
             /// Walks down through element-shape-preserving operators (Where, OrderBy,
@@ -183,31 +225,6 @@ namespace nORM.Query
                 return null;
             }
 
-            /// <summary>
-            /// Matches a projection whose constructor arguments are all direct
-            /// member accesses on the source parameter and resolves them to their
-            /// mapped columns (in projection order). Computed members return false —
-            /// those shapes keep the DISTINCT keyword fallback.
-            /// </summary>
-            private static bool TryGetMemberAccessColumns(
-                NewExpression shape,
-                ParameterExpression sourceParam,
-                TableMapping mapping,
-                out List<Column> columns)
-            {
-                columns = new List<Column>(shape.Arguments.Count);
-                foreach (var arg in shape.Arguments)
-                {
-                    if (arg is not MemberExpression member
-                        || member.Expression != sourceParam
-                        || !mapping.ColumnsByName.TryGetValue(member.Member.Name, out var col))
-                    {
-                        return false;
-                    }
-                    columns.Add(col);
-                }
-                return true;
-            }
 
             /// <summary>
             /// Matches a sub-select whose output list is exactly one plain
