@@ -853,6 +853,8 @@ namespace nORM.Query
         private void ReserveClosureSlots(Expression expression)
             => new ClosureSlotReserver(this).Visit(expression);
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure slot reservation evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure slot reservation reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ClosureSlotReserver : ExpressionVisitor
         {
             private readonly QueryTranslator _t;

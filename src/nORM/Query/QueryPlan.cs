@@ -158,11 +158,17 @@ namespace nORM.Query
     /// visitor pre-order — the SAME traversal the GroupJoin closure lift uses to
     /// assign slots, so collected values bind positionally to the lifted delegate.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure value collection evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+    [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure value collection reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
     internal static class GroupJoinClosureValues
     {
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure value collection evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure value collection reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         internal static void Collect(System.Linq.Expressions.Expression body, List<object?> into)
             => new Collector(into).Visit(body);
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure value collection evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure value collection reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class Collector : System.Linq.Expressions.ExpressionVisitor
         {
             private readonly List<object?> _into;

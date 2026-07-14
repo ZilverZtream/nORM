@@ -97,6 +97,8 @@ namespace nORM.Query
         /// positional reads from the lifted values array, so the compiled GroupJoin
         /// result selector is closure-free and per-execution values can be rebound.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure lifting evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure lifting reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ClosureLiftRewriter : ExpressionVisitor
         {
             private readonly ParameterExpression _values;
