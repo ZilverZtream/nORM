@@ -310,8 +310,20 @@ namespace nORM.Core
                         EntityState.Deleted  => map.KeyColumns.Length + (map.TimestampColumn != null ? 1 : 0) + tenantParamCount,
                         _ => 0
                     };
+                    // A Modified entity may have entered this batch solely because its
+                    // many-to-many collection changed (change detection marks the owner
+                    // Modified for an association edit). When such an owner has NO mutable
+                    // columns — a key-only join owner — there is no column UPDATE to emit,
+                    // and building one would throw. Skip the column UPDATE; the M2M sync
+                    // below still runs and applies the association change. Restricted to
+                    // maps that HAVE M2M joins so a genuinely un-updatable entity (key- or
+                    // key+timestamp-only, no M2M) still surfaces the clear configuration
+                    // error rather than silently no-op'ing a real update attempt.
+                    var isColumnlessModified = state == EntityState.Modified
+                        && map.UpdateColumns.Length == 0
+                        && map.ManyToManyJoins.Count > 0;
                     var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
-                    var templateLength = EstimateTemplateLength(state, map);
+                    var templateLength = isColumnlessModified ? 64 : EstimateTemplateLength(state, map);
 
                     // Reuse DbCommand and StringBuilder across batches: create ONE of each and
                     // clear/reset between batches rather than allocating per-batch.
@@ -353,7 +365,8 @@ namespace nORM.Core
                                 totalAffected += await ExecuteInsertBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);
                                 break;
                             case EntityState.Modified:
-                                totalAffected += await ExecuteUpdateBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);
+                                if (!isColumnlessModified)
+                                    totalAffected += await ExecuteUpdateBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);
                                 break;
                             case EntityState.Deleted:
                                 totalAffected += await ExecuteDeleteBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);
