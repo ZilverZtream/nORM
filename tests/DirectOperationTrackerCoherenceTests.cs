@@ -124,6 +124,62 @@ public class DirectOperationTrackerCoherenceTests
     }
 
     [Fact]
+    public async Task Direct_update_of_pending_added_entity_does_not_drop_the_pending_insert()
+    {
+        var (keeper, openCtx) = CreateDb();
+        using var _ = keeper;
+        using var ctx = openCtx();
+
+        var row = new Row { Id = 1, Val = 10 };
+        ctx.Add(row);
+        row.Val = 20;
+        var affected = await ctx.UpdateAsync(row); // nothing persisted yet: no row to update
+        Assert.Equal(0, affected);
+
+        await ctx.SaveChangesAsync(); // the pending INSERT must still happen, with current values
+
+        using var verifyCtx = openCtx();
+        var persisted = await verifyCtx.Query<Row>().FirstAsync(r => r.Id == 1);
+        Assert.Equal(20, persisted.Val);
+    }
+
+    [Fact]
+    public async Task Direct_update_of_pending_added_token_entity_is_not_a_concurrency_conflict()
+    {
+        var (keeper, openCtx) = CreateDb();
+        using var _ = keeper;
+        using var ctx = openCtx();
+
+        var row = new TokenRow { Id = 1, Val = 10 };
+        ctx.Add(row);
+        var affected = await ctx.UpdateAsync(row); // never persisted: no conflict, just nothing to update
+        Assert.Equal(0, affected);
+
+        await ctx.SaveChangesAsync();
+
+        using var verifyCtx = openCtx();
+        Assert.Single(await verifyCtx.Query<TokenRow>().ToListAsync());
+    }
+
+    [Fact]
+    public async Task Direct_delete_of_pending_added_entity_discards_the_pending_insert()
+    {
+        var (keeper, openCtx) = CreateDb();
+        using var _ = keeper;
+        using var ctx = openCtx();
+
+        var row = new TokenRow { Id = 1, Val = 10 };
+        ctx.Add(row);
+        var affected = await ctx.DeleteAsync(row); // add-then-delete is a net no-op
+        Assert.Equal(0, affected);
+
+        await ctx.SaveChangesAsync(); // nothing must be inserted
+
+        using var verifyCtx = openCtx();
+        Assert.Empty(await verifyCtx.Query<TokenRow>().ToListAsync());
+    }
+
+    [Fact]
     public async Task Direct_update_of_tracked_entity_is_accepted_so_save_writes_nothing()
     {
         var (keeper, openCtx) = CreateDb();

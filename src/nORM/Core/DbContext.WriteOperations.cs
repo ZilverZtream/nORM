@@ -168,6 +168,25 @@ namespace nORM.Core
             var map = GetMapping(typeof(T));
             EnsureWritableMapping(map, operation.ToString());
             ValidateTenantContext(entity, map, operation);
+
+            // A tracked entity still pending insertion has no database row: a direct
+            // UPDATE has nothing to write (the pending INSERT carries the current
+            // values), and a direct DELETE discards the pending insert (add-then-delete
+            // is a net no-op). Executing SQL instead would misreport the missing row as
+            // a concurrency conflict for [Timestamp] entities, or no-op and then
+            // wrongly accept the Added entry, silently dropping the pending INSERT.
+            if (operation is WriteOperation.Update or WriteOperation.Delete)
+            {
+                var pendingEntry = ChangeTracker.GetEntryOrDefault(entity);
+                if (pendingEntry != null && ReferenceEquals(pendingEntry.Entity, entity)
+                    && pendingEntry.State == EntityState.Added)
+                {
+                    if (operation == WriteOperation.Delete)
+                        ChangeTracker.Remove(entity, true);
+                    return 0;
+                }
+            }
+
             var tx = transaction ?? CurrentTransaction;
             var ambientTransaction = tx == null ? System.Transactions.Transaction.Current : null;
 
