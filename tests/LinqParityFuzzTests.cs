@@ -309,6 +309,66 @@ public class LinqParityFuzzTests
         RunStringComparisonClosureFuzz(ctx, seed, cases: 80);
         RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 120);
         RunIncludeFuzz(ctx, seed, cases: 60);
+        await RunCompiledQueryFuzzAsync(ctx, seed, cases: 80);
+    }
+
+    // Compiled queries pre-translate ONCE into a permanently cached plan and bind
+    // their free parameter per invocation — the delegates are static so every
+    // fuzz case exercises the same cached plan with a different argument. A plan
+    // that baked the first invocation's value (or bound the parameter to the
+    // wrong slot) diverges immediately.
+    private static readonly Func<DbContext, int, System.Threading.Tasks.Task<List<Row>>> _cqThreshold =
+        Norm.CompileQuery((DbContext c, int k) => c.Query<Row>().Where(r => r.IntVal >= k));
+
+    private static readonly Func<DbContext, int, System.Threading.Tasks.Task<List<Row>>> _cqBand =
+        Norm.CompileQuery((DbContext c, int k) => c.Query<Row>().Where(r => r.IntVal >= k && r.IntVal <= k + 2));
+
+    private static readonly Func<DbContext, int, System.Threading.Tasks.Task<List<Row>>> _cqCorrelated =
+        Norm.CompileQuery((DbContext c, int m) => c.Query<Row>()
+            .Where(r => c.Query<Child>().Count(ch => ch.ParentId == r.Id && ch.ChildVal >= m - 2) >= 1 || r.IntVal > m));
+
+    private static readonly Func<DbContext, int, System.Threading.Tasks.Task<List<Row>>> _cqWindow =
+        Norm.CompileQuery((DbContext c, int n) => c.Query<Row>().OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(1).Take(n));
+
+    private static readonly Func<DbContext, int, System.Threading.Tasks.Task<List<Row>>> _cqNullable =
+        Norm.CompileQuery((DbContext c, int k) => c.Query<Row>().Where(r => r.NullableInt != null && r.NullableInt >= k));
+
+    internal static async System.Threading.Tasks.Task RunCompiledQueryFuzzAsync(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        for (var i = 0; i < cases; i++)
+        {
+            var arg = rng.Next(-4, 6);
+            var shape = rng.Next(5);
+            List<int> expected;
+            List<int> actual;
+            try
+            {
+                (expected, actual) = shape switch
+                {
+                    0 => (Rows.Where(r => r.IntVal >= arg).Select(r => r.Id).OrderBy(x => x).ToList(),
+                          (await _cqThreshold(ctx, arg)).Select(r => r.Id).OrderBy(x => x).ToList()),
+                    1 => (Rows.Where(r => r.IntVal >= arg && r.IntVal <= arg + 2).Select(r => r.Id).OrderBy(x => x).ToList(),
+                          (await _cqBand(ctx, arg)).Select(r => r.Id).OrderBy(x => x).ToList()),
+                    2 => (Rows.Where(r => Children.Count(ch => ch.ParentId == r.Id && ch.ChildVal >= arg - 2) >= 1 || r.IntVal > arg)
+                              .Select(r => r.Id).OrderBy(x => x).ToList(),
+                          (await _cqCorrelated(ctx, arg)).Select(r => r.Id).OrderBy(x => x).ToList()),
+                    3 => (Rows.OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(1).Take(Math.Max(0, arg)).Select(r => r.Id).ToList(),
+                          (await _cqWindow(ctx, arg)).Select(r => r.Id).ToList()),
+                    _ => (Rows.Where(r => r.NullableInt != null && r.NullableInt >= arg).Select(r => r.Id).OrderBy(x => x).ToList(),
+                          (await _cqNullable(ctx, arg)).Select(r => r.Id).OrderBy(x => x).ToList()),
+                };
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"compiled-query shape threw (seed={seed} case={i} shape={shape} arg={arg})", ex);
+            }
+
+            Assert.True(expected.SequenceEqual(actual),
+                $"compiled-query mismatch seed={seed} case={i} shape={shape} arg={arg}\n" +
+                $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
     }
 
     /// <summary>
