@@ -208,6 +208,79 @@ public class ProjectionClosureTrailingOperatorTests
     }
 
     [Fact]
+    public async Task Closure_where_after_projection_closure_stays_aligned()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, rows);
+
+        // A WHERE over a projected computed member re-expands the projection with
+        // its closure at clause time — the same duplicate-mint hazard as the
+        // ORDER BY key shape.
+        foreach (var (add, cut) in new[] { (100, 140), (7, 40) })
+        {
+            var expected = rows.Select(r => new { r.Id, V = r.IntVal + add })
+                .Where(x => x.V >= cut).OrderBy(x => x.Id).Select(x => x.V).ToList();
+            var actual = ctx.Query<Row>().Select(r => new { r.Id, V = r.IntVal + add })
+                .Where(x => x.V >= cut).OrderBy(x => x.Id)
+                .AsEnumerable().Select(x => x.V).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"add={add},cut={cut}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
+    public async Task Closure_thenby_key_over_projected_member_stays_aligned()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, rows);
+
+        // BOTH order keys carry closures and both expand the projection fragment.
+        foreach (var (add, mod, mod2) in new[] { (100, 7, 3), (3, 13, 5) })
+        {
+            var expected = rows.Select(r => new { r.Id, V = r.IntVal + add })
+                .OrderBy(x => x.V % mod).ThenBy(x => x.V % mod2).ThenBy(x => x.Id)
+                .Select(x => x.V).ToList();
+            var actual = (await ctx.Query<Row>().Select(r => new { r.Id, V = r.IntVal + add })
+                    .OrderBy(x => x.V % mod).ThenBy(x => x.V % mod2).ThenBy(x => x.Id)
+                    .ToListAsync())
+                .Select(x => x.V).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"add={add},mods=({mod},{mod2}): expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
+    public async Task Group_join_selector_and_where_closures_rebind_per_execution()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, rows);
+
+        // SQL-side WHERE closure + client-lifted selector closure in one query:
+        // the WHERE binds a compiled slot, the selector rebinds through the
+        // group-join closure lift — churned values must not cross or go stale.
+        foreach (var (cut, bound) in new[] { (25, 30), (40, 60) })
+        {
+            var expected = rows.Where(r => r.IntVal >= cut)
+                .GroupJoin(rows, r => r.Id, r2 => r2.Id,
+                    (r, g) => new { r.Id, N = g.Count(x => x.IntVal >= bound) })
+                .OrderBy(x => x.Id).Select(x => (x.Id, x.N)).ToList();
+            var actual = (await ctx.Query<Row>().Where(r => r.IntVal >= cut)
+                    .GroupJoin(ctx.Query<Row>(), r => r.Id, r2 => r2.Id,
+                        (r, g) => new { r.Id, N = g.Count(x => x.IntVal >= bound) })
+                    .ToListAsync())
+                .OrderBy(x => x.Id).Select(x => (x.Id, x.N)).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"cut={cut},bound={bound}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
     public async Task Closure_take_count_after_projection_closure_stays_aligned()
     {
         var (keeper, ctx, rows) = CreateDb();
