@@ -25,7 +25,31 @@ namespace nORM.Query
                 or nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max)
                 or nameof(Queryable.Average)))
                 return false;
-            var current = node.Arguments.Count > 0 ? node.Arguments[0] : null;
+            return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
+        }
+
+        /// <summary>
+        /// A Query-rooted subquery TERMINAL — the scalar aggregates plus the boolean
+        /// terminals Any/All/Contains — over an explicit <c>ctx.Query&lt;T&gt;()</c> chain.
+        /// Even when such a terminal has no outer-row reference (its predicate touches
+        /// only closures/constants) it must NOT be constant-folded: folding executes a
+        /// database query during translation, bakes the result as a literal, and caches
+        /// it, so a later execution with a different closure replays the first value.
+        /// These must stay server-side subqueries whose closures re-bind per execution.
+        /// </summary>
+        internal static bool IsQueryRootedSubqueryTerminal(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType != typeof(Queryable))
+                return false;
+            if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All)
+                or nameof(Queryable.Contains))
+                return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
+            return IsQueryRootedScalarAggregate(node);
+        }
+
+        private static bool HasQueryRootedSource(Expression? source)
+        {
+            var current = source;
             while (current is MethodCallExpression mce)
             {
                 switch (mce.Method.Name)

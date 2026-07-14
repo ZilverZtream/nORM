@@ -365,7 +365,7 @@ namespace nORM.Query
             // the next execution with a different closure replays the first value.
             // Keep it as a server-side subquery so its closures re-bind per execution.
             if (!IsNonDeterministicServerMethod(node.Method)
-                && !QueryTranslator.IsQueryRootedScalarAggregate(node)
+                && !QueryTranslator.IsQueryRootedSubqueryTerminal(node)
                 && TryGetConstantValueSafe(node, out var constVal))
             {
                 return CreateSafeParameter(constVal);
