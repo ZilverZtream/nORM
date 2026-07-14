@@ -314,6 +314,13 @@ namespace nORM.Query
                         pendingClientProjection = clientProjection;
                         pendingClientProjectionResultType = originalProjection.Body.Type;
                         shouldLogClientEvaluation = t._ctx.Options.ClientEvaluationPolicy == ClientEvaluationPolicy.Warn;
+                        // The client part compiles NOW with its closures captured, so a
+                        // cached plan would replay this execution's closure values (and
+                        // any folded server-side values) on every later hit. Mark the
+                        // plan fold-no-cache when the projection captures closures —
+                        // it re-translates per execution with live values.
+                        if (clientProjection != null && nORM.Internal.ExpressionCompiler.HasClosureValues(originalProjection.Body))
+                            t._closureFoldedIntoSql = true;
                     }
                     else
                     {

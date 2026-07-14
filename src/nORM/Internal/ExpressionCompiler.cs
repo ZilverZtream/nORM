@@ -776,7 +776,7 @@ namespace nORM.Internal
                     : "");
         }
 
-        private static bool HasClosureValues(Expression expression)
+        internal static bool HasClosureValues(Expression expression)
         {
             var detector = new ClosureValueDetector();
             detector.Visit(expression);
