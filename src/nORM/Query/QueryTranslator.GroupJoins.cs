@@ -210,11 +210,15 @@ namespace nORM.Query
             // every outer row's block is contiguous, and segment on that identity at runtime.
             // Skip a PK column that already IS the join key — SQL Server rejects duplicate
             // ORDER BY columns.
-            if (groupJoinOuterIsEntity && _mapping.KeyColumns.Length > 0)
+            if (groupJoinOuterIsEntity)
             {
-                for (int ki = _mapping.KeyColumns.Length - 1; ki >= 0; ki--)
+                // PK tiebreak — or, for a keyless outer, EVERY column: segmentation
+                // identity below matches this ordering, so rows of the same outer
+                // must be contiguous within each join-key tie.
+                var tiebreakColumns = _mapping.KeyColumns.Length > 0 ? _mapping.KeyColumns : _mapping.Columns;
+                for (int ki = tiebreakColumns.Length - 1; ki >= 0; ki--)
                 {
-                    var pkSql = $"{outerAlias}.{_mapping.KeyColumns[ki].EscCol}";
+                    var pkSql = $"{outerAlias}.{tiebreakColumns[ki].EscCol}";
                     var alreadyOrdered = false;
                     for (int existing = 0; existing < keyOrderEntryCount; existing++)
                     {
@@ -247,35 +251,44 @@ namespace nORM.Query
             // unmatched row is all-NULL. Without a probe the plan silently lacked
             // GroupJoinInfo and materialization crashed casting entities to the projection.
             innerKeyColumn ??= innerMapping.KeyColumns.FirstOrDefault();
-            if (innerKeyColumn != null)
+            // Fail closed instead of skipping GroupJoinInfo: without the LEFT-JOIN
+            // match probe the plan silently materialized bare outer entities and
+            // crashed casting them to the result type (a computed inner key over a
+            // keyless inner entity has no probe candidate).
+            if (innerKeyColumn == null)
+                throw new NormUnsupportedFeatureException(
+                    $"GroupJoin inner key over '{innerMapping.Type.Name}' has no mapped column, and the entity declares " +
+                    "no primary key to use as the LEFT-JOIN match probe. Add [Key] or a fluent HasKey to the inner " +
+                    "entity, or use a plain column as the inner key.");
+
+            var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
+            var (resultSelectorFunc, liftedSelector, closureSlots) = CompileGroupJoinResultSelector(runtimeResultSelector);
+            // Segmentation identity: the outer's PK getters — or for a keyless
+            // outer, the full column set (structural row identity) so distinct
+            // outers sharing a join key value do not fuse. Byte-identical duplicate
+            // keyless rows remain indistinguishable (SQL has nothing to tell them
+            // apart). Matches the tiebreak ordering inserted above.
+            Func<object, object?>? outerIdentityFunc = null;
+            if (groupJoinOuterIsEntity)
             {
-                var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
-                var (resultSelectorFunc, liftedSelector, closureSlots) = CompileGroupJoinResultSelector(runtimeResultSelector);
-                // Segmentation identity: the outer's PK getters, matching the PK tiebreak
-                // ordering above. Also spares navigation-member keys (e.Dept.Title) from
-                // client evaluation — the materialized outer has null navigations.
-                Func<object, object?>? outerIdentityFunc = null;
-                if (groupJoinOuterIsEntity && _mapping.KeyColumns.Length > 0)
-                {
-                    var idCols = _mapping.KeyColumns;
-                    outerIdentityFunc = idCols.Length == 1
-                        ? idCols[0].Getter
-                        : o => new GroupJoinOuterIdentity(Array.ConvertAll(idCols, c => c.Getter(o)));
-                }
-                _groupJoinInfo = new GroupJoinInfo(
-                    outerType,
-                    innerType,
-                    resultType,
-                    outerKeyFunc,
-                    innerKeyColumn,
-                    resultSelectorFunc,
-                    groupJoinOuterIsEntity,
-                    groupJoinOuterColumnCount,
-                    OuterIdentitySelector: outerIdentityFunc,
-                    ClosureLiftedResultSelector: liftedSelector,
-                    ClosureSlotCount: closureSlots
-                );
+                var idCols = _mapping.KeyColumns.Length > 0 ? _mapping.KeyColumns : _mapping.Columns;
+                outerIdentityFunc = idCols.Length == 1
+                    ? idCols[0].Getter
+                    : o => new GroupJoinOuterIdentity(Array.ConvertAll(idCols, c => c.Getter(o)));
             }
+            _groupJoinInfo = new GroupJoinInfo(
+                outerType,
+                innerType,
+                resultType,
+                outerKeyFunc,
+                innerKeyColumn,
+                resultSelectorFunc,
+                groupJoinOuterIsEntity,
+                groupJoinOuterColumnCount,
+                OuterIdentitySelector: outerIdentityFunc,
+                ClosureLiftedResultSelector: liftedSelector,
+                ClosureSlotCount: closureSlots
+            );
             return node;
         }
 

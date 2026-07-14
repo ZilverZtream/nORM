@@ -28,7 +28,7 @@ public class LinqParityFuzzTests
     [System.ComponentModel.DataAnnotations.Schema.Table("FuzzRow_Test")]
     private class Row
     {
-        public int Id { get; set; }
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
         public int IntVal { get; set; }
         public int? NullableInt { get; set; }
         public string Name { get; set; } = string.Empty;
@@ -335,7 +335,7 @@ public class LinqParityFuzzTests
     [System.ComponentModel.DataAnnotations.Schema.Table("FuzzChild_Test")]
     private class Child
     {
-        public int Id { get; set; }
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
         public int ParentId { get; set; }
         public int ChildVal { get; set; }
         public string Tag { get; set; } = string.Empty;
@@ -557,7 +557,7 @@ public class LinqParityFuzzTests
         for (var i = 0; i < cases; i++)
         {
             var predicate = GeneratePredicate(rng);
-            var joinKind = rng.Next(4);
+            var joinKind = rng.Next(6);
             var caseRng = new Random(rng.Next());
 
             IQueryable<Row> parents = ctx.Query<Row>().Where(predicate);
@@ -608,6 +608,33 @@ public class LinqParityFuzzTests
                             .ToList().OrderBy(x => x.Id).ToList();
                         Assert.True(db.SequenceEqual(oracle),
                             $"groupjoin mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    case 4: // closure captured in the inner-join keys — a cached plan
+                            // must bind the CURRENT modulus, not replay the first one
+                    {
+                        var m = caseRng.Next(2, 7);
+                        var db = parents.Join(children, p => p.Id % m, c => c.ParentId % m,
+                                (p, c) => new JoinRow(p.Id, c.Id, c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        var oracle = oracleParents.Join(oracleChildren, p => p.Id % m, c => c.ParentId % m,
+                                (p, c) => new JoinRow(p.Id, c.Id, c.ChildVal))
+                            .ToList().OrderBy(x => x.PId).ThenBy(x => x.CId).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"closure join key mismatch seed={seed} case={i} m={m}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    case 5: // closure captured in GroupJoin keys
+                    {
+                        var m = caseRng.Next(2, 7);
+                        var db = parents.GroupJoin(children, p => p.Id % m, c => c.ParentId % m,
+                                (p, cs) => new { p.Id, N = cs.Count() })
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        var oracle = oracleParents.GroupJoin(oracleChildren, p => p.Id % m, c => c.ParentId % m,
+                                (p, cs) => new { p.Id, N = cs.Count() })
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"closure groupjoin key mismatch seed={seed} case={i} m={m}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
                         break;
                     }
                     default: // GroupJoin with filtered count, nullable Max/Min (null on empty), Any
