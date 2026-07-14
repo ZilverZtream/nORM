@@ -305,6 +305,31 @@ public class CorrelatedScalarAggregateSubqueryTests
             $"expected [{string.Join(",", expected)}] got [{string.Join(",", survivors)}]");
     }
 
+    private static readonly Func<DbContext, int, Task<List<Parent>>> _parentsByChildCount =
+        Norm.CompileQuery((DbContext c, int minCount) =>
+            c.Query<Parent>().Where(p => c.Query<Child>().Count(ch => ch.ParentId == p.Id) >= minCount));
+
+    [Fact]
+    public async Task Compiled_query_with_correlated_count_binds_the_free_parameter()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The compiled lambda's DbContext is a FREE PARAMETER, not a closure —
+        // the subquery root consumes it through a different route than ctx-local
+        // captures, and the threshold must re-bind per invocation.
+        foreach (var min in new[] { 1, 2, 3 })
+        {
+            var expected = parents.Where(p => children.Count(ch => ch.ParentId == p.Id) >= min)
+                .Select(p => p.Id).OrderBy(i => i).ToList();
+            var actual = (await _parentsByChildCount(ctx, min)).Select(p => p.Id).OrderBy(i => i).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"min={min}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
     [Fact]
     public async Task Windowed_subquery_aggregate_fails_closed()
     {

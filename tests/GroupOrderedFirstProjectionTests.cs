@@ -222,6 +222,30 @@ public class GroupOrderedFirstProjectionTests
     }
 
     [Fact]
+    public async Task Computed_closure_group_key_correlates_consistently()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, rows);
+
+        // The computed group key translates TWICE — once for GROUP BY (compiled
+        // parameter) and once for the subquery correlation (folded literal); both
+        // must see the same closure value, including across cached-plan reruns.
+        foreach (var mod in new[] { 2, 3 })
+        {
+            var expected = rows.GroupBy(x => x.Grp % mod)
+                .Select(g => (g.Key, Top: g.OrderByDescending(x => x.Val).ThenBy(x => x.Id).First().Id))
+                .OrderBy(t => t.Key).ToList();
+            var actual = (await ctx.Query<Row>().GroupBy(x => x.Grp % mod)
+                .Select(g => new { g.Key, Top = g.OrderByDescending(x => x.Val).ThenBy(x => x.Id).First().Id })
+                .ToListAsync()).Select(x => (x.Key, x.Top)).OrderBy(t => t.Key).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"mod={mod}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
     public async Task Existing_single_order_shape_still_translates()
     {
         var (keeper, ctx, rows) = CreateDb();
