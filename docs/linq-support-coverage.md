@@ -24,7 +24,8 @@ MySQL evidence before they are treated as release-green.
 | `OrderBy`, `ThenBy` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs` |
 | `Reverse` | `tests/LinqReverseAndLastTests.cs` |
 | `Skip`, `Take` | `tests/LinqOperatorCardinalityTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/LinqPagingAndNullableBoolTests.cs`, `tests/LiveProviderSkipTakeParityTests.cs`, `tests/LinqWhereAfterTakeTests.cs`, `tests/LinqOrderByAfterTakeTests.cs` (operators after windows, any spine shape), `tests/LiveProviderWindowedChainParityTests.cs` (windowed-chain wraps on all providers) |
-| `TakeWhile` / `SkipWhile` | `tests/LinqTakeSkipWhileProviderMobileTests.cs`, `tests/LiveProviderTakeSkipWhileParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
+| `TakeLast`, `SkipLast` | `tests/LinqSkipLastTakeLastTranslatabilityTests.cs`, `tests/LinqCompiledTailPagingAndKeyedSetOpsTests.cs`, `tests/TailPagingAfterWindowTests.cs` (tail paging after a `Take`/`Skip` window, incl. filtered windows) |
+| `TakeWhile` / `SkipWhile` | `tests/LinqTakeSkipWhileProviderMobileTests.cs`, `tests/LiveProviderTakeSkipWhileParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs`, `tests/TakeSkipWhileAfterWindowTests.cs` (while operators after a `Take`/`Skip` window) |
 | `SequenceEqual` | `tests/LinqSequenceEqualProviderMobileTests.cs`, `tests/LiveProviderSequenceEqualParityTests.cs`, `tests/LinqUnsupportedShapeContractTests.cs` |
 | `Distinct` | `tests/QueryTranslatorCoverageTests.cs`, `tests/QueryComplexityTests.cs`, `tests/LinqGuidAndDistinctTests.cs` |
 | `DistinctBy` | `tests/DistinctByProviderShapeTests.cs`, `tests/LinqDistinctByImplementationTests.cs`, `tests/LinqDistinctByDecimalColumnTests.cs`, `tests/LiveProviderDistinctByParityTests.cs` |
@@ -50,8 +51,8 @@ MySQL evidence before they are treated as release-green.
 | Dynamic table query `DbContext.Query(string)` | Provider-bound compatibility API rejected by strict provider mobility; covered by `tests/DynamicTypeQueryTests.cs`, `tests/DynamicTypeCacheKeyTests.cs`, `tests/DynamicQueryRootConcurrencyTests.cs`, `tests/ProviderMobilityStrictModeTests.cs` |
 | Custom `[SqlFunction]` methods | Provider-bound compatibility API rejected by strict provider mobility unless nORM-owned; covered by `tests/ExpressionToSqlVisitorTests.cs`, `tests/LinqNormFunctionsLikeTests.cs`, `tests/ProviderMobilityStrictModeTests.cs` |
 | `AsAsyncEnumerable` | `tests/AsyncEnumerableTests.cs`, `tests/QueryTranslatorCoverageTests.cs`, `tests/AsyncCancellationAuditTests.cs`, `tests/GroupJoinAsyncEnumerableTests.cs` (GroupJoin streaming), `tests/LiveProviderAsyncEnumerableParityTests.cs` |
-| `ExecuteUpdateAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source), `tests/LinqCompositePkExecuteCudTests.cs` (composite-PK), `tests/LiveProviderCompositePkBulkCudParityTests.cs` |
-| `ExecuteDeleteAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source), `tests/LinqCompositePkExecuteCudTests.cs` (composite-PK), `tests/LiveProviderCompositePkBulkCudParityTests.cs` |
+| `ExecuteUpdateAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source), `tests/LinqCompositePkExecuteCudTests.cs` (composite-PK), `tests/LiveProviderCompositePkBulkCudParityTests.cs`, `tests/OrderedPagedBulkCudTests.cs` (ordered/paged/windowed shapes), `tests/OrderedPagedBulkCudLiveTests.cs`, `tests/BulkCudOracleFuzzTests.cs` (oracle fuzz incl. windowed ops) |
+| `ExecuteDeleteAsync` | `tests/BatchCudTests.cs`, `tests/NormQueryProviderCoverageTests.cs`, `tests/ExecuteDeleteUpdateJoinSourceTests.cs` (join source), `tests/LinqCompositePkExecuteCudTests.cs` (composite-PK), `tests/LiveProviderCompositePkBulkCudParityTests.cs`, `tests/OrderedPagedBulkCudTests.cs` (ordered/paged/windowed shapes), `tests/OrderedPagedBulkCudLiveTests.cs`, `tests/BulkCudOracleFuzzTests.cs` (oracle fuzz incl. windowed ops) |
 
 ## Terminal operators
 
