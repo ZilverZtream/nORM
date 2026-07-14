@@ -693,7 +693,7 @@ public class LinqParityFuzzTests
         var m = rng.Next(0, 5);
         var sumCut = rng.Next(-10, 15);
         var avgCut = rng.Next(-3, 3) + 0.25;
-        var shape = rng.Next(12);
+        var shape = rng.Next(14);
 
         List<int> expected;
         List<int> actual;
@@ -810,6 +810,30 @@ public class LinqParityFuzzTests
                         .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
                     break;
                 }
+                case 11:
+                    // PROJECTION-side correlated First over a converter-free column, into a
+                    // nullable member so an empty group surfaces SQL NULL (matched by the
+                    // oracle's FirstOrDefault). Exercises the materializer's shadow-column path.
+                    expected = Rows
+                        .Select(r => r.Id * 1000 + (Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => (int?)c.ChildVal).FirstOrDefault() ?? -999))
+                        .OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Select(r => new { r.Id, V = ctx.Query<Child>().Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => (int?)c.ChildVal).FirstOrDefault() })
+                        .AsEnumerable().Select(x => x.Id * 1000 + (x.V ?? -999)).OrderBy(x => x).ToList();
+                    break;
+                case 12:
+                    // PROJECTION-side correlated Last (reversed ordering) into a nullable member.
+                    expected = Rows
+                        .Select(r => r.Id * 1000 + (Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => (int?)c.ChildVal).LastOrDefault() ?? -999))
+                        .OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Select(r => new { r.Id, V = ctx.Query<Child>().Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => (int?)c.ChildVal).LastOrDefault() })
+                        .AsEnumerable().Select(x => x.Id * 1000 + (x.V ?? -999)).OrderBy(x => x).ToList();
+                    break;
                 default:
                     // PROJECTION-side correlated count: the ctx capture inside the
                     // projection reserves its own alignment slot and the inner
