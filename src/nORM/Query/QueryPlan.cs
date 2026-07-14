@@ -156,7 +156,14 @@ namespace nORM.Query
         // restored by emitting only the FIRST segment per distinct outer key — equal-key
         // segments are adjacent by construction. Each segment still carries its own
         // correct inner group; duplicates are simply not emitted.
-        bool DistinctOuterKeys = false
+        bool DistinctOuterKeys = false,
+        // Closure captures inside the outer KEY selector (e.g. a modulus captured in a
+        // Distinct projection) would bake the first execution's values into the compiled
+        // key delegate used for de-dup and key-based segmentation. When present, this
+        // takes the current closure values as a slot array and the provider rebinds
+        // OuterKeySelector per execution (see NormQueryProvider.RebindGroupJoinClosures).
+        Func<object, object?[], object?>? ClosureLiftedOuterKeySelector = null,
+        int OuterKeyClosureSlotCount = 0
     );
 
     /// <summary>

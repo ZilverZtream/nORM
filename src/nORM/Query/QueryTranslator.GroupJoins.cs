@@ -67,20 +67,9 @@ namespace nORM.Query
                     // emitting only the first segment per distinct outer key at materialization.
                     // The derived-table branch above cannot express this shape: its outer
                     // references would re-translate the computed body against a derived table
-                    // that only exposes the computed output column.
-                    // Closure captures in the projection are fail-closed: the compiled de-dup
-                    // key delegate bakes them at translation, so a cached plan would compare
-                    // segments with the FIRST execution's values while SQL orders by the
-                    // current ones — silently emitting duplicate or fused results.
-                    var composedDistinctKey = ComposeThroughOuterProjection(distinctProjection, outerKeySelector);
-                    var distinctKeyClosures = new List<object?>();
-                    GroupJoinClosureValues.Collect(composedDistinctKey.Body, distinctKeyClosures);
-                    if (distinctKeyClosures.Count > 0)
-                        throw new NormUnsupportedFeatureException(
-                            "GroupJoin over a `.Select(...).Distinct()` outer whose projection captures local " +
-                            "variables isn't supported: the distinct-key comparison would replay the first " +
-                            "execution's captured values from the plan cache. Inline the values as constants, " +
-                            "or materialize the distinct keys first and join client-side.");
+                    // that only exposes the computed output column. Closure captures in the
+                    // projection are handled by the outer-key closure lift below (the de-dup
+                    // key delegate rebinds per execution like the result selector).
                     outerQuery = outerMce.Arguments[0];
                     distinctOuterKeys = true;
                 }
@@ -313,7 +302,10 @@ namespace nORM.Query
 
             // A composed projected outer materializes the ENTITY, so the runtime key
             // selector must be the entity-composed one, not the projection-typed original.
-            var outerKeyFunc = CreateObjectKeySelector(outerProjection != null ? effectiveOuterKeySelector : outerKeySelector);
+            // Closure captures inside the key are lifted so the de-dup / segmentation
+            // delegate rebinds per execution instead of replaying cached values.
+            var runtimeOuterKeySelector = outerProjection != null ? effectiveOuterKeySelector : outerKeySelector;
+            var (outerKeyFunc, liftedOuterKey, outerKeySlots) = CompileGroupJoinOuterKeySelector(runtimeOuterKeySelector);
             var (resultSelectorFunc, liftedSelector, closureSlots) = CompileGroupJoinResultSelector(runtimeResultSelector);
             // Segmentation identity: the outer's PK getters — or for a keyless
             // outer, the full column set (structural row identity) so distinct
@@ -340,7 +332,9 @@ namespace nORM.Query
                 OuterIdentitySelector: outerIdentityFunc,
                 ClosureLiftedResultSelector: liftedSelector,
                 ClosureSlotCount: closureSlots,
-                DistinctOuterKeys: distinctOuterKeys
+                DistinctOuterKeys: distinctOuterKeys,
+                ClosureLiftedOuterKeySelector: liftedOuterKey,
+                OuterKeyClosureSlotCount: outerKeySlots
             );
             return node;
         }

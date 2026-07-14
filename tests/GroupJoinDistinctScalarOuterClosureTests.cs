@@ -85,13 +85,23 @@ public class GroupJoinDistinctScalarOuterClosureTests
                 $"computed distinct bonus={bonus}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
         }
 
-        // A projection that CAPTURES a local variable stays fail-closed: the de-dup key
-        // delegate would replay the first execution's captured value from the plan cache.
-        var captured = 3;
-        Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Emp>().Select(e => e.DeptId % captured).Distinct()
-                .GroupJoin(ctx.Query<TaskRow>(), v => v, t => t.DeptId, (v, ts) => new { V = v, N = ts.Count() })
-                .ToList());
+        // A projection that CAPTURES a local variable: the distinct-key delegate is
+        // closure-lifted, so the de-dup comparison must use the CURRENT captured value
+        // on every cached-plan execution, never the first execution's.
+        for (var m = 2; m <= 4; m++)
+        {
+            var mod = m;
+            var expected = emps.Select(e => e.DeptId % mod).Distinct()
+                .GroupJoin(tasks, v => v, t => t.DeptId % mod, (v, ts) => new { V = v, N = ts.Count() })
+                .OrderBy(x => x.V).ToList();
+
+            var actual = ctx.Query<Emp>().Select(e => e.DeptId % mod).Distinct()
+                .GroupJoin(ctx.Query<TaskRow>(), v => v, t => t.DeptId % mod, (v, ts) => new { V = v, N = ts.Count() })
+                .AsEnumerable().OrderBy(x => x.V).ToList();
+
+            Assert.True(expected.SequenceEqual(actual),
+                $"captured m={mod}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
 
         // Plain-column projection (the supported Distinct shape); the closure lives in
         // the result selector and must rebind per execution from the cached plan.

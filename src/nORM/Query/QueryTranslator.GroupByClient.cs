@@ -93,6 +93,42 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Compiles the GroupJoin outer KEY selector with the same closure-lift
+        /// treatment as the result selector: captures become positional slot reads
+        /// (pre-order, matching <see cref="GroupJoinClosureValues.Collect"/>) so the
+        /// de-dup / segmentation key delegate can be rebound per execution instead of
+        /// replaying the first execution's captured values out of the plan cache.
+        /// </summary>
+        private static (Func<object, object?> Selector,
+                        Func<object, object?[], object?>? Lifted,
+                        int SlotCount)
+            CompileGroupJoinOuterKeySelector(LambdaExpression keySelector)
+        {
+            var objParam = Expression.Parameter(typeof(object), "obj");
+            var valuesParam = Expression.Parameter(typeof(object?[]), "closureValues");
+            var castParam = Expression.Convert(objParam, keySelector.Parameters[0].Type);
+            var lifter = new ClosureLiftRewriter(valuesParam);
+            var body = lifter.Visit(keySelector.Body)!;
+            if (lifter.SlotCount == 0)
+                return (CreateObjectKeySelector(keySelector), null, 0);
+
+            body = new ParameterReplacer(keySelector.Parameters[0], castParam).Visit(body)!;
+            var boxed = Expression.Convert(body, typeof(object));
+            var liftedLambda = Expression.Lambda<Func<object, object?[], object?>>(boxed, objParam, valuesParam);
+            ExpressionUtils.ValidateExpression(liftedLambda);
+            var timeout = ExpressionUtils.GetCompilationTimeout(liftedLambda);
+            using var cts = new CancellationTokenSource(timeout);
+            var lifted = ExpressionUtils.CompileWithFallback(liftedLambda, cts.Token);
+
+            // Bind the translating expression's own values so the selector is
+            // correct even on a path that never rebinds.
+            var initialValues = new List<object?>(lifter.SlotCount);
+            GroupJoinClosureValues.Collect(keySelector.Body, initialValues);
+            var initial = initialValues.ToArray();
+            return (o => lifted(o, initial), lifted, lifter.SlotCount);
+        }
+
+        /// <summary>
         /// Rewrites closure captures (member accesses rooted in a constant) to
         /// positional reads from the lifted values array, so the compiled GroupJoin
         /// result selector is closure-free and per-execution values can be rebound.

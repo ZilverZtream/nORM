@@ -186,43 +186,63 @@ namespace nORM.Query
         private static QueryPlan RebindGroupJoinClosures(QueryPlan plan, Expression current)
         {
             var info = plan.GroupJoinInfo;
-            if (info?.ClosureLiftedResultSelector == null || info.ClosureSlotCount == 0)
+            if (info == null
+                || (info.ClosureLiftedResultSelector == null && info.ClosureLiftedOuterKeySelector == null))
                 return plan;
 
-            var selector = FindGroupJoinResultSelector(current);
-            if (selector == null)
+            var finder = new GroupJoinFinder();
+            finder.Visit(current);
+            if (finder.Found is not { Arguments.Count: 5 } node)
                 return plan;
 
-            var values = new List<object?>(info.ClosureSlotCount);
-            GroupJoinClosureValues.Collect(selector.Body, values);
-            if (values.Count != info.ClosureSlotCount)
-                return plan; // structural mismatch — keep the translation-time binding
+            var updated = info;
 
-            var lifted = info.ClosureLiftedResultSelector;
-            var bound = values.ToArray();
-            return plan with
+            if (info.ClosureLiftedResultSelector != null && info.ClosureSlotCount > 0
+                && ComposeGroupJoinConsumer(node, node.Arguments[4]) is { } selector)
             {
-                GroupJoinInfo = info with { ResultSelector = (o, cs) => lifted(o, cs, bound) }
-            };
+                var values = new List<object?>(info.ClosureSlotCount);
+                GroupJoinClosureValues.Collect(selector.Body, values);
+                if (values.Count == info.ClosureSlotCount) // structural mismatch keeps the translation-time binding
+                {
+                    var lifted = info.ClosureLiftedResultSelector;
+                    var bound = values.ToArray();
+                    updated = updated with { ResultSelector = (o, cs) => lifted(o, cs, bound) };
+                }
+            }
+
+            // The outer KEY selector drives Distinct de-dup and key-based segmentation;
+            // its captures replay from the cache just like the result selector's.
+            if (info.ClosureLiftedOuterKeySelector != null && info.OuterKeyClosureSlotCount > 0
+                && ComposeGroupJoinConsumer(node, node.Arguments[2]) is { } keySelector)
+            {
+                var values = new List<object?>(info.OuterKeyClosureSlotCount);
+                GroupJoinClosureValues.Collect(keySelector.Body, values);
+                if (values.Count == info.OuterKeyClosureSlotCount)
+                {
+                    var liftedKey = info.ClosureLiftedOuterKeySelector;
+                    var bound = values.ToArray();
+                    updated = updated with { OuterKeySelector = o => liftedKey(o, bound) };
+                }
+            }
+
+            return ReferenceEquals(updated, info) ? plan : plan with { GroupJoinInfo = updated };
         }
 
-        private static LambdaExpression? FindGroupJoinResultSelector(Expression expression)
+        /// <summary>
+        /// Unquotes a GroupJoin lambda argument and mirrors translation's
+        /// Select-projected outer handling: the projection is composed INTO the
+        /// consumer (key or result selector) there, moving the projection's closure
+        /// captures into the lifted body. Closure values must be collected from the
+        /// SAME composed shape or the slot ordering (and count) diverges and cached
+        /// plans replay the first execution's projection closures.
+        /// </summary>
+        private static LambdaExpression? ComposeGroupJoinConsumer(MethodCallExpression node, Expression arg)
         {
-            var finder = new GroupJoinFinder();
-            finder.Visit(expression);
-            if (finder.Found is not { Arguments.Count: 5 } node)
-                return null;
-            var arg = node.Arguments[4];
             while (arg is UnaryExpression { NodeType: ExpressionType.Quote } quote)
                 arg = quote.Operand;
-            if (arg is not LambdaExpression selector)
+            if (arg is not LambdaExpression consumer)
                 return null;
 
-            // Mirror translation's Select-projected outer handling: the projection is
-            // composed INTO the result selector there, moving the projection's closure
-            // captures into the lifted body. Closure values must be collected from the
-            // SAME composed shape or the slot ordering (and count) diverges and cached
-            // plans replay the first execution's projection closures.
             var outer = node.Arguments[0];
             while (outer is MethodCallExpression { Arguments.Count: >= 1 } outerCall
                    && outerCall.Method.Name != nameof(Queryable.Select))
@@ -234,11 +254,11 @@ namespace nORM.Query
                 while (projArg is UnaryExpression { NodeType: ExpressionType.Quote } projQuote)
                     projArg = projQuote.Operand;
                 if (projArg is LambdaExpression { Parameters.Count: 1 } projection
-                    && projection.Body.Type == selector.Parameters[0].Type
+                    && projection.Body.Type == consumer.Parameters[0].Type
                     && projection.Body.Type != projection.Parameters[0].Type)
-                    return QueryTranslator.ComposeThroughOuterProjection(projection, selector);
+                    return QueryTranslator.ComposeThroughOuterProjection(projection, consumer);
             }
-            return selector;
+            return consumer;
         }
 
         private sealed class GroupJoinFinder : ExpressionVisitor
