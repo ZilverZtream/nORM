@@ -207,10 +207,51 @@ namespace nORM.Core
             var totalAffected = 0;
             try
             {
-                var allGroups = changedEntries.GroupBy(e => (e.State, e.Mapping)).ToList();
+                var allGroups = changedEntries.GroupBy(e => (e.State, e.Mapping))
+                    .Select(g => (IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>)new SaveChangesEntryGroup(g.Key, g))
+                    .ToList();
                 var addedGroups = allGroups.Where(g => g.Key.State == EntityState.Added).ToList();
                 var modifiedGroups = allGroups.Where(g => g.Key.State == EntityState.Modified).ToList();
                 var deletedGroups = allGroups.Where(g => g.Key.State == EntityState.Deleted).ToList();
+
+                // Replace-in-place: a key that is both Deleted and re-Added in this
+                // batch must DELETE before the insert or the primary key's unique
+                // constraint fires mid-batch (inserts run first globally). Hoist
+                // exactly those deletes into a pre-pass; all other deletes keep
+                // their position after inserts and updates, which the FK-repoint
+                // scenarios rely on.
+                var preDeleteGroups = new List<IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>>();
+                if (deletedGroups.Count > 0 && addedGroups.Count > 0)
+                {
+                    for (var gi = 0; gi < deletedGroups.Count; gi++)
+                    {
+                        var delGroup = deletedGroups[gi];
+                        var map = delGroup.Key.Mapping;
+                        if (map.KeyColumns.Length == 0)
+                            continue;
+                        var addedSame = addedGroups.FirstOrDefault(g => g.Key.Mapping == map);
+                        if (addedSame == null)
+                            continue;
+                        var addedKeys = new HashSet<nORM.Query.GroupJoinOuterIdentity>(
+                            addedSame.Select(e => new nORM.Query.GroupJoinOuterIdentity(
+                                Array.ConvertAll(map.KeyColumns, k => k.Getter(e.Entity!)))));
+                        var replaced = delGroup
+                            .Where(e => addedKeys.Contains(new nORM.Query.GroupJoinOuterIdentity(
+                                Array.ConvertAll(map.KeyColumns, k => k.Getter(e.Entity!)))))
+                            .ToList();
+                        if (replaced.Count == 0)
+                            continue;
+                        var remaining = delGroup.Except(replaced).ToList();
+                        preDeleteGroups.Add(new SaveChangesEntryGroup(delGroup.Key, replaced));
+                        deletedGroups[gi] = new SaveChangesEntryGroup(delGroup.Key, remaining);
+                    }
+                    if (preDeleteGroups.Count > 1)
+                    {
+                        // Children-first, matching the regular delete ordering.
+                        var sortedPre = TopologicalSortMappings(preDeleteGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
+                        preDeleteGroups = sortedPre.Select(m => preDeleteGroups.First(g => g.Key.Mapping == m)).ToList();
+                    }
+                }
 
                 var sortedAddedMappings = TopologicalSortMappings(addedGroups.Select(g => g.Key.Mapping)).ToList();
                 // Gate D fix: Apply the same topological sort to modified groups so that FK
@@ -222,7 +263,7 @@ namespace nORM.Core
                 var orderedAddedGroups = sortedAddedMappings.Select(m => addedGroups.First(g => g.Key.Mapping == m));
                 var orderedModifiedGroups = sortedModifiedMappings.Select(m => modifiedGroups.First(g => g.Key.Mapping == m));
                 var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
-                var orderedGroups = orderedAddedGroups.Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
+                var orderedGroups = preDeleteGroups.Concat(orderedAddedGroups).Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
 
                 foreach (var group in orderedGroups)
                 {
@@ -635,6 +676,19 @@ namespace nORM.Core
             if (ex is DbException dbEx && Options.RetryPolicy != null)
                 return Options.RetryPolicy.ShouldRetry(dbEx);
             return false;   // TimeoutException is excluded - retrying a timed-out write can duplicate data.
+        }
+
+        /// <summary>
+        /// Materialized grouping used by SaveChanges ordering when a group must be
+        /// split (replace-in-place delete hoisting) while keeping the IGrouping
+        /// pipeline shape.
+        /// </summary>
+        private sealed class SaveChangesEntryGroup : List<EntityEntry>, IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>
+        {
+            public SaveChangesEntryGroup((EntityState State, TableMapping Mapping) key, IEnumerable<EntityEntry> entries)
+                : base(entries) => Key = key;
+
+            public (EntityState State, TableMapping Mapping) Key { get; }
         }
     }
 }

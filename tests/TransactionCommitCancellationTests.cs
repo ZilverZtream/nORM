@@ -117,7 +117,9 @@ public class TransactionCommitCancellationTests
         ctx.Add(new TxCommitItem { Id = 1, Val = "ok" });
         await ctx.SaveChangesAsync();
 
- // Add duplicate PK to force failure
+ // Add an UNTRACKED duplicate PK to force the failure inside SaveChanges
+ // (adding a tracked duplicate now throws an identity conflict at Add time).
+        ctx.ChangeTracker.Clear();
         ctx.Add(new TxCommitItem { Id = 1, Val = "duplicate" });
         await Assert.ThrowsAnyAsync<Exception>(() => ctx.SaveChangesAsync());
 

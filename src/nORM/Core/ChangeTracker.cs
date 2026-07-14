@@ -147,6 +147,30 @@ namespace nORM.Core
                     // An entry with this PK already existed (or was just inserted by another writer).
                     if (!ReferenceEquals(pkEntry.Entity, entity))
                     {
+                        if (state == EntityState.Added)
+                        {
+                            if (pkEntry.State == EntityState.Deleted)
+                            {
+                                // Replace-in-place: keep the pending DELETE and track the new
+                                // instance as this key's insert. SaveChanges hoists same-key
+                                // deletes before inserts, so the batch is DELETE then INSERT.
+                                // The new entry takes over the identity-map slot so PK lookups
+                                // resolve to the live instance; the deleted entry remains
+                                // reference-tracked and therefore still executes.
+                                var replacementEntry = new EntityEntry(entity, EntityState.Added, mapping, _options, MarkDirty);
+                                typeEntries[pk] = replacementEntry;
+                                _entriesByReference.TryAdd(entity, replacementEntry);
+                                if (entity is not INotifyPropertyChanged)
+                                    _nonNotifyingEntries.TryAdd(replacementEntry, 0);
+                                return replacementEntry;
+                            }
+                            // Adopting the state onto the OTHER instance's entry would insert
+                            // that instance's values and silently discard this one's.
+                            throw new InvalidOperationException(
+                                $"Cannot add an instance of '{mapping.Type.Name}' with key '{pk}': another instance with " +
+                                "the same key is already being tracked. Mutate the tracked instance, or remove it (and " +
+                                "save) before adding the replacement.");
+                        }
                         // Different CLR instance with same PK — update state but don't downgrade
                         // from a dirty state to Unchanged.
                         if (!(pkEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
