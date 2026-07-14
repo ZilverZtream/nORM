@@ -868,20 +868,35 @@ public class LinqParityFuzzTests
                 Assert.True(dbProj.SequenceEqual(orProj),
                     $"projection mismatch\n{Describe()}\nprojection: {projection}\ndb: [{string.Join(" | ", dbProj)}]\noracle: [{string.Join(" | ", orProj)}]");
                 break;
-            default: // distinct scalar — int, or nullable string (NULL dedup + ordinal case variants)
-                if (caseRng.Next(2) == 0)
+            default: // distinct — int scalar, nullable string scalar, or anonymous pair
+                switch (caseRng.Next(3))
                 {
-                    var dbDistinct = db.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
-                    var orDistinct = oracle.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
-                    Assert.True(dbDistinct.SequenceEqual(orDistinct),
-                        $"Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbDistinct)}]\noracle: [{string.Join(",", orDistinct)}]");
-                }
-                else
-                {
-                    var dbNickDistinct = db.Select(r => r.Nick).Distinct().ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
-                    var orNickDistinct = oracle.Select(r => r.Nick).Distinct().ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
-                    Assert.True(dbNickDistinct.SequenceEqual(orNickDistinct),
-                        $"nullable-string Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbNickDistinct)}]\noracle: [{string.Join(",", orNickDistinct)}]");
+                    case 0:
+                    {
+                        var dbDistinct = db.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
+                        var orDistinct = oracle.Select(r => r.IntVal).Distinct().ToList().OrderBy(x => x).ToList();
+                        Assert.True(dbDistinct.SequenceEqual(orDistinct),
+                            $"Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbDistinct)}]\noracle: [{string.Join(",", orDistinct)}]");
+                        break;
+                    }
+                    case 1:
+                    {
+                        var dbNickDistinct = db.Select(r => r.Nick).Distinct().ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
+                        var orNickDistinct = oracle.Select(r => r.Nick).Distinct().ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
+                        Assert.True(dbNickDistinct.SequenceEqual(orNickDistinct),
+                            $"nullable-string Distinct mismatch\n{Describe()}\ndb: [{string.Join(",", dbNickDistinct)}]\noracle: [{string.Join(",", orNickDistinct)}]");
+                        break;
+                    }
+                    default: // anonymous member pair (NULL + case variants in a composite)
+                    {
+                        var dbAnon = db.Select(r => new { r.Nick, r.IntVal }).Distinct().ToList()
+                            .OrderBy(x => x.Nick, StringComparer.Ordinal).ThenBy(x => x.IntVal).ToList();
+                        var orAnon = oracle.Select(r => new { r.Nick, r.IntVal }).Distinct().ToList()
+                            .OrderBy(x => x.Nick, StringComparer.Ordinal).ThenBy(x => x.IntVal).ToList();
+                        Assert.True(dbAnon.SequenceEqual(orAnon),
+                            $"anonymous Distinct mismatch\n{Describe()}\ndb: [{string.Join(" | ", dbAnon)}]\noracle: [{string.Join(" | ", orAnon)}]");
+                        break;
+                    }
                 }
                 break;
         }

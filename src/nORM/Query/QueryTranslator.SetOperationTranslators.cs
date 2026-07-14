@@ -88,6 +88,23 @@ namespace nORM.Query
                 // (column, binary column) instead of emitting DISTINCT — grouping by
                 // the composite is byte-wise distinctness while the SELECT keeps
                 // returning the plain string.
+                // The sub-context consumed the projection that defines the element
+                // shape; without re-installing it the outer plan materializes the
+                // entity mapping's columns into the projected type's constructor and
+                // fails ("no suitable constructor" for any anonymous shape). The
+                // parameter binds to the wrap alias so any later projection-driven
+                // SELECT rewrite emits wrap-scope references.
+                var shapeSelect = FindShapeDefiningSelect(node.Arguments[0]);
+                LambdaExpression? shapeLambda = null;
+                if (shapeSelect != null
+                    && StripQuotes(shapeSelect.Arguments[1]) is LambdaExpression shapeProj)
+                {
+                    shapeLambda = shapeProj;
+                    if (!t._correlatedParams.ContainsKey(shapeProj.Parameters[0]))
+                        t._correlatedParams[shapeProj.Parameters[0]] = (subMapD, winAliasD);
+                    t._projection = shapeProj;
+                }
+
                 var elementArgs = node.Arguments[0].Type.IsGenericType
                     ? node.Arguments[0].Type.GetGenericArguments()
                     : Type.EmptyTypes;
@@ -104,9 +121,92 @@ namespace nORM.Query
                     return node;
                 }
 
+                // Anonymous / record shapes of plain member accesses: DISTINCT under a
+                // CI collation folds case in the string members, so group the wrap by
+                // every column with a binary extra per string member — the same
+                // byte-wise distinctness rewrite as the scalar branch, per column.
+                if (t._provider.DefaultStringEqualityIsCaseInsensitive
+                    && shapeLambda?.Body is NewExpression shapeNew
+                    && shapeNew.Members != null
+                    && shapeNew.Members.Count == shapeNew.Arguments.Count
+                    && shapeNew.Arguments.Count > 0
+                    && TryGetMemberAccessColumns(shapeNew, shapeLambda.Parameters[0], subMapD, out var shapeCols))
+                {
+                    // The sub-select aliases each output by the projection MEMBER name
+                    // (`"Nick" AS "N"`), so wrap-scope references use member names.
+                    t._sql.AppendFragment("SELECT ");
+                    for (var ci = 0; ci < shapeCols.Count; ci++)
+                    {
+                        if (ci > 0) t._sql.AppendFragment(", ");
+                        t._sql.Append(t._provider.Escape(shapeNew.Members[ci].Name));
+                    }
+                    t._sql.AppendFragment(" FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
+                    for (var ci = 0; ci < shapeCols.Count; ci++)
+                    {
+                        var outName = t._provider.Escape(shapeNew.Members[ci].Name);
+                        t._groupBy.Add(outName);
+                        if (shapeCols[ci].Prop.PropertyType == typeof(string))
+                            t._groupByOrdinalExtras.Add(t._provider.ForceCaseSensitiveStringComparison(outName));
+                    }
+                    t._isDistinct = true;
+                    return node;
+                }
+
                 t._sql.AppendFragment("SELECT DISTINCT * FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
                 t._isDistinct = true;
                 return node;
+            }
+
+            /// <summary>
+            /// Walks down through element-shape-preserving operators (Where, OrderBy,
+            /// ThenBy, Skip, Take) to the Select call whose lambda produced the
+            /// windowed source's element shape. Returns null when the chain bottoms
+            /// out at the entity root (no reshaping Select).
+            /// </summary>
+            private static MethodCallExpression? FindShapeDefiningSelect(Expression source)
+            {
+                var current = source;
+                while (current is MethodCallExpression call && call.Arguments.Count > 0)
+                {
+                    if (call.Method.Name == nameof(Queryable.Select))
+                        return call;
+                    if (call.Method.Name is nameof(Queryable.Where)
+                        or nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                        or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending)
+                        or nameof(Queryable.Skip) or nameof(Queryable.Take))
+                    {
+                        current = call.Arguments[0];
+                        continue;
+                    }
+                    return null;
+                }
+                return null;
+            }
+
+            /// <summary>
+            /// Matches a projection whose constructor arguments are all direct
+            /// member accesses on the source parameter and resolves them to their
+            /// mapped columns (in projection order). Computed members return false —
+            /// those shapes keep the DISTINCT keyword fallback.
+            /// </summary>
+            private static bool TryGetMemberAccessColumns(
+                NewExpression shape,
+                ParameterExpression sourceParam,
+                TableMapping mapping,
+                out List<Column> columns)
+            {
+                columns = new List<Column>(shape.Arguments.Count);
+                foreach (var arg in shape.Arguments)
+                {
+                    if (arg is not MemberExpression member
+                        || member.Expression != sourceParam
+                        || !mapping.ColumnsByName.TryGetValue(member.Member.Name, out var col))
+                    {
+                        return false;
+                    }
+                    columns.Add(col);
+                }
+                return true;
             }
 
             /// <summary>
