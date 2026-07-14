@@ -542,6 +542,16 @@ namespace nORM.Query
                 if (!SharedCompiledParams.Contains(compiled))
                     SharedCompiledParams.Add(compiled);
             }
+            // Merge value-converter registrations the sub-translation minted for
+            // closure values compared against converter columns inside the
+            // subquery (e.g. `s.Region == capturedRegion`). Without this the plan
+            // binds the raw CLR value instead of the provider representation and
+            // the comparison silently matches nothing.
+            if (subPlan.ParameterConverters is { Count: > 0 } && SharedParamConverters != null)
+            {
+                foreach (var kvp in subPlan.ParameterConverters)
+                    SharedParamConverters[kvp.Key] = kvp.Value;
+            }
 
             var sql = subPlan.Sql;
             var fromIdx = ExpressionToSqlVisitor.FindTopLevelFromIndex(sql);
