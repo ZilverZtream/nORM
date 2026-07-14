@@ -170,6 +170,10 @@ namespace nORM.Query
                         info = (t._mapping, alias);
                         t._correlatedParams[param] = info;
                     }
+                    // Record THIS translator's root alias so Build's FROM clause never has
+                    // to reverse-lookup by mapping in the shared correlated dict (ambiguous
+                    // when a nested subquery targets the same entity type as an outer scope).
+                    t._selfRootAlias ??= info.Alias;
                     // paramIndexStart = t._params.Count so that this predicate's visitor
                     // does not reuse @p0/@p1 names already allocated by preceding predicates
                     // (e.g. inner Where's compiled param and global-filter constant colliding).
@@ -693,6 +697,10 @@ namespace nORM.Query
                         info = (t._mapping, alias);
                         t._correlatedParams[param] = info;
                     }
+                    // Record THIS translator's root alias so Build's FROM clause never has
+                    // to reverse-lookup by mapping in the shared correlated dict (ambiguous
+                    // when a nested subquery targets the same entity type as an outer scope).
+                    t._selfRootAlias ??= info.Alias;
                     var vctx = new VisitorContext(t._ctx, t._mapping, t._provider, param, info.Alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx);
                     // Mirror the WhereTranslator grouping setup so that

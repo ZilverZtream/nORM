@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -214,6 +215,94 @@ public class CorrelatedScalarAggregateSubqueryTests
             .ToListAsync()).Select(p => p.Id).OrderBy(i => i).ToList();
         Assert.True(expected.SequenceEqual(actual),
             $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task Correlated_count_in_projection_keeps_the_client_evaluation_policy_contract()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // Explicit ctx.Query subqueries in PROJECTIONS route through the client-
+        // evaluation policy (default Throw) with navigation-property guidance —
+        // the predicate/order-key translation above is the server-side surface.
+        var cut = 15;
+        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
+            ctx.Query<Parent>()
+                .Select(p => new { p.Id, N = ctx.Query<Child>().Count(c => c.ParentId == p.Id && c.Amount >= cut) })
+                .ToListAsync());
+        Assert.Contains("ClientEvaluationPolicy", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Correlated_count_as_order_key_binds_closures()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        var cut = 15;
+        var expected = parents
+            .OrderByDescending(p => children.Count(c => c.ParentId == p.Id && c.Amount >= cut))
+            .ThenBy(p => p.Id).Select(p => p.Id).ToList();
+        var actual = (await ctx.Query<Parent>()
+            .OrderByDescending(p => ctx.Query<Child>().Count(c => c.ParentId == p.Id && c.Amount >= cut))
+            .ThenBy(p => p.Id).ToListAsync()).Select(p => p.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task Nested_correlated_any_binds_both_ctx_captures()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        var t = 30;
+        var amt = 10;
+        var expected = parents
+            .Where(p => children.Any(c => c.ParentId == p.Id && c.Amount >= amt
+                && parents.Any(q => q.Id == c.ParentId && q.Threshold >= t)))
+            .Select(p => p.Id).OrderBy(i => i).ToList();
+        var actual = (await ctx.Query<Parent>()
+            .Where(p => ctx.Query<Child>().Any(c => c.ParentId == p.Id && c.Amount >= amt
+                && ctx.Query<Parent>().Any(q => q.Id == c.ParentId && q.Threshold >= t)))
+            .ToListAsync()).Select(p => p.Id).OrderBy(i => i).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task Correlated_count_in_bulk_delete_predicate_binds_closures()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        var cut = 15;
+        var minCount = 2;
+        var doomed = parents
+            .Where(p => children.Count(c => c.ParentId == p.Id && c.Amount >= cut) >= minCount)
+            .Select(p => p.Id).ToHashSet();
+        var affected = await ctx.Query<Parent>()
+            .Where(p => ctx.Query<Child>().Count(c => c.ParentId == p.Id && c.Amount >= cut) >= minCount)
+            .ExecuteDeleteAsync();
+        Assert.Equal(doomed.Count, affected);
+
+        using var check = keeper.CreateCommand();
+        check.CommandText = "SELECT Id FROM CsaParent_Test ORDER BY Id";
+        var survivors = new List<int>();
+        using (var reader = check.ExecuteReader())
+            while (reader.Read()) survivors.Add(reader.GetInt32(0));
+        var expected = parents.Where(p => !doomed.Contains(p.Id)).Select(p => p.Id).OrderBy(i => i).ToList();
+        Assert.True(expected.SequenceEqual(survivors),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", survivors)}]");
     }
 
     [Fact]

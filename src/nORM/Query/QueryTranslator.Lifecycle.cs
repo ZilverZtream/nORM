@@ -109,6 +109,7 @@ namespace nORM.Query
                 _groupByKeySelector = null;
                 _groupOrderedFirstSourceWheres = null;
                 _closureFoldedIntoSql = false;
+                _selfRootAlias = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _singleResult = false;
@@ -167,6 +168,7 @@ namespace nORM.Query
                 _groupByKeySelector = null;
                 _groupOrderedFirstSourceWheres = null;
                 _closureFoldedIntoSql = false;
+                _selfRootAlias = null;
                 _joinCounter = 0;
                 _recursionDepth = 0;
                 _contextStack.Clear();

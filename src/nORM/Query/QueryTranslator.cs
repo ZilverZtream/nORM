@@ -128,6 +128,12 @@ namespace nORM.Query
         // outer translation already registered would shift positional bindings).
         // Marks the plan execution-specific: translate fresh, skip both caches.
         private bool _closureFoldedIntoSql;
+        // The alias THIS translator bound its root lambda parameter to. Build's FROM
+        // clause previously reverse-looked-up the alias by mapping in the SHARED
+        // correlated dict — ambiguous when a nested correlated subquery targets the
+        // SAME entity type as an outer scope (both entries carry the same mapping),
+        // which emitted the outer scope's alias and broke every inner reference.
+        private string? _selfRootAlias;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;

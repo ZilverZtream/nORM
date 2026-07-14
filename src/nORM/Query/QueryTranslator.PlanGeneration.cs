@@ -306,14 +306,17 @@ namespace nORM.Query
                 if (_t._sql.Length == 0)
                 {
                     var fromClause = _t._mapping.EscTable;
-                    // Pick the alias bound to THIS translator's mapping (not the first correlated
-                    // entry blindly). When this translator runs as a subquery that inherits outer
-                    // correlated parameters, the outer entry is listed first; falling back to it
-                    // would alias the FROM clause to the outer table's alias and break the join.
-                    var alias = _t._correlatedParams.Count > 0
-                        ? _t._correlatedParams.FirstOrDefault(kvp => kvp.Value.Mapping == _t._mapping).Value.Alias
-                          ?? _t._correlatedParams.Values.FirstOrDefault().Alias
-                        : null;
+                    // Prefer the alias THIS translator bound its root parameter to. The
+                    // mapping-based reverse lookup below is ambiguous when a nested
+                    // correlated subquery targets the SAME entity type as an outer scope:
+                    // the shared dict lists the outer entry first, so the inner FROM got
+                    // the outer alias and every inner reference broke. The lookup remains
+                    // as the fallback for translators that never bind a root lambda.
+                    var alias = _t._selfRootAlias
+                        ?? (_t._correlatedParams.Count > 0
+                            ? _t._correlatedParams.FirstOrDefault(kvp => kvp.Value.Mapping == _t._mapping).Value.Alias
+                              ?? _t._correlatedParams.Values.FirstOrDefault().Alias
+                            : null);
                     if (_t._asOfTimestamp.HasValue)
                     {
                         alias ??= _t.EscapeAlias("T0");
