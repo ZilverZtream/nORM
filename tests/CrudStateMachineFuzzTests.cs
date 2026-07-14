@@ -485,7 +485,7 @@ public class CrudStateMachineFuzzTests
         {
             for (var step = 0; step < steps; step++)
             {
-                switch (rng.Next(15))
+                switch (rng.Next(16))
                 {
                     case 0: // add a childless parent
                     {
@@ -683,7 +683,7 @@ public class CrudStateMachineFuzzTests
                         trace.Add($"{step}: nav retarget child {ck} -> parent {pk}");
                         break;
                     }
-                    default: // reference-nav add with an UNTRACKED new principal (graph discovery)
+                    case 14: // reference-nav add with an UNTRACKED new principal (graph discovery)
                     {
                         var pk = nextParentKey++;
                         var name = NamePool[rng.Next(NamePool.Length)];
@@ -699,6 +699,37 @@ public class CrudStateMachineFuzzTests
                         parents[pk] = name;
                         children[ck] = (pk, val);
                         trace.Add($"{step}: refnav add child {ck} -> NEW principal {pk}");
+                        break;
+                    }
+                    default: // cascade delete: remove a parent whose children are all
+                             // context-visible; tracked children delete with it, pending
+                             // nav children die undiscovered (fixup skips deleted navs)
+                    {
+                        var eligible = trackedParents.Keys
+                            .Where(pk => parents.ContainsKey(pk)
+                                && !pendingPrincipals.Contains(pk)
+                                && children.All(kv => kv.Value.ParentId != pk
+                                    || trackedChildren.ContainsKey(kv.Key)
+                                    || pendingNavChildren.TryGetValue(kv.Key, out var np) && np == pk)
+                                // Added-with-nav children have unaligned FKs the cascade
+                                // cannot match; keep the machine on contracted ground.
+                                && !children.Any(kv => kv.Value.ParentId == pk && pendingRefChildren.Contains(kv.Key)))
+                            .ToList();
+                        if (eligible.Count == 0) break;
+                        var pkDel = eligible[rng.Next(eligible.Count)];
+                        ctx.Remove(trackedParents[pkDel]);
+                        var doomed = children.Where(kv => kv.Value.ParentId == pkDel).Select(kv => kv.Key).ToList();
+                        foreach (var ck in doomed)
+                        {
+                            children.Remove(ck);
+                            trackedChildren.Remove(ck);
+                            pendingNavChildren.Remove(ck);
+                            fkEdited.Remove(ck);
+                            navRetargeted.Remove(ck);
+                        }
+                        trackedParents.Remove(pkDel);
+                        parents.Remove(pkDel);
+                        trace.Add($"{step}: cascade delete parent {pkDel} (children [{string.Join(",", doomed)}])");
                         break;
                     }
                 }

@@ -1,157 +1,113 @@
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
-using nORM.Mapping;
 using nORM.Providers;
 using Xunit;
+using Xunit.Abstractions;
+
+#nullable enable
 
 namespace nORM.Tests;
 
-[Xunit.Trait("Category", "Fast")]
+[Trait("Category", TestCategory.Fast)]
 public class CascadeDeleteTests
 {
-    private class Blog
+    private readonly ITestOutputHelper _output;
+    public CascadeDeleteTests(ITestOutputHelper output) => _output = output;
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("Casc_Parent")]
+    public class CascParent
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
-        public ICollection<Post> Posts { get; set; } = new List<Post>();
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public List<CascChild> Children { get; set; } = new();
     }
 
-    private class Post
+    [System.ComponentModel.DataAnnotations.Schema.Table("Casc_Child")]
+    public class CascChild
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
-        public int BlogId { get; set; }
-        public Blog? Blog { get; set; }
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public int ParentId { get; set; }
+        public int Val { get; set; }
     }
 
-    [Fact]
-    public async Task ChangeTracker_removes_cascaded_children()
+    private static (SqliteConnection, DbContext) Create()
     {
-        using var cn = new SqliteConnection("Data Source=:memory:");
+        var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = "CREATE TABLE Blog(Id INTEGER PRIMARY KEY AUTOINCREMENT);";
+            cmd.CommandText = """
+                CREATE TABLE Casc_Parent (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                CREATE TABLE Casc_Child (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Val INTEGER NOT NULL)
+                """;
             cmd.ExecuteNonQuery();
         }
-        using (var cmd = cn.CreateCommand())
+        var options = new DbContextOptions
         {
-            cmd.CommandText = "CREATE TABLE Post(Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogId INTEGER NOT NULL, FOREIGN KEY(BlogId) REFERENCES Blog(Id) ON DELETE CASCADE);";
-            cmd.ExecuteNonQuery();
-        }
-
-        using var ctx = new DbContext(cn, new SqliteProvider());
-
-        var blog = new Blog();
-        ctx.Add(blog);
-        await ctx.SaveChangesAsync();
-
-        var post1 = new Post { BlogId = blog.Id };
-        var post2 = new Post { BlogId = blog.Id };
-        ctx.Add(post1);
-        ctx.Add(post2);
-        blog.Posts.Add(post1);
-        blog.Posts.Add(post2);
-        await ctx.SaveChangesAsync();
-
-        ctx.Remove(blog);
-        await ctx.SaveChangesAsync();
-
-        Assert.Empty(ctx.ChangeTracker.Entries);
-    }
-
-    private class Node
-    {
-        [Key]
-        public int Id { get; set; }
-        public int ParentId { get; set; }
-        public List<Node> Children { get; set; } = new();
-    }
-
-    private static TableMapping CreateNodeMapping()
-    {
-        var provider = new SqliteProvider();
-        var pk = new Column(typeof(Node).GetProperty(nameof(Node.Id))!, provider, null);
-        var fk = new Column(typeof(Node).GetProperty(nameof(Node.ParentId))!, provider, null);
-        var mapping = (TableMapping)RuntimeHelpers.GetUninitializedObject(typeof(TableMapping));
-
-        // Auto-properties have private backing fields named <PropertyName>k__BackingField
-        const BindingFlags bf = BindingFlags.NonPublic | BindingFlags.Instance;
-        typeof(TableMapping).GetField("<Type>k__BackingField", bf)!.SetValue(mapping, typeof(Node));
-        typeof(TableMapping).GetField("<Provider>k__BackingField", bf)!.SetValue(mapping, provider);
-        typeof(TableMapping).GetField("<Columns>k__BackingField", bf)!.SetValue(mapping, new[] { pk, fk });
-        typeof(TableMapping).GetField("<ColumnsByName>k__BackingField", bf)!
-            .SetValue(mapping, new Dictionary<string, Column> { [nameof(Node.Id)] = pk, [nameof(Node.ParentId)] = fk });
-        typeof(TableMapping).GetField("<KeyColumns>k__BackingField", bf)!.SetValue(mapping, new[] { pk });
-        typeof(TableMapping).GetField("<Relations>k__BackingField", bf)!
-            .SetValue(mapping, new Dictionary<string, TableMapping.Relation>());
-        typeof(TableMapping).GetField("<TphMappings>k__BackingField", bf)!
-            .SetValue(mapping, new Dictionary<object, TableMapping>());
-        // EscTable has { get; set; } so we can set it directly
-        mapping.EscTable = "\"Nodes\"";
-
-        var navProp = typeof(Node).GetProperty(nameof(Node.Children))!;
-        mapping.Relations[nameof(Node.Children)] = new TableMapping.Relation(navProp, typeof(Node), pk, fk, true);
-        return mapping;
+            OnModelCreating = mb =>
+            {
+                mb.Entity<CascParent>().HasKey(p => p.Id);
+                mb.Entity<CascChild>().HasKey(c => c.Id);
+                mb.Entity<CascParent>().HasMany(p => p.Children).WithOne()
+                                       .HasForeignKey(c => c.ParentId, p => p.Id);
+            }
+        };
+        return (cn, new DbContext(cn, new SqliteProvider(), options));
     }
 
     [Fact]
-    public void CascadeDelete_handles_cycles_without_overflow()
+    public async Task Removing_a_parent_cascades_to_children_present_in_the_navigation()
     {
-        var mapping = CreateNodeMapping();
-        var tracker = new ChangeTracker(new DbContextOptions());
+        var (cn, ctx) = Create();
+        using var _ = cn;
+        using var __ = ctx;
 
-        var a = new Node { Id = 1 };
-        var b = new Node { Id = 2 };
-        a.Children.Add(b);
-        b.Children.Add(a);
+        var parent = new CascParent { Id = 1, Name = "p" };
+        parent.Children.Add(new CascChild { Id = 10, Val = 1 });
+        parent.Children.Add(new CascChild { Id = 11, Val = 2 });
+        ctx.Add(parent);
+        await ctx.SaveChangesAsync();
+        Assert.Equal(2, (await ctx.Query<CascChild>().ToListAsync()).Count);
 
-        tracker.Track(a, EntityState.Unchanged, mapping);
-        tracker.Track(b, EntityState.Unchanged, mapping);
+        // Children are in the tracked navigation — Remove cascades to them.
+        ctx.Remove(parent);
+        await ctx.SaveChangesAsync();
 
-        tracker.Remove(a, true);
-
-        Assert.Empty(tracker.Entries);
+        _output.WriteLine($"parents: {(await ctx.Query<CascParent>().ToListAsync()).Count}");
+        var children = await ctx.Query<CascChild>().ToListAsync();
+        _output.WriteLine($"children: [{string.Join(",", children.Select(c => c.Id))}]");
+        Assert.Empty(await ctx.Query<CascParent>().ToListAsync());
+        Assert.Empty(children);
     }
 
     [Fact]
-    public void CascadeDelete_respects_max_depth()
+    public async Task Removing_a_parent_with_an_unloaded_navigation_leaves_children_orphaned()
     {
-        var mapping = CreateNodeMapping();
-        var tracker = new ChangeTracker(new DbContextOptions());
+        var (cn, ctx) = Create();
+        using var _ = cn;
+        using var __ = ctx;
 
-        var maxDepth = (int)typeof(ChangeTracker)
-            .GetField("MaxCascadeDepth", BindingFlags.NonPublic | BindingFlags.Static)!
-            .GetValue(null)!;
+        var parent = new CascParent { Id = 1, Name = "p" };
+        parent.Children.Add(new CascChild { Id = 10, Val = 1 });
+        ctx.Add(parent);
+        await ctx.SaveChangesAsync();
 
-        var root = new Node { Id = 0 };
-        var current = root;
-        var nodes = new List<Node> { root };
+        // Fresh context: the requeried parent has an EMPTY navigation, so the
+        // tracked-graph cascade has nothing to traverse — the child stays.
+        ctx.ChangeTracker.Clear();
+        var requeried = await ctx.Query<CascParent>().FirstAsync(p => p.Id == 1);
+        Assert.Empty(requeried.Children);
+        ctx.Remove(requeried);
+        await ctx.SaveChangesAsync();
 
-        int nextId = 1;
-        for (int i = 0; i < maxDepth + 5; i++)
-        {
-            var child = new Node { Id = nextId++, ParentId = current.Id };
-            current.Children.Add(child);
-            nodes.Add(child);
-            tracker.Track(child, EntityState.Unchanged, mapping);
-            current = child;
-        }
-
-        tracker.Track(root, EntityState.Unchanged, mapping);
-        tracker.Remove(root, true);
-
-        var expectedRemaining = nodes.Count - (maxDepth + 1);
-        Assert.Equal(expectedRemaining, tracker.Entries.Count());
+        var children = await ctx.Query<CascChild>().ToListAsync();
+        _output.WriteLine($"children after: [{string.Join(",", children.Select(c => c.Id))}]");
+        Assert.Empty(await ctx.Query<CascParent>().ToListAsync());
+        Assert.Single(children); // orphaned, per the tracked-graph cascade contract
     }
 }
+

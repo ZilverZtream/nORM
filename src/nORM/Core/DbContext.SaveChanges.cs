@@ -154,6 +154,7 @@ namespace nORM.Core
                 // Fixup first: the reference direction assigns FK scalars on already-tracked
                 // dependents, and detection must see those assignments to mark the rows Modified.
                 FixupNavigationChildren();
+                CascadeMarkDeletedDependents();
                 ChangeTracker.DetectAllChanges();
             }
             var changedEntries = ChangeTracker.Entries
@@ -700,6 +701,78 @@ namespace nORM.Core
             if (ex is DbException dbEx && Options.RetryPolicy != null)
                 return Options.RetryPolicy.ShouldRetry(dbEx);
             return false;   // TimeoutException is excluded - retrying a timed-out write can duplicate data.
+        }
+
+        /// <summary>
+        /// Client-side cascade delete: marks TRACKED dependents of Deleted
+        /// principals as Deleted, transitively, for relations configured with
+        /// <c>CascadeDelete</c>. Dependents are matched by foreign key value, so
+        /// loaded children cascade whether or not they sit in the navigation
+        /// collection. Added dependents were never persisted and detach instead.
+        /// Unloaded dependents are the database referential action's
+        /// responsibility (migrations emit ON DELETE CASCADE for these relations).
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Cascade marking reads relation metadata via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Cascade marking reflects over relations; trimming may remove the required members.")]
+        private void CascadeMarkDeletedDependents()
+        {
+            Queue<EntityEntry>? queue = null;
+            foreach (var e in ChangeTracker.Entries)
+            {
+                if (e.State == EntityState.Deleted && e.Mapping.Relations.Count > 0)
+                    (queue ??= new Queue<EntityEntry>()).Enqueue(e);
+            }
+            if (queue == null)
+                return;
+
+            var trackedByType = ChangeTracker.Entries
+                .GroupBy(e => e.Mapping.Type)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            while (queue.Count > 0)
+            {
+                var principalEntry = queue.Dequeue();
+                var principal = principalEntry.Entity;
+                if (principal == null)
+                    continue;
+
+                foreach (var relation in principalEntry.Mapping.Relations.Values)
+                {
+                    if (!relation.CascadeDelete)
+                        continue;
+                    if (!trackedByType.TryGetValue(relation.DependentType, out var dependents))
+                        continue;
+
+                    var principalKeyValues = new object?[relation.PrincipalKeys.Count];
+                    for (var i = 0; i < relation.PrincipalKeys.Count; i++)
+                        principalKeyValues[i] = relation.PrincipalKeys[i].Getter(principal);
+
+                    foreach (var dependentEntry in dependents)
+                    {
+                        if (dependentEntry.State is EntityState.Deleted or EntityState.Detached)
+                            continue;
+                        var dependent = dependentEntry.Entity;
+                        if (dependent == null)
+                            continue;
+                        var matches = true;
+                        for (var i = 0; i < relation.ForeignKeys.Count && matches; i++)
+                            matches = Equals(relation.ForeignKeys[i].Getter(dependent), principalKeyValues[i]);
+                        if (!matches)
+                            continue;
+
+                        if (dependentEntry.State == EntityState.Added)
+                        {
+                            // Never persisted — nothing to delete; just stop tracking it.
+                            ChangeTracker.Remove(dependent);
+                            continue;
+                        }
+
+                        dependentEntry.State = EntityState.Deleted;
+                        if (dependentEntry.Mapping.Relations.Count > 0)
+                            queue.Enqueue(dependentEntry);
+                    }
+                }
+            }
         }
 
         /// <summary>
