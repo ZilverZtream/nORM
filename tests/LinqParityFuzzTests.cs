@@ -306,6 +306,55 @@ public class LinqParityFuzzTests
         RunSetOpFuzz(ctx, seed, cases: 120);
         RunKeyedOpFuzz(ctx, seed, cases: 100);
         RunWindowFuzz(ctx, seed, cases: 100);
+        RunStringComparisonClosureFuzz(ctx, seed, cases: 80);
+    }
+
+    /// <summary>
+    /// Runs string StartsWith/Contains/EndsWith/Equals shapes whose needle AND
+    /// StringComparison are CLOSURE captures, alternating both across cases. The
+    /// comparison selects between case-folded and binary SQL shapes, so these
+    /// plans must translate fresh per execution — a fingerprint-cached plan (or
+    /// pooled command) would replay the first case's needle and semantics.
+    /// </summary>
+    internal static void RunStringComparisonClosureFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var comparisons = new[] { StringComparison.Ordinal, StringComparison.OrdinalIgnoreCase };
+        var oracleRows = Rows.ToList();
+
+        for (var i = 0; i < cases; i++)
+        {
+            var needle = ((char)('a' + rng.Next(6))).ToString();
+            if (rng.Next(3) == 0) needle = needle.ToUpperInvariant();
+            var cmp = comparisons[rng.Next(comparisons.Length)];
+            var op = rng.Next(4);
+
+            Expression<Func<Row, bool>> predicate = op switch
+            {
+                0 => r => r.Name.StartsWith(needle, cmp),
+                1 => r => r.Name.Contains(needle, cmp),
+                2 => r => r.Name.EndsWith(needle, cmp),
+                _ => r => r.Nick != null && r.Nick.Equals(needle, cmp),
+            };
+
+            var expected = oracleRows.AsQueryable().Where(predicate)
+                .Select(r => r.Id).OrderBy(x => x).ToList();
+            List<int> actual;
+            try
+            {
+                actual = ctx.Query<Row>().Where(predicate)
+                    .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"comparison-closure shape threw (seed={seed} case={i} op={op} needle={needle} cmp={cmp})", ex);
+            }
+
+            Assert.True(expected.SequenceEqual(actual),
+                $"comparison-closure mismatch seed={seed} case={i} op={op} needle={needle} cmp={cmp}\n" +
+                $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
     }
 
     /// <summary>

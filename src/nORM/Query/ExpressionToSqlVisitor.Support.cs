@@ -557,16 +557,20 @@ namespace nORM.Query
             ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
         }
 
+        // As with the LIKE handlers above: the value operands precede the
+        // StringComparison in the extractor's expression-order walk, so their
+        // compiled parameters must be created BEFORE the comparison's placeholder
+        // or the values bind to the wrong slots.
         private static void HandleStringEqualsInstanceWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
-            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
             EmitEqualityPredicate(visitor, node.Object!, node.Arguments[0], IsIgnoreCase(node.Arguments[1]));
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
         }
 
         private static void HandleStringEqualsStaticWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
-            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[2]);
             EmitEqualityPredicate(visitor, node.Arguments[0], node.Arguments[1], IsIgnoreCase(node.Arguments[2]));
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[2]);
         }
 
         // ParameterValueExtractor walks every closure MemberExpression in the
