@@ -38,6 +38,18 @@ namespace nORM.Providers
         internal virtual string GetUpdateTokenOutputClause(TableMapping m) => string.Empty;
 
         /// <summary>
+        /// Clause emitted between the column list and VALUES of an INSERT to read
+        /// back a server-generated concurrency token (SQL Server ROWVERSION) for
+        /// entities whose keys the application supplies. The server generates a
+        /// fresh token on INSERT, so without this read-back the tracked instance's
+        /// first UPDATE or DELETE compares a stale in-memory token and throws a
+        /// false concurrency conflict. Entities with DB-generated keys read the
+        /// token back through the identity-retrieval clause instead. Empty on
+        /// providers whose tokens are client-managed.
+        /// </summary>
+        internal virtual string GetInsertTokenOutputClause(TableMapping m) => string.Empty;
+
+        /// <summary>
         /// Builds a parameterized <c>INSERT</c> statement for the specified table
         /// mapping, caching the generated SQL for future use.
         /// </summary>
@@ -54,13 +66,19 @@ namespace nORM.Providers
                 var cols = GetInsertColumns(m);
                 var identityPrefix = includeIdentityRetrieval ? GetIdentityRetrievalPrefix(m) : string.Empty;
                 var identitySuffix = includeIdentityRetrieval ? GetIdentityRetrievalString(m) : string.Empty;
+                // Server-generated tokens (ROWVERSION) are assigned on INSERT too; when no
+                // identity retrieval reads them back, the token output clause does. The two
+                // are mutually exclusive: identity retrieval already includes the token.
+                var tokenPrefix = !includeIdentityRetrieval && m.TimestampColumn != null && SupportsNativeRowVersion
+                    ? GetInsertTokenOutputClause(m)
+                    : string.Empty;
                 if (cols.Length == 0)
                 {
-                    return $"INSERT INTO {m.EscTable}{identityPrefix} {DefaultValuesInsertClause}{identitySuffix}";
+                    return $"INSERT INTO {m.EscTable}{identityPrefix}{tokenPrefix} {DefaultValuesInsertClause}{identitySuffix}";
                 }
                 var colNames = string.Join(", ", cols.Select(c => c.EscCol));
                 var valParams = string.Join(", ", cols.Select(c => ParamPrefix + c.PropName));
-                return $"INSERT INTO {m.EscTable} ({colNames}){identityPrefix} VALUES ({valParams}){identitySuffix}";
+                return $"INSERT INTO {m.EscTable} ({colNames}){identityPrefix}{tokenPrefix} VALUES ({valParams}){identitySuffix}";
             });
         }
 
@@ -106,7 +124,13 @@ namespace nORM.Providers
                     whereCols.Add($"{m.TenantColumn.EscCol}={ParamPrefix}{m.TenantColumn.PropName}");
                 var where = string.Join(" AND ", whereCols);
 
-                return $"UPDATE {m.EscTable} SET {set} WHERE {where}";
+                // Server-generated tokens (ROWVERSION) regenerate on every UPDATE; read the
+                // fresh value back inline so the entity can update or delete again without a
+                // false stale-token conflict (mirrors the batched BuildUpdateBatch path).
+                var tokenOutput = m.TimestampColumn != null && SupportsNativeRowVersion
+                    ? GetUpdateTokenOutputClause(m)
+                    : string.Empty;
+                return $"UPDATE {m.EscTable} SET {set}{tokenOutput} WHERE {where}";
             });
         }
 

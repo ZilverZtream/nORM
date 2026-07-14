@@ -60,12 +60,26 @@ public class CrossProviderBehaviorTests
         public byte[]? Token { get; set; }
     }
 
+    // Token-free second type for the plan-collision test: [Timestamp] entities
+    // now emit provider-native token read-back on INSERT and UPDATE for SQL
+    // Server (OUTPUT INSERTED), which the SQLite lock-step backend cannot
+    // execute — and plan-cache collision only needs two distinct entity types.
+    [Table("G50PayloadItem")]
+    private class G50PayloadItem
+    {
+        [Key]
+        public int Id { get; set; }
+        public string Payload { get; set; } = "";
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private const string ItemDdl =
         "CREATE TABLE G50Item (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL, Value INTEGER NOT NULL)";
     private const string OccDdl =
         "CREATE TABLE G50OccItem (Id INTEGER PRIMARY KEY, Payload TEXT NOT NULL, Token BLOB)";
+    private const string PayloadDdl =
+        "CREATE TABLE G50PayloadItem (Id INTEGER PRIMARY KEY, Payload TEXT NOT NULL)";
 
     private static DatabaseProvider MakeProvider(string kind) => kind switch
     {
@@ -296,7 +310,7 @@ public class CrossProviderBehaviorTests
         cmdA.CommandText = ItemDdl;
         cmdA.ExecuteNonQuery();
         using var cmdB = cn.CreateCommand();
-        cmdB.CommandText = OccDdl;
+        cmdB.CommandText = PayloadDdl;
         cmdB.ExecuteNonQuery();
 
         await using var ctx = new DbContext(cn, MakeProvider(kind));
@@ -304,7 +318,7 @@ public class CrossProviderBehaviorTests
         for (int i = 1; i <= 5; i++)
         {
             ctx.Add(new G50Item { Id = i, Label = $"item{i}", Value = i });
-            ctx.Add(new G50OccItem { Id = i, Payload = $"occ{i}" });
+            ctx.Add(new G50PayloadItem { Id = i, Payload = $"payload{i}" });
         }
         await ctx.SaveChangesAsync();
 
@@ -312,10 +326,10 @@ public class CrossProviderBehaviorTests
         // A NON-string predicate: this test exercises plan-cache collision across entity
         // types, and string equality now wraps in provider-native ordinal forms the SQLite
         // test backend cannot execute.
-        var occItems = ctx.Query<G50OccItem>().Where(x => x.Id == 3).ToList();
+        var payloadItems = ctx.Query<G50PayloadItem>().Where(x => x.Id == 3).ToList();
 
         Assert.Equal(3, items.Count);   // items 3, 4, 5
-        Assert.Single(occItems); // occ3 only
+        Assert.Single(payloadItems); // payload3 only
     }
 
     // ══════════════════════════════════════════════════════════════════════

@@ -344,6 +344,36 @@ namespace nORM.Core
                 return 1;
             }
 
+            // Server-generated tokens (ROWVERSION) with application-supplied keys: the INSERT
+            // carries an OUTPUT clause returning the generated token. Read it back so the
+            // entity's first UPDATE or DELETE compares against the current value instead of
+            // throwing a false stale-token conflict.
+            if (operation == WriteOperation.Insert && map.TimestampColumn != null
+                && _p.SupportsNativeRowVersion && _p.GetInsertTokenOutputClause(map).Length > 0)
+            {
+                var tokenValue = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                if (tokenValue != null && tokenValue != DBNull.Value)
+                    map.TimestampColumn.Setter(entity, tokenValue);
+                Options.CacheProvider?.InvalidateTag(map.TableName);
+                return 1;
+            }
+
+            // Server-generated tokens (ROWVERSION): the UPDATE carries an OUTPUT clause
+            // returning the regenerated token (see BuildUpdate). Read it back so the same
+            // instance's next UPDATE or DELETE compares against the current value; an empty
+            // result means the WHERE (pk + token) matched nothing - a genuine conflict.
+            if (operation == WriteOperation.Update && map.TimestampColumn != null
+                && _p.SupportsNativeRowVersion && _p.GetUpdateTokenOutputClause(map).Length > 0)
+            {
+                var newToken = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
+                if (newToken == null || newToken == DBNull.Value)
+                    throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+                map.TimestampColumn.Setter(entity, newToken);
+                RefreshTrackedOriginalToken(entity, map);
+                Options.CacheProvider?.InvalidateTag(map.TableName);
+                return 1;
+            }
+
             var recordsAffected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             if ((operation is WriteOperation.Update or WriteOperation.Delete) &&
                 map.TimestampColumn != null && recordsAffected == 0)
@@ -358,9 +388,34 @@ namespace nORM.Core
                     throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             }
 
+            // Client-managed tokens stamp the fresh value on the entity before executing; a
+            // tracked entry's original-token snapshot must follow, or the next direct update
+            // of the same tracked instance compares the pre-update token and false-conflicts.
+            if (operation == WriteOperation.Update && map.TimestampColumn != null
+                && map.ClientManagedConcurrencyToken && recordsAffected > 0)
+            {
+                RefreshTrackedOriginalToken(entity, map);
+            }
+
             // Invalidate after a confirmed write (mirrors SaveChanges/ExecuteUpdate-Delete/Bulk).
             Options.CacheProvider?.InvalidateTag(map.TableName);
             return recordsAffected;
+        }
+
+        /// <summary>
+        /// Aligns a tracked entry's original-token snapshot with the entity's current token
+        /// after a successful direct UPDATE, so subsequent direct writes of the same tracked
+        /// instance compare against the token the row actually carries.
+        /// </summary>
+        private void RefreshTrackedOriginalToken(object entity, TableMapping map)
+        {
+            if (map.TimestampColumn == null)
+                return;
+            var entry = ChangeTracker.GetEntryOrDefault(entity);
+            if (entry == null)
+                return;
+            var current = map.TimestampColumn.Getter(entity);
+            entry.OriginalToken = current is byte[] bytes ? bytes.Clone() : current;
         }
 
         private void AddParametersOptimized<T>(DbCommand cmd, TableMapping map, T entity, WriteOperation operation, object? originalToken = null) where T : class
@@ -666,12 +721,18 @@ namespace nORM.Core
             var identityFragment = hasDbGeneratedKey
                 ? _p.GetIdentityRetrievalString(map)
                 : string.Empty;
+            // Server-generated tokens (ROWVERSION) are assigned on INSERT too; when no
+            // identity retrieval reads them back, the token output clause does (the
+            // identity clause already includes the token for DB-generated keys).
+            var tokenPrefix = !hasDbGeneratedKey && map.TimestampColumn != null && _p.SupportsNativeRowVersion
+                ? _p.GetInsertTokenOutputClause(map)
+                : string.Empty;
             var cols = _p.GetInsertColumns(map);
             if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable}{identityPrefix} {_p.DefaultValuesInsertClause}{identityFragment}";
+                return $"INSERT INTO {map.EscTable}{identityPrefix}{tokenPrefix} {_p.DefaultValuesInsertClause}{identityFragment}";
             var colNames = string.Join(", ", cols.Select(c => c.EscCol));
             var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
-            return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix} VALUES ({paramNames}){identityFragment}";
+            return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix}{tokenPrefix} VALUES ({paramNames}){identityFragment}";
         }
 
         private string BuildUpdateBatch(TableMapping map, int startParamIndex)

@@ -166,6 +166,34 @@ namespace nORM.Core
                 return reader.RecordsAffected;
             }
 
+            // Server-generated tokens (ROWVERSION) with application-supplied keys: each
+            // INSERT carries an OUTPUT clause returning the generated token (one result
+            // set per statement). Hydrate it so the same context's first UPDATE or DELETE
+            // of this row compares against the current value instead of throwing a false
+            // stale-token conflict.
+            if (map.TimestampColumn != null && _p.SupportsNativeRowVersion
+                && _p.GetInsertTokenOutputClause(map).Length > 0)
+            {
+                var inserted = 0;
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
+                var entryIndex = 0;
+                do
+                {
+                    if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        var tokenValue = reader.GetValue(0);
+                        var insertedEntity = batch[entryIndex].Entity;
+                        if (insertedEntity != null && tokenValue != DBNull.Value)
+                            map.TimestampColumn.Setter(insertedEntity, tokenValue);
+                        inserted++;
+                    }
+                    entryIndex++;
+                }
+                while (await reader.NextResultAsync(ct).ConfigureAwait(false) && entryIndex < batch.Count);
+                // AcceptChanges is intentionally deferred until after commit.
+                return inserted;
+            }
+
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
             // AcceptChanges is intentionally deferred until after commit.
             return affected;

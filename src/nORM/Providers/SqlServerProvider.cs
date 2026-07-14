@@ -54,6 +54,14 @@ namespace nORM.Providers
             => m.TimestampColumn is { } tokenColumn ? $" OUTPUT INSERTED.{tokenColumn.EscCol}" : string.Empty;
 
         /// <summary>
+        /// ROWVERSION is generated on INSERT as well; for application-supplied keys
+        /// (no identity retrieval) read it back inline so the tracked instance's
+        /// first UPDATE or DELETE does not compare a stale in-memory token.
+        /// </summary>
+        internal override string GetInsertTokenOutputClause(TableMapping m)
+            => m.TimestampColumn is { } tokenColumn ? $" OUTPUT INSERTED.{tokenColumn.EscCol}" : string.Empty;
+
+        /// <summary>
         /// SQL Server uses TOP(n)/OFFSET-FETCH paging syntax rather than LIMIT.
         /// </summary>
         public override bool UsesFetchOffsetPaging => true;

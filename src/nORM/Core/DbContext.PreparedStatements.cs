@@ -194,6 +194,7 @@ namespace nORM.Core
             private readonly (DbParameter Parameter, Mapping.Column Column)[] _bindings;
             private readonly bool _hydrateGeneratedKeys;
             private readonly bool _hydrateGeneratedKeysFromCommand;
+            private readonly bool _hydrateInsertToken;
             private volatile bool _disposed;
 
             internal PreparedInsertCommand(
@@ -210,6 +211,13 @@ namespace nORM.Core
                 BoundTransaction = boundTransaction;
                 _hydrateGeneratedKeys = hydrateGeneratedKeys && HasDbGeneratedKey(_mapping.KeyColumns);
                 _hydrateGeneratedKeysFromCommand = hydrateGeneratedKeysFromCommand && _hydrateGeneratedKeys;
+                // Server-generated tokens (ROWVERSION) with application-supplied keys: the INSERT
+                // SQL carries an OUTPUT clause returning the generated token (see BuildInsert),
+                // which must be read back or the entity's first UPDATE/DELETE false-conflicts.
+                _hydrateInsertToken = !_hydrateGeneratedKeys
+                    && _mapping.TimestampColumn != null
+                    && _context.RawProvider.SupportsNativeRowVersion
+                    && _context.RawProvider.GetInsertTokenOutputClause(_mapping).Length > 0;
 
                 var insertCols = _context.RawProvider.GetInsertColumns(_mapping);
                 _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
@@ -253,6 +261,11 @@ namespace nORM.Core
                     return ExecuteWithHydrateAsync(entity, ct);
                 }
 
+                if (_hydrateInsertToken)
+                {
+                    return ExecuteWithTokenHydrateAsync(entity, ct);
+                }
+
                 if (_context.RawProvider.PrefersSyncFastPathExecution
                     && _context.Options.CommandInterceptors.Count == 0)
                 {
@@ -270,6 +283,25 @@ namespace nORM.Core
                 var affected = await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
                 InvalidateResultCache();
                 return affected;
+            }
+
+            private async Task<int> ExecuteWithTokenHydrateAsync(object entity, CancellationToken ct)
+            {
+                object? tokenValue;
+                if (_context.RawProvider.PrefersSyncFastPathExecution
+                    && _context.Options.CommandInterceptors.Count == 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    tokenValue = _command.ExecuteScalar();
+                }
+                else
+                {
+                    tokenValue = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
+                }
+                if (tokenValue != null && tokenValue != DBNull.Value)
+                    _mapping.TimestampColumn!.Setter(entity, tokenValue);
+                InvalidateResultCache();
+                return 1;
             }
 
             // The prepared active-record insert persists rows just like SaveChanges/Bulk*, so the
