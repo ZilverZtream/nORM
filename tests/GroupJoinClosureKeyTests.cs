@@ -57,7 +57,7 @@ public class GroupJoinClosureKeyTests
         var rows = (await q.ToListAsync()).OrderBy(x => x.Id).ToList();
         _output.WriteLine("rows: " + string.Join(" | ", rows));
 
-        // C#: keys 1%2=1,2%2=0,3%2=1; children keys 1,0,1,0 â†’ p1:{c1,c3}, p2:{c2,c4}, p3:{c1,c3}
+        // C#: keys 1%2=1,2%2=0,3%2=1; children keys 1,0,1,0 → p1:{c1,c3}, p2:{c2,c4}, p3:{c1,c3}
         Assert.Equal(new[] { 2, 2, 2 }, rows.Select(x => x.N).ToArray());
 
         // Second execution with a different modulus hits the cached plan.
@@ -68,7 +68,7 @@ public class GroupJoinClosureKeyTests
         var rows2 = (await q2.ToListAsync()).OrderBy(x => x.Id).ToList();
         _output.WriteLine("rows2: " + string.Join(" | ", rows2));
 
-        // C#: parent keys 1,2,0; child keys 1,2,0,1 â†’ p1:{c1,c4}=2, p2:{c2}=1, p3:{c3}=1
+        // C#: parent keys 1,2,0; child keys 1,2,0,1 → p1:{c1,c4}=2, p2:{c2}=1, p3:{c3}=1
         Assert.Equal(new[] { 2, 1, 1 }, rows2.Select(x => x.N).ToArray());
     }
 }
