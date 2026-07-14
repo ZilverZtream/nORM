@@ -76,9 +76,25 @@ public class SqliteMigrationDataPreservationFuzzTests
             });
         }
 
-        var baselineTable = BuildTable(baseline);
+        // ── Optional indexes (must survive recreates verbatim) ────────────
+        var indexedColumns = new List<string>();
+        var indexCount = rng.Next(3) == 0 ? rng.Next(1, 3) : 0;
+        for (var ix = 0; ix < indexCount && ix < baseline.Count; ix++)
+        {
+            var col = baseline[rng.Next(baseline.Count)];
+            if (indexedColumns.Contains(col.Name)) continue;
+            indexedColumns.Add(col.Name);
+        }
+
+        // ── Optional FK child table (parent recreates must not orphan it) ──
+        var withChild = rng.Next(2) == 0;
+
+        var baselineTable = BuildTable(baseline, indexedColumns: indexedColumns);
+        var childTable = withChild ? BuildChildTable() : null;
         var gen = new SqliteMigrationSqlGenerator();
-        foreach (var s in gen.GenerateSql(new SchemaDiff { AddedTables = { baselineTable } }).Up)
+        var createDiff = new SchemaDiff { AddedTables = { baselineTable } };
+        if (childTable != null) createDiff.AddedTables.Add(childTable);
+        foreach (var s in gen.GenerateSql(createDiff).Up)
             Exec(cn, s);
 
         // ── Seed rows ──────────────────────────────────────────────────────
@@ -108,6 +124,22 @@ public class SqliteMigrationDataPreservationFuzzTests
             insert.ExecuteNonQuery();
         }
 
+        // Seed child rows referencing existing parent identities (1..rowCount).
+        var childBefore = new Dictionary<long, Dictionary<string, object>>();
+        if (withChild)
+        {
+            var childRows = rng.Next(2, 6);
+            for (var r = 0; r < childRows; r++)
+            {
+                using var insert = cn.CreateCommand();
+                insert.CommandText = "INSERT INTO FuzzMigChild (ParentId, Val) VALUES (@p, @v)";
+                insert.Parameters.AddWithValue("@p", rng.Next(1, rowCount + 1));
+                insert.Parameters.AddWithValue("@v", "c" + rng.Next(1000));
+                insert.ExecuteNonQuery();
+            }
+            childBefore = SnapshotTable(cn, "FuzzMigChild", new[] { "ParentId", "Val" });
+        }
+
         var before = Snapshot(cn, baseline.Select(c => c.Name));
 
         // ── Random mutations (at most one per column) ─────────────────────
@@ -118,7 +150,9 @@ public class SqliteMigrationDataPreservationFuzzTests
         var renames = new Dictionary<string, string>(StringComparer.Ordinal); // old -> new
         var dropped = new List<ColSpec>();
         var added = new List<string>();
-        var touched = new HashSet<string>(StringComparer.Ordinal);
+        // Indexed columns keep their definitions this round — the indexes
+        // themselves must ride through any recreate untouched.
+        var touched = new HashSet<string>(indexedColumns, StringComparer.Ordinal);
         var previousNames = new Dictionary<string, string>(StringComparer.Ordinal); // target col -> PreviousName
 
         var mutations = rng.Next(1, 4);
@@ -174,10 +208,15 @@ public class SqliteMigrationDataPreservationFuzzTests
         if (added.Count == 0 && dropped.Count == 0 && renames.Count == 0 && !TargetDiffers(baseline, target, previousNames))
             return; // no-op case
 
-        var targetTable = BuildTable(target, previousNames);
-        var diff = SchemaDiffer.Diff(
-            new SchemaSnapshot { Tables = { baselineTable } },
-            new SchemaSnapshot { Tables = { targetTable } });
+        var targetTable = BuildTable(target, previousNames, indexedColumns);
+        var oldSnapshot = new SchemaSnapshot { Tables = { baselineTable } };
+        var newSnapshot = new SchemaSnapshot { Tables = { targetTable } };
+        if (childTable != null)
+        {
+            oldSnapshot.Tables.Add(childTable);
+            newSnapshot.Tables.Add(BuildChildTable());
+        }
+        var diff = SchemaDiffer.Diff(oldSnapshot, newSnapshot);
         var sql = gen.GenerateSql(diff);
 
         var detail = $"seed={seed} case={caseIndex} baseline=[{Describe(baseline)}] target=[{Describe(target)}] " +
@@ -194,6 +233,8 @@ public class SqliteMigrationDataPreservationFuzzTests
         }
 
         AssertSchema(cn, target, detail + " (after Up)");
+        AssertIndexes(cn, indexedColumns, detail + " (after Up)");
+        if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Up)");
         var afterUp = Snapshot(cn, target.Select(c => c.Name));
         Assert.True(before.Count == afterUp.Count, $"row count changed on Up: {detail} — {before.Count} -> {afterUp.Count}");
         foreach (var col in target)
@@ -219,6 +260,8 @@ public class SqliteMigrationDataPreservationFuzzTests
         }
 
         AssertSchema(cn, baseline, detail + " (after Down)");
+        AssertIndexes(cn, indexedColumns, detail + " (after Down)");
+        if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Down)");
         var afterDown = Snapshot(cn, baseline.Select(c => c.Name));
         Assert.True(before.Count == afterDown.Count, $"row count changed on Down: {detail} — {before.Count} -> {afterDown.Count}");
         var droppedByName = dropped.ToDictionary(d => d.Name, StringComparer.Ordinal);
@@ -251,7 +294,8 @@ public class SqliteMigrationDataPreservationFuzzTests
         return false;
     }
 
-    private static TableSchema BuildTable(List<ColSpec> cols, Dictionary<string, string>? previousNames = null)
+    private static TableSchema BuildTable(List<ColSpec> cols, Dictionary<string, string>? previousNames = null,
+        List<string>? indexedColumns = null)
     {
         var t = new TableSchema { Name = "FuzzMig" };
         t.Columns.Add(new ColumnSchema
@@ -271,9 +315,80 @@ public class SqliteMigrationDataPreservationFuzzTests
             };
             if (previousNames != null && previousNames.TryGetValue(c.Name, out var prev))
                 schema.PreviousName = prev;
+            if (indexedColumns != null && indexedColumns.Contains(c.Name))
+                schema.Indexes.Add(new ColumnIndexSchema { Name = IndexName(c.Name), IsUnique = false, Order = 0 });
             t.Columns.Add(schema);
         }
         return t;
+    }
+
+    private static string IndexName(string columnName) => $"IX_FuzzMig_{columnName}";
+
+    private static TableSchema BuildChildTable()
+    {
+        var t = new TableSchema { Name = "FuzzMigChild" };
+        t.Columns.Add(new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true, IsIdentity = true });
+        t.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName! });
+        t.Columns.Add(new ColumnSchema { Name = "Val", ClrType = typeof(string).FullName!, IsNullable = true });
+        t.ForeignKeys.Add(new ForeignKeySchema
+        {
+            ConstraintName = "FK_FuzzMigChild_FuzzMig_ParentId",
+            DependentColumns = new[] { "ParentId" },
+            PrincipalTable = "FuzzMig",
+            PrincipalColumns = new[] { "Id" },
+        });
+        return t;
+    }
+
+    private static void AssertIndexes(SqliteConnection cn, List<string> indexedColumns, string detail)
+    {
+        var live = new List<string>();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='FuzzMig' AND name NOT LIKE 'sqlite_%'";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                live.Add(reader.GetString(0));
+        }
+        var expected = indexedColumns.Select(IndexName).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        var actual = live.OrderBy(x => x, StringComparer.Ordinal).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"index drift {detail}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    private static void AssertChildIntegrity(SqliteConnection cn, Dictionary<long, Dictionary<string, object>> childBefore, string detail)
+    {
+        // Child rows survive the parent's recreate untouched.
+        var childNow = SnapshotTable(cn, "FuzzMigChild", new[] { "ParentId", "Val" });
+        Assert.True(childBefore.Count == childNow.Count,
+            $"child row count changed {detail}: {childBefore.Count} -> {childNow.Count}");
+        foreach (var id in childBefore.Keys)
+        {
+            foreach (var col in childBefore[id].Keys)
+            {
+                Assert.True(StorageEquals(childBefore[id][col], childNow[id][col]),
+                    $"child value drift {detail} col={col} row={id}: expected {Render(childBefore[id][col])} got {Render(childNow[id][col])}");
+            }
+        }
+
+        // No orphans slipped through the recreate.
+        Exec(cn, "PRAGMA foreign_keys=ON");
+        using (var check = cn.CreateCommand())
+        {
+            check.CommandText = "PRAGMA foreign_key_check";
+            using var reader = check.ExecuteReader();
+            Assert.False(reader.Read(), $"foreign_key_check reported violations {detail}");
+        }
+
+        // The FK constraint is still ENFORCED (not silently lost by the rebuild).
+        using (var orphan = cn.CreateCommand())
+        {
+            orphan.CommandText = "INSERT INTO FuzzMigChild (ParentId, Val) VALUES (999999, 'orphan')";
+            var threw = false;
+            try { orphan.ExecuteNonQuery(); }
+            catch (SqliteException) { threw = true; }
+            Assert.True(threw, $"FK constraint no longer enforced {detail} — orphan insert succeeded");
+        }
     }
 
     private static void AssertSchema(SqliteConnection cn, List<ColSpec> expected, string detail)
@@ -300,11 +415,14 @@ public class SqliteMigrationDataPreservationFuzzTests
     }
 
     private static Dictionary<long, Dictionary<string, object>> Snapshot(SqliteConnection cn, IEnumerable<string> columns)
+        => SnapshotTable(cn, "FuzzMig", columns);
+
+    private static Dictionary<long, Dictionary<string, object>> SnapshotTable(SqliteConnection cn, string table, IEnumerable<string> columns)
     {
         var cols = columns.ToList();
         var result = new Dictionary<long, Dictionary<string, object>>();
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = $"SELECT Id{(cols.Count > 0 ? ", " + string.Join(", ", cols) : "")} FROM FuzzMig";
+        cmd.CommandText = $"SELECT Id{(cols.Count > 0 ? ", " + string.Join(", ", cols) : "")} FROM {table}";
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
