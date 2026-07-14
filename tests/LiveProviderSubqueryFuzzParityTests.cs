@@ -124,6 +124,7 @@ public class LiveProviderSubqueryFuzzParityTests
             {
                 using var ctx = new DbContext(factory!(), provider!, LinqParityFuzzTests.CreateFuzzOptions());
                 LinqParityFuzzTests.RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 80);
+                LinqParityFuzzTests.RunProjectionClosureFuzz(ctx, seed, cases: 60);
                 LinqParityFuzzTests.RunStringComparisonClosureFuzz(ctx, seed, cases: 60);
                 LinqParityFuzzTests.RunIncludeFuzz(ctx, seed, cases: 40);
                 LinqParityFuzzTests.RunThenIncludeFuzz(ctx, seed, cases: 30);

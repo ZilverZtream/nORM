@@ -313,6 +313,7 @@ public class LinqParityFuzzTests
         RunWindowFuzz(ctx, seed, cases: 100);
         RunStringComparisonClosureFuzz(ctx, seed, cases: 80);
         RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 120);
+        RunProjectionClosureFuzz(ctx, seed, cases: 100);
         RunIncludeFuzz(ctx, seed, cases: 60);
         RunThenIncludeFuzz(ctx, seed, cases: 40);
         await RunCompiledQueryFuzzAsync(ctx, seed, cases: 80);
@@ -545,6 +546,85 @@ public class LinqParityFuzzTests
                 RunGroupedFirstCase(ctx, rng, seed, i);
             else
                 RunCorrelatedAggregateCase(ctx, rng, seed, i);
+        }
+    }
+
+    // Projection closures register their compiled slots at plan-Build time — after
+    // every clause-translated slot — while values extract in document order. These
+    // shapes combine closure-bearing projections with trailing operators that mint
+    // their own slots (computed order keys, set-op arms, quantifier predicates,
+    // paging) so any registration/extraction divergence surfaces as a parity break.
+    internal static void RunProjectionClosureFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        for (var i = 0; i < cases; i++)
+        {
+            var add = rng.Next(-50, 200);
+            var mod = rng.Next(2, 12);
+            var cut = rng.Next(-3, 4);
+            var needle = rng.Next(-30, 240);
+            var take = rng.Next(1, 8);
+            var shape = rng.Next(6);
+
+            List<int> expected;
+            List<int> actual;
+            try
+            {
+                switch (shape)
+                {
+                    case 0:
+                        // Closure ORDER BY key over a projected computed member — the
+                        // key expansion renders the projection fragment at clause time.
+                        expected = Rows.Select(r => new { r.Id, V = r.IntVal + add })
+                            .OrderBy(x => x.V % mod).ThenBy(x => x.Id).Select(x => x.V).ToList();
+                        actual = ctx.Query<Row>().Select(r => new { r.Id, V = r.IntVal + add })
+                            .OrderBy(x => x.V % mod).ThenBy(x => x.Id)
+                            .AsEnumerable().Select(x => x.V).ToList();
+                        break;
+                    case 1:
+                        expected = Rows.Where(r => r.IntVal >= cut).Select(r => new { r.Id, V = r.IntVal * 2 + add })
+                            .OrderByDescending(x => x.V % mod).ThenBy(x => x.Id).Select(x => x.V).ToList();
+                        actual = ctx.Query<Row>().Where(r => r.IntVal >= cut).Select(r => new { r.Id, V = r.IntVal * 2 + add })
+                            .OrderByDescending(x => x.V % mod).ThenBy(x => x.Id)
+                            .AsEnumerable().Select(x => x.V).ToList();
+                        break;
+                    case 2:
+                        // Trailing quantifier with a needle closure after a projection closure.
+                        var expectedHit = Rows.Select(r => r.IntVal + add).Any(x => x == needle);
+                        var actualHit = ctx.Query<Row>().Select(r => r.IntVal + add).Any(x => x == needle);
+                        Assert.True(expectedHit == actualHit,
+                            $"projection-closure quantifier mismatch seed={seed} case={i} add={add} needle={needle}: expected {expectedHit} got {actualHit}");
+                        continue;
+                    case 3:
+                        expected = Rows.Select(r => r.IntVal + add)
+                            .Concat(Rows.Where(r => r.IntVal >= cut).Select(r => r.IntVal + add))
+                            .OrderBy(x => x).ToList();
+                        actual = ctx.Query<Row>().Select(r => r.IntVal + add)
+                            .Concat(ctx.Query<Row>().Where(r => r.IntVal >= cut).Select(r => r.IntVal + add))
+                            .AsEnumerable().OrderBy(x => x).ToList();
+                        break;
+                    case 4:
+                        var expectedAny = Rows.Select(r => r.IntVal % mod).Distinct().Any(x => x >= cut);
+                        var actualAny = ctx.Query<Row>().Select(r => r.IntVal % mod).Distinct().Any(x => x >= cut);
+                        Assert.True(expectedAny == actualAny,
+                            $"projection-closure distinct-any mismatch seed={seed} case={i} mod={mod} cut={cut}: expected {expectedAny} got {actualAny}");
+                        continue;
+                    default:
+                        expected = Rows.OrderBy(r => r.Id).Select(r => (r.IntVal + add) % mod).Take(take).ToList();
+                        actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => (r.IntVal + add) % mod).Take(take)
+                            .AsEnumerable().ToList();
+                        break;
+                }
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"projection-closure shape threw (seed={seed} case={i} shape={shape} add={add} mod={mod} cut={cut} needle={needle} take={take})", ex);
+            }
+
+            Assert.True(expected.SequenceEqual(actual),
+                $"projection-closure mismatch seed={seed} case={i} shape={shape} add={add} mod={mod} cut={cut} needle={needle} take={take}\n" +
+                $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
         }
     }
 
