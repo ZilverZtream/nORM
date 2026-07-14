@@ -513,6 +513,12 @@ namespace nORM.Query
                     dependentQueries = _t.BuildDependentQueryDefinitions();
                 }
 
+                // Merge tables touched by correlated sub-translations (whose own _tables sets
+                // are discarded) so the result-cache tags — and thus write invalidation — cover
+                // every table the query actually reads, not just the root.
+                if (CurrentReferencedTables is { Count: > 0 } referencedTables)
+                    _t._tables.UnionWith(referencedTables);
+
                 var plan = new QueryPlan(
                     _t._sql.ToString(),
                     (IReadOnlyDictionary<string, object>)_t._params,

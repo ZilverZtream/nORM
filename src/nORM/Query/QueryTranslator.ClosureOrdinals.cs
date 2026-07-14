@@ -32,6 +32,38 @@ namespace nORM.Query
         [ThreadStatic] private static Dictionary<Expression, string>? t_closureSlots;
         [ThreadStatic] private static Dictionary<string, int>? t_slotOrdinals;
 
+        // ── Referenced-table accumulation ───────────────────────────────────────
+        //
+        // The result-cache tags a Cacheable query with every table it reads so a
+        // write to ANY of them invalidates the entry. A correlated subquery is
+        // translated by a SEPARATE sub-translator whose local _tables set is
+        // discarded, so its table (e.g. the child queried by a projection subquery)
+        // never reached the outer plan's Tables — a write to that table then left a
+        // stale cached result. This ambient set, shared across the top-level
+        // translation and every nested sub-translation (like the closure ordinals
+        // above), collects every table any translator touches; the plan merges it.
+        [ThreadStatic] private static HashSet<string>? t_referencedTables;
+
+        /// <summary>
+        /// Starts referenced-table accumulation for a top-level translation. Returns
+        /// false when already ambient (a nested sub-translation must not end the scope).
+        /// </summary>
+        private static bool BeginReferencedTableScope()
+        {
+            if (t_referencedTables != null)
+                return false;
+            t_referencedTables = new HashSet<string>(StringComparer.Ordinal);
+            return true;
+        }
+
+        private static void EndReferencedTableScope() => t_referencedTables = null;
+
+        /// <summary>Records a table read during translation into the ambient scope, if active.</summary>
+        internal static void RecordReferencedTable(string tableName) => t_referencedTables?.Add(tableName);
+
+        /// <summary>The tables accumulated for the current translation, or null when no scope is active.</summary>
+        internal static IReadOnlyCollection<string>? CurrentReferencedTables => t_referencedTables;
+
         /// <summary>
         /// Starts ordinal tracking for a top-level translation. Returns false when a
         /// translation is already ambient (a nested sub-translation), in which case

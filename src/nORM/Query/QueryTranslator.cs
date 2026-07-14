@@ -224,6 +224,7 @@ namespace nORM.Query
             lock (_syncRoot)
             {
                 var ownsOrdinalScope = BeginClosureOrdinalScope(e);
+                var ownsTableScope = BeginReferencedTableScope();
                 try
                 {
                     return new TranslationBuilder(this, e)
@@ -235,6 +236,8 @@ namespace nORM.Query
                 {
                     if (ownsOrdinalScope)
                         EndClosureOrdinalScope();
+                    if (ownsTableScope)
+                        EndReferencedTableScope();
                 }
             }
         }
@@ -243,6 +246,7 @@ namespace nORM.Query
             ArgumentNullException.ThrowIfNull(type);
             var map = _ctx?.GetMapping(type) ?? throw new InvalidOperationException("Context not available");
             _tables.Add(map.TableName);
+            RecordReferencedTable(map.TableName);
             return map;
         }
 

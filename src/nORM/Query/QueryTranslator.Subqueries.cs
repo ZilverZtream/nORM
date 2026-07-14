@@ -162,6 +162,7 @@ namespace nORM.Query
                 _parameterManager.Index = parameterIndex;
                 _recursionDepth = recursionDepth;
                 _tables.Add(mapping.TableName);
+                RecordReferencedTable(mapping.TableName);
                 var plan = Translate(e);
                 resultingMapping = _mapping;
                 return plan;

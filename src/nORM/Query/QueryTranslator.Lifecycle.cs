@@ -57,6 +57,7 @@ namespace nORM.Query
             _compiledParams = compiledParams;
             _paramMap = paramMap;
             _tables.Add(mapping.TableName);
+            RecordReferencedTable(mapping.TableName);
             _joinCounter = joinStart;
             _recursionDepth = recursionDepth;
             _maxRecursionDepth = ctx.Options.MaxRecursionDepth;
