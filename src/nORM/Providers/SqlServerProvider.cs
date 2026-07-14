@@ -194,6 +194,18 @@ namespace nORM.Providers
                 ? BuildCorrelatedTopOneSubquery(selectSql, tableSql, alias, whereSql, orderBySql)
                 : $"(SELECT {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql} OFFSET {offsetSql} ROWS FETCH NEXT 1 ROWS ONLY)";
 
+        /// <summary>
+        /// SQL Server has no <c>LIMIT</c>; the single-row scalar subquery injects <c>TOP 1</c>
+        /// after the leading <c>SELECT</c> (before any <c>DISTINCT</c>), keeping any ORDER BY.
+        /// </summary>
+        public override string BuildScalarLimitedSubquery(string innerSelectSql)
+        {
+            const string sel = "SELECT ";
+            return innerSelectSql.StartsWith(sel, StringComparison.OrdinalIgnoreCase)
+                ? $"(SELECT TOP 1 {innerSelectSql.Substring(sel.Length)})"
+                : $"({innerSelectSql})";
+        }
+
         /// <summary>T-SQL rejects subqueries inside GROUP BY; CROSS APPLY exposes the key as a column.</summary>
         internal override string? AppliedScalarColumnClause(string scalarSql, string escapedAlias, string escapedColumn)
             => $" CROSS APPLY (SELECT {scalarSql} AS {escapedColumn}) {escapedAlias}";

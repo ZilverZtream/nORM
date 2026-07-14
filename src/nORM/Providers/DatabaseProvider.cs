@@ -242,6 +242,16 @@ namespace nORM.Providers
                 : $"(SELECT {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql} LIMIT 1 OFFSET {offsetSql})";
 
         /// <summary>
+        /// Wraps a fully-formed inner <c>SELECT</c> (which may carry its own <c>ORDER BY</c>) as a
+        /// parenthesised scalar subquery returning a single row — the correlated
+        /// <c>First</c>/<c>FirstOrDefault</c> form used inside a predicate or projection. The
+        /// default appends <c>LIMIT 1</c> (SQLite/PostgreSQL/MySQL); SQL Server overrides with an
+        /// injected <c>TOP 1</c>.
+        /// </summary>
+        public virtual string BuildScalarLimitedSubquery(string innerSelectSql)
+            => $"({innerSelectSql} LIMIT 1)";
+
+        /// <summary>
         /// Returns SQL that retrieves the identity value generated for an inserted row.
         /// </summary>
         /// <param name="m">The mapping for the table being inserted into.</param>

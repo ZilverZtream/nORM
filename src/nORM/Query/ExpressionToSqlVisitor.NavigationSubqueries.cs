@@ -374,15 +374,29 @@ namespace nORM.Query
         /// </summary>
         private (string Head, string Tail) TranslateScalarAggregateSource(Expression source, string aggregateName)
         {
+            var sql = TranslateCorrelatedSubquerySql(source);
+            var fromIdx = FindTopLevelFromIndex(sql);
+            if (fromIdx < 0)
+                throw new NormQueryException($"Could not rewrite {aggregateName}() subquery: no top-level FROM clause found.");
+            var head = sql.Substring("SELECT ".Length, fromIdx - "SELECT ".Length).Trim();
+            var tail = sql.Substring(fromIdx);
+            var orderIdx = tail.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+            if (orderIdx >= 0)
+                tail = tail.Substring(0, orderIdx);
+            return (head, tail);
+        }
+
+        /// <summary>
+        /// Sub-translates a correlated subquery source and returns its full SQL. Outer
+        /// references correlate through the shared parameter mappings; @p and @cp numbering
+        /// continues globally (both dicts are seeded with the outer's entries so a restarted
+        /// name cannot collide with an outer/sibling slot and silently merge two values).
+        /// The sub-plan's value converters are merged back so provider bindings survive.
+        /// </summary>
+        private string TranslateCorrelatedSubquerySql(Expression source)
+        {
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            // Seed both dicts with the outer's entries so @p numbering (derived from
-            // _params.Count inside the sub-translation's visitor contexts) and @cp
-            // numbering continue globally instead of restarting: a restarted name
-            // collides with an outer (or sibling/nested) subquery's slot and the
-            // name-deduping copy-back below then MERGES two distinct values into one
-            // parameter — the second one silently binds the first one's value. The
-            // seeded entries copy back onto themselves.
             var tempParams = new Dictionary<string, object>(_params);
             var tempCompiled = new List<string>(_compiledParams);
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), tempCompiled, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
@@ -396,17 +410,43 @@ namespace nORM.Query
                     _compiledParams.Add(compiled);
             }
             MergeSubPlanConverters(subPlan);
+            return subPlan.Sql;
+        }
 
-            var sql = subPlan.Sql;
+        /// <summary>
+        /// Emits a correlated <c>First</c>/<c>FirstOrDefault</c> scalar subquery for an explicit
+        /// queryable source in a predicate — <c>ctx.Query&lt;B&gt;().Where(b =&gt; b.Fk == a.Id)
+        /// .OrderByDescending(b =&gt; b.V).Select(b =&gt; b.V).First()</c>. The source must project a
+        /// single scalar; its ORDER BY is kept (unlike the aggregate slice) so the row selected is
+        /// deterministic, and the provider limits the result to one row (<c>LIMIT 1</c> / SQL Server
+        /// <c>TOP 1</c>). An empty subquery yields SQL NULL — matching the correlated-aggregate
+        /// surface and EF's translation (LINQ-to-Objects would instead throw on First over empty).
+        /// </summary>
+        private void BuildScalarFirstSubquery(Expression source, LambdaExpression? predicate, string methodName)
+        {
+            ThrowIfUnsupportedScalarAggregateSource(source, methodName);
+            ReserveQuerySourceRootClosureSlot(source);
+            if (predicate != null)
+            {
+                var et = GetElementType(source);
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
+            }
+            source = ApplySubqueryRootFiltersWithFoldSignal(source);
+            source = QueryCallMaterializer.Materialize(source);
+
+            var sql = TranslateCorrelatedSubquerySql(source);
             var fromIdx = FindTopLevelFromIndex(sql);
             if (fromIdx < 0)
-                throw new NormQueryException($"Could not rewrite {aggregateName}() subquery: no top-level FROM clause found.");
+                throw new NormQueryException($"Could not rewrite {methodName}() subquery: no top-level FROM clause found.");
             var head = sql.Substring("SELECT ".Length, fromIdx - "SELECT ".Length).Trim();
-            var tail = sql.Substring(fromIdx);
-            var orderIdx = tail.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
-            if (orderIdx >= 0)
-                tail = tail.Substring(0, orderIdx);
-            return (head, tail);
+            if (head.StartsWith("DISTINCT ", StringComparison.OrdinalIgnoreCase))
+                head = head.Substring("DISTINCT ".Length).Trim();
+            if (HasTopLevelComma(head))
+                throw new NormUnsupportedFeatureException(
+                    $"{methodName}() over a correlated subquery requires a single scalar projection; " +
+                    "project the value with Select(x => x.Member) first.");
+
+            _sql.Append(_provider.BuildScalarLimitedSubquery(sql));
         }
 
         /// <summary>

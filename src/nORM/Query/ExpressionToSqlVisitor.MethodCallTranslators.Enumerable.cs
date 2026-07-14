@@ -386,6 +386,19 @@ namespace nORM.Query
                         BuildScalarAggregateSubquery(node.Arguments[0], aggregateSelector, node.Method.Name);
                         return node;
                     }
+                    case nameof(Queryable.First):
+                    case nameof(Queryable.FirstOrDefault):
+                    {
+                        LambdaExpression? firstPredicate = null;
+                        if (node.Arguments.Count > 1)
+                        {
+                            firstPredicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                            if (firstPredicate == null)
+                                throw new NormQueryException($"{node.Method.Name}() requires a lambda predicate argument.");
+                        }
+                        BuildScalarFirstSubquery(node.Arguments[0], firstPredicate, node.Method.Name);
+                        return node;
+                    }
                     default:
                         throw new NormUnsupportedFeatureException($"Queryable method '{node.Method.Name}' is not supported.");
                 }
