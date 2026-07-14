@@ -188,6 +188,12 @@ namespace nORM.Providers
         public override string BuildCorrelatedTopOneSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql)
             => $"(SELECT TOP 1 {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql})";
 
+        /// <summary>T-SQL pages with OFFSET/FETCH rather than LIMIT/OFFSET.</summary>
+        internal override string BuildCorrelatedSingleRowSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql, string? offsetSql)
+            => offsetSql == null
+                ? BuildCorrelatedTopOneSubquery(selectSql, tableSql, alias, whereSql, orderBySql)
+                : $"(SELECT {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql} OFFSET {offsetSql} ROWS FETCH NEXT 1 ROWS ONLY)";
+
         /// <summary>T-SQL rejects subqueries inside GROUP BY; CROSS APPLY exposes the key as a column.</summary>
         internal override string? AppliedScalarColumnClause(string scalarSql, string escapedAlias, string escapedColumn)
             => $" CROSS APPLY (SELECT {scalarSql} AS {escapedColumn}) {escapedAlias}";

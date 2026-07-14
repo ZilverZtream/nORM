@@ -31,7 +31,7 @@ namespace nORM.Query
                     PooledStringBuilder.Return(keyBuilder);
                 }
                 else if (resultSelector.Body is MethodCallExpression methodCall
-                         && TranslateGroupAggregateMethod(methodCall, alias) is { } aggregateSql)
+                         && TranslateGroupAggregateMethod(methodCall, alias, groupBySql) is { } aggregateSql)
                 {
                     var groupBuilder = PooledStringBuilder.Rent();
                     groupBuilder.Append(groupBySql).Append(" AS GroupKey");
@@ -146,8 +146,15 @@ namespace nORM.Query
                                     var subArg = nestedNew.Arguments[j];
                                     var subName = nestedNew.Members?[j]?.Name ?? $"Item{j + 1}";
                                     var aliasName = memberName + "__" + subName;
-                                    if (subArg is MethodCallExpression subAgg
-                                        && TranslateGroupAggregateMethod(subAgg, alias) is { } subAggSql)
+                                    if (TryTranslateGroupOrderedFirst(subArg, alias, groupBySql) is { } nestedOrderedFirst)
+                                    {
+                                        var b0 = PooledStringBuilder.Rent();
+                                        b0.Append(nestedOrderedFirst).Append(" AS ").Append(_provider.Escape(aliasName));
+                                        selectItems.Add(b0.ToString());
+                                        PooledStringBuilder.Return(b0);
+                                    }
+                                    else if (subArg is MethodCallExpression subAgg
+                                        && TranslateGroupAggregateMethod(subAgg, alias, groupBySql) is { } subAggSql)
                                     {
                                         var b = PooledStringBuilder.Rent();
                                         b.Append(subAggSql).Append(" AS ").Append(_provider.Escape(aliasName));
@@ -206,7 +213,7 @@ namespace nORM.Query
                             }
                             if (arg is MethodCallExpression aggregateCall)
                             {
-                                var innerAggregate = TranslateGroupAggregateMethod(aggregateCall, alias);
+                                var innerAggregate = TranslateGroupAggregateMethod(aggregateCall, alias, groupBySql);
                                 if (innerAggregate != null)
                                 {
                                     builder = PooledStringBuilder.Rent();
@@ -295,9 +302,14 @@ namespace nORM.Query
         /// </summary>
         private string? TryTranslateGroupOrderedFirst(Expression arg, string alias, string groupBySql)
         {
-            // Re-projecting through a group element selector is not yet plumbed for this shape.
+            // Re-projecting through a group element selector is not yet plumbed for this
+            // shape, and a windowed or otherwise-reshaped source keeps its rows in a
+            // derived table the re-scan cannot see (_groupOrderedFirstSourceWheres is
+            // null for such sources).
             if (_groupByKeySelector == null
                 || _groupByElementSelector != null
+                || _groupOrderedFirstSourceWheres == null
+                || _windowedGroupBySubSql != null
                 || string.IsNullOrEmpty(groupBySql))
                 return null;
 
@@ -309,48 +321,128 @@ namespace nORM.Query
                 arg = outerMember.Expression;
             }
 
-            if (arg is not MethodCallExpression firstCall || firstCall.Arguments.Count != 1)
+            if (arg is not MethodCallExpression terminalCall)
                 return null;
 
-            bool lastSemantics;
-            switch (firstCall.Method.Name)
+            var lastSemantics = false;
+            Expression? indexExpr = null;
+            LambdaExpression? terminalPredicate = null;
+            switch (terminalCall.Method.Name)
             {
                 case "First":
-                case "FirstOrDefault": lastSemantics = false; break;
+                case "FirstOrDefault":
+                    break;
                 case "Last":
-                case "LastOrDefault": lastSemantics = true; break;
-                default: return null;
+                case "LastOrDefault":
+                    lastSemantics = true;
+                    break;
+                case "ElementAt":
+                case "ElementAtOrDefault":
+                    if (terminalCall.Arguments.Count != 2)
+                        return null;
+                    indexExpr = terminalCall.Arguments[1];
+                    // ElementAt with a constant negative index throws in LINQ; SQL
+                    // OFFSET would silently clamp — keep that shape fail-closed.
+                    if (TryGetIntValue(indexExpr, out var constIndex) && constIndex < 0)
+                        return null;
+                    break;
+                default:
+                    return null;
+            }
+            if (indexExpr == null)
+            {
+                if (terminalCall.Arguments.Count == 2)
+                {
+                    if (StripQuotes(terminalCall.Arguments[1]) is not LambdaExpression termPred
+                        || termPred.Parameters.Count != 1)
+                        return null;
+                    terminalPredicate = termPred;
+                }
+                else if (terminalCall.Arguments.Count != 1)
+                {
+                    return null;
+                }
             }
 
-            var firstSource = firstCall.Arguments[0];
+            var src = terminalCall.Arguments[0];
 
-            // Optional `.Select(x => scalar)` between the ordering and First().
+            // Optional `.Select(x => scalar)` directly under the terminal.
             LambdaExpression? resultSelector = null;
-            if (firstSource is MethodCallExpression selectCall
+            if (src is MethodCallExpression selectCall
                 && selectCall.Method.Name == "Select"
                 && selectCall.Arguments.Count == 2
-                && StripQuotes(selectCall.Arguments[1]) is LambdaExpression resLambda)
+                && StripQuotes(selectCall.Arguments[1]) is LambdaExpression resLambda
+                && resLambda.Parameters.Count == 1)
             {
                 resultSelector = resLambda;
-                firstSource = selectCall.Arguments[0];
+                src = selectCall.Arguments[0];
             }
 
-            if (firstSource is not MethodCallExpression orderCall
-                || orderCall.Arguments.Count != 2
-                || StripQuotes(orderCall.Arguments[1]) is not LambdaExpression orderSelector)
-                return null;
-
-            bool orderDescending;
-            switch (orderCall.Method.Name)
+            // `Where` filters between the ordering chain and the Select/terminal.
+            // LINQ preserves order through Where, and SQL applies WHERE before
+            // ORDER BY anyway, so position relative to the ordering is immaterial.
+            var predicates = new List<LambdaExpression>();
+            while (src is MethodCallExpression whereAbove
+                   && whereAbove.Method.Name == "Where"
+                   && whereAbove.Arguments.Count == 2
+                   && StripQuotes(whereAbove.Arguments[1]) is LambdaExpression whereAboveLambda
+                   && whereAboveLambda.Parameters.Count == 1)
             {
-                case "OrderBy": orderDescending = false; break;
-                case "OrderByDescending": orderDescending = true; break;
-                default: return null;
+                predicates.Add(whereAboveLambda);
+                src = whereAbove.Arguments[0];
             }
 
-            // The ordering must apply directly to the grouping range variable.
-            if (orderCall.Arguments[0] is not ParameterExpression groupParam || !IsGroupingSequenceType(groupParam.Type))
+            // ThenBy* chain ending at the primary OrderBy. The expression tree nests
+            // outermost-last, so collect then reverse to put the primary key first.
+            var orderKeys = new List<(LambdaExpression Selector, bool Descending)>();
+            while (src is MethodCallExpression thenByCall
+                   && thenByCall.Method.Name is "ThenBy" or "ThenByDescending"
+                   && thenByCall.Arguments.Count == 2
+                   && StripQuotes(thenByCall.Arguments[1]) is LambdaExpression thenByLambda)
+            {
+                orderKeys.Add((thenByLambda, thenByCall.Method.Name == "ThenByDescending"));
+                src = thenByCall.Arguments[0];
+            }
+            if (src is not MethodCallExpression orderCall
+                || orderCall.Method.Name is not ("OrderBy" or "OrderByDescending")
+                || orderCall.Arguments.Count != 2
+                || StripQuotes(orderCall.Arguments[1]) is not LambdaExpression orderLambda)
                 return null;
+            orderKeys.Add((orderLambda, orderCall.Method.Name == "OrderByDescending"));
+            orderKeys.Reverse();
+            src = orderCall.Arguments[0];
+
+            // `Where` filters below the ordering.
+            while (src is MethodCallExpression whereBelow
+                   && whereBelow.Method.Name == "Where"
+                   && whereBelow.Arguments.Count == 2
+                   && StripQuotes(whereBelow.Arguments[1]) is LambdaExpression whereBelowLambda
+                   && whereBelowLambda.Parameters.Count == 1)
+            {
+                predicates.Add(whereBelowLambda);
+                src = whereBelow.Arguments[0];
+            }
+
+            // The chain must bottom out at the grouping range variable.
+            if (src is not ParameterExpression groupParam || !IsGroupingSequenceType(groupParam.Type))
+                return null;
+
+            // A terminal predicate filters like a Where. After a Select it binds to
+            // the projected scalar — substitute the selector body so it references
+            // source columns.
+            if (terminalPredicate != null)
+            {
+                if (resultSelector != null)
+                {
+                    var substituted = new ParameterReplacer(terminalPredicate.Parameters[0], resultSelector.Body)
+                        .Visit(terminalPredicate.Body)!;
+                    predicates.Add(Expression.Lambda(substituted, resultSelector.Parameters[0]));
+                }
+                else
+                {
+                    predicates.Add(terminalPredicate);
+                }
+            }
 
             // Resolve the scalar to project from the single row.
             Expression resultBody;
@@ -358,11 +450,13 @@ namespace nORM.Query
             if (resultSelector != null)
             {
                 resultParam = resultSelector.Parameters[0];
-                resultBody = resultSelector.Body;
+                resultBody = tailMember == null
+                    ? resultSelector.Body
+                    : Expression.MakeMemberAccess(resultSelector.Body, tailMember);
             }
             else if (tailMember != null)
             {
-                resultParam = Expression.Parameter(orderSelector.Parameters[0].Type, "e");
+                resultParam = Expression.Parameter(orderKeys[0].Selector.Parameters[0].Type, "e");
                 resultBody = Expression.MakeMemberAccess(resultParam, tailMember);
             }
             else
@@ -385,13 +479,68 @@ namespace nORM.Query
                 whereSql = whereSql + " AND (" + filterSql + ")";
             }
 
-            var orderSql = TranslateAgainstSubAlias(orderSelector.Body, orderSelector.Parameters[0], subAlias);
+            // The query's own Where filters define which rows belong to the groups —
+            // the re-scan must repeat them or an excluded row could win the ordering.
+            foreach (var sourceWhere in _groupOrderedFirstSourceWheres)
+                whereSql += " AND (" + TranslateAgainstSubAlias(sourceWhere.Body, sourceWhere.Parameters[0], subAlias) + ")";
+
+            // Group-local Where filters and terminal predicates.
+            foreach (var predicate in predicates)
+                whereSql += " AND (" + TranslateAgainstSubAlias(predicate.Body, predicate.Parameters[0], subAlias) + ")";
+
             var selectSql = TranslateAgainstSubAlias(resultBody, resultParam, subAlias);
 
-            // Last/LastOrDefault picks the opposite end of the ordering.
-            var descending = orderDescending ^ lastSemantics;
-            var orderByFull = descending ? orderSql + " DESC" : orderSql;
-            return _provider.BuildCorrelatedTopOneSubquery(selectSql, _mapping.EscTable, subAlias, whereSql, orderByFull);
+            // Last/LastOrDefault picks the opposite end of the ordering: flip EVERY key.
+            var orderParts = new List<string>(orderKeys.Count);
+            foreach (var (selector, descending) in orderKeys)
+            {
+                var keySql = TranslateAgainstSubAlias(selector.Body, selector.Parameters[0], subAlias);
+                keySql = CoerceOrderKeySql(keySql, selector.Body.Type);
+                orderParts.Add(descending ^ lastSemantics ? keySql + " DESC" : keySql);
+            }
+            var orderByFull = string.Join(", ", orderParts);
+
+            string? offsetSql = null;
+            if (indexExpr != null)
+                offsetSql = TranslateAgainstSubAlias(indexExpr, Expression.Parameter(typeof(int), "__idx"), subAlias);
+
+            return _provider.BuildCorrelatedSingleRowSubquery(selectSql, _mapping.EscTable, subAlias, whereSql, orderByFull, offsetSql);
+        }
+
+        /// <summary>
+        /// Collects the source chain's Where predicates for re-application inside a
+        /// greatest-N-per-group correlated subquery. Returns null when the chain holds
+        /// anything beyond Where/ordering over the root queryable — the subquery
+        /// re-scans the base table, so any other operator (projection, window, join,
+        /// set op) would make the re-scan see different rows than the groups did.
+        /// </summary>
+        private static List<LambdaExpression>? ExtractGroupSourceWheres(Expression source)
+        {
+            var wheres = new List<LambdaExpression>();
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case "Where" when mce.Arguments.Count == 2
+                        && StripQuotes(mce.Arguments[1]) is LambdaExpression whereLambda
+                        && whereLambda.Parameters.Count == 1:
+                        wheres.Add(whereLambda);
+                        break;
+                    case "OrderBy":
+                    case "OrderByDescending":
+                    case "ThenBy":
+                    case "ThenByDescending":
+                    case "AsNoTracking":
+                    case "AsSplitQuery":
+                        break;
+                    default:
+                        return null;
+                }
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+            return current is ConstantExpression ? wheres : null;
         }
 
         /// <summary>
@@ -550,7 +699,7 @@ namespace nORM.Query
             return sql;
         }
 
-        private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias)
+        private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias, string? groupBySql = null)
         {
             var methodName = methodCall.Method.Name;
 
@@ -680,22 +829,29 @@ namespace nORM.Query
                 case "FirstOrDefault":
                 case "Last":
                 case "LastOrDefault":
-                case "Single":
-                case "SingleOrDefault":
                 case "ElementAt":
                 case "ElementAtOrDefault":
-                    // `g.OrderBy(...).Select(...).First()` and friends require a correlated
-                    // subquery emit (SELECT sel FROM tbl WHERE groupKey = outer.groupKey ORDER
-                    // BY sortKey LIMIT 1). nORM's group-aggregate path doesn't yet plumb that
-                    // shape, so surface a clear exception that points at the supported
-                    // `g.Min(selector)` / `g.Max(selector)` equivalents rather than silently
-                    // emitting nothing for the column (which crashes the materializer).
+                    // `g.OrderBy(...).Select(...).First()` and friends lower to a correlated
+                    // single-row subquery when the caller supplies the outer group-key SQL
+                    // and the chain is an ordered scalar shape.
+                    if (groupBySql != null
+                        && TryTranslateGroupOrderedFirst(methodCall, alias, groupBySql) is { } orderedFirstSql)
+                        return orderedFirstSql;
+                    goto case "Single";
+                case "Single":
+                case "SingleOrDefault":
+                    // Single/SingleOrDefault assert the group holds exactly one matching
+                    // element — SQL cannot honor the throw-on-multiple contract, so they
+                    // stay fail-closed. The ordered positional operators reach here only
+                    // when the chain is not an ordered scalar shape.
                     throw new NormUnsupportedFeatureException(
-                        $"`g.{methodName}(...)` inside a grouping projection requires a correlated subquery " +
-                        "that nORM does not yet emit. For `g.OrderBy(sel).First()` / `OrderByDescending(sel).First()` " +
-                        "use `g.Min(sel)` / `g.Max(sel)` instead. For more complex shapes, project the group " +
-                        "elements into a list with `g.ToList()` (when streaming is acceptable) and apply the " +
-                        "operation client-side.");
+                        $"`g.{methodName}(...)` inside a grouping projection translates only as an ordered " +
+                        "scalar chain: optional `Where(...)` filters, `OrderBy/OrderByDescending` with optional " +
+                        "`ThenBy/ThenByDescending`, an optional `Select(x => scalar)`, then " +
+                        "First/FirstOrDefault/Last/LastOrDefault/ElementAt projecting a scalar member. " +
+                        "`Single`/`SingleOrDefault` cannot honor their throw-on-multiple contract in SQL. " +
+                        "For whole-entity results or other shapes, project the group elements with " +
+                        "`g.ToList()` (when streaming is acceptable) and apply the operation client-side.");
                 default:
                     return null;
             }

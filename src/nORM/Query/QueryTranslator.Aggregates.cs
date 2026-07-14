@@ -158,6 +158,9 @@ namespace nORM.Query
                 elementSelectorLambda = ExpandProjection(elementSelectorLambda);
             _groupByElementSelector = elementSelectorLambda;
             _groupByKeySelector = keySelectorLambda;
+            // A windowed source's rows live in the derived table, which the
+            // greatest-N-per-group re-scan cannot see — disable the rewrite there.
+            _groupOrderedFirstSourceWheres = sourceIsWindowed ? null : ExtractGroupSourceWheres(sourceQuery);
             var param = keySelectorLambda.Parameters[0];
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);

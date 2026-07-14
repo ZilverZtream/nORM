@@ -118,6 +118,11 @@ namespace nORM.Query
         // The GroupBy key selector, retained so the projection builder can re-render the key
         // against a subquery alias when emitting a greatest-N-per-group correlated subquery.
         private LambdaExpression? _groupByKeySelector;
+        // The source chain's Where predicates below GroupBy, retained so the
+        // greatest-N-per-group subquery re-applies them — it re-scans the base
+        // table, so a dropped filter would let excluded rows win the ordering.
+        // Null when the source chain holds operators the re-scan cannot honor.
+        private List<LambdaExpression>? _groupOrderedFirstSourceWheres;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;

@@ -231,6 +231,17 @@ namespace nORM.Providers
             => $"(SELECT {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql} LIMIT 1)";
 
         /// <summary>
+        /// Correlated single-row subquery with an optional row offset — ElementAt inside
+        /// a grouped projection. Without an offset this is the top-one form; with one,
+        /// the base grammar appends <c>LIMIT 1 OFFSET n</c> (SQL Server overrides with
+        /// <c>OFFSET … ROWS FETCH NEXT 1 ROWS ONLY</c>).
+        /// </summary>
+        internal virtual string BuildCorrelatedSingleRowSubquery(string selectSql, string tableSql, string alias, string whereSql, string orderBySql, string? offsetSql)
+            => offsetSql == null
+                ? BuildCorrelatedTopOneSubquery(selectSql, tableSql, alias, whereSql, orderBySql)
+                : $"(SELECT {selectSql} FROM {tableSql} {alias} WHERE {whereSql} ORDER BY {orderBySql} LIMIT 1 OFFSET {offsetSql})";
+
+        /// <summary>
         /// Returns SQL that retrieves the identity value generated for an inserted row.
         /// </summary>
         /// <param name="m">The mapping for the table being inserted into.</param>
