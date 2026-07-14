@@ -233,6 +233,7 @@ namespace nORM.Core
                     // outcome and must not be retried, or the write could be duplicated.
                     onCommitAttempted?.Invoke();
                     await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                    SyncTrackerAfterDirectWrite(entity, map, operation);
                 }
                 return recordsAffected;
             }
@@ -400,6 +401,32 @@ namespace nORM.Core
             // Invalidate after a confirmed write (mirrors SaveChanges/ExecuteUpdate-Delete/Bulk).
             Options.CacheProvider?.InvalidateTag(map.TableName);
             return recordsAffected;
+        }
+
+        /// <summary>
+        /// After a direct write commits durably, aligns the change tracker with the database
+        /// for an entity instance the context happens to track: INSERT/UPDATE accept the
+        /// entity's current values as the new baseline (a later SaveChanges must not re-write
+        /// them over a concurrent writer's committed state), DELETE evicts the entry and
+        /// clears navigation references so the tracked corpse cannot resurrect the row,
+        /// block a same-key re-add, or false-conflict a later save. Mirrors the SaveChanges
+        /// accept phase; direct writes inside externally-owned or ambient transactions skip
+        /// this because the caller controls durability (same rule as SaveChanges).
+        /// </summary>
+        private void SyncTrackerAfterDirectWrite(object entity, TableMapping map, WriteOperation operation)
+        {
+            var entry = ChangeTracker.GetEntryOrDefault(entity);
+            if (entry == null || !ReferenceEquals(entry.Entity, entity))
+                return;
+            if (operation == WriteOperation.Delete)
+            {
+                ChangeTracker.Remove(entity, true);
+                RemoveDeletedInstancesFromTrackedNavigations(new List<object> { entity });
+            }
+            else
+            {
+                entry.AcceptChanges();
+            }
         }
 
         /// <summary>
@@ -709,121 +736,6 @@ namespace nORM.Core
 
         private static bool HasExplicitRelationshipDependency(TableMapping dependent, TableMapping candidatePrincipal)
             => candidatePrincipal.Relations.Values.Any(r => r.DependentType == dependent.Type);
-
-        private string BuildInsertBatch(TableMapping map, int startParamIndex)
-        {
-            // INS-1: Only append identity retrieval when at least one key column is DB-generated.
-            // For natural-key entities the fragment is wasteful and potentially wrong across providers.
-            var hasDbGeneratedKey = HasDbGeneratedKey(map.KeyColumns);
-            var identityPrefix = hasDbGeneratedKey
-                ? _p.GetIdentityRetrievalPrefix(map)
-                : string.Empty;
-            var identityFragment = hasDbGeneratedKey
-                ? _p.GetIdentityRetrievalString(map)
-                : string.Empty;
-            // Server-generated tokens (ROWVERSION) are assigned on INSERT too; when no
-            // identity retrieval reads them back, the token output clause does (the
-            // identity clause already includes the token for DB-generated keys).
-            var tokenPrefix = !hasDbGeneratedKey && map.TimestampColumn != null && _p.SupportsNativeRowVersion
-                ? _p.GetInsertTokenOutputClause(map)
-                : string.Empty;
-            var cols = _p.GetInsertColumns(map);
-            if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable}{identityPrefix}{tokenPrefix} {_p.DefaultValuesInsertClause}{identityFragment}";
-            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-            var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
-            return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix}{tokenPrefix} VALUES ({paramNames}){identityFragment}";
-        }
-
-        private string BuildUpdateBatch(TableMapping map, int startParamIndex)
-        {
-            if (map.KeyColumns.Length == 0)
-                throw new NormConfigurationException(string.Format(
-                    ErrorMessages.InvalidConfiguration,
-                    $"Entity '{map.Type.Name}' has no primary key; UPDATE requires a key."));
-
-            // Guard against empty SET clause when entity has no mutable columns.
-            // This happens when all columns are either keys or concurrency tokens.
-            // Emitting "UPDATE T SET WHERE ..." is invalid SQL; throw a clear, actionable error.
-            if (map.UpdateColumns.Length == 0)
-                throw new NormConfigurationException(
-                    $"Entity '{map.Type.Name}' has no mutable columns to update " +
-                    "(all non-key columns are concurrency tokens or the entity only has key columns). " +
-                    "Use [NotMapped] for computed properties or add at least one mutable property " +
-                    "that is not a key or concurrency token.");
-
-            var setSb = new StringBuilder();
-            var idx = startParamIndex;
-            for (int i = 0; i < map.UpdateColumns.Length; i++)
-            {
-                if (i > 0) setSb.Append(", ");
-                setSb.Append(map.UpdateColumns[i].EscCol)
-                    .Append('=')
-                    .Append(_p.ParamPrefix).Append('p').Append(idx++);
-            }
-            // Client-managed concurrency token: write a fresh value in the SET clause so a stale
-            // concurrent UPDATE (whose WHERE still carries the old token) affects zero rows. The
-            // parameter binder generates the new value and binds this slot; the old token is compared
-            // separately in the WHERE below.
-            if (map.ClientManagedConcurrencyToken)
-            {
-                if (setSb.Length > 0) setSb.Append(", ");
-                setSb.Append(map.TimestampColumn!.EscCol)
-                    .Append('=')
-                    .Append(_p.ParamPrefix).Append('p').Append(idx++);
-            }
-            var whereParts = new List<string>();
-            foreach (var col in map.KeyColumns)
-                whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
-            if (map.TimestampColumn != null)
-            {
-                var tc = map.TimestampColumn;
-                // Null-safe equality: handles the case where the concurrency token is a nullable column.
-                // Optimization opportunity: when the column is known non-nullable at mapping time,
-                // the OR branch is unreachable and could be elided to produce simpler SQL. Currently
-                // we always emit the full null-safe form for correctness across all column definitions.
-                whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
-                idx++;
-            }
-            if (Options.TenantProvider != null)
-            {
-                var tenantCol = RequireTenantColumn(map, "update batch");
-                whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
-            }
-            var where = string.Join(" AND ", whereParts);
-            // Server-generated tokens (ROWVERSION) regenerate on every UPDATE; the
-            // provider's OUTPUT clause reads the fresh value back so the tracked
-            // instance can save again (see ExecuteUpdateBatch's reader path).
-            var tokenOutput = map.TimestampColumn != null && _p.SupportsNativeRowVersion
-                ? _p.GetUpdateTokenOutputClause(map)
-                : string.Empty;
-            return $"UPDATE {map.EscTable} SET {setSb}{tokenOutput} WHERE {where}";
-        }
-
-        private string BuildDeleteBatch(TableMapping map, int startParamIndex)
-        {
-            if (map.KeyColumns.Length == 0)
-                throw new NormConfigurationException(string.Format(
-                    ErrorMessages.InvalidConfiguration,
-                    $"Entity '{map.Type.Name}' has no primary key; DELETE requires a key."));
-            var idx = startParamIndex;
-            var whereParts = new List<string>();
-            foreach (var col in map.KeyColumns)
-                whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
-            if (map.TimestampColumn != null)
-            {
-                var tc = map.TimestampColumn;
-                whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
-                idx++;
-            }
-            if (Options.TenantProvider != null)
-            {
-                var tenantCol = RequireTenantColumn(map, "delete batch");
-                whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
-            }
-            var where = string.Join(" AND ", whereParts);
-            return $"DELETE FROM {map.EscTable} WHERE {where}";
-        }
 
         private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null)
         {

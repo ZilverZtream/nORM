@@ -271,18 +271,36 @@ namespace nORM.Core
                 {
                     ct.ThrowIfCancellationRequested();
                     var affected = _command.ExecuteNonQuery();
+                    AcceptTrackedInsert(entity);
                     InvalidateResultCache();
                     return Task.FromResult(affected);
                 }
 
-                return ExecuteNonQueryThenInvalidateAsync(ct);
+                return ExecuteNonQueryThenInvalidateAsync(entity, ct);
             }
 
-            private async Task<int> ExecuteNonQueryThenInvalidateAsync(CancellationToken ct)
+            private async Task<int> ExecuteNonQueryThenInvalidateAsync(object entity, CancellationToken ct)
             {
                 var affected = await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
+                AcceptTrackedInsert(entity);
                 InvalidateResultCache();
                 return affected;
+            }
+
+            /// <summary>
+            /// A direct insert that just committed (auto-commit: no bound or ambient
+            /// transaction) persisted the tracked instance's values; accept them so a
+            /// later SaveChanges does not INSERT the same row a second time. Inside a
+            /// caller-owned transaction the caller controls durability, so the tracker
+            /// is left untouched (same rule as the SaveChanges accept phase).
+            /// </summary>
+            private void AcceptTrackedInsert(object entity)
+            {
+                if (BoundTransaction != null || System.Transactions.Transaction.Current != null)
+                    return;
+                var entry = _context.ChangeTracker.GetEntryOrDefault(entity);
+                if (entry != null && ReferenceEquals(entry.Entity, entity) && entry.State == EntityState.Added)
+                    entry.AcceptChanges();
             }
 
             private async Task<int> ExecuteWithTokenHydrateAsync(object entity, CancellationToken ct)
@@ -300,6 +318,7 @@ namespace nORM.Core
                 }
                 if (tokenValue != null && tokenValue != DBNull.Value)
                     _mapping.TimestampColumn!.Setter(entity, tokenValue);
+                AcceptTrackedInsert(entity);
                 InvalidateResultCache();
                 return 1;
             }
@@ -370,6 +389,7 @@ namespace nORM.Core
                         var commandGeneratedIdSync = _context.RawProvider.GetCommandGeneratedKey(_command, _mapping);
                         if (commandGeneratedIdSync != null && commandGeneratedIdSync != DBNull.Value)
                             _mapping.SetPrimaryKey(entity, commandGeneratedIdSync);
+                        AcceptTrackedInsert(entity);
                         InvalidateResultCache();
                         return recordsAffectedSync;
                     }
@@ -378,6 +398,7 @@ namespace nORM.Core
                     var commandGeneratedId = _context.RawProvider.GetCommandGeneratedKey(_command, _mapping);
                     if (commandGeneratedId != null && commandGeneratedId != DBNull.Value)
                         _mapping.SetPrimaryKey(entity, commandGeneratedId);
+                    AcceptTrackedInsert(entity);
                     InvalidateResultCache();
                     return recordsAffected;
                 }
@@ -389,6 +410,7 @@ namespace nORM.Core
                     var newIdSync = _command.ExecuteScalar();
                     if (newIdSync != null && newIdSync != DBNull.Value)
                         _mapping.SetPrimaryKey(entity, newIdSync);
+                    AcceptTrackedInsert(entity);
                     InvalidateResultCache();
                     return 1;
                 }
@@ -396,6 +418,7 @@ namespace nORM.Core
                 var newId = await _command.ExecuteScalarWithInterceptionAsync(_context, ct).ConfigureAwait(false);
                 if (newId != null && newId != DBNull.Value)
                     _mapping.SetPrimaryKey(entity, newId);
+                AcceptTrackedInsert(entity);
                 InvalidateResultCache();
                 return 1;
             }
