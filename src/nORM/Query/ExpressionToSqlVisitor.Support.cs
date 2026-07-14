@@ -43,25 +43,40 @@ namespace nORM.Query
         }.ToFrozenSet();
 
         /// <summary>
-        /// Replaces `NormQueryable.Query&lt;T&gt;(ctxConstant)` MethodCall nodes inside a
-        /// sub-expression with a `ConstantExpression(IQueryable&lt;T&gt;)` so the
-        /// QueryTranslator recognizes them as the query source. Used by BuildExists +
-        /// related sub-translator entry points; the outer compiled-query path does the same
-        /// materialization in ExpressionCompiler.QueryCallEvaluator.
+        /// Replaces the `NormQueryable.Query&lt;T&gt;(ctxConstant)` MethodCall at the
+        /// root of a sub-expression's SPINE (the Arguments[0] chain) with a
+        /// `ConstantExpression(IQueryable&lt;T&gt;)` so the QueryTranslator recognizes
+        /// it as the query source. Deliberately NOT recursive into lambda bodies:
+        /// a Query root nested inside a predicate belongs to its own subquery
+        /// builder, which must first reserve an alignment slot for the consumed
+        /// ctx capture — erasing it here would skip that reservation while the
+        /// ParameterValueExtractor still walks the original member, shifting
+        /// every later positional binding.
         /// </summary>
-        private sealed class QueryCallMaterializer : ExpressionVisitor
+        private static class QueryCallMaterializer
         {
-            public static Expression Materialize(Expression e) => new QueryCallMaterializer().Visit(e)!;
-
-            protected override Expression VisitMethodCall(MethodCallExpression node)
+            public static Expression Materialize(Expression e)
             {
-                if (node.Method.DeclaringType == typeof(NormQueryable) && node.Method.Name == nameof(NormQueryable.Query))
+                if (e is MethodCallExpression mce)
                 {
-                    var compiled = Expression.Lambda(node).Compile();
-                    var queryable = compiled.DynamicInvoke();
-                    return Expression.Constant(queryable, node.Type);
+                    if (mce.Method.DeclaringType == typeof(NormQueryable) && mce.Method.Name == nameof(NormQueryable.Query))
+                    {
+                        var compiled = Expression.Lambda(mce).Compile();
+                        var queryable = compiled.DynamicInvoke();
+                        return Expression.Constant(queryable, mce.Type);
+                    }
+                    if (mce.Arguments.Count > 0)
+                    {
+                        var newSource = Materialize(mce.Arguments[0]);
+                        if (!ReferenceEquals(newSource, mce.Arguments[0]))
+                        {
+                            var args = mce.Arguments.ToArray();
+                            args[0] = newSource;
+                            return mce.Update(mce.Object, args);
+                        }
+                    }
                 }
-                return base.VisitMethodCall(node);
+                return e;
             }
         }
 

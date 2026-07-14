@@ -222,7 +222,13 @@ namespace nORM.Query
             // outer's accumulated params and compiled-param registrations the moment the
             // sub-translator goes out of `using`. Copy both back before dispose.
             var tempParams = new Dictionary<string, object>();
-            var tempCompiled = new List<string>();
+            // Seed with the outer's compiled-param names so the sub-translator's
+            // @cp numbering continues globally instead of restarting at @cp0: a
+            // restarted name collides with an outer (or sibling/nested) subquery's
+            // slot and the name-deduping copy-back below then MERGES two distinct
+            // closures into one parameter — the second closure silently binds the
+            // first one's value. The seeded prefix is deduped away on copy-back.
+            var tempCompiled = new List<string>(_compiledParams);
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), tempCompiled, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
@@ -329,7 +335,13 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
             var tempParams = new Dictionary<string, object>();
-            var tempCompiled = new List<string>();
+            // Seed with the outer's compiled-param names so the sub-translator's
+            // @cp numbering continues globally instead of restarting at @cp0: a
+            // restarted name collides with an outer (or sibling/nested) subquery's
+            // slot and the name-deduping copy-back below then MERGES two distinct
+            // closures into one parameter — the second closure silently binds the
+            // first one's value. The seeded prefix is deduped away on copy-back.
+            var tempCompiled = new List<string>(_compiledParams);
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), tempCompiled, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
             _paramIndex = subTranslator.ParameterIndex;
@@ -472,7 +484,13 @@ namespace nORM.Query
             var mapping = _ctx.GetMapping(rootType);
             var freshCorrelatedForIn = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
             var tempParams = new Dictionary<string, object>();
-            var tempCompiled = new List<string>();
+            // Seed with the outer's compiled-param names so the sub-translator's
+            // @cp numbering continues globally instead of restarting at @cp0: a
+            // restarted name collides with an outer (or sibling/nested) subquery's
+            // slot and the name-deduping copy-back below then MERGES two distinct
+            // closures into one parameter — the second closure silently binds the
+            // first one's value. The seeded prefix is deduped away on copy-back.
+            var tempCompiled = new List<string>(_compiledParams);
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex,
                 freshCorrelatedForIn, new HashSet<string>(), tempCompiled, _paramMap, 0,
                 recursionDepth: _recursionDepth + 1);
