@@ -46,7 +46,7 @@ public class CollectionNavigationRemovalWriteTests
             cmd.CommandText = """
                 CREATE TABLE CnrDept (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
                 CREATE TABLE CnrEmp (Id INTEGER PRIMARY KEY, DeptId INTEGER NULL, Name TEXT NOT NULL);
-                INSERT INTO CnrDept VALUES (1, 'Eng');
+                INSERT INTO CnrDept VALUES (1, 'Eng'), (2, 'Ops');
                 INSERT INTO CnrEmp VALUES (1, 1, 'ann'), (2, 1, 'bob');
                 """;
             cmd.ExecuteNonQuery();
@@ -157,6 +157,27 @@ public class CollectionNavigationRemovalWriteTests
         Assert.Equal(1, ReadDeptId(keeper, 2)); // bob untouched throughout
     }
 
+    [Fact]
+    public async Task Moving_child_between_loaded_collections_reparents_not_severs()
+    {
+        var (keeper, make) = Setup();
+        using var _ = keeper;
+        await using var ctx = make();
+
+        var eng = ((INormQueryable<Dept>)ctx.Query<Dept>()).Include(d => d.Employees).First(d => d.Id == 1);
+        var ops = ((INormQueryable<Dept>)ctx.Query<Dept>()).Include(d => d.Employees).First(d => d.Id == 2);
+        var ann = eng.Employees.First(e => e.Id == 1);
+
+        // Move ann Eng -> Ops purely by collection manipulation (no scalar FK touch). The
+        // removal from Eng must NOT sever her; the add to Ops must repoint her FK.
+        eng.Employees.Remove(ann);
+        ops.Employees.Add(ann);
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(2, ReadDeptId(keeper, 1)); // ann now under Ops
+        Assert.Equal(1, ReadDeptId(keeper, 2)); // bob still under Eng
+    }
+
     // ---- Required (non-nullable FK) relationship: removal deletes the orphan ----
 
     [System.ComponentModel.DataAnnotations.Schema.Table("CnrReqOrder")]
@@ -175,18 +196,16 @@ public class CollectionNavigationRemovalWriteTests
         public string Sku { get; set; } = "";
     }
 
-    [Fact]
-    public async Task Removing_child_from_required_collection_deletes_orphan()
+    private static (SqliteConnection Keeper, Func<DbContext> Make) SetupRequired()
     {
         var keeper = new SqliteConnection($"Data Source=file:cnrreq_{Guid.NewGuid():N}?mode=memory&cache=shared");
         keeper.Open();
-        using var _ = keeper;
         using (var cmd = keeper.CreateCommand())
         {
             cmd.CommandText = """
                 CREATE TABLE CnrReqOrder (Id INTEGER PRIMARY KEY, Code TEXT NOT NULL);
                 CREATE TABLE CnrReqLine (Id INTEGER PRIMARY KEY, OrderId INTEGER NOT NULL, Sku TEXT NOT NULL);
-                INSERT INTO CnrReqOrder VALUES (1, 'o1');
+                INSERT INTO CnrReqOrder VALUES (1, 'o1'), (2, 'o2');
                 INSERT INTO CnrReqLine VALUES (1, 1, 'a'), (2, 1, 'b');
                 """;
             cmd.ExecuteNonQuery();
@@ -207,21 +226,59 @@ public class CollectionNavigationRemovalWriteTests
             };
             return new DbContext(cn, new SqliteProvider(), opts);
         }
+        return (keeper, Make);
+    }
 
-        await using var ctx = Make();
+    private static int CountLine(SqliteConnection k, int id)
+    {
+        using var cmd = k.CreateCommand();
+        cmd.CommandText = $"SELECT COUNT(*) FROM CnrReqLine WHERE Id = {id}";
+        return Convert.ToInt32(cmd.ExecuteScalar());
+    }
+
+    private static int? ReadOrderId(SqliteConnection k, int lineId)
+    {
+        using var cmd = k.CreateCommand();
+        cmd.CommandText = $"SELECT OrderId FROM CnrReqLine WHERE Id = {lineId}";
+        var v = cmd.ExecuteScalar();
+        return v is DBNull or null ? null : Convert.ToInt32(v);
+    }
+
+    [Fact]
+    public async Task Removing_child_from_required_collection_deletes_orphan()
+    {
+        var (keeper, make) = SetupRequired();
+        using var _ = keeper;
+        await using var ctx = make();
+
         var order = ((INormQueryable<Order>)ctx.Query<Order>()).Include(o => o.Lines).First(o => o.Id == 1);
         Assert.Equal(2, order.Lines.Count);
         var a = order.Lines.First(l => l.Id == 1);
         order.Lines.Remove(a);
         await ctx.SaveChangesAsync();
 
-        int CountLine(int id)
-        {
-            using var cmd = keeper.CreateCommand();
-            cmd.CommandText = $"SELECT COUNT(*) FROM CnrReqLine WHERE Id = {id}";
-            return Convert.ToInt32(cmd.ExecuteScalar());
-        }
-        Assert.Equal(0, CountLine(1)); // orphan of a required relationship is deleted
-        Assert.Equal(1, CountLine(2)); // sibling untouched
+        Assert.Equal(0, CountLine(keeper, 1)); // orphan of a required relationship is deleted
+        Assert.Equal(1, CountLine(keeper, 2)); // sibling untouched
+    }
+
+    [Fact]
+    public async Task Moving_child_between_required_collections_reparents_not_deletes()
+    {
+        var (keeper, make) = SetupRequired();
+        using var _ = keeper;
+        await using var ctx = make();
+
+        var o1 = ((INormQueryable<Order>)ctx.Query<Order>()).Include(o => o.Lines).First(o => o.Id == 1);
+        var o2 = ((INormQueryable<Order>)ctx.Query<Order>()).Include(o => o.Lines).First(o => o.Id == 2);
+        var a = o1.Lines.First(l => l.Id == 1);
+
+        // Move line 'a' from o1 to o2 across a REQUIRED relationship: the removal from o1
+        // must NOT delete it as an orphan; the add to o2 repoints its FK.
+        o1.Lines.Remove(a);
+        o2.Lines.Add(a);
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(1, CountLine(keeper, 1)); // 'a' survives (reparented, not orphan-deleted)
+        Assert.Equal(2, ReadOrderId(keeper, 1)); // now under o2
     }
 }
