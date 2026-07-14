@@ -139,25 +139,32 @@ namespace nORM.Providers
             if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
                 keyCondition += $" AND {Escape(tc.Name)} = OLD.{Escape(tc.Name)}";
 
+            // strftime %f carries milliseconds — datetime('now') is second-precision,
+            // which collapses versions written within one second and answers AsOf
+            // timestamps between sub-second updates with the wrong version. The
+            // millisecond text compares lexically with both the second-precision
+            // rows of pre-existing history tables and the fractional format
+            // Microsoft.Data.Sqlite binds for .NET DateTime parameters.
+            const string nowExpr = "strftime('%Y-%m-%d %H:%M:%f', 'now')";
             return @$"
 CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
 BEGIN
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
-    VALUES (datetime('now'), '9999-12-31', 'I', {newColumns});
+    VALUES ({nowExpr}, '9999-12-31', 'I', {newColumns});
 END;
 
 CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
 BEGIN
-    UPDATE {history} SET __ValidTo = datetime('now') WHERE __ValidTo = '9999-12-31' AND {keyCondition};
+    UPDATE {history} SET __ValidTo = {nowExpr} WHERE __ValidTo = '9999-12-31' AND {keyCondition};
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
-    VALUES (datetime('now'), '9999-12-31', 'U', {newColumns});
+    VALUES ({nowExpr}, '9999-12-31', 'U', {newColumns});
 END;
 
 CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
 BEGIN
-    UPDATE {history} SET __ValidTo = datetime('now') WHERE __ValidTo = '9999-12-31' AND {keyCondition};
+    UPDATE {history} SET __ValidTo = {nowExpr} WHERE __ValidTo = '9999-12-31' AND {keyCondition};
     INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
-    VALUES (datetime('now'), datetime('now'), 'D', {oldColumns});
+    VALUES ({nowExpr}, {nowExpr}, 'D', {oldColumns});
 END;";
         }
 
@@ -170,7 +177,7 @@ END;";
             var table = Escape("__NormTemporalTags");
             var tagCol = Escape("TagName");
             var tsCol = Escape("Timestamp");
-            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, datetime('now'))";
+            return $"INSERT INTO {table} ({tagCol}, {tsCol}) VALUES ({pTagName}, strftime('%Y-%m-%d %H:%M:%f', 'now'))";
         }
 
         internal override bool UsesDatabaseClockForTemporalTags => true;
