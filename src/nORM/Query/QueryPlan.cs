@@ -142,8 +142,45 @@ namespace nORM.Query
         // navigation-member key, unreadable from the materialized entity, avoid client
         // evaluation entirely). Null falls back to OuterKeySelector — correct for scalar
         // outers, which are DISTINCT keys by construction.
-        Func<object, object?>? OuterIdentitySelector = null
+        Func<object, object?>? OuterIdentitySelector = null,
+        // The result selector executes CLIENT-side as a compiled delegate cached with
+        // the plan; a closure captured inside it (e.g. the bound of a filtered
+        // per-group aggregate) would replay the FIRST execution's value forever.
+        // When the selector captures closures, this delegate takes the closure
+        // values as a slot array and the provider rebinds it per execution from the
+        // current expression (see NormQueryProvider.RebindGroupJoinClosures).
+        Func<object, IEnumerable<object>, object?[], object>? ClosureLiftedResultSelector = null,
+        int ClosureSlotCount = 0
     );
+
+    /// <summary>
+    /// Collects closure-captured values (member accesses rooted in a constant) in
+    /// visitor pre-order — the SAME traversal the GroupJoin closure lift uses to
+    /// assign slots, so collected values bind positionally to the lifted delegate.
+    /// </summary>
+    internal static class GroupJoinClosureValues
+    {
+        internal static void Collect(System.Linq.Expressions.Expression body, List<object?> into)
+            => new Collector(into).Visit(body);
+
+        private sealed class Collector : System.Linq.Expressions.ExpressionVisitor
+        {
+            private readonly List<object?> _into;
+            public Collector(List<object?> into) => _into = into;
+
+            protected override System.Linq.Expressions.Expression VisitConstant(System.Linq.Expressions.ConstantExpression node) => node;
+
+            protected override System.Linq.Expressions.Expression VisitMember(System.Linq.Expressions.MemberExpression node)
+            {
+                if (QueryTranslator.TryGetConstantValue(node, out var value))
+                {
+                    _into.Add(value);
+                    return node;
+                }
+                return base.VisitMember(node);
+            }
+        }
+    }
 
     /// <summary>
     /// Structural equality wrapper for a composite outer identity in GroupJoin

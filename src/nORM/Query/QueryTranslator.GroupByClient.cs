@@ -38,10 +38,14 @@ namespace nORM.Query
                 }
             };
         }
-        private static Func<object, IEnumerable<object>, object> CompileGroupJoinResultSelector(LambdaExpression resultSelector)
+        private static (Func<object, IEnumerable<object>, object> Selector,
+                        Func<object, IEnumerable<object>, object?[], object>? Lifted,
+                        int ClosureSlotCount)
+            CompileGroupJoinResultSelector(LambdaExpression resultSelector)
         {
             var outerParam = Expression.Parameter(typeof(object), "outer");
             var innerParam = Expression.Parameter(typeof(IEnumerable<object>), "inners");
+            var valuesParam = Expression.Parameter(typeof(object?[]), "closureValues");
             var castOuter = Expression.Convert(outerParam, resultSelector.Parameters[0].Type);
             var innerParamType = resultSelector.Parameters[1].Type;
             var innerGenericArgs = innerParamType.GetGenericArguments();
@@ -52,14 +56,65 @@ namespace nORM.Query
             var castMethod = typeof(Enumerable).GetMethod("Cast")!.MakeGenericMethod(innerElementType);
             var castInner = Expression.Call(castMethod, innerParam);
             Expression body = resultSelector.Body;
+            // Lift closure captures FIRST, over the original body, in the same
+            // pre-order traversal GroupJoinClosureValues.Collect uses on the
+            // current expression at execution time — slots bind positionally.
+            // Without the lift, the compiled delegate holds the FIRST execution's
+            // display-class instance and every later execution replays its values
+            // out of the plan cache.
+            var lifter = new ClosureLiftRewriter(valuesParam);
+            body = lifter.Visit(body)!;
             body = new ParameterReplacer(resultSelector.Parameters[0], castOuter).Visit(body)!;
             body = new ParameterReplacer(resultSelector.Parameters[1], castInner).Visit(body)!;
             body = Expression.Convert(body, typeof(object));
-            var lambda = Expression.Lambda<Func<object, IEnumerable<object>, object>>(body, outerParam, innerParam);
-            ExpressionUtils.ValidateExpression(lambda);
-            var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
-            using var cts = new CancellationTokenSource(timeout);
-            return ExpressionUtils.CompileWithFallback(lambda, cts.Token);
+
+            if (lifter.SlotCount == 0)
+            {
+                var lambda = Expression.Lambda<Func<object, IEnumerable<object>, object>>(body, outerParam, innerParam);
+                ExpressionUtils.ValidateExpression(lambda);
+                var timeout = ExpressionUtils.GetCompilationTimeout(lambda);
+                using var cts = new CancellationTokenSource(timeout);
+                return (ExpressionUtils.CompileWithFallback(lambda, cts.Token), null, 0);
+            }
+
+            var liftedLambda = Expression.Lambda<Func<object, IEnumerable<object>, object?[], object>>(
+                body, outerParam, innerParam, valuesParam);
+            ExpressionUtils.ValidateExpression(liftedLambda);
+            var liftedTimeout = ExpressionUtils.GetCompilationTimeout(liftedLambda);
+            using var liftedCts = new CancellationTokenSource(liftedTimeout);
+            var lifted = ExpressionUtils.CompileWithFallback(liftedLambda, liftedCts.Token);
+
+            // Bind the translating expression's own values so the selector is
+            // correct even on a path that never rebinds.
+            var initialValues = new List<object?>(lifter.SlotCount);
+            GroupJoinClosureValues.Collect(resultSelector.Body, initialValues);
+            var initial = initialValues.ToArray();
+            return ((o, cs) => lifted(o, cs, initial), lifted, lifter.SlotCount);
+        }
+
+        /// <summary>
+        /// Rewrites closure captures (member accesses rooted in a constant) to
+        /// positional reads from the lifted values array, so the compiled GroupJoin
+        /// result selector is closure-free and per-execution values can be rebound.
+        /// </summary>
+        private sealed class ClosureLiftRewriter : ExpressionVisitor
+        {
+            private readonly ParameterExpression _values;
+            public int SlotCount { get; private set; }
+
+            public ClosureLiftRewriter(ParameterExpression values) => _values = values;
+
+            protected override Expression VisitConstant(ConstantExpression node) => node;
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (TryGetConstantValue(node, out _))
+                {
+                    var slot = Expression.ArrayIndex(_values, Expression.Constant(SlotCount++));
+                    return Expression.Convert(slot, node.Type);
+                }
+                return base.VisitMember(node);
+            }
         }
         /// <summary>
         /// Compiles <paramref name="keySelectorLambda"/> into a client-side grouping transform

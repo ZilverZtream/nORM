@@ -250,7 +250,7 @@ namespace nORM.Query
             if (innerKeyColumn != null)
             {
                 var outerKeyFunc = CreateObjectKeySelector(outerKeySelector);
-                var resultSelectorFunc = CompileGroupJoinResultSelector(runtimeResultSelector);
+                var (resultSelectorFunc, liftedSelector, closureSlots) = CompileGroupJoinResultSelector(runtimeResultSelector);
                 // Segmentation identity: the outer's PK getters, matching the PK tiebreak
                 // ordering above. Also spares navigation-member keys (e.Dept.Title) from
                 // client evaluation — the materialized outer has null navigations.
@@ -271,7 +271,9 @@ namespace nORM.Query
                     resultSelectorFunc,
                     groupJoinOuterIsEntity,
                     groupJoinOuterColumnCount,
-                    OuterIdentitySelector: outerIdentityFunc
+                    OuterIdentitySelector: outerIdentityFunc,
+                    ClosureLiftedResultSelector: liftedSelector,
+                    ClosureSlotCount: closureSlots
                 );
             }
             return node;

@@ -124,7 +124,7 @@ namespace nORM.Query
             if (_planCache.TryGet(fingerprint, out var cached))
             {
                 parameterValues = ExtractParameterValues(filtered, cached);
-                return cached;
+                return RebindGroupJoinClosures(cached, filtered);
             }
 
             // ExceptBy / IntersectBy / UnionBy and local-sequence SequenceEqual capture
@@ -172,7 +172,68 @@ namespace nORM.Query
             });
 
             parameterValues = ExtractParameterValues(filtered, plan);
-            return plan;
+            return RebindGroupJoinClosures(plan, filtered);
+        }
+
+        /// <summary>
+        /// A GroupJoin result selector executes client-side as a compiled delegate
+        /// cached with the plan; closures captured inside it (e.g. the bound of a
+        /// filtered per-group aggregate) would replay the FIRST execution's values
+        /// on every cache hit. When the selector was closure-lifted at translation,
+        /// re-collect the current expression's closure values and bind them —
+        /// returning a per-execution plan copy so the cached plan stays untouched.
+        /// </summary>
+        private static QueryPlan RebindGroupJoinClosures(QueryPlan plan, Expression current)
+        {
+            var info = plan.GroupJoinInfo;
+            if (info?.ClosureLiftedResultSelector == null || info.ClosureSlotCount == 0)
+                return plan;
+
+            var selector = FindGroupJoinResultSelector(current);
+            if (selector == null)
+                return plan;
+
+            var values = new List<object?>(info.ClosureSlotCount);
+            GroupJoinClosureValues.Collect(selector.Body, values);
+            if (values.Count != info.ClosureSlotCount)
+                return plan; // structural mismatch — keep the translation-time binding
+
+            var lifted = info.ClosureLiftedResultSelector;
+            var bound = values.ToArray();
+            return plan with
+            {
+                GroupJoinInfo = info with { ResultSelector = (o, cs) => lifted(o, cs, bound) }
+            };
+        }
+
+        private static LambdaExpression? FindGroupJoinResultSelector(Expression expression)
+        {
+            var finder = new GroupJoinFinder();
+            finder.Visit(expression);
+            if (finder.Found is not { Arguments.Count: 5 } node)
+                return null;
+            var arg = node.Arguments[4];
+            while (arg is UnaryExpression { NodeType: ExpressionType.Quote } quote)
+                arg = quote.Operand;
+            return arg as LambdaExpression;
+        }
+
+        private sealed class GroupJoinFinder : ExpressionVisitor
+        {
+            public MethodCallExpression? Found { get; private set; }
+
+            public override Expression? Visit(Expression? node)
+            {
+                if (Found != null)
+                    return node;
+                if (node is MethodCallExpression { Arguments.Count: 5 } call
+                    && call.Method.Name == nameof(Queryable.GroupJoin))
+                {
+                    Found = call;
+                    return node;
+                }
+                return base.Visit(node);
+            }
         }
 
         /// <summary>

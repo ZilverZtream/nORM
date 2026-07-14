@@ -557,7 +557,7 @@ public class LinqParityFuzzTests
         for (var i = 0; i < cases; i++)
         {
             var predicate = GeneratePredicate(rng);
-            var joinKind = rng.Next(3);
+            var joinKind = rng.Next(4);
             var caseRng = new Random(rng.Next());
 
             IQueryable<Row> parents = ctx.Query<Row>().Where(predicate);
@@ -598,7 +598,7 @@ public class LinqParityFuzzTests
                             $"composite join mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
                         break;
                     }
-                    default: // GroupJoin with per-parent aggregate
+                    case 2: // GroupJoin with per-parent aggregate
                     {
                         var db = parents.GroupJoin(children, p => p.Id, c => c.ParentId,
                                 (p, cs) => new { p.Id, N = cs.Count(), S = cs.Sum(c => (int?)c.ChildVal) ?? 0 })
@@ -608,6 +608,33 @@ public class LinqParityFuzzTests
                             .ToList().OrderBy(x => x.Id).ToList();
                         Assert.True(db.SequenceEqual(oracle),
                             $"groupjoin mismatch seed={seed} case={i}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    default: // GroupJoin with filtered count, nullable Max/Min (null on empty), Any
+                    {
+                        var k = caseRng.Next(-3, 3);
+                        var db = parents.GroupJoin(children, p => p.Id, c => c.ParentId,
+                                (p, cs) => new
+                                {
+                                    p.Id,
+                                    FC = cs.Where(c => c.ChildVal > k).Count(),
+                                    Mx = cs.Max(c => (int?)c.ChildVal),
+                                    Mn = cs.Min(c => (int?)c.ChildVal),
+                                    HasNeg = cs.Any(c => c.ChildVal < 0),
+                                })
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        var oracle = oracleParents.GroupJoin(oracleChildren, p => p.Id, c => c.ParentId,
+                                (p, cs) => new
+                                {
+                                    p.Id,
+                                    FC = cs.Where(c => c.ChildVal > k).Count(),
+                                    Mx = cs.Max(c => (int?)c.ChildVal),
+                                    Mn = cs.Min(c => (int?)c.ChildVal),
+                                    HasNeg = cs.Any(c => c.ChildVal < 0),
+                                })
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"groupjoin aggregates mismatch seed={seed} case={i} k={k}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(6))}]\noracle: [{string.Join(" | ", oracle.Take(6))}]");
                         break;
                     }
                 }
@@ -656,7 +683,7 @@ public class LinqParityFuzzTests
         {
             var pred1 = GeneratePredicate(rng);
             var pred2 = GeneratePredicate(rng);
-            var kind = rng.Next(3);
+            var kind = rng.Next(4);
             var op = rng.Next(4);
             var caseRng = new Random(rng.Next());
 
@@ -697,7 +724,7 @@ public class LinqParityFuzzTests
                             $"{SetOpName(op)} int mismatch seed={seed} case={i} windowed={windowed}\npred1: {pred1}\npred2: {pred2}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
                         break;
                     }
-                    default: // anonymous pair with a nullable string member
+                    case 2: // anonymous pair with a nullable string member
                     {
                         var db = ApplySetOp(
                                 a.Select(r => new { r.Nick, r.IntVal }),
@@ -709,6 +736,16 @@ public class LinqParityFuzzTests
                             .ToList().OrderBy(x => x.Nick, StringComparer.Ordinal).ThenBy(x => x.IntVal).ToList();
                         Assert.True(db.SequenceEqual(oracle),
                             $"{SetOpName(op)} anon mismatch seed={seed} case={i} windowed={windowed}\npred1: {pred1}\npred2: {pred2}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    default: // decimal element (scale-insensitive dedup, exact text storage on SQLite)
+                    {
+                        var db = ApplySetOp(a.Select(r => r.Amount), b.Select(r => r.Amount), op)
+                            .ToList().OrderBy(x => x).ToList();
+                        var oracle = ApplySetOp(oa.Select(r => r.Amount), ob.Select(r => r.Amount), op)
+                            .ToList().OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"{SetOpName(op)} decimal mismatch seed={seed} case={i} windowed={windowed}\npred1: {pred1}\npred2: {pred2}\ndb: [{string.Join(",", db.Take(10))}]\noracle: [{string.Join(",", oracle.Take(10))}]");
                         break;
                     }
                 }
