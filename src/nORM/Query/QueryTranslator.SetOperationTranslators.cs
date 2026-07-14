@@ -455,6 +455,13 @@ namespace nORM.Query
                     "Except" => "EXCEPT",
                     _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
                 };
+                // A wrapped arm places the arm SELECT inside a derived table, where
+                // an unaliased expression column — the ordinal-collation wrap on a
+                // scalar string arm — has no name and SQL Server rejects the derived
+                // table outright. Name the expression before wrapping; set ops match
+                // columns positionally, so the alias never changes semantics.
+                if (leftNeedsWrap) leftSql = AliasNamelessScalarSelect(t, leftSql);
+                if (rightNeedsWrap) rightSql = AliasNamelessScalarSelect(t, rightSql);
                 // SQLite rejects bare-parenthesised compound SELECTs in set ops;
                 // every dialect accepts `SELECT * FROM (subq) AS alias` though,
                 // so wrap each LIMIT/OFFSET arm as a derived table. Unwrapped arms
@@ -491,6 +498,44 @@ namespace nORM.Query
             /// OFFSET in the arm SQL and must be wrapped as a derived table so the
             /// outer set op parses.
             /// </summary>
+            /// <summary>
+            /// Names the output of a single-expression SELECT list (no alias, not a
+            /// bare column identifier) so the arm can serve as a derived table.
+            /// Multi-column lists, aliased items, and plain identifiers pass
+            /// through unchanged.
+            /// </summary>
+            private static string AliasNamelessScalarSelect(QueryTranslator t, string sql)
+            {
+                if (!sql.StartsWith("SELECT ", StringComparison.Ordinal)) return sql;
+                var depth = 0;
+                var fromIdx = -1;
+                for (var i = 7; i < sql.Length - 6; i++)
+                {
+                    var ch = sql[i];
+                    if (ch == '(') depth++;
+                    else if (ch == ')') depth--;
+                    else if (depth == 0 && ch == ' ' && string.CompareOrdinal(sql, i, " FROM ", 0, 6) == 0)
+                    {
+                        fromIdx = i;
+                        break;
+                    }
+                }
+                if (fromIdx < 0) return sql;
+
+                var list = sql[7..fromIdx];
+                var listDepth = 0;
+                foreach (var ch in list)
+                {
+                    if (ch == '(') listDepth++;
+                    else if (ch == ')') listDepth--;
+                    else if (ch == ',' && listDepth == 0) return sql; // multi-column
+                }
+                if (list.Contains(" AS ", StringComparison.OrdinalIgnoreCase)) return sql;
+                if (!list.Contains('(') && !list.Contains(' ')) return sql; // bare identifier is already named
+
+                return string.Concat(sql.AsSpan(0, fromIdx), " AS ", t._provider.Escape("__set_val"), sql.AsSpan(fromIdx));
+            }
+
             private static bool SourceHasOrderTakeOrSkip(Expression source)
             {
                 var current = source;

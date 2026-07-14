@@ -303,6 +303,7 @@ public class LinqParityFuzzTests
         RunJoinFuzz(ctx, seed, cases: 150);
         RunSelectManyFuzz(ctx, seed, cases: 120);
         RunNavFlattenFuzz(ctx, seed, cases: 120);
+        RunSetOpFuzz(ctx, seed, cases: 120);
     }
 
     /// <summary>
@@ -624,6 +625,107 @@ public class LinqParityFuzzTests
 
         Assert.True(unsupported < cases / 5,
             $"{unsupported}/{cases} join shapes were declined as unsupported (seed {seed}).");
+    }
+
+    private static IQueryable<T> ApplySetOp<T>(IQueryable<T> a, IQueryable<T> b, int op) => op switch
+    {
+        0 => a.Union(b),
+        1 => a.Concat(b),
+        2 => a.Intersect(b),
+        _ => a.Except(b),
+    };
+
+    private static string SetOpName(int op) => op switch
+    {
+        0 => "Union", 1 => "Concat", 2 => "Intersect", _ => "Except",
+    };
+
+    /// <summary>
+    /// Runs generated set-operation shapes (Union, Concat, Intersect, Except)
+    /// over independently predicated arms of the same table, with int, nullable
+    /// string, and anonymous-pair element shapes. C# set semantics are the
+    /// oracle: NULL equals NULL, string equality is ordinal, Concat preserves
+    /// duplicates. A coin flip windows the first arm with OrderBy/Take.
+    /// </summary>
+    internal static void RunSetOpFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var unsupported = 0;
+
+        for (var i = 0; i < cases; i++)
+        {
+            var pred1 = GeneratePredicate(rng);
+            var pred2 = GeneratePredicate(rng);
+            var kind = rng.Next(3);
+            var op = rng.Next(4);
+            var caseRng = new Random(rng.Next());
+
+            IQueryable<Row> a = ctx.Query<Row>().Where(pred1);
+            IQueryable<Row> b = ctx.Query<Row>().Where(pred2);
+            IQueryable<Row> oa = Rows.AsQueryable().Where(pred1);
+            IQueryable<Row> ob = Rows.AsQueryable().Where(pred2);
+
+            var windowed = caseRng.Next(3) == 0;
+            if (windowed)
+            {
+                var take = caseRng.Next(1, 25);
+                a = a.OrderBy(r => r.Id).Take(take);
+                oa = oa.OrderBy(r => r.Id).Take(take);
+            }
+
+            try
+            {
+                switch (kind)
+                {
+                    case 0: // nullable string element
+                    {
+                        var db = ApplySetOp(a.Select(r => r.Nick), b.Select(r => r.Nick), op)
+                            .ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
+                        var oracle = ApplySetOp(oa.Select(r => r.Nick), ob.Select(r => r.Nick), op)
+                            .ToList().OrderBy(x => x, StringComparer.Ordinal).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"{SetOpName(op)} string mismatch seed={seed} case={i} windowed={windowed}\npred1: {pred1}\npred2: {pred2}\ndb: [{string.Join(",", db)}]\noracle: [{string.Join(",", oracle)}]");
+                        break;
+                    }
+                    case 1: // int element
+                    {
+                        var db = ApplySetOp(a.Select(r => r.IntVal), b.Select(r => r.IntVal), op)
+                            .ToList().OrderBy(x => x).ToList();
+                        var oracle = ApplySetOp(oa.Select(r => r.IntVal), ob.Select(r => r.IntVal), op)
+                            .ToList().OrderBy(x => x).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"{SetOpName(op)} int mismatch seed={seed} case={i} windowed={windowed}\npred1: {pred1}\npred2: {pred2}\ndb: {db.Count} rows, oracle: {oracle.Count} rows");
+                        break;
+                    }
+                    default: // anonymous pair with a nullable string member
+                    {
+                        var db = ApplySetOp(
+                                a.Select(r => new { r.Nick, r.IntVal }),
+                                b.Select(r => new { r.Nick, r.IntVal }), op)
+                            .ToList().OrderBy(x => x.Nick, StringComparer.Ordinal).ThenBy(x => x.IntVal).ToList();
+                        var oracle = ApplySetOp(
+                                oa.Select(r => new { r.Nick, r.IntVal }),
+                                ob.Select(r => new { r.Nick, r.IntVal }), op)
+                            .ToList().OrderBy(x => x.Nick, StringComparer.Ordinal).ThenBy(x => x.IntVal).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"{SetOpName(op)} anon mismatch seed={seed} case={i} windowed={windowed}\npred1: {pred1}\npred2: {pred2}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                }
+            }
+            catch (NormUnsupportedFeatureException)
+            {
+                unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"set-op shape threw (seed={seed} case={i} kind={kind} op={SetOpName(op)} windowed={windowed})\npred1: {pred1}\npred2: {pred2}", ex);
+            }
+        }
+
+        Assert.True(unsupported < cases / 5,
+            $"{unsupported}/{cases} set-op shapes were declined as unsupported (seed {seed}).");
     }
 
     /// <summary>
