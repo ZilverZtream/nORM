@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -332,6 +333,56 @@ public class CorrelatedSubqueryGlobalFilterTests
             var n = await CountChildren(ctxB);
             Assert.True(n == 1,
                 $"tenant-B context counted {n} children — the shared plan cache replayed tenant A's injected subquery filter");
+        }
+    }
+
+    public sealed class CountDto { public int N { get; set; } }
+
+    private static readonly Func<DbContext, int, Task<List<CountDto>>> _compiledChildCount =
+        Norm.CompileQuery((DbContext c, int minParent) =>
+            c.Query<OpenParent>()
+                .Where(p => p.Id >= minParent)
+                .Select(p => new CountDto { N = c.Query<OpenChild>().Count(ch => ch.ParentId == p.Id) }));
+
+    [Fact]
+    public async Task Compiled_query_subquery_respects_per_context_global_filters()
+    {
+        // The compiled-query cache is a SEPARATE layer (BuildContextPlanKey /
+        // plansByCtx) from the plan cache. Its key must discriminate on the
+        // filter set too, or the second context's compiled subquery replays the
+        // first's injected filter.
+        var cs = $"Data Source=file:csgfcq_{Guid.NewGuid():N}?mode=memory&cache=shared";
+        using var keeper = new SqliteConnection(cs);
+        keeper.Open();
+        using (var cmd = keeper.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE CsgfOpenParent_Test (Id INTEGER PRIMARY KEY);
+                CREATE TABLE CsgfChild_Test (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Tenant TEXT NOT NULL);
+                INSERT INTO CsgfOpenParent_Test VALUES (1);
+                INSERT INTO CsgfChild_Test VALUES (1, 1, 'T1'), (2, 1, 'T1'), (3, 1, 'T2');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        var cnA = new SqliteConnection(cs);
+        cnA.Open();
+        var optsA = new DbContextOptions();
+        optsA.AddGlobalFilter<OpenChild>(c => c.Tenant == "T1");
+        await using (var ctxA = new DbContext(cnA, new SqliteProvider(), optsA))
+        {
+            Assert.Equal(2, (await _compiledChildCount(ctxA, 1)).Single().N);
+        }
+
+        var cnB = new SqliteConnection(cs);
+        cnB.Open();
+        var optsB = new DbContextOptions();
+        optsB.AddGlobalFilter<OpenChild>(c => c.Tenant == "T2");
+        await using (var ctxB = new DbContext(cnB, new SqliteProvider(), optsB))
+        {
+            var n = (await _compiledChildCount(ctxB, 1)).Single().N;
+            Assert.True(n == 1,
+                $"compiled query in tenant-B context counted {n} children — the compiled-query cache replayed tenant A's injected subquery filter");
         }
     }
 
