@@ -43,6 +43,7 @@ namespace nORM.Query
                                      or nameof(Queryable.Any)))
             {
                 var intermediateMapping = _ctx.GetMapping(hop1Relation.DependentType);
+                QueryTranslator.RecordReferencedTable(intermediateMapping.TableName);
                 if (intermediateMapping.Relations.TryGetValue(hop2NavMember.Member.Name, out var hop2Relation))
                 {
                     var hop2Filter = node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression hop2Predicate
@@ -162,6 +163,7 @@ namespace nORM.Query
             // attributes — match the same convention TableMapping uses (table name from
             // [Table] attribute or type name; columns from property names escaped by provider).
             var depTable = GetTableName(depType);
+            RecordNavReferencedTable(depType);
             var depAlias = _provider.Escape("__nav");
             // Outer alias / table-name reference for parent columns — set via SCV ctor.
             var outerAlias = _outerAlias;
@@ -264,6 +266,19 @@ namespace nORM.Query
                 AppendNavigationRelationPredicate(sb, hop2Rel, hop2Alias, hop1Alias);
                 sb.Append("))");
             }
+        }
+
+        /// <summary>
+        /// Records a navigation-subquery's dependent table into the ambient referenced-table
+        /// scope so a Cacheable query reading it is invalidated when that table is written.
+        /// The single-hop nav-aggregate emit resolves its table via [Table]-attribute lookup
+        /// (GetTableName), bypassing GetMapping, so it must record the table explicitly.
+        /// </summary>
+        private void RecordNavReferencedTable(Type dependentType)
+        {
+            if (_ctx == null) return;
+            try { QueryTranslator.RecordReferencedTable(_ctx.GetMapping(dependentType).TableName); }
+            catch { /* mapping resolution is best-effort for cache tagging */ }
         }
 
         private string RenderNavigationFilter(LambdaExpression filter, string depAlias)
@@ -400,6 +415,7 @@ namespace nORM.Query
             // (e.g. `c => c.Amount`); resolve it to the column name via attribute lookup.
             var depType = relation.DependentType;
             var depTable = GetTableName(depType);
+            RecordNavReferencedTable(depType);
             var depAlias = _provider.Escape("__nav");
 
             // Resolve the selector: a member on the dependent element (optionally

@@ -56,6 +56,13 @@ namespace nORM.Core
                 }
             }
 
+            // Record every table whose mapping is resolved during a query translation so the
+            // result cache tags a Cacheable query with all the tables it reads (joins, includes,
+            // reference navigations, correlated/nav subqueries) — a write to any of them then
+            // invalidates the entry. No-op outside an active translation scope, so runtime
+            // mapping lookups (materialization, etc.) are unaffected.
+            nORM.Query.QueryTranslator.RecordReferencedTable(mapping.TableName);
+
             return mapping;
         }
 

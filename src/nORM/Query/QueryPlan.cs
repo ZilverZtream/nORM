@@ -122,7 +122,13 @@ namespace nORM.Query
         // the unclaimed ordinals in ascending order (the legacy positional stream). Needed
         // because projection-rendered slots register at Build time — after clause slots —
         // so registration order alone can diverge from document order.
-        IReadOnlyDictionary<string, int>? CompiledParameterOrdinals = null
+        IReadOnlyDictionary<string, int>? CompiledParameterOrdinals = null,
+        // Every table the query READS, for result-cache tagging so a write to any of them
+        // invalidates the entry — this is a SUPERSET of <see cref="Tables"/>, which stays the
+        // semantic table set (root + joins) that ExecuteUpdate/ExecuteDelete use to choose their
+        // UPDATE/DELETE form. Correlated-subquery and navigation-aggregate tables belong here but
+        // NOT in Tables. Null when it would equal Tables (no subquery-only tables).
+        IReadOnlyCollection<string>? CacheTables = null
     );
 
     internal sealed record BulkCudQueryShape(

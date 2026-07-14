@@ -513,11 +513,19 @@ namespace nORM.Query
                     dependentQueries = _t.BuildDependentQueryDefinitions();
                 }
 
-                // Merge tables touched by correlated sub-translations (whose own _tables sets
-                // are discarded) so the result-cache tags — and thus write invalidation — cover
-                // every table the query actually reads, not just the root.
-                if (CurrentReferencedTables is { Count: > 0 } referencedTables)
-                    _t._tables.UnionWith(referencedTables);
+                // Tables the query READS beyond the semantic set (correlated-subquery and
+                // navigation-aggregate tables, whose sub-translators' own _tables are discarded).
+                // These go into CacheTables for result-cache invalidation but MUST NOT enter
+                // _tables — ExecuteUpdate/ExecuteDelete branch on Tables.Count to pick their
+                // single- vs multi-table form, and a subquery-only table there would misgenerate.
+                IReadOnlyCollection<string>? cacheTables = null;
+                if (CurrentReferencedTables is { Count: > 0 } referencedTables
+                    && !referencedTables.All(_t._tables.Contains))
+                {
+                    var union = new HashSet<string>(_t._tables, StringComparer.Ordinal);
+                    union.UnionWith(referencedTables);
+                    cacheTables = union;
+                }
 
                 var plan = new QueryPlan(
                     _t._sql.ToString(),
@@ -555,7 +563,8 @@ namespace nORM.Query
                         ? new Dictionary<string, nORM.Mapping.IValueConverter>(_t._paramConverters)
                         : null,
                     ClosureFoldedIntoSql: _t._closureFoldedIntoSql,
-                    CompiledParameterOrdinals: SnapshotSlotOrdinals(_t._compiledParams)
+                    CompiledParameterOrdinals: SnapshotSlotOrdinals(_t._compiledParams),
+                    CacheTables: cacheTables
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

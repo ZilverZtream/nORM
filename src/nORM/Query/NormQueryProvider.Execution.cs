@@ -218,7 +218,7 @@ namespace nORM.Query
             Func<Task<TResult>> queryExecutorFactory = () => ExecuteQueryFromPlanAsync<TResult>(plan, paramValues, sw, ct);
             var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, parameterDictionary);
             var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
-            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+            return await ExecuteWithCacheAsync(cacheKey, plan.CacheTables ?? plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
         }
         /// <summary>
         /// Non-async entry point - does synchronous command setup when connection is ready,

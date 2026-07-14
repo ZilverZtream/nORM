@@ -128,7 +128,7 @@ namespace nORM.Query
             {
                 var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, GetParameterDictionary());
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
-                return ExecuteWithCacheSync(cacheKey, plan.Tables, expiration, queryExecutorFactory);
+                return ExecuteWithCacheSync(cacheKey, plan.CacheTables ?? plan.Tables, expiration, queryExecutorFactory);
             }
             else
             {

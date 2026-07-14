@@ -60,7 +60,7 @@ namespace nORM.Query
                 Func<Task<TResult>> queryExecutorFactory = () => ExecuteCompiledDictAsync<TResult>(plan, finalParameters, sw, ct);
                 var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, finalParameters);
                 var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
-                return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
+                return await ExecuteWithCacheAsync(cacheKey, plan.CacheTables ?? plan.Tables, expiration, queryExecutorFactory, ct).ConfigureAwait(false);
             }
             else
             {
@@ -870,7 +870,7 @@ namespace nORM.Query
 
             var cacheKey = BuildCacheKeyFromPlan<TResult>(plan, dict);
             var expiration = plan.CacheExpiration ?? _ctx.Options.CacheExpiration;
-            return await ExecuteWithCacheAsync(cacheKey, plan.Tables, expiration,
+            return await ExecuteWithCacheAsync(cacheKey, plan.CacheTables ?? plan.Tables, expiration,
                 () => ExecuteCompiledInternalArrayAsync<TResult>(plan, parameterValues, ct), ct).ConfigureAwait(false);
         }
 
