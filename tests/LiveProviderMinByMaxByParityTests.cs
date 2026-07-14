@@ -216,14 +216,16 @@ public class LiveProviderMinByMaxByParityTests
         }
     }
 
-    // ── 6: MinBy on empty sequence throws ────────────────────────────────────
+    // ── 6: MinBy on empty sequence returns null ───────────────────────────────
+    // LINQ MinBy/MaxBy return null for empty sequences of reference-type
+    // elements; only non-nullable value types throw.
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
-    public async Task MinBy_on_empty_sequence_throws_InvalidOperationException_on_live_provider(ProviderKind kind)
+    public async Task MinBy_on_empty_sequence_returns_null_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
         if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
@@ -235,21 +237,21 @@ public class LiveProviderMinByMaxByParityTests
             await SetupAsync(ctx, kind);
             try
             {
-                await Assert.ThrowsAsync<InvalidOperationException>(
-                    () => ctx.Query<MbLiveRow>().Where(r => r.IntVal > 9999).MinByAsync(r => r.IntVal));
+                var row = await ctx.Query<MbLiveRow>().Where(r => r.IntVal > 9999).MinByAsync(r => r.IntVal);
+                Assert.Null(row);
             }
             finally { await TeardownAsync(ctx, kind); }
         }
     }
 
-    // ── 7: MaxBy on empty sequence throws ────────────────────────────────────
+    // ── 7: MaxBy on empty sequence returns null ───────────────────────────────
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
     [InlineData(ProviderKind.Postgres)]
     [InlineData(ProviderKind.MySql)]
     [InlineData(ProviderKind.Sqlite)]
-    public async Task MaxBy_on_empty_sequence_throws_InvalidOperationException_on_live_provider(ProviderKind kind)
+    public async Task MaxBy_on_empty_sequence_returns_null_on_live_provider(ProviderKind kind)
     {
         var live = LiveProviderFactory.OpenLive(kind);
         if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
@@ -261,8 +263,8 @@ public class LiveProviderMinByMaxByParityTests
             await SetupAsync(ctx, kind);
             try
             {
-                await Assert.ThrowsAsync<InvalidOperationException>(
-                    () => ctx.Query<MbLiveRow>().Where(r => r.IntVal > 9999).MaxByAsync(r => r.IntVal));
+                var row = await ctx.Query<MbLiveRow>().Where(r => r.IntVal > 9999).MaxByAsync(r => r.IntVal);
+                Assert.Null(row);
             }
             finally { await TeardownAsync(ctx, kind); }
         }
