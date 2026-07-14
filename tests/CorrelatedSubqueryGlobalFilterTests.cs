@@ -149,6 +149,105 @@ public class CorrelatedSubqueryGlobalFilterTests
         Assert.Empty(parents[1].Children);
     }
 
+    [Table("CsgfDept_Test")]
+    public class Dept
+    {
+        [Key] public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Tenant { get; set; } = "";
+    }
+
+    [Table("CsgfEmp_Test")]
+    public class Emp
+    {
+        [Key] public int Id { get; set; }
+        public int? DeptId { get; set; }
+        [ForeignKey(nameof(DeptId))] public Dept? Dept { get; set; }
+        public string Tenant { get; set; } = "";
+    }
+
+    private static (SqliteConnection Keeper, DbContext Ctx) CreateRefNavDb()
+    {
+        var cs = $"Data Source=file:csgfref_{Guid.NewGuid():N}?mode=memory&cache=shared";
+        var keeper = new SqliteConnection(cs);
+        keeper.Open();
+        using (var cmd = keeper.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE CsgfDept_Test (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL, Tenant TEXT NOT NULL);
+                CREATE TABLE CsgfEmp_Test (Id INTEGER PRIMARY KEY, DeptId INTEGER NULL, Tenant TEXT NOT NULL);
+                INSERT INTO CsgfDept_Test VALUES (1, 'Eng', 'T1'), (2, 'Ops', 'T2');
+                -- Emp 1 -> T1 dept; Emp 2 -> T2 dept (the leak detector).
+                INSERT INTO CsgfEmp_Test VALUES (1, 1, 'T1'), (2, 2, 'T1');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        var cn = new SqliteConnection(cs);
+        cn.Open();
+        var opts = new DbContextOptions();
+        opts.AddGlobalFilter<Emp>(e => e.Tenant == "T1");
+        opts.AddGlobalFilter<Dept>(d => d.Tenant == "T1");
+        return (keeper, new DbContext(cn, new SqliteProvider(), opts));
+    }
+
+    [Fact]
+    public async Task Reference_navigation_scalar_respects_principal_global_filters()
+    {
+        var (keeper, ctx) = CreateRefNavDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        // Emp 2's dept belongs to the other tenant: e.Dept.Title must read NULL,
+        // not leak the other tenant's data.
+        var rows = (await ctx.Query<Emp>()
+                .Select(e => new { e.Id, T = e.Dept!.Title })
+                .ToListAsync())
+            .OrderBy(x => x.Id).ToList();
+
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("Eng", rows[0].T);
+        Assert.True(rows[1].T == null, $"emp 2 read the other tenant's dept title: '{rows[1].T}'");
+    }
+
+    [Fact]
+    public async Task Reference_navigation_predicate_respects_principal_global_filters()
+    {
+        var (keeper, ctx) = CreateRefNavDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        // Matching on the other tenant's dept title must find nothing.
+        var viaOtherTenant = (await ctx.Query<Emp>()
+                .Where(e => e.Dept!.Title == "Ops")
+                .ToListAsync())
+            .Select(e => e.Id).ToList();
+        Assert.Empty(viaOtherTenant);
+
+        var viaOwn = (await ctx.Query<Emp>()
+                .Where(e => e.Dept!.Title == "Eng")
+                .ToListAsync())
+            .Select(e => e.Id).ToList();
+        Assert.Equal(new[] { 1 }, viaOwn);
+    }
+
+    [Fact]
+    public async Task Reference_include_respects_principal_global_filters()
+    {
+        var (keeper, ctx) = CreateRefNavDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        var emps = (await ((INormQueryable<Emp>)ctx.Query<Emp>())
+                .Include(e => e.Dept!)
+                .ToListAsync())
+            .OrderBy(e => e.Id).ToList();
+
+        Assert.Equal(2, emps.Count);
+        Assert.NotNull(emps[0].Dept);
+        Assert.Equal("Eng", emps[0].Dept!.Title);
+        Assert.True(emps[1].Dept == null, "emp 2 eager-loaded the other tenant's dept");
+    }
+
     [Fact]
     public async Task Bulk_update_respects_global_filters()
     {
