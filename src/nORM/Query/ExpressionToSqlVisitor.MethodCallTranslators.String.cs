@@ -45,16 +45,12 @@ namespace nORM.Query
                     }
                     if (allConst) chars = arr;
                 }
-                else if (TryGetConstantValue(node.Arguments[0], out var arrVal) && arrVal is char[] capturedChars)
+                var charsFromClosure = false;
+                if (chars == null
+                    && TryGetConstantValue(node.Arguments[0], out var arrVal) && arrVal is char[] capturedChars)
                 {
-                    // Closure-captured array -- reserve a placeholder slot so
-                    // the ParameterValueExtractor's value-list stays aligned.
-                    // Same shape as 407e03d / eeff6e7 / cf39b61 / 04a0003 /
-                    // 7d6d7ac / c6c4710.
-                    var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
-                    _params[placeholder] = DBNull.Value;
-                    _compiledParams.Add(placeholder);
                     chars = capturedChars;
+                    charsFromClosure = true;
                 }
                 if (chars is { Length: > 0 })
                 {
@@ -64,7 +60,16 @@ namespace nORM.Query
                         nameof(string.TrimEnd) => "RTRIM",
                         _ => "TRIM",
                     };
+                    // Object first (extractor document order), THEN the closure
+                    // array's placeholder slot — aligned with consumption so a
+                    // degenerate empty captured array reserves nothing.
                     var recvSql = GetSql(node.Object);
+                    if (charsFromClosure)
+                    {
+                        var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[placeholder] = DBNull.Value;
+                        _compiledParams.Add(placeholder);
+                    }
                     var trimSet = new string(chars).Replace("'", "''");
                     _sql.Append(sqlFn).Append('(').Append(recvSql).Append(", '").Append(trimSet).Append("')");
                     return node;

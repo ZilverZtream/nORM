@@ -244,13 +244,15 @@ namespace nORM.Query
                     && int.TryParse(fmt.AsSpan(1), out var digits)
                     && digits >= 0 && digits <= 17)
                 {
+                    // The OBJECT is visited first in the extractor's document-order
+                    // walk, so its parameters precede the format's placeholder.
+                    var inner = GetSql(node.Object);
                     if (node.Arguments[0] is MemberExpression)
                     {
                         var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
                         _params[placeholder] = DBNull.Value;
                         _compiledParams.Add(placeholder);
                     }
-                    var inner = GetSql(node.Object);
                     _sql.Append(_provider.FormatFixedDecimalSql(inner, digits));
                     return true;
                 }
@@ -264,13 +266,14 @@ namespace nORM.Query
                         || underlying == typeof(DateOnly)
                         || underlying == typeof(TimeOnly))
                     {
+                        // Object first — see the numeric format branch above.
+                        var inner = GetSql(node.Object);
                         if (node.Arguments[0] is MemberExpression)
                         {
                             var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
                             _params[placeholder] = DBNull.Value;
                             _compiledParams.Add(placeholder);
                         }
-                        var inner = GetSql(node.Object);
                         var formattedSql = _provider.FormatDateUsingDotNetPattern(inner, dateFmt);
                         if (formattedSql != null)
                         {

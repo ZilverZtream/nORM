@@ -296,10 +296,13 @@ namespace nORM.Query
                 // anchor RHS of an outer relop would then receive the shift
                 // value, returning silently wrong rows. Reserve a placeholder
                 // slot so the extractor's index aligns with ETSV's @cpN names.
+                // The LEFT operand is visited FIRST (the extractor walks in
+                // document order), so its parameters must be created before
+                // this right-hand placeholder.
+                var leftSql = GetSql(node.Left);
                 var placeholderParam = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
                 _params[placeholderParam] = DBNull.Value;
                 _compiledParams.Add(placeholderParam);
-                var leftSql = GetSql(node.Left);
                 var seconds = span.TotalSeconds;
                 if (node.NodeType == ExpressionType.Subtract) seconds = -seconds;
                 var secondsLiteral = seconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
