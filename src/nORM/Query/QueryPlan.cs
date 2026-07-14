@@ -109,7 +109,13 @@ namespace nORM.Query
         // Value converters keyed by compiled-parameter name, for closure values compared against a
         // value-converter column. Applied to the extractor-supplied value before binding so the
         // predicate compares against the provider representation. Null/empty for almost all queries.
-        IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? ParameterConverters = null
+        IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? ParameterConverters = null,
+        // True when a translator baked closure-captured VALUES into the SQL text without
+        // registering compiled parameters (e.g. correlated-subquery fragments re-translated
+        // against a sub-alias, where a second registration would shift positional bindings).
+        // Such SQL is execution-specific: the plan translates fresh per execution and skips
+        // both the plan cache and the pooled prepared-command cache.
+        bool ClosureFoldedIntoSql = false
     );
 
     internal sealed record BulkCudQueryShape(

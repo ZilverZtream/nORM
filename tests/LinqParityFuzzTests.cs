@@ -307,6 +307,156 @@ public class LinqParityFuzzTests
         RunKeyedOpFuzz(ctx, seed, cases: 100);
         RunWindowFuzz(ctx, seed, cases: 100);
         RunStringComparisonClosureFuzz(ctx, seed, cases: 80);
+        RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 120);
+    }
+
+    /// <summary>
+    /// Fuzzes the greatest-per-group projection chain (ordered First/Last/ElementAt
+    /// with ThenBy tiebreaks, group-local Where filters, terminal predicates, source
+    /// Where re-application) and correlated scalar Queryable aggregates in predicates
+    /// (Count/Sum/Min/Max/Average over explicit subqueries). Every constant is a
+    /// CLOSURE re-randomized per case so fingerprint-cached plans must re-bind — a
+    /// baked value replays the first case's filter and silently returns wrong rows.
+    /// Cases whose terminal would throw in LINQ (empty filtered group, out-of-range
+    /// index) are skipped: SQL yields NULL there, a documented divergence. Aggregate
+    /// oracles guard with Any() to mirror SQL's NULL propagation on empty inputs
+    /// (Count alone is 0-valued, not NULL).
+    /// </summary>
+    internal static void RunGroupedFirstAndCorrelatedAggregateFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        for (var i = 0; i < cases; i++)
+        {
+            if (rng.Next(2) == 0)
+                RunGroupedFirstCase(ctx, rng, seed, i);
+            else
+                RunCorrelatedAggregateCase(ctx, rng, seed, i);
+        }
+    }
+
+    private static void RunGroupedFirstCase(DbContext ctx, Random rng, int seed, int i)
+    {
+        var baseCut = rng.Next(-3, 2);
+        var localCut = rng.Next(-3, 3);
+        var termCut = rng.Next(0, 20);
+        var idx = rng.Next(0, 2);
+        var shape = rng.Next(5);
+
+        var modelGroups = Rows.Where(r => r.IntVal >= baseCut).GroupBy(r => r.IntVal).ToList();
+        if (modelGroups.Count == 0) return;
+        switch (shape)
+        {
+            case 2 when modelGroups.Any(g => !g.Any(x => x.IntVal >= localCut)): return;
+            case 3 when modelGroups.Any(g => g.Count() <= idx): return;
+            case 4 when modelGroups.Any(g => !g.Any(x => x.Id > termCut)): return;
+        }
+
+        List<(int Key, int V)> expected;
+        List<(int Key, int V)> actual;
+        try
+        {
+            expected = shape switch
+            {
+                0 => modelGroups.Select(g => (g.Key, V: g.OrderByDescending(x => x.Price).ThenBy(x => x.Id).First().IntVal)).OrderBy(t => t.Key).ToList(),
+                1 => modelGroups.Select(g => (g.Key, V: g.OrderBy(x => x.Amount).ThenBy(x => x.Id).Last().Id)).OrderBy(t => t.Key).ToList(),
+                2 => modelGroups.Select(g => (g.Key, V: g.Where(x => x.IntVal >= localCut).OrderBy(x => x.Created).ThenBy(x => x.Id).First().Id)).OrderBy(t => t.Key).ToList(),
+                3 => modelGroups.Select(g => (g.Key, V: g.OrderBy(x => x.Price).ThenBy(x => x.Id).ElementAt(idx).Id)).OrderBy(t => t.Key).ToList(),
+                _ => modelGroups.Select(g => (g.Key, V: g.OrderByDescending(x => x.IntVal).ThenBy(x => x.Id).First(x => x.Id > termCut).Id)).OrderBy(t => t.Key).ToList(),
+            };
+            actual = shape switch
+            {
+                0 => ctx.Query<Row>().Where(r => r.IntVal >= baseCut).GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, V = g.OrderByDescending(x => x.Price).ThenBy(x => x.Id).First().IntVal })
+                        .AsEnumerable().Select(x => (x.Key, x.V)).OrderBy(t => t.Key).ToList(),
+                1 => ctx.Query<Row>().Where(r => r.IntVal >= baseCut).GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, V = g.OrderBy(x => x.Amount).ThenBy(x => x.Id).Last().Id })
+                        .AsEnumerable().Select(x => (x.Key, x.V)).OrderBy(t => t.Key).ToList(),
+                2 => ctx.Query<Row>().Where(r => r.IntVal >= baseCut).GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, V = g.Where(x => x.IntVal >= localCut).OrderBy(x => x.Created).ThenBy(x => x.Id).First().Id })
+                        .AsEnumerable().Select(x => (x.Key, x.V)).OrderBy(t => t.Key).ToList(),
+                3 => ctx.Query<Row>().Where(r => r.IntVal >= baseCut).GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, V = g.OrderBy(x => x.Price).ThenBy(x => x.Id).ElementAt(idx).Id })
+                        .AsEnumerable().Select(x => (x.Key, x.V)).OrderBy(t => t.Key).ToList(),
+                _ => ctx.Query<Row>().Where(r => r.IntVal >= baseCut).GroupBy(r => r.IntVal)
+                        .Select(g => new { g.Key, V = g.OrderByDescending(x => x.IntVal).ThenBy(x => x.Id).First(x => x.Id > termCut).Id })
+                        .AsEnumerable().Select(x => (x.Key, x.V)).OrderBy(t => t.Key).ToList(),
+            };
+        }
+        catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+        {
+            throw new InvalidOperationException(
+                $"grouped-first shape threw (seed={seed} case={i} shape={shape} baseCut={baseCut} localCut={localCut} termCut={termCut} idx={idx})", ex);
+        }
+
+        Assert.True(expected.SequenceEqual(actual),
+            $"grouped-first mismatch seed={seed} case={i} shape={shape} baseCut={baseCut} localCut={localCut} termCut={termCut} idx={idx}\n" +
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    private static void RunCorrelatedAggregateCase(DbContext ctx, Random rng, int seed, int i)
+    {
+        var k = rng.Next(-4, 4);
+        var m = rng.Next(0, 5);
+        var sumCut = rng.Next(-10, 15);
+        var avgCut = rng.Next(-3, 3) + 0.25;
+        var shape = rng.Next(5);
+
+        List<int> expected;
+        List<int> actual;
+        try
+        {
+            switch (shape)
+            {
+                case 0:
+                    expected = Rows.Where(r => Children.Count(c => c.ParentId == r.Id && c.ChildVal >= k) >= m)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Count(c => c.ParentId == r.Id && c.ChildVal >= k) >= m)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                case 1:
+                    expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id)
+                            && Children.Where(c => c.ParentId == r.Id).Sum(c => c.ChildVal + k) > sumCut)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id).Sum(c => c.ChildVal + k) > sumCut)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                case 2:
+                    expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id)
+                            && Children.Where(c => c.ParentId == r.Id).Min(c => c.ChildVal) >= k)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id).Min(c => c.ChildVal) >= k)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                case 3:
+                    expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            && Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k).Max(c => c.ChildVal) <= sumCut)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id && c.ChildVal >= k).Max(c => c.ChildVal) <= sumCut)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                default:
+                    expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id)
+                            && Children.Where(c => c.ParentId == r.Id).Average(c => c.ChildVal) > avgCut)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id).Average(c => c.ChildVal) > avgCut)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+            }
+        }
+        catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+        {
+            throw new InvalidOperationException(
+                $"correlated-aggregate shape threw (seed={seed} case={i} shape={shape} k={k} m={m} sumCut={sumCut} avgCut={avgCut})", ex);
+        }
+
+        Assert.True(expected.SequenceEqual(actual),
+            $"correlated-aggregate mismatch seed={seed} case={i} shape={shape} k={k} m={m} sumCut={sumCut} avgCut={avgCut}\n" +
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
     }
 
     /// <summary>

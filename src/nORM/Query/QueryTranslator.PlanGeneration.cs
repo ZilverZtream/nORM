@@ -540,7 +540,8 @@ namespace nORM.Query
                     ClientScalar: _t._clientScalarResult,
                     ParameterConverters: _t._paramConverters.Count > 0
                         ? new Dictionary<string, nORM.Mapping.IValueConverter>(_t._paramConverters)
-                        : null
+                        : null,
+                    ClosureFoldedIntoSql: _t._closureFoldedIntoSql
                 );
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;

@@ -508,6 +508,28 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Replaces closure-captured member accesses (and evaluable static members)
+        /// with their current values so a re-translated subquery fragment mints no
+        /// compiled-parameter slots. Mirrors ParameterValueExtractor's walk: one
+        /// substitution per top-level constant-resolvable member, no descent below it.
+        /// </summary>
+        private sealed class CapturedValueInliner : ExpressionVisitor
+        {
+            private readonly QueryTranslator _t;
+            public CapturedValueInliner(QueryTranslator t) => _t = t;
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (TryGetConstantValue(node, out var value))
+                {
+                    _t._closureFoldedIntoSql = true;
+                    return Expression.Constant(value, node.Type);
+                }
+                return base.VisitMember(node);
+            }
+        }
+
+        /// <summary>
         /// Collects the source chain's Where predicates for re-application inside a
         /// greatest-N-per-group correlated subquery. Returns null when the chain holds
         /// anything beyond Where/ordering over the root queryable — the subquery
@@ -591,6 +613,14 @@ namespace nORM.Query
         /// </summary>
         private string TranslateAgainstSubAlias(Expression body, ParameterExpression param, string subAlias)
         {
+            // Inline closure captures as constants before translating: the outer
+            // translation already registered ONE compiled slot per closure occurrence
+            // in the expression tree (the extractor supplies one value per occurrence),
+            // and a second registration here would leave the new slot valueless and
+            // shift every later positional binding. The baked values make the SQL
+            // execution-specific, so the inliner flags the plan to translate fresh
+            // and skip both caches.
+            body = new CapturedValueInliner(this).Visit(body)!;
             var local = new Dictionary<ParameterExpression, (nORM.Mapping.TableMapping Mapping, string Alias)> { [param] = (_mapping, subAlias) };
             var vctx = new VisitorContext(_ctx, _mapping, _provider, param, subAlias, local, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);

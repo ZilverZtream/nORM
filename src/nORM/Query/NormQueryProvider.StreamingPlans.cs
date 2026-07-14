@@ -196,9 +196,16 @@ namespace nORM.Query
         /// </summary>
         private static bool HasClosureFoldedIntoSql(QueryPlan plan)
         {
+            if (plan.ClosureFoldedIntoSql)
+                return true;
             for (var i = 0; i < plan.CompiledParameters.Count; i++)
             {
-                if (IsUnusedCompiledParameter(plan.CompiledParameters[i]))
+                // `_ctx_unused` placeholders are pure extractor alignment for
+                // structurally-consumed query roots — nothing execution-specific
+                // is folded, so they must not disable caching.
+                var name = plan.CompiledParameters[i];
+                if (IsUnusedCompiledParameter(name)
+                    && !name.EndsWith("_ctx_unused", StringComparison.Ordinal))
                     return true;
             }
             return false;

@@ -194,6 +194,29 @@ public class CorrelatedScalarAggregateSubqueryTests
     }
 
     [Fact]
+    public async Task Correlated_Any_with_closure_and_outer_closure_binds_both()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The ctx capture inside the subquery is a closure member the extractor
+        // walks like any other; the inner and outer closures around it must still
+        // bind their own slots.
+        var cut = 15;
+        var limit = 60;
+        var expected = parents
+            .Where(p => children.Any(c => c.ParentId == p.Id && c.Amount >= cut) && p.Threshold <= limit)
+            .Select(p => p.Id).OrderBy(i => i).ToList();
+        var actual = (await ctx.Query<Parent>()
+            .Where(p => ctx.Query<Child>().Any(c => c.ParentId == p.Id && c.Amount >= cut) && p.Threshold <= limit)
+            .ToListAsync()).Select(p => p.Id).OrderBy(i => i).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
     public async Task Windowed_subquery_aggregate_fails_closed()
     {
         var (keeper, ctx, parents, children) = CreateDb();

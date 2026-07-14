@@ -123,6 +123,11 @@ namespace nORM.Query
         // table, so a dropped filter would let excluded rows win the ordering.
         // Null when the source chain holds operators the re-scan cannot honor.
         private List<LambdaExpression>? _groupOrderedFirstSourceWheres;
+        // Set when a subquery fragment baked closure VALUES into its SQL instead of
+        // registering compiled parameters (a second registration for a lambda the
+        // outer translation already registered would shift positional bindings).
+        // Marks the plan execution-specific: translate fresh, skip both caches.
+        private bool _closureFoldedIntoSql;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;

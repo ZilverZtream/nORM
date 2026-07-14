@@ -156,8 +156,55 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Reserves one placeholder compiled-param slot when a correlated subquery's
+        /// chain root consumes a closure member structurally — the DbContext receiver
+        /// inside <c>ctx.Query&lt;T&gt;()</c> or a captured IQueryable local. The
+        /// ParameterValueExtractor walks those members in document order like any
+        /// other closure (the root comes FIRST in its walk of the subtree), so
+        /// without a placeholder the extracted DbContext/queryable value binds to
+        /// the first real compiled parameter and shifts every one after it.
+        /// </summary>
+        private void ReserveQuerySourceRootClosureSlot(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                if (mce.Method.Name == "Query")
+                {
+                    var receiver = mce.Object ?? (mce.Arguments.Count > 0 ? mce.Arguments[0] : null);
+                    if (receiver is MemberExpression receiverMember
+                        && QueryTranslator.TryGetConstantValue(receiverMember, out _))
+                    {
+                        ReserveUnusedCompiledSlot();
+                    }
+                    return;
+                }
+                if (mce.Arguments.Count == 0) return;
+                current = mce.Arguments[0];
+            }
+            if (current is MemberExpression rootMember
+                && typeof(IQueryable).IsAssignableFrom(rootMember.Type)
+                && QueryTranslator.TryGetConstantValue(rootMember, out _))
+            {
+                ReserveUnusedCompiledSlot();
+            }
+        }
+
+        private void ReserveUnusedCompiledSlot()
+        {
+            // The `_ctx_unused` suffix keeps the binder's DBNull override (it still
+            // ends in `_unused`) WITHOUT tripping the fold-no-cache rule: unlike a
+            // folded value, nothing execution-specific is baked into the SQL — the
+            // slot exists purely for extractor alignment, so the plan stays cacheable.
+            var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_ctx_unused";
+            _params[placeholder] = DBNull.Value;
+            _compiledParams.Add(placeholder);
+        }
+
         private void BuildExists(Expression source, LambdaExpression? predicate, bool negate)
         {
+            ReserveQuerySourceRootClosureSlot(source);
             if (predicate != null)
             {
                 var et = GetElementType(source);
@@ -193,6 +240,7 @@ namespace nORM.Query
         private void BuildScalarCountSubquery(Expression source, LambdaExpression? predicate)
         {
             ThrowIfUnsupportedScalarAggregateSource(source, "Count");
+            ReserveQuerySourceRootClosureSlot(source);
             if (predicate != null)
             {
                 var et = GetElementType(source);
@@ -227,6 +275,7 @@ namespace nORM.Query
         private void BuildScalarAggregateSubquery(Expression source, LambdaExpression? selector, string aggregateName)
         {
             ThrowIfUnsupportedScalarAggregateSource(source, aggregateName);
+            ReserveQuerySourceRootClosureSlot(source);
             var sqlAgg = aggregateName switch
             {
                 nameof(Queryable.Sum) => "SUM",
@@ -392,6 +441,7 @@ namespace nORM.Query
         }
         private void BuildIn(Expression source, Expression value)
         {
+            ReserveQuerySourceRootClosureSlot(source);
             // Extract expression from closure-captured IQueryable.
             if (TryGetConstantValue(source, out var srcConstValue) && srcConstValue is System.Linq.IQueryable iqSrc)
                 source = iqSrc.Expression!;
