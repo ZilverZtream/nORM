@@ -131,7 +131,7 @@ public class BatchCudTests
     }
 
     [Fact]
-    public async Task ExecuteDeleteAsync_rejects_paged_query_shape()
+    public async Task ExecuteDeleteAsync_rejects_paged_query_on_keyless_entity()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -144,14 +144,16 @@ public class BatchCudTests
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
+        // A paged window resolves its target rows through a keyed subquery; an
+        // entity with no key columns has no row identity to resolve against.
         var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
             ctx.Query<User>().Where(u => !u.Archived).Take(1).ExecuteDeleteAsync());
 
-        Assert.Contains("paged", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("key columns", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task ExecuteUpdateAsync_rejects_ordered_query_shape()
+    public async Task ExecuteUpdateAsync_with_ordering_updates_the_filtered_rows()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -159,22 +161,27 @@ public class BatchCudTests
         {
             cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
                              "INSERT INTO User VALUES(1,'A',0);" +
-                             "INSERT INTO User VALUES(2,'B',0);";
+                             "INSERT INTO User VALUES(2,'B',0);" +
+                             "INSERT INTO User VALUES(3,'C',1);";
             cmd.ExecuteNonQuery();
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
-            ctx.Query<User>()
-                .Where(u => !u.Archived)
-                .OrderBy(u => u.Name)
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Archived, true)));
+        // Ordering without paging never changes the row set, so the update runs
+        // against the plain filter.
+        var affected = await ctx.Query<User>()
+            .Where(u => !u.Archived)
+            .OrderBy(u => u.Name)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Archived, true));
+        Assert.Equal(2, affected);
 
-        Assert.Contains("ordered", ex.Message, StringComparison.OrdinalIgnoreCase);
+        using var check = cn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM User WHERE Archived = 1";
+        Assert.Equal(3L, Convert.ToInt64(check.ExecuteScalar()));
     }
 
     [Fact]
-    public async Task ExecuteDeleteAsync_rejects_distinct_query_shape()
+    public async Task ExecuteDeleteAsync_with_distinct_deletes_the_filtered_rows()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
@@ -182,15 +189,20 @@ public class BatchCudTests
         {
             cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
                              "INSERT INTO User VALUES(1,'A',0);" +
-                             "INSERT INTO User VALUES(2,'B',0);";
+                             "INSERT INTO User VALUES(2,'B',0);" +
+                             "INSERT INTO User VALUES(3,'C',1);";
             cmd.ExecuteNonQuery();
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
-            ctx.Query<User>().Where(u => !u.Archived).Distinct().ExecuteDeleteAsync());
+        // Distinct over entity rows is inert for the row set, so the delete runs
+        // against the plain filter.
+        var affected = await ctx.Query<User>().Where(u => !u.Archived).Distinct().ExecuteDeleteAsync();
+        Assert.Equal(2, affected);
 
-        Assert.Contains("distinct", ex.Message, StringComparison.OrdinalIgnoreCase);
+        using var check = cn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM User";
+        Assert.Equal(1L, Convert.ToInt64(check.ExecuteScalar()));
     }
 
     private static string ThrowingName()

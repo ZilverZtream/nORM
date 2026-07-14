@@ -473,7 +473,7 @@ namespace nORM.Query
         /// silently widen the row set (TakeLast/SkipLast and Take/Skip windows
         /// page this way).
         /// </summary>
-        private static string RemoveTrailingOrderByUnlessPaged(string sql)
+        internal static string RemoveTrailingOrderByUnlessPaged(string sql)
         {
             var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
             if (idx < 0) return sql;

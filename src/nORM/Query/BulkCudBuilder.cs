@@ -35,8 +35,12 @@ namespace nORM.Query
             if (shape == null)
                 throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
 
-            if (shape.HasGroupBy || shape.HasOrderBy || shape.HasHaving || shape.HasJoins || shape.HasDistinct || shape.HasPaging)
-                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped, ordered, joined, distinct, paged or aggregated queries.");
+            // Ordering and Distinct never change an entity query's row set (rows are
+            // key-unique), and paged shapes resolve their window through a keyed
+            // subquery — only genuine reshapes (grouping) remain unsupported here;
+            // joined shapes route through the joined builder before this check.
+            if (shape.HasGroupBy || shape.HasHaving || shape.HasJoins)
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped or aggregated queries.");
         }
 
         /// <summary>

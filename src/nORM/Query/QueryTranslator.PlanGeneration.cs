@@ -487,6 +487,9 @@ namespace nORM.Query
                 // When the projection was split for client-side evaluation, the FINAL row shape
                 // is the original projection's body type, not the server-side intermediate.
                 var elementType = _t._postMaterializeElementType ?? _t._groupJoinInfo?.ResultType ?? _t._clientProjectionResultType ?? materializerType;
+                // A window wrap (Where/OrderBy after Take/Skip) consumes the paging
+                // fields into its derived-table SQL, so the query is still paged even
+                // when no take/skip field survives — mark it via the wrap alias.
                 var bulkCudShape = new BulkCudQueryShape(
                     _t._where.Length > 0 ? " WHERE " + _t._where.ToSqlString() : string.Empty,
                     _t._groupBy.Count > 0,
@@ -494,7 +497,7 @@ namespace nORM.Query
                     _t._having.Length > 0,
                     _t._complexityMetrics.JoinCount > 0,
                     _t._isDistinct,
-                    _t._take.HasValue || _t._skip.HasValue || _t._takeParam != null || _t._skipParam != null);
+                    _t._take.HasValue || _t._skip.HasValue || _t._takeParam != null || _t._skipParam != null || _t._outerDerivedAlias != null);
 
                 // Build dependent query definitions for nested collections
                 List<DependentQueryDefinition>? dependentQueries = null;

@@ -156,13 +156,23 @@ namespace nORM.Query
             if (plan.Tables.Count != 1)
             {
                 ValidateJoinedCudShape(plan.BulkCudShape);
-                finalSql = BuildJoinedCudWhereInSql("DELETE FROM " + mapping.EscTable, null, plan.Sql, mapping);
+                finalSql = plan.BulkCudShape!.HasPaging
+                    ? BuildKeyedSubqueryCudSql("DELETE FROM " + mapping.EscTable, null, plan.Sql, mapping)
+                    : BuildJoinedCudWhereInSql("DELETE FROM " + mapping.EscTable, null,
+                        QueryTranslator.RemoveTrailingOrderByUnlessPaged(plan.Sql), mapping);
             }
             else
             {
                 _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-                var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
-                finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
+                if (plan.BulkCudShape!.HasPaging)
+                {
+                    finalSql = BuildKeyedSubqueryCudSql("DELETE FROM " + mapping.EscTable, null, plan.Sql, mapping);
+                }
+                else
+                {
+                    var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+                    finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
+                }
             }
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
@@ -188,11 +198,14 @@ namespace nORM.Query
         /// </summary>
         private static void ThrowIfClientMaterializedCudShape(QueryPlan plan, string operation)
         {
-            if (plan.PostMaterializeTransform != null || plan.GroupJoinInfo != null || plan.ClientScalar || plan.PostReverse)
+            // PostReverse (tail paging) is deliberately absent: TakeLast/SkipLast
+            // define their row SET server-side (flipped ORDER BY + paging); only the
+            // client-side re-ordering is post-materialize, and CUD ignores order.
+            if (plan.PostMaterializeTransform != null || plan.GroupJoinInfo != null || plan.ClientScalar)
             {
                 throw new NormUnsupportedFeatureException(
                     $"{operation} over a client-materialized query shape (Append, Prepend, Chunk, Zip, DefaultIfEmpty " +
-                    "with a default value, streaming GroupBy, group-join results, or tail paging) has no set-based SQL " +
+                    "with a default value, streaming GroupBy, or group-join results) has no set-based SQL " +
                     "equivalent. Express the target rows with Where(...) instead.");
             }
         }
@@ -201,9 +214,52 @@ namespace nORM.Query
         {
             if (shape == null)
                 throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
-            if (shape.HasGroupBy || shape.HasOrderBy || shape.HasHaving || shape.HasDistinct || shape.HasPaging)
+            if (shape.HasGroupBy || shape.HasHaving)
                 throw new NormUnsupportedFeatureException(
-                    "ExecuteUpdate/Delete with a join does not support grouped, ordered, distinct, or paged queries.");
+                    "ExecuteUpdate/Delete with a join does not support grouped or aggregated queries.");
+        }
+
+        /// <summary>
+        /// Resolves the target rows of an ordered/paged/windowed bulk CUD statement
+        /// through a keyed subquery over the FULL query SQL: the query embeds as a
+        /// derived table so its ORDER BY + paging clause survives on every provider
+        /// (the derived-table materialization also lifts MySQL's update-target and
+        /// LIMIT-inside-IN restrictions). A bare trailing ORDER BY re-derived by a
+        /// window wrap is stripped first — it is row-set-neutral and invalid inside
+        /// a derived table on SQL Server.
+        /// </summary>
+        private string BuildKeyedSubqueryCudSql(string prefix, string? setSql, string planSql, TableMapping mapping)
+        {
+            if (mapping.KeyColumns.Length == 0)
+                throw new NormUnsupportedFeatureException(
+                    $"ExecuteUpdate/Delete over an ordered or paged query requires key columns on '{mapping.Type.Name}' " +
+                    "to resolve the target rows.");
+
+            var innerSql = QueryTranslator.RemoveTrailingOrderByUnlessPaged(planSql);
+            var pkCols = mapping.KeyColumns.Select(k => k.EscCol).ToArray();
+            var pkSelect = string.Join(", ", pkCols);
+            var subquery = "SELECT " + pkSelect + " FROM (" + innerSql + ") AS __nm_cud";
+
+            if (pkCols.Length == 1 || _ctx.RawProvider.SupportsRowTupleComparison)
+            {
+                var target = pkCols.Length == 1 ? pkCols[0] : "(" + pkSelect + ")";
+                var whereIn = target + " IN (" + subquery + ")";
+                return setSql == null
+                    ? prefix + " WHERE " + whereIn
+                    : prefix + " SET " + setSql + " WHERE " + whereIn;
+            }
+
+            // SQL Server composite keys: row-tuple IN is unsupported — join the keyed
+            // subquery to the target instead (same form as the joined-CUD path).
+            const string tgtAlias = "__nm_tgt";
+            var joinOn = string.Join(" AND ", pkCols.Select(pk => tgtAlias + "." + pk + " = __nm_keys." + pk));
+            var keysSubquery = "(" + subquery + ") AS __nm_keys";
+            return setSql == null
+                ? "DELETE " + tgtAlias + " FROM " + mapping.EscTable + " AS " + tgtAlias
+                    + " INNER JOIN " + keysSubquery + " ON " + joinOn
+                : "UPDATE " + tgtAlias + " SET " + setSql
+                    + " FROM " + mapping.EscTable + " AS " + tgtAlias
+                    + " INNER JOIN " + keysSubquery + " ON " + joinOn;
         }
 
         private string BuildJoinedCudWhereInSql(string prefix, string? setSql, string planSql, TableMapping mapping)
@@ -282,15 +338,25 @@ namespace nORM.Query
                 ValidateJoinedCudShape(plan.BulkCudShape);
                 var (setClauseJ, setParamsJ) = _cudBuilder.BuildSetClause(mapping, set);
                 setParams = setParamsJ;
-                finalSql = BuildJoinedCudWhereInSql("UPDATE " + mapping.EscTable, setClauseJ, plan.Sql, mapping);
+                finalSql = plan.BulkCudShape!.HasPaging
+                    ? BuildKeyedSubqueryCudSql("UPDATE " + mapping.EscTable, setClauseJ, plan.Sql, mapping)
+                    : BuildJoinedCudWhereInSql("UPDATE " + mapping.EscTable, setClauseJ,
+                        QueryTranslator.RemoveTrailingOrderByUnlessPaged(plan.Sql), mapping);
             }
             else
             {
                 _cudBuilder.ValidateCudPlan(plan.BulkCudShape);
-                var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
                 var (setClause, setParamsSingle) = _cudBuilder.BuildSetClause(mapping, set);
                 setParams = setParamsSingle;
-                finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
+                if (plan.BulkCudShape!.HasPaging)
+                {
+                    finalSql = BuildKeyedSubqueryCudSql("UPDATE " + mapping.EscTable, setClause, plan.Sql, mapping);
+                }
+                else
+                {
+                    var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
+                    finalSql = $"UPDATE {mapping.EscTable} SET {setClause}{whereClause}";
+                }
             }
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
