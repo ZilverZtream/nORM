@@ -305,6 +305,7 @@ public class LinqParityFuzzTests
         RunNavFlattenFuzz(ctx, seed, cases: 120);
         RunSetOpFuzz(ctx, seed, cases: 120);
         RunKeyedOpFuzz(ctx, seed, cases: 100);
+        RunWindowFuzz(ctx, seed, cases: 100);
     }
 
     /// <summary>
@@ -788,6 +789,102 @@ public class LinqParityFuzzTests
 
         Assert.True(unsupported < cases / 4,
             $"{unsupported}/{cases} keyed-op shapes were declined as unsupported (seed {seed}).");
+    }
+
+    /// <summary>
+    /// Runs generated window-function shapes (WithRowNumber over a fully
+    /// tiebroken order, WithRank and WithDenseRank over tie-heavy keys) against
+    /// a client-side computed oracle: row number is the ordered index, rank is
+    /// 1 + count(smaller keys), dense rank is 1 + count(distinct smaller keys) —
+    /// all deterministic per row even when the window order has ties.
+    /// </summary>
+    internal static void RunWindowFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var unsupported = 0;
+
+        for (var i = 0; i < cases; i++)
+        {
+            var predicate = GeneratePredicate(rng);
+            var kind = rng.Next(3);
+            var caseRng = new Random(rng.Next());
+            var byAmount = caseRng.Next(2) == 0;
+
+            var filtered = Rows.Where(predicate.Compile()).ToList();
+
+            try
+            {
+                switch (kind)
+                {
+                    case 0: // ROW_NUMBER over a fully tiebroken order (optionally Take-limited)
+                    {
+                        var take = caseRng.Next(2) == 0 ? caseRng.Next(1, 20) : int.MaxValue;
+                        var q = ctx.Query<Row>().Where(predicate)
+                            .OrderBy(r => r.IntVal).ThenBy(r => r.Id)
+                            .WithRowNumber((r, n) => new { r.Id, N = n });
+                        var db = (take == int.MaxValue ? q : q.Take(take))
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        var oracle = filtered.OrderBy(r => r.IntVal).ThenBy(r => r.Id)
+                            .Select((r, idx) => new { r.Id, N = idx + 1 })
+                            .Take(take)
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"RowNumber mismatch seed={seed} case={i} take={take}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    case 1: // RANK over a tie-heavy key
+                    {
+                        var db = (byAmount
+                                ? ctx.Query<Row>().Where(predicate).OrderBy(r => r.Amount).WithRank((r, n) => new { r.Id, N = n })
+                                : ctx.Query<Row>().Where(predicate).OrderBy(r => r.IntVal).WithRank((r, n) => new { r.Id, N = n }))
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        var oracle = filtered
+                            .Select(r => new
+                            {
+                                r.Id,
+                                N = 1 + (byAmount
+                                    ? filtered.Count(o => o.Amount < r.Amount)
+                                    : filtered.Count(o => o.IntVal < r.IntVal)),
+                            })
+                            .OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"Rank mismatch seed={seed} case={i} byAmount={byAmount}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    default: // DENSE_RANK over a tie-heavy key
+                    {
+                        var db = (byAmount
+                                ? ctx.Query<Row>().Where(predicate).OrderBy(r => r.Amount).WithDenseRank((r, n) => new { r.Id, N = n })
+                                : ctx.Query<Row>().Where(predicate).OrderBy(r => r.IntVal).WithDenseRank((r, n) => new { r.Id, N = n }))
+                            .ToList().OrderBy(x => x.Id).ToList();
+                        var oracle = filtered
+                            .Select(r => new
+                            {
+                                r.Id,
+                                N = 1 + (byAmount
+                                    ? filtered.Where(o => o.Amount < r.Amount).Select(o => o.Amount).Distinct().Count()
+                                    : filtered.Where(o => o.IntVal < r.IntVal).Select(o => o.IntVal).Distinct().Count()),
+                            })
+                            .OrderBy(x => x.Id).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"DenseRank mismatch seed={seed} case={i} byAmount={byAmount}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                }
+            }
+            catch (NormUnsupportedFeatureException)
+            {
+                unsupported++;
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"window shape threw (seed={seed} case={i} kind={kind} byAmount={byAmount})\npredicate: {predicate}", ex);
+            }
+        }
+
+        Assert.True(unsupported < cases / 4,
+            $"{unsupported}/{cases} window shapes were declined as unsupported (seed {seed}).");
     }
 
     private static IQueryable<T> ApplySetOp<T>(IQueryable<T> a, IQueryable<T> b, int op) => op switch
