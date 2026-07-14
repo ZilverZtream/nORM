@@ -162,7 +162,9 @@ public class ProviderCoverageExtendedTests
         Assert.Contains("INSERT INTO", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("@tagName", sql);
         Assert.DoesNotContain("@ts", sql);
-        Assert.Contains("datetime('now')", sql, StringComparison.OrdinalIgnoreCase);
+        // Millisecond-precision database clock (strftime %f) so tag timestamps
+        // discriminate sub-second temporal versions.
+        Assert.Contains("strftime('%Y-%m-%d %H:%M:%f', 'now')", sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
