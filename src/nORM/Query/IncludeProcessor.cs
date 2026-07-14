@@ -252,6 +252,9 @@ namespace nORM.Query
                     }
 
                     relation.NavProp.SetValue(p, childList);
+                    // Record the loaded children so a later removal from the collection is
+                    // detected as a real disassociation and the child's FK is severed on save.
+                    _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
                 }
                 else
                 {
@@ -605,6 +608,9 @@ namespace nORM.Query
                     }
 
                     relation.NavProp.SetValue(p, childList);
+                    // Record the loaded children so a later removal from the collection is
+                    // detected as a real disassociation and the child's FK is severed on save.
+                    _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
                 }
                 else
                 {

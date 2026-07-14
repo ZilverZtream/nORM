@@ -151,6 +151,49 @@ namespace nORM.Core
             }
         }
 
+        /// Per one-to-many collection navigation, the set of child instances present
+        /// when the collection was loaded via Include. Lets fixup detect a child that
+        /// the user removed from a loaded collection (in the snapshot, absent now) and
+        /// sever it — the collection-side mirror of clearing a reference navigation.
+        /// Reference identity is used: the loaded children are the tracked instances.
+        /// Only navigations that were actually loaded get a snapshot, so an unloaded
+        /// (empty) collection never triggers a spurious severance. Null until captured.
+        internal Dictionary<string, HashSet<object>>? CollectionNavSnapshots { get; private set; }
+
+        /// <summary>
+        /// Records the instances currently held by a loaded collection navigation as
+        /// the severance baseline. Called by the Include processor after it populates
+        /// the collection, and refreshed on AcceptChanges for already-loaded navs.
+        /// </summary>
+        internal void CaptureCollectionNavSnapshot(string navName, IEnumerable? collection)
+        {
+            var set = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            if (collection != null && collection is not string)
+            {
+                foreach (var item in collection)
+                    if (item != null) set.Add(item);
+            }
+            (CollectionNavSnapshots ??= new Dictionary<string, HashSet<object>>(StringComparer.Ordinal))[navName] = set;
+        }
+
+        /// <summary>
+        /// Re-captures the baseline for every collection navigation that already has a
+        /// snapshot (i.e. was loaded), reading the current post-save contents. Skips
+        /// unloaded navs so they never begin tracking severances.
+        /// </summary>
+        private void RecaptureLoadedCollectionNavSnapshots()
+        {
+            if (CollectionNavSnapshots == null || CollectionNavSnapshots.Count == 0) return;
+            var entity = Entity;
+            if (entity == null) return;
+            foreach (var relation in _mapping.Relations.Values)
+            {
+                if (!CollectionNavSnapshots.ContainsKey(relation.NavProp.Name)) continue;
+                var value = relation.NavProp.GetValue(entity) as IEnumerable;
+                CaptureCollectionNavSnapshot(relation.NavProp.Name, value);
+            }
+        }
+
         /// Owned-collection content snapshots: per nav property, a multiset of each
         /// child's column-value signature captured when the collection was loaded.
         /// Used to detect owned-collection edits (add / remove / child-scalar change),
@@ -591,6 +634,9 @@ namespace nORM.Core
             // not carried across a save as still-loaded.
             LoadedReferenceNavs = null;
             CaptureReferenceNavSnapshots();
+            // Refresh loaded collection-nav baselines so a severed/removed child is not
+            // re-severed on the next save, and a newly added child becomes the baseline.
+            RecaptureLoadedCollectionNavSnapshots();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.
@@ -633,6 +679,7 @@ namespace nORM.Core
             _propertyIndex = null;
             _hasNotifiedChange = false;
             ManyToManySnapshots = null;
+            CollectionNavSnapshots = null;
         }
     }
 }

@@ -553,30 +553,96 @@ namespace nORM.Core
 
                 foreach (var relation in entry.Mapping.Relations.Values)
                 {
-                    if (relation.NavProp.GetValue(principal) is not System.Collections.IEnumerable collection || collection is string)
-                        continue;
+                    var navValue = relation.NavProp.GetValue(principal);
+                    var collection = navValue is System.Collections.IEnumerable e && navValue is not string ? e : null;
 
-                    TableMapping? childMapping = null;
-                    foreach (var child in collection)
+                    if (collection != null)
                     {
-                        if (child == null || ChangeTracker.GetEntryOrDefault(child) != null)
-                            continue;
+                        TableMapping? childMapping = null;
+                        foreach (var child in collection)
+                        {
+                            if (child == null || ChangeTracker.GetEntryOrDefault(child) != null)
+                                continue;
 
-                        childMapping ??= GetMapping(relation.DependentType);
-                        var childEntry = ChangeTracker.Track(child, EntityState.Added, childMapping);
+                            childMapping ??= GetMapping(relation.DependentType);
+                            var childEntry = ChangeTracker.Track(child, EntityState.Added, childMapping);
 
-                        // Set the FK from the principal's PK. Correct immediately when the principal's key
-                        // is already assigned; re-propagated after insert for DB-generated principal keys.
-                        for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
-                            relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
+                            // Set the FK from the principal's PK. Correct immediately when the principal's key
+                            // is already assigned; re-propagated after insert for DB-generated principal keys.
+                            for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
+                                relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
 
-                        if (childEntry.Mapping.Relations.Count > 0 || childEntry.Mapping.ReferenceNavigations.Length > 0)
-                            queue.Enqueue(childEntry);
+                            if (childEntry.Mapping.Relations.Count > 0 || childEntry.Mapping.ReferenceNavigations.Length > 0)
+                                queue.Enqueue(childEntry);
+                        }
                     }
+
+                    // Sever children removed from a loaded collection (a null/empty current
+                    // collection means every loaded child was removed).
+                    SeverRemovedCollectionChildren(entry, relation, collection);
                 }
 
                 FixupReferenceNavigations(entry, queue);
             }
+        }
+
+        /// <summary>
+        /// The collection direction of disassociation: a child that was present when a
+        /// one-to-many collection was loaded but has since been removed is severed. For an
+        /// optional relationship the child's foreign key is nulled; for a required one the
+        /// orphan is deleted — mirroring EF's default delete behavior (SetNull vs Cascade).
+        /// Only navigations that carry a load-time snapshot are considered, so an unloaded
+        /// collection (no snapshot) never severs, and children added this cycle (Added) or
+        /// already removed elsewhere (Deleted) are left to their own state.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Relationship fixup reads navigation properties and resolves dependent mappings via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup reflects over navigation properties; trimming may remove the required members.")]
+        private void SeverRemovedCollectionChildren(EntityEntry entry, TableMapping.Relation relation, System.Collections.IEnumerable? currentCollection)
+        {
+            if (entry.CollectionNavSnapshots == null
+                || !entry.CollectionNavSnapshots.TryGetValue(relation.NavProp.Name, out var loaded)
+                || loaded.Count == 0)
+                return;
+
+            var current = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            if (currentCollection != null)
+                foreach (var item in currentCollection)
+                    if (item != null) current.Add(item);
+
+            var isOptional = true;
+            for (int i = 0; i < relation.ForeignKeys.Count; i++)
+                if (!relation.ForeignKeys[i].IsNullable) { isOptional = false; break; }
+
+            List<object>? severed = null;
+            foreach (var removed in loaded)
+            {
+                if (current.Contains(removed))
+                    continue;
+                var removedEntry = ChangeTracker.GetEntryOrDefault(removed);
+                if (removedEntry == null || removedEntry.State is not (EntityState.Unchanged or EntityState.Modified))
+                    continue;
+
+                if (isOptional)
+                {
+                    for (int i = 0; i < relation.ForeignKeys.Count; i++)
+                        relation.ForeignKeys[i].Setter(removed, null);
+                    removedEntry.State = EntityState.Modified;
+                    removedEntry.MarkExplicitlyModified();
+                }
+                else
+                {
+                    removedEntry.State = EntityState.Deleted;
+                }
+                (severed ??= new List<object>()).Add(removed);
+            }
+
+            // Drop severed children from the baseline so a later save does not re-sever
+            // them. The principal owning this snapshot is often itself Unchanged (only the
+            // child was modified), so its AcceptChanges — which would otherwise refresh the
+            // baseline — never runs.
+            if (severed != null)
+                foreach (var s in severed)
+                    loaded.Remove(s);
         }
 
         /// <summary>
