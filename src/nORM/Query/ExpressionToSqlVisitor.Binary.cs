@@ -918,6 +918,17 @@ namespace nORM.Query
             column = null!;
             viaNavigation = false;
             expr = StripConvert(expr);
+            // A correlated subquery whose scalar result is a converter column —
+            // ctx.Query<Child>()...Select(c => c.Status).First() or ...Max(c => c.Status).
+            // The member-side emit (Visit) already lowers it to a scalar subquery; surfacing
+            // the converter here makes the value side bind the provider representation instead
+            // of the raw model value (which silently matches nothing).
+            if (expr is MethodCallExpression && TryGetSubqueryConverterColumn(expr, out var subCol))
+            {
+                column = subCol;
+                viaNavigation = true; // an empty subquery yields SQL NULL — keep != null-safe
+                return true;
+            }
             if (expr is not MemberExpression me)
                 return false;
             if (TableMapping.TryGetMemberAccessRoot(me, out var root)
@@ -952,6 +963,64 @@ namespace nORM.Query
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Recognizes a correlated First/FirstOrDefault/Min/Max subquery whose scalar result is a
+        /// value-converter column, and returns that column. Sum/Average/Count are excluded — they
+        /// yield a numeric aggregate, not the column's own converted type. Used so a comparison
+        /// against such a subquery binds the other operand through the converter.
+        /// </summary>
+        private bool TryGetSubqueryConverterColumn(Expression expr, out Column column)
+        {
+            column = null!;
+            if (_ctx == null || expr is not MethodCallExpression mce)
+                return false;
+            var isFirst = QueryTranslator.IsQueryRootedScalarFirst(mce);
+            var isMinMax = mce.Method.DeclaringType == typeof(System.Linq.Queryable)
+                && mce.Method.Name is nameof(System.Linq.Queryable.Min) or nameof(System.Linq.Queryable.Max)
+                && QueryTranslator.IsQueryRootedScalarAggregate(mce);
+            if (!isFirst && !isMinMax)
+                return false;
+
+            var (elementType, member) = ResolveSubqueryProjectedMember(mce);
+            if (elementType == null || member == null)
+                return false;
+            try
+            {
+                var mapping = _ctx.GetMapping(elementType);
+                if (mapping.TryGetColumnForMemberAccess(member, out var col) && col.Converter != null)
+                {
+                    column = col;
+                    return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Finds the single scalar member a correlated subquery projects: an explicit aggregate
+        /// selector (<c>Max(c =&gt; c.Member)</c>) or the innermost <c>Select(c =&gt; c.Member)</c>
+        /// in the source chain. Returns the member's declaring (element) type and the member access.
+        /// </summary>
+        private (Type?, MemberExpression?) ResolveSubqueryProjectedMember(MethodCallExpression mce)
+        {
+            if (mce.Arguments.Count > 1 && StripQuotes(mce.Arguments[1]) is LambdaExpression aggSel
+                && aggSel.Parameters.Count == 1 && StripConvert(aggSel.Body) is MemberExpression aggMember)
+                return (aggSel.Parameters[0].Type, aggMember);
+
+            var current = mce.Arguments.Count > 0 ? mce.Arguments[0] : null;
+            while (current is MethodCallExpression m)
+            {
+                if (m.Method.Name == nameof(System.Linq.Queryable.Select) && m.Arguments.Count == 2
+                    && StripQuotes(m.Arguments[1]) is LambdaExpression sel
+                    && sel.Parameters.Count == 1 && StripConvert(sel.Body) is MemberExpression selMember)
+                    return (sel.Parameters[0].Type, selMember);
+                if (m.Arguments.Count == 0) break;
+                current = m.Arguments[0];
+            }
+            return (null, null);
         }
 
         private static ExpressionType FlipComparison(ExpressionType op) => op switch
