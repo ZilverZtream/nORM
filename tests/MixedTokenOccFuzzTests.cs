@@ -465,7 +465,25 @@ public class MixedTokenOccFuzzTests
                         if (!s.HasPending) break;
                         if (IsStale(s))
                         {
-                            await ConflictedSaveAsync(i, step, "faulted save");
+                            // A stale save must conflict IDENTICALLY through injected
+                            // transient failures: the retries consume the faults and the
+                            // token conflict (never retryable) surfaces, applying nothing.
+                            var staleSkip = rng.Next(s.MinWriteExecutions);
+                            var staleTrips = 1 + rng.Next(2);
+                            injector.Arm(staleSkip, staleTrips);
+                            trace.Add($"{step}: ctx{i} stale save with {staleTrips} failures at write {staleSkip} (-> conflict)");
+                            try
+                            {
+                                var ex = await Record.ExceptionAsync(() => s.Ctx.SaveChangesAsync());
+                                Assert.True(ex is DbConcurrencyException,
+                                    $"expected DbConcurrencyException from faulted stale save seed={seed} step={step} ctx{i}, got {ex?.GetType().Name ?? "no exception"}{Tail()}");
+                            }
+                            finally
+                            {
+                                injector.Disarm();
+                            }
+                            await VerifyCommittedAsync($"seed={seed} step={step} (after faulted stale save of ctx{i})");
+                            await RefreshAsync(i);
                             break;
                         }
                         var skip = rng.Next(s.MinWriteExecutions);
@@ -494,7 +512,24 @@ public class MixedTokenOccFuzzTests
                         if (!s.HasPending) break;
                         if (IsStale(s))
                         {
-                            await ConflictedSaveAsync(i, step, "exhausted save");
+                            // Stale + budget-exhausting faults: whichever surfaces first —
+                            // the token conflict (if its write executes before the armed
+                            // trip) or the exhausted injected failure — nothing may apply.
+                            var staleSkip = rng.Next(s.MinWriteExecutions);
+                            injector.Arm(staleSkip, trips: 10);
+                            trace.Add($"{step}: ctx{i} stale save exhausting retries at write {staleSkip}");
+                            try
+                            {
+                                var ex = await Record.ExceptionAsync(() => s.Ctx.SaveChangesAsync());
+                                Assert.True(ex is DbConcurrencyException or InjectedRetryableException,
+                                    $"expected conflict or injected failure from exhausted stale save seed={seed} step={step} ctx{i}, got {ex?.GetType().Name ?? "no exception"}{Tail()}");
+                            }
+                            finally
+                            {
+                                injector.Disarm();
+                            }
+                            await VerifyCommittedAsync($"seed={seed} step={step} (after exhausted stale save of ctx{i})");
+                            await RefreshAsync(i);
                             break;
                         }
                         var skip = rng.Next(s.MinWriteExecutions);
