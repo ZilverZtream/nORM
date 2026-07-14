@@ -489,12 +489,22 @@ namespace nORM.Query
             // binds it against the subquery's own alias.
             if (lambdaArg != null)
             {
-                // Count/First carry a PREDICATE lambda (append as Where); Sum/Min/Max/Average
+                // Count/First/Last carry a PREDICATE lambda (append as Where); Sum/Min/Max/Average
                 // carry a SELECTOR lambda (append as Select).
                 source = methodName is nameof(Queryable.Count) or nameof(Queryable.LongCount)
                         or nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)
+                        or nameof(Queryable.Last) or nameof(Queryable.LastOrDefault)
                     ? Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambdaArg))
                     : Expression.Call(typeof(Queryable), nameof(Queryable.Select), new[] { elementType, lambdaArg.Body.Type }, source, Expression.Quote(lambdaArg));
+            }
+
+            // Last/LastOrDefault = First of the reversed ordering; fail closed without an ordering.
+            if (methodName is nameof(Queryable.Last) or nameof(Queryable.LastOrDefault))
+            {
+                source = QueryTranslator.ReverseQueryableOrderings(source, out var hadOrdering);
+                if (!hadOrdering)
+                    throw new NormUnsupportedFeatureException(
+                        $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.");
             }
 
             ReserveQueryRootClosureSlot(node.Arguments[0]);

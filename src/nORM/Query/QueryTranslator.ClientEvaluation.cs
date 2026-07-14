@@ -38,9 +38,52 @@ namespace nORM.Query
         {
             if (node.Method.DeclaringType != typeof(Queryable))
                 return false;
-            if (node.Method.Name is not (nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)))
+            if (node.Method.Name is not (nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)
+                or nameof(Queryable.Last) or nameof(Queryable.LastOrDefault)))
                 return false;
             return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
+        }
+
+        /// <summary>
+        /// Rewrites a queryable chain so every ordering flips direction (OrderBy↔OrderByDescending,
+        /// ThenBy↔ThenByDescending) — turning "the last ordered row" into "the first" so Last can be
+        /// served by the same single-row subquery as First. <paramref name="hadOrdering"/> reports
+        /// whether any ordering was present; without one, "last" is undefined and callers fail closed.
+        /// </summary>
+        internal static Expression ReverseQueryableOrderings(Expression source, out bool hadOrdering)
+        {
+            var had = false;
+            var result = ReverseOrderingsCore(source, ref had);
+            hadOrdering = had;
+            return result;
+        }
+
+        private static Expression ReverseOrderingsCore(Expression source, ref bool hadOrdering)
+        {
+            if (source is not MethodCallExpression mce || mce.Arguments.Count == 0)
+                return source;
+            var newSource = ReverseOrderingsCore(mce.Arguments[0], ref hadOrdering);
+            string? flipped = mce.Method.DeclaringType == typeof(Queryable)
+                ? mce.Method.Name switch
+                {
+                    nameof(Queryable.OrderBy) => nameof(Queryable.OrderByDescending),
+                    nameof(Queryable.OrderByDescending) => nameof(Queryable.OrderBy),
+                    nameof(Queryable.ThenBy) => nameof(Queryable.ThenByDescending),
+                    nameof(Queryable.ThenByDescending) => nameof(Queryable.ThenBy),
+                    _ => null
+                }
+                : null;
+            var args = new Expression[mce.Arguments.Count];
+            args[0] = newSource;
+            for (int i = 1; i < mce.Arguments.Count; i++) args[i] = mce.Arguments[i];
+            if (flipped != null)
+            {
+                hadOrdering = true;
+                return Expression.Call(typeof(Queryable), flipped, mce.Method.GetGenericArguments(), args);
+            }
+            if (ReferenceEquals(newSource, mce.Arguments[0]))
+                return mce;
+            return Expression.Call(mce.Object, mce.Method, args);
         }
 
         /// <summary>

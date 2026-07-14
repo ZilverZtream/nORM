@@ -388,6 +388,8 @@ namespace nORM.Query
                     }
                     case nameof(Queryable.First):
                     case nameof(Queryable.FirstOrDefault):
+                    case nameof(Queryable.Last):
+                    case nameof(Queryable.LastOrDefault):
                     {
                         LambdaExpression? firstPredicate = null;
                         if (node.Arguments.Count > 1)

@@ -431,6 +431,15 @@ namespace nORM.Query
                 var et = GetElementType(source);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
             }
+            // Last/LastOrDefault = First of the reversed ordering. Without an ordering "last" is
+            // undefined in SQL, so fail closed rather than silently returning the first row.
+            if (methodName is nameof(Queryable.Last) or nameof(Queryable.LastOrDefault))
+            {
+                source = QueryTranslator.ReverseQueryableOrderings(source, out var hadOrdering);
+                if (!hadOrdering)
+                    throw new NormUnsupportedFeatureException(
+                        $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.");
+            }
             source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
 
