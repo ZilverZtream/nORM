@@ -457,7 +457,7 @@ namespace nORM.Query
             }
             return node;
         }
-        private static bool SourceHasTakeOrSkip(Expression source)
+        internal static bool SourceHasTakeOrSkip(Expression source)
         {
             var current = source;
             while (current is MethodCallExpression mce)

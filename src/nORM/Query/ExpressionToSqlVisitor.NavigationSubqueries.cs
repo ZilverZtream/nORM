@@ -192,11 +192,91 @@ namespace nORM.Query
         }
         private void BuildScalarCountSubquery(Expression source, LambdaExpression? predicate)
         {
+            ThrowIfUnsupportedScalarAggregateSource(source, "Count");
             if (predicate != null)
             {
                 var et = GetElementType(source);
                 source = Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { et }, source, Expression.Quote(predicate));
             }
+            source = QueryCallMaterializer.Materialize(source);
+            var (head, tail) = TranslateScalarAggregateSource(source, "Count");
+
+            // A single distinct scalar column must stay distinct inside COUNT; an
+            // entity-wide DISTINCT is a no-op for the row count (rows are key-unique).
+            var countOperand = "*";
+            if (head.StartsWith("DISTINCT ", StringComparison.OrdinalIgnoreCase))
+            {
+                var projected = head.Substring("DISTINCT ".Length).Trim();
+                if (!HasTopLevelComma(projected))
+                    countOperand = "DISTINCT " + projected;
+            }
+            _sql.Append("(SELECT COUNT(").Append(countOperand).Append(')');
+            _sql.Append(tail);
+            _sql.Append(")");
+        }
+
+        /// <summary>
+        /// Emits a correlated scalar-aggregate subquery for an explicit queryable source in a
+        /// predicate — <c>ctx.Query&lt;B&gt;().Where(b =&gt; b.Fk == a.Id).Sum(b =&gt; b.Amt)</c> —
+        /// the sibling of the navigation-collection aggregate emit. The selector appends as a
+        /// Select so it translates against the subquery's own alias, then the single-column
+        /// SELECT head is wrapped in the aggregate function. Outer references correlate through
+        /// the shared parameter mappings. Empty subqueries yield SQL NULL (matching the
+        /// navigation-aggregate surface), which comparison predicates treat as no match.
+        /// </summary>
+        private void BuildScalarAggregateSubquery(Expression source, LambdaExpression? selector, string aggregateName)
+        {
+            ThrowIfUnsupportedScalarAggregateSource(source, aggregateName);
+            var sqlAgg = aggregateName switch
+            {
+                nameof(Queryable.Sum) => "SUM",
+                nameof(Queryable.Min) => "MIN",
+                nameof(Queryable.Max) => "MAX",
+                _ => "AVG",
+            };
+            Type operandType;
+            if (selector != null)
+            {
+                var et = GetElementType(source);
+                operandType = selector.Body.Type;
+                source = Expression.Call(typeof(Queryable), nameof(Queryable.Select),
+                    new[] { et, operandType }, source, Expression.Quote(selector));
+            }
+            else
+            {
+                operandType = GetElementType(source);
+            }
+            source = QueryCallMaterializer.Materialize(source);
+            var (head, tail) = TranslateScalarAggregateSource(source, aggregateName);
+
+            var distinct = false;
+            if (head.StartsWith("DISTINCT ", StringComparison.OrdinalIgnoreCase))
+            {
+                distinct = true;
+                head = head.Substring("DISTINCT ".Length).Trim();
+            }
+            if (HasTopLevelComma(head))
+                throw new NormUnsupportedFeatureException(
+                    $"{aggregateName}() over a correlated subquery requires a single scalar projection; " +
+                    "project the value with Select(x => x.Member) first.");
+            if (sqlAgg == "AVG")
+                head = _provider.AverageAggregateOperand(head, operandType);
+
+            _sql.Append("(SELECT ").Append(sqlAgg).Append('(');
+            if (distinct)
+                _sql.Append("DISTINCT ");
+            _sql.Append(head).Append(')').Append(tail).Append(')');
+        }
+
+        /// <summary>
+        /// Translates a correlated-aggregate source in a sub-translator (correlated params
+        /// shared, so outer references resolve to the outer alias) and splits the SQL at its
+        /// top-level FROM, stripping the trailing ORDER BY (meaningless inside a scalar
+        /// subquery and disallowed by some providers). Returns the SELECT head and the
+        /// FROM-onward tail.
+        /// </summary>
+        private (string Head, string Tail) TranslateScalarAggregateSource(Expression source, string aggregateName)
+        {
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
             var tempParams = new Dictionary<string, object>();
@@ -212,20 +292,103 @@ namespace nORM.Query
                     _compiledParams.Add(compiled);
             }
 
-            // Rewrite the entity SELECT into SELECT COUNT(*) by replacing everything before the
-            // first ` FROM `. Strip any trailing ORDER BY which is meaningless inside a scalar
-            // subquery and disallowed by some providers.
             var sql = subPlan.Sql;
-            var fromIdx = sql.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
+            var fromIdx = FindTopLevelFromIndex(sql);
             if (fromIdx < 0)
-                throw new NormQueryException("Could not rewrite Count() subquery: no FROM clause found.");
+                throw new NormQueryException($"Could not rewrite {aggregateName}() subquery: no top-level FROM clause found.");
+            var head = sql.Substring("SELECT ".Length, fromIdx - "SELECT ".Length).Trim();
             var tail = sql.Substring(fromIdx);
             var orderIdx = tail.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
             if (orderIdx >= 0)
                 tail = tail.Substring(0, orderIdx);
-            _sql.Append("(SELECT COUNT(*)");
-            _sql.Append(tail);
-            _sql.Append(")");
+            return (head, tail);
+        }
+
+        /// <summary>
+        /// Correlated scalar aggregates slice the sub-plan at its top-level FROM and wrap the
+        /// projection in the aggregate function, which is only sound for a plain
+        /// filtered/projected/ordered source: windows would apply their paging AFTER the
+        /// aggregate (LIMIT limits the one-row result, not the aggregated inputs), and set
+        /// ops, grouping, and client-tail reshapes change the row set the slice sees.
+        /// </summary>
+        private static void ThrowIfUnsupportedScalarAggregateSource(Expression source, string methodName)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case "Where":
+                    case "Select":
+                    case "OrderBy":
+                    case "OrderByDescending":
+                    case "ThenBy":
+                    case "ThenByDescending":
+                    case "Distinct":
+                    case "AsNoTracking":
+                    case "Query": // the `ctx.Query<T>()` chain root
+                        break;
+                    default:
+                        throw new NormUnsupportedFeatureException(
+                            $"{methodName}() over a correlated subquery supports Where/Select/OrderBy/Distinct sources; " +
+                            $"'{mce.Method.Name}' windows or reshapes the subquery's rows and has no sound scalar-aggregate " +
+                            "form. Materialize the inner query first or restructure the aggregate.");
+                }
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+        }
+
+        /// <summary>
+        /// Finds the first <c> FROM </c> at parenthesis depth zero, skipping string literals,
+        /// so a projection containing a nested subquery does not split the SQL mid-expression.
+        /// </summary>
+        private static int FindTopLevelFromIndex(string sql)
+        {
+            var depth = 0;
+            var inString = false;
+            for (var i = 0; i < sql.Length; i++)
+            {
+                var c = sql[i];
+                if (inString)
+                {
+                    if (c == '\'') inString = false;
+                    continue;
+                }
+                switch (c)
+                {
+                    case '\'': inString = true; break;
+                    case '(': depth++; break;
+                    case ')': depth--; break;
+                    case ' ' when depth == 0
+                        && i + 6 <= sql.Length
+                        && string.Compare(sql, i, " FROM ", 0, 6, StringComparison.OrdinalIgnoreCase) == 0:
+                        return i;
+                }
+            }
+            return -1;
+        }
+
+        private static bool HasTopLevelComma(string sql)
+        {
+            var depth = 0;
+            var inString = false;
+            foreach (var c in sql)
+            {
+                if (inString)
+                {
+                    if (c == '\'') inString = false;
+                    continue;
+                }
+                switch (c)
+                {
+                    case '\'': inString = true; break;
+                    case '(': depth++; break;
+                    case ')': depth--; break;
+                    case ',' when depth == 0: return true;
+                }
+            }
+            return false;
         }
         private void BuildIn(Expression source, Expression value)
         {

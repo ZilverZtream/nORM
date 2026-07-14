@@ -163,6 +163,16 @@ namespace nORM.Query
                                 return node;
                             }
                         }
+                        // Aggregate over a query source in a predicate context: emit a
+                        // correlated scalar subquery, mirroring the Count branch above.
+                        // Grouping/range parameters are handled by the branch above; a
+                        // bare parameter reaching here has no query source to translate.
+                        if (node.Arguments.Count >= 1 && node.Arguments[0] is not ParameterExpression)
+                        {
+                            var aggSelector = node.Arguments.Count > 1 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null;
+                            BuildScalarAggregateSubquery(node.Arguments[0], aggSelector, node.Method.Name);
+                            return node;
+                        }
                         break;
                 }
             }
@@ -348,6 +358,34 @@ namespace nORM.Query
                     case nameof(Queryable.Contains):
                         BuildIn(node.Arguments[0], node.Arguments[1]);
                         return node;
+                    case nameof(Queryable.Count):
+                    case nameof(Queryable.LongCount):
+                    {
+                        LambdaExpression? countPredicate = null;
+                        if (node.Arguments.Count > 1)
+                        {
+                            countPredicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                            if (countPredicate == null)
+                                throw new NormQueryException($"{node.Method.Name}() requires a lambda predicate argument.");
+                        }
+                        BuildScalarCountSubquery(node.Arguments[0], countPredicate);
+                        return node;
+                    }
+                    case nameof(Queryable.Sum):
+                    case nameof(Queryable.Min):
+                    case nameof(Queryable.Max):
+                    case nameof(Queryable.Average):
+                    {
+                        LambdaExpression? aggregateSelector = null;
+                        if (node.Arguments.Count > 1)
+                        {
+                            aggregateSelector = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                            if (aggregateSelector == null)
+                                throw new NormQueryException($"{node.Method.Name}() requires a lambda selector argument.");
+                        }
+                        BuildScalarAggregateSubquery(node.Arguments[0], aggregateSelector, node.Method.Name);
+                        return node;
+                    }
                     default:
                         throw new NormUnsupportedFeatureException($"Queryable method '{node.Method.Name}' is not supported.");
                 }
