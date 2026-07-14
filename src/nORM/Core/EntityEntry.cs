@@ -124,6 +124,48 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Compares each tracked many-to-many collection against its snapshot and returns
+        /// true when the association set has changed (an item added or removed). Change
+        /// detection is otherwise column-only, so without this a collection-only edit
+        /// leaves the owner Unchanged and its join-table sync never runs — silently
+        /// dropping the association write.
+        /// </summary>
+        internal bool HasManyToManyChanges()
+        {
+            if (_mapping.ManyToManyJoins == null || _mapping.ManyToManyJoins.Count == 0) return false;
+            var entity = Entity;
+            if (entity == null) return false;
+
+            foreach (var jtm in _mapping.ManyToManyJoins)
+            {
+                var snapshot = ManyToManySnapshots != null
+                    && ManyToManySnapshots.TryGetValue(jtm.LeftNavPropertyName, out var snap)
+                    ? snap
+                    : null;
+                var collection = jtm.LeftCollectionGetter(entity);
+
+                var currentCount = 0;
+                if (collection != null)
+                {
+                    foreach (var item in collection)
+                    {
+                        if (item == null) continue;
+                        var pk = jtm.GetRightKey(item);
+                        if (pk == null) continue;
+                        currentCount++;
+                        if (snapshot == null || !snapshot.Contains(pk))
+                            return true; // an item not in the snapshot → added
+                    }
+                }
+                // Every current item was in the snapshot; a size mismatch means the
+                // snapshot had extra items → one or more were removed.
+                if ((snapshot?.Count ?? 0) != currentCount)
+                    return true;
+            }
+            return false;
+        }
+
         internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
         {
             Entity = entity ?? throw new ArgumentNullException(nameof(entity));
@@ -247,7 +289,11 @@ namespace nORM.Core
             CaptureOriginalValues();
             // Only capture M2M snapshots if entity is already Unchanged (loaded from DB).
             // For Added entities, AcceptChanges() will capture after the INSERT succeeds.
-            if (State == EntityState.Unchanged)
+            // Skip when a snapshot already exists: an Include may have re-captured the
+            // loaded association set already, and this lazy init runs at DetectChanges
+            // time — AFTER any user edit — so re-capturing here would overwrite the true
+            // baseline with the post-edit state and lose removals.
+            if (State == EntityState.Unchanged && ManyToManySnapshots == null)
                 CaptureManyToManySnapshots();
 
             if (Entity is INotifyPropertyChanged notify)
@@ -406,6 +452,11 @@ namespace nORM.Core
                 _changedProperties![i] = changed;
                 hasChanges |= changed;
             }
+
+            // A many-to-many collection edit is not a column change, so it must be
+            // detected separately or the owner stays Unchanged and its join-table
+            // sync never runs (silent association-write loss).
+            hasChanges |= HasManyToManyChanges();
 
             if (hasChanges)
                 State = EntityState.Modified;

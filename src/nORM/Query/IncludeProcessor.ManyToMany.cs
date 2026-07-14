@@ -162,16 +162,25 @@ namespace nORM.Query
                 if (!joinRows.TryGetValue(leftPk, out var rightPks))
                     rightPks = CoercedLookup(joinRows, leftPk);
 
-                if (rightPks == null) continue;
-
-                foreach (var rPk in rightPks)
+                if (rightPks != null)
                 {
-                    if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
-                        rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
+                    foreach (var rPk in rightPks)
+                    {
+                        if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
+                            rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
 
-                    if (rightEntity != null)
-                        collection.Add(rightEntity);
+                        if (rightEntity != null)
+                            collection.Add(rightEntity);
+                    }
                 }
+
+                // Re-capture the parent's M2M snapshot now that its collection reflects
+                // the loaded association set (including the empty case). The parent was
+                // tracked BEFORE this include populated the collection, so its snapshot
+                // (if any) is stale/empty — without this, a later collection edit computes
+                // its delta against an empty baseline and removals are silently dropped.
+                if (!noTracking)
+                    _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureManyToManySnapshots();
             }
         }
 
@@ -314,16 +323,22 @@ namespace nORM.Query
                 if (!joinRows.TryGetValue(leftPk, out var rightPks))
                     rightPks = CoercedLookup(joinRows, leftPk);
 
-                if (rightPks == null) continue;
-
-                foreach (var rPk in rightPks)
+                if (rightPks != null)
                 {
-                    if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
-                        rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
+                    foreach (var rPk in rightPks)
+                    {
+                        if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity))
+                            rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
 
-                    if (rightEntity != null)
-                        collection.Add(rightEntity);
+                        if (rightEntity != null)
+                            collection.Add(rightEntity);
+                    }
                 }
+
+                // See the async path: capture the loaded association set as the M2M
+                // snapshot baseline so later collection edits diff against it.
+                if (!noTracking)
+                    _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureManyToManySnapshots();
             }
         }
     }
