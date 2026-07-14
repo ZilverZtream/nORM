@@ -372,6 +372,277 @@ public class CrudStateMachineFuzzTests
         }
     }
 
+    [System.ComponentModel.DataAnnotations.Schema.Table("RelParent_Test")]
+    public class RelParent
+    {
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public List<RelChild> Children { get; set; } = new();
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("RelChild_Test")]
+    public class RelChild
+    {
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public int ParentId { get; set; }
+        public int Val { get; set; }
+    }
+
+    /// <summary>
+    /// Relationship variant: parents with child collections. Children arrive via
+    /// graph adds (parent added with populated navigation), collection adds on a
+    /// tracked parent (the FK comes from relationship fixup), and direct adds
+    /// with an explicit FK; they move between parents through FK edits. After
+    /// every save both tables verify exactly and every child's FK must point at
+    /// an existing parent.
+    /// </summary>
+    [Theory]
+    [InlineData(20260714)]
+    [InlineData(42)]
+    [InlineData(987654)]
+    [InlineData(31337)]
+    public async Task Random_relationship_mutations_match_the_committed_model(int seed)
+    {
+        var dbName = $"relfuzz_{seed}_{Guid.NewGuid():N}";
+        var cs = $"Data Source=file:{dbName}?mode=memory&cache=shared";
+        using var keeper = new SqliteConnection(cs);
+        keeper.Open();
+        using (var cmd = keeper.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE RelParent_Test (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                CREATE TABLE RelChild_Test (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Val INTEGER NOT NULL)
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection Open()
+        {
+            var cn = new SqliteConnection(cs);
+            cn.Open();
+            return cn;
+        }
+
+        static nORM.Configuration.DbContextOptions Options() => new()
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<RelParent>().HasKey(p => p.Id);
+                mb.Entity<RelChild>().HasKey(c => c.Id);
+                mb.Entity<RelParent>().HasMany(p => p.Children).WithOne()
+                                      .HasForeignKey(c => c.ParentId, p => p.Id);
+            }
+        };
+
+        var rng = new Random(seed);
+        var parents = new Dictionary<int, string>();          // working view
+        var children = new Dictionary<int, (int ParentId, int Val)>();
+        var committedParents = new Dictionary<int, string>();
+        var committedChildren = new Dictionary<int, (int ParentId, int Val)>();
+        var trackedParents = new Dictionary<int, RelParent>();
+        var trackedChildren = new Dictionary<int, RelChild>();
+        // Children living only in a parent's navigation until the next save: the
+        // context discovers them through fixup, which sets their FK from the nav
+        // parent (nav wins for new graph children). Until saved they are not
+        // context-tracked, so FK edits target only tracked children, and undoing
+        // a pending nav child means removing it from the parent's collection.
+        var pendingNavChildren = new Dictionary<int, int>(); // childId -> parentId
+        var nextParentKey = 1;
+        var nextChildKey = 1;
+        var trace = new List<string>();
+        string Tail() => "\nops:\n" + string.Join("\n", trace.TakeLast(50));
+
+        var ctx = new DbContext(Open(), new SqliteProvider(), Options());
+        try
+        {
+            for (var step = 0; step < 200; step++)
+            {
+                switch (rng.Next(12))
+                {
+                    case 0: // add a childless parent
+                    {
+                        var key = nextParentKey++;
+                        var name = NamePool[rng.Next(NamePool.Length)];
+                        var parent = new RelParent { Id = key, Name = name };
+                        ctx.Add(parent);
+                        trackedParents[key] = parent;
+                        parents[key] = name;
+                        trace.Add($"{step}: add parent {key}");
+                        break;
+                    }
+                    case 1 or 2: // graph add: parent with populated child navigation
+                    {
+                        var key = nextParentKey++;
+                        var name = NamePool[rng.Next(NamePool.Length)];
+                        var parent = new RelParent { Id = key, Name = name };
+                        var kidCount = rng.Next(1, 4);
+                        var kids = new List<int>();
+                        for (var k = 0; k < kidCount; k++)
+                        {
+                            var ck = nextChildKey++;
+                            var val = rng.Next(-50, 50);
+                            var child = new RelChild { Id = ck, Val = val }; // FK comes from fixup
+                            parent.Children.Add(child);
+                            trackedChildren[ck] = child;
+                            pendingNavChildren[ck] = key;
+                            children[ck] = (key, val);
+                            kids.Add(ck);
+                        }
+                        ctx.Add(parent);
+                        trackedParents[key] = parent;
+                        parents[key] = name;
+                        trace.Add($"{step}: graph add parent {key} kids [{string.Join(",", kids)}]");
+                        break;
+                    }
+                    case 3 or 4: // collection add on a tracked parent
+                    {
+                        if (trackedParents.Count == 0) break;
+                        var pk = trackedParents.Keys.ElementAt(rng.Next(trackedParents.Count));
+                        var ck = nextChildKey++;
+                        var val = rng.Next(-50, 50);
+                        var child = new RelChild { Id = ck, Val = val }; // FK comes from fixup
+                        trackedParents[pk].Children.Add(child);
+                        trackedChildren[ck] = child;
+                        pendingNavChildren[ck] = pk;
+                        children[ck] = (pk, val);
+                        trace.Add($"{step}: nav add child {ck} -> parent {pk}");
+                        break;
+                    }
+                    case 5: // direct child add with an explicit FK
+                    {
+                        if (parents.Count == 0) break;
+                        var pk = parents.Keys.ElementAt(rng.Next(parents.Count));
+                        var ck = nextChildKey++;
+                        var val = rng.Next(-50, 50);
+                        var child = new RelChild { Id = ck, ParentId = pk, Val = val };
+                        ctx.Add(child);
+                        trackedChildren[ck] = child;
+                        children[ck] = (pk, val);
+                        trace.Add($"{step}: direct add child {ck} -> parent {pk}");
+                        break;
+                    }
+                    case 6: // FK edit: move a CONTEXT-tracked child to another parent
+                    {
+                        if (parents.Count == 0) break;
+                        var editable = trackedChildren.Keys
+                            .Where(ck => children.ContainsKey(ck) && !pendingNavChildren.ContainsKey(ck))
+                            .ToList();
+                        if (editable.Count == 0) break;
+                        var ckEdit = editable[rng.Next(editable.Count)];
+                        var pk = parents.Keys.ElementAt(rng.Next(parents.Count));
+                        trackedChildren[ckEdit].ParentId = pk;
+                        children[ckEdit] = (pk, children[ckEdit].Val);
+                        trace.Add($"{step}: fk edit child {ckEdit} -> parent {pk}");
+                        break;
+                    }
+                    case 7: // delete a child: context-tracked via Remove, pending nav via collection removal
+                    {
+                        if (trackedChildren.Count == 0) break;
+                        var ck = trackedChildren.Keys.ElementAt(rng.Next(trackedChildren.Count));
+                        if (!children.ContainsKey(ck)) break;
+                        if (pendingNavChildren.TryGetValue(ck, out var navParent))
+                        {
+                            if (trackedParents.TryGetValue(navParent, out var parent))
+                                parent.Children.Remove(trackedChildren[ck]);
+                            pendingNavChildren.Remove(ck);
+                            trace.Add($"{step}: nav-remove pending child {ck} from parent {navParent}");
+                        }
+                        else
+                        {
+                            ctx.Remove(trackedChildren[ck]);
+                            trace.Add($"{step}: remove child {ck}");
+                        }
+                        trackedChildren.Remove(ck);
+                        children.Remove(ck);
+                        break;
+                    }
+                    case 8: // delete a childless tracked parent
+                    {
+                        var childless = trackedParents.Keys
+                            .Where(pk => parents.ContainsKey(pk) && !children.Values.Any(c => c.ParentId == pk))
+                            .ToList();
+                        if (childless.Count == 0) break;
+                        var pk = childless[rng.Next(childless.Count)];
+                        ctx.Remove(trackedParents[pk]);
+                        trackedParents.Remove(pk);
+                        parents.Remove(pk);
+                        trace.Add($"{step}: remove parent {pk}");
+                        break;
+                    }
+                    case 9 or 10: // save and verify both tables plus FK integrity
+                    {
+                        await ctx.SaveChangesAsync();
+                        pendingNavChildren.Clear();
+                        committedParents = new Dictionary<int, string>(parents);
+                        committedChildren = new Dictionary<int, (int, int)>(children);
+                        trace.Add($"{step}: save");
+                        await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} step={step} (after save){Tail()}");
+                        break;
+                    }
+                    default: // discard
+                    {
+                        ctx.Dispose();
+                        parents = new Dictionary<int, string>(committedParents);
+                        children = new Dictionary<int, (int, int)>(committedChildren);
+                        trackedParents.Clear();
+                        trackedChildren.Clear();
+                        pendingNavChildren.Clear();
+                        ctx = new DbContext(Open(), new SqliteProvider(), Options());
+                        trace.Add($"{step}: discard");
+                        await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} step={step} (fresh context after discard){Tail()}");
+                        foreach (var p in await ctx.Query<RelParent>().ToListAsync())
+                            trackedParents[p.Id] = p;
+                        foreach (var c in await ctx.Query<RelChild>().ToListAsync())
+                            trackedChildren[c.Id] = c;
+                        break;
+                    }
+                }
+            }
+
+            await ctx.SaveChangesAsync();
+            committedParents = new Dictionary<int, string>(parents);
+            committedChildren = new Dictionary<int, (int, int)>(children);
+            ctx.Dispose();
+
+            ctx = new DbContext(Open(), new SqliteProvider(), Options());
+            await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} final (fresh context){Tail()}");
+        }
+        finally
+        {
+            ctx.Dispose();
+        }
+    }
+
+    private static async Task VerifyRelAsync(
+        DbContext ctx,
+        Dictionary<int, string> expectedParents,
+        Dictionary<int, (int ParentId, int Val)> expectedChildren,
+        string context)
+    {
+        var parents = (await ctx.Query<RelParent>().ToListAsync()).OrderBy(p => p.Id).ToList();
+        var children = (await ctx.Query<RelChild>().ToListAsync()).OrderBy(c => c.Id).ToList();
+
+        Assert.True(parents.Count == expectedParents.Count,
+            $"parent count mismatch {context}: db={parents.Count} model={expectedParents.Count}\n" +
+            $"db: [{string.Join(",", parents.Select(p => p.Id))}]\nmodel: [{string.Join(",", expectedParents.Keys.OrderBy(k => k))}]");
+        foreach (var p in parents)
+        {
+            Assert.True(expectedParents.TryGetValue(p.Id, out var name) && name == p.Name,
+                $"parent mismatch {context} at Id={p.Id}: db Name=\"{p.Name}\" model=\"{(expectedParents.TryGetValue(p.Id, out var n) ? n : "<absent>")}\"");
+        }
+
+        Assert.True(children.Count == expectedChildren.Count,
+            $"child count mismatch {context}: db={children.Count} model={expectedChildren.Count}\n" +
+            $"db: [{string.Join(",", children.Select(c => c.Id))}]\nmodel: [{string.Join(",", expectedChildren.Keys.OrderBy(k => k))}]");
+        foreach (var c in children)
+        {
+            Assert.True(expectedChildren.TryGetValue(c.Id, out var state) && state.ParentId == c.ParentId && state.Val == c.Val,
+                $"child mismatch {context} at Id={c.Id}: db=({c.ParentId},{c.Val}) model={(expectedChildren.TryGetValue(c.Id, out var s) ? $"({s.ParentId},{s.Val})" : "<absent>")}");
+            Assert.True(expectedParents.ContainsKey(c.ParentId),
+                $"orphaned child {context}: child {c.Id} points at missing parent {c.ParentId}");
+        }
+    }
+
     private static async Task<List<MutGenRow>> VerifyGenAsync(DbContext ctx, Dictionary<int, RowState> expected, string context)
     {
         var rows = (await ctx.Query<MutGenRow>().ToListAsync()).OrderBy(r => r.Id).ToList();

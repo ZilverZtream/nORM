@@ -385,13 +385,20 @@ namespace nORM.Core
                 // ambient scopes, ShouldAcceptChanges=false and the caller controls durability.
                 if (transactionManager.ShouldAcceptChanges)
                 {
+                    // Capture the deleted instances BEFORE detaching them — Remove
+                    // resets the entry state, and the navigation cleanup below needs
+                    // to know which instances just left the database.
+                    List<object>? deletedInstances = null;
                     foreach (var entry in changedEntries)
                     {
                         if (entry.State == EntityState.Deleted)
                         {
                             // Remove deleted entities from the ChangeTracker
                             if (entry.Entity is { } entityToRemove)
+                            {
+                                (deletedInstances ??= new List<object>()).Add(entityToRemove);
                                 ChangeTracker.Remove(entityToRemove, true);
+                            }
                         }
                         else
                         {
@@ -399,6 +406,9 @@ namespace nORM.Core
                             entry.AcceptChanges();
                         }
                     }
+
+                    if (deletedInstances != null)
+                        RemoveDeletedInstancesFromTrackedNavigations(deletedInstances);
                 }
             }
             catch (Exception originalEx)
@@ -676,6 +686,35 @@ namespace nORM.Core
             if (ex is DbException dbEx && Options.RetryPolicy != null)
                 return Options.RetryPolicy.ShouldRetry(dbEx);
             return false;   // TimeoutException is excluded - retrying a timed-out write can duplicate data.
+        }
+
+        /// <summary>
+        /// Strips just-deleted instances out of tracked principals' navigation
+        /// collections. A deleted dependent left sitting in a tracked navigation
+        /// would be re-discovered by relationship fixup on the NEXT SaveChanges —
+        /// its tracker entry is gone by then — and silently re-inserted.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Navigation cleanup reads navigation properties via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Navigation cleanup reflects over navigation properties; trimming may remove the required members.")]
+        private void RemoveDeletedInstancesFromTrackedNavigations(IReadOnlyList<object> deleted)
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                var principal = entry.Entity;
+                if (principal == null || entry.Mapping.Relations.Count == 0)
+                    continue;
+
+                foreach (var relation in entry.Mapping.Relations.Values)
+                {
+                    if (relation.NavProp.GetValue(principal) is not System.Collections.IList list || list.IsReadOnly)
+                        continue;
+                    foreach (var gone in deleted)
+                    {
+                        if (relation.DependentType.IsInstanceOfType(gone))
+                            list.Remove(gone);
+                    }
+                }
+            }
         }
 
         /// <summary>
