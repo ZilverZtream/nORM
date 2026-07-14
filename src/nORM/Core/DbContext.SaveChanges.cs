@@ -381,7 +381,15 @@ namespace nORM.Core
                         {
                             if (entry.Entity != null)
                             {
-                                if (map.OwnedCollections.Count > 0)
+                                // The owned sync DELETE-then-INSERTs every owned child, so
+                                // running it for a Modified owner whose owned collection did
+                                // NOT change would churn the children's DB-generated identity
+                                // keys (breaking references) and emit needless writes. Run it
+                                // for Added owners (new children) and only for Modified owners
+                                // whose owned collection actually changed. The M2M sync is
+                                // delta-based (no-op when unchanged), so it needs no such gate.
+                                if (map.OwnedCollections.Count > 0
+                                    && (state == EntityState.Added || entry.HasOwnedCollectionChanges()))
                                     await SaveOwnedCollectionsAsync(entry.Entity, map, state, transaction, ct).ConfigureAwait(false);
                                 if (map.ManyToManyJoins.Count > 0)
                                     await ExecuteJoinTableSyncAsync(entry.Entity, entry, transaction, ct).ConfigureAwait(false);
