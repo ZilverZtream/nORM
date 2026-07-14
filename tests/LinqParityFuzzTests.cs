@@ -291,7 +291,11 @@ public class LinqParityFuzzTests
                     Id INTEGER PRIMARY KEY,
                     ParentId INTEGER NOT NULL,
                     ChildVal INTEGER NOT NULL,
-                    Tag TEXT NOT NULL)
+                    Tag TEXT NOT NULL);
+                CREATE TABLE FuzzGrand_Test (
+                    Id INTEGER PRIMARY KEY,
+                    ChildId INTEGER NOT NULL,
+                    GVal INTEGER NOT NULL)
                 """;
             cmd.ExecuteNonQuery();
         }
@@ -299,6 +303,7 @@ public class LinqParityFuzzTests
         using var ctx = new DbContext(cn, new SqliteProvider(), CreateFuzzOptions());
         await SeedAsync(ctx);
         await SeedChildrenAsync(ctx);
+        await SeedGrandsAsync(ctx);
         RunFuzz(ctx, seed, cases: 400);
         RunJoinFuzz(ctx, seed, cases: 150);
         RunSelectManyFuzz(ctx, seed, cases: 120);
@@ -309,7 +314,74 @@ public class LinqParityFuzzTests
         RunStringComparisonClosureFuzz(ctx, seed, cases: 80);
         RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 120);
         RunIncludeFuzz(ctx, seed, cases: 60);
+        RunThenIncludeFuzz(ctx, seed, cases: 40);
         await RunCompiledQueryFuzzAsync(ctx, seed, cases: 80);
+    }
+
+    /// <summary>
+    /// Three-level eager-load graph fuzz: filters and windows over the parent with
+    /// Include(Kids).ThenInclude(Grands), verifying every level exactly — parents,
+    /// each parent's children, and each child's grandchildren. A second-hop
+    /// correlation keyed off the wrong level loads another child's grandchildren.
+    /// </summary>
+    internal static void RunThenIncludeFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        for (var i = 0; i < cases; i++)
+        {
+            var k = rng.Next(-4, 4);
+            var n = rng.Next(1, 8);
+            var windowed = rng.Next(2) == 0;
+
+            List<NavRow> actual;
+            List<Row> expectedParents;
+            try
+            {
+                if (windowed)
+                {
+                    actual = ((System.Linq.IQueryable<NavRow>)((INormQueryable<NavRow>)ctx.Query<NavRow>()
+                            .OrderByDescending(r => r.IntVal).ThenBy(r => r.Id).Take(n))
+                        .Include(r => r.Kids).ThenInclude(c => c.Grands).AsNoTracking()).ToList();
+                    expectedParents = Rows.OrderByDescending(r => r.IntVal).ThenBy(r => r.Id).Take(n).ToList();
+                }
+                else
+                {
+                    actual = ((System.Linq.IQueryable<NavRow>)((INormQueryable<NavRow>)ctx.Query<NavRow>()
+                            .Where(r => r.IntVal >= k))
+                        .Include(r => r.Kids).ThenInclude(c => c.Grands).AsNoTracking()).ToList()
+                        .OrderBy(r => r.Id).ToList();
+                    expectedParents = Rows.Where(r => r.IntVal >= k).OrderBy(r => r.Id).ToList();
+                }
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"then-include shape threw (seed={seed} case={i} windowed={windowed} k={k} n={n})", ex);
+            }
+
+            Assert.True(expectedParents.Select(r => r.Id).SequenceEqual(actual.Select(r => r.Id)),
+                $"then-include parent mismatch seed={seed} case={i} windowed={windowed} k={k} n={n}\n" +
+                $"expected [{string.Join(",", expectedParents.Select(r => r.Id))}] got [{string.Join(",", actual.Select(r => r.Id))}]");
+
+            foreach (var parent in actual)
+            {
+                var expectedKids = Children.Where(c => c.ParentId == parent.Id).Select(c => c.Id).OrderBy(x => x).ToList();
+                var actualKids = parent.Kids.OrderBy(c => c.Id).ToList();
+                Assert.True(expectedKids.SequenceEqual(actualKids.Select(c => c.Id)),
+                    $"then-include kids mismatch seed={seed} case={i} parent={parent.Id}\n" +
+                    $"expected [{string.Join(",", expectedKids)}] got [{string.Join(",", actualKids.Select(c => c.Id))}]");
+
+                foreach (var kid in actualKids)
+                {
+                    var expectedGrands = Grands.Where(g => g.ChildId == kid.Id).OrderBy(g => g.Id).ToList();
+                    var actualGrands = kid.Grands.OrderBy(g => g.Id).ToList();
+                    Assert.True(expectedGrands.Count == actualGrands.Count
+                            && expectedGrands.Zip(actualGrands).All(p => p.First.Id == p.Second.Id && p.First.GVal == p.Second.GVal),
+                        $"then-include grands mismatch seed={seed} case={i} parent={parent.Id} kid={kid.Id}\n" +
+                        $"expected [{string.Join(",", expectedGrands.Select(g => g.Id))}] got [{string.Join(",", actualGrands.Select(g => g.Id))}]");
+                }
+            }
+        }
     }
 
     // Compiled queries pre-translate ONCE into a permanently cached plan and bind
@@ -692,8 +764,11 @@ public class LinqParityFuzzTests
         {
             mb.Entity<NavRow>().HasKey(r => r.Id);
             mb.Entity<NavChild>().HasKey(c => c.Id);
+            mb.Entity<NavGrand>().HasKey(g => g.Id);
             mb.Entity<NavRow>().HasMany(r => r.Kids).WithOne()
                                .HasForeignKey(c => c.ParentId, r => r.Id);
+            mb.Entity<NavChild>().HasMany(c => c.Grands).WithOne()
+                                 .HasForeignKey(g => g.ChildId, c => c.Id);
         }
     };
 
@@ -769,6 +844,41 @@ public class LinqParityFuzzTests
         public int ParentId { get; set; }
         public int ChildVal { get; set; }
         public string Tag { get; set; } = string.Empty;
+        public List<NavGrand> Grands { get; set; } = new();
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("FuzzGrand_Test")]
+    private class NavGrand
+    {
+        public int Id { get; set; }
+        public int ChildId { get; set; }
+        public int GVal { get; set; }
+    }
+
+    private static readonly NavGrand[] Grands = BuildGrands();
+
+    private static NavGrand[] BuildGrands()
+    {
+        // Children 1..70; grandchildren cover none/one/many per child with keys
+        // past the child range (unmatched).
+        var grands = new List<NavGrand>();
+        for (var i = 0; i < 90; i++)
+        {
+            grands.Add(new NavGrand
+            {
+                Id = i + 1,
+                ChildId = (i * 11) % 80 + 1,
+                GVal = (i % 13) - 6,
+            });
+        }
+        return grands.ToArray();
+    }
+
+    /// <summary>Inserts the grandchild dataset through the context under test.</summary>
+    internal static async System.Threading.Tasks.Task SeedGrandsAsync(DbContext ctx)
+    {
+        foreach (var grand in Grands) ctx.Add(grand);
+        await ctx.SaveChangesAsync();
     }
 
     /// <summary>In-memory oracle copies with the navigation populated.</summary>
