@@ -150,6 +150,53 @@ public class CorrelatedSubqueryGlobalFilterTests
     }
 
     [Fact]
+    public async Task Bulk_update_respects_global_filters()
+    {
+        var (keeper, ctx) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        // A broad bulk update on the filtered context must not touch the other
+        // tenant's rows.
+        await ctx.Query<Child>().Where(c => c.ParentId >= 1)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.ParentId, 99));
+
+        using var read = keeper.CreateCommand();
+        read.CommandText = "SELECT Id, ParentId, Tenant FROM CsgfChild_Test ORDER BY Id";
+        using var reader = read.ExecuteReader();
+        while (reader.Read())
+        {
+            var tenant = reader.GetString(2);
+            var parentId = reader.GetInt32(1);
+            if (tenant == "T1")
+                Assert.True(parentId == 99, $"T1 child {reader.GetInt32(0)} not updated");
+            else
+                Assert.True(parentId != 99, $"T2 child {reader.GetInt32(0)} was updated across the tenant filter");
+        }
+    }
+
+    [Fact]
+    public async Task Bulk_delete_respects_global_filters()
+    {
+        var (keeper, ctx) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        await ctx.Query<Child>().Where(c => c.ParentId >= 1).ExecuteDeleteAsync();
+
+        using var read = keeper.CreateCommand();
+        read.CommandText = "SELECT Tenant, COUNT(*) FROM CsgfChild_Test GROUP BY Tenant ORDER BY Tenant";
+        using var reader = read.ExecuteReader();
+        var survivors = new System.Collections.Generic.Dictionary<string, long>();
+        while (reader.Read())
+            survivors[reader.GetString(0)] = reader.GetInt64(1);
+
+        Assert.False(survivors.ContainsKey("T1"), "T1 children not deleted");
+        Assert.True(survivors.TryGetValue("T2", out var t2) && t2 == 2,
+            $"T2 children were deleted across the tenant filter (survivors: {string.Join(",", survivors.Select(kv => kv.Key + "=" + kv.Value))})");
+    }
+
+    [Fact]
     public async Task Projection_correlated_count_respects_global_filters()
     {
         var (keeper, ctx) = CreateDb();
