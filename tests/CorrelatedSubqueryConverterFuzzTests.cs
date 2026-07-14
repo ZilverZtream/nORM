@@ -125,7 +125,7 @@ public class CorrelatedSubqueryConverterFuzzTests
         {
             var status = AllStatuses[rng.Next(AllStatuses.Length)];
             var threshold = rng.Next(0, 3);
-            var shape = rng.Next(4);
+            var shape = rng.Next(5);
 
             switch (shape)
             {
@@ -169,6 +169,24 @@ public class CorrelatedSubqueryConverterFuzzTests
                         .Select(p => p.Id).OrderBy(i => i).ToList();
                     Assert.True(expected.SequenceEqual(actual),
                         $"seed={seed} case={caseIdx} shape=pred-any status={status}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+                    break;
+                }
+                case 3:
+                {
+                    // Projection: the FIRST child's Status (ordered by Id) per parent — the
+                    // converter column is materialized back to the enum through the correlated
+                    // First path. Ordered by Id (not the converter column) so it matches LINQ.
+                    var expected = parents
+                        .Select(p => (p.Id, S: children.Where(c => c.ParentId == p.Id).OrderBy(c => c.Id)
+                            .Select(c => (Status?)c.Status).FirstOrDefault()))
+                        .OrderBy(t => t.Id).ToList();
+                    var actual = (await ctx.Query<Parent>()
+                            .Select(p => new { p.Id, S = ctx.Query<Child>().Where(c => c.ParentId == p.Id)
+                                .OrderBy(c => c.Id).Select(c => (Status?)c.Status).FirstOrDefault() })
+                            .ToListAsync())
+                        .Select(x => (x.Id, x.S)).OrderBy(t => t.Id).ToList();
+                    Assert.True(expected.SequenceEqual(actual),
+                        $"seed={seed} case={caseIdx} shape=proj-first-status: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
                     break;
                 }
                 default:
