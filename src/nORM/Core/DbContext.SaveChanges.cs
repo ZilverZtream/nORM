@@ -703,10 +703,11 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Strips just-deleted instances out of tracked principals' navigation
-        /// collections. A deleted dependent left sitting in a tracked navigation
-        /// would be re-discovered by relationship fixup on the NEXT SaveChanges —
-        /// its tracker entry is gone by then — and silently re-inserted.
+        /// Strips just-deleted instances out of tracked entities' navigations. A
+        /// deleted instance left sitting in a navigation would be re-discovered by
+        /// relationship fixup on the NEXT SaveChanges — its tracker entry is gone
+        /// by then — and silently re-inserted: a deleted child through a principal's
+        /// collection, or a deleted principal through a dependent's reference.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Navigation cleanup reads navigation properties via reflection; not NativeAOT-compatible.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Navigation cleanup reflects over navigation properties; trimming may remove the required members.")]
@@ -714,18 +715,36 @@ namespace nORM.Core
         {
             foreach (var entry in ChangeTracker.Entries)
             {
-                var principal = entry.Entity;
-                if (principal == null || entry.Mapping.Relations.Count == 0)
+                var entity = entry.Entity;
+                if (entity == null)
                     continue;
 
                 foreach (var relation in entry.Mapping.Relations.Values)
                 {
-                    if (relation.NavProp.GetValue(principal) is not System.Collections.IList list || list.IsReadOnly)
+                    if (relation.NavProp.GetValue(entity) is not System.Collections.IList list || list.IsReadOnly)
                         continue;
                     foreach (var gone in deleted)
                     {
                         if (relation.DependentType.IsInstanceOfType(gone))
                             list.Remove(gone);
+                    }
+                }
+
+                foreach (var navProp in entry.Mapping.ReferenceNavigations)
+                {
+                    object? current;
+                    try { current = navProp.GetValue(entity); }
+                    catch { continue; }
+                    if (current == null)
+                        continue;
+                    foreach (var gone in deleted)
+                    {
+                        if (ReferenceEquals(current, gone))
+                        {
+                            try { navProp.SetValue(entity, null); }
+                            catch { /* read-only navigation — leave it */ }
+                            break;
+                        }
                     }
                 }
             }
