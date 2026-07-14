@@ -121,6 +121,11 @@ namespace nORM.Query
         {
             var snapshot = CaptureContext();
             _contextStack.Push(snapshot);
+            // The sub-context binds its own root parameter; its alias must neither
+            // inherit the outer scope's nor leak back to it (Build's FROM clause
+            // prefers this over the ambiguous mapping-based lookup).
+            var outerSelfRootAlias = _selfRootAlias;
+            _selfRootAlias = null;
             try
             {
                 _clauses = new SqlBuilder();
@@ -166,6 +171,7 @@ namespace nORM.Query
                 var subClauses = _clauses;
                 var contextToRestore = _contextStack.Pop();
                 RestoreContext(contextToRestore);
+                _selfRootAlias = outerSelfRootAlias;
                 subClauses.Dispose();
             }
         }
