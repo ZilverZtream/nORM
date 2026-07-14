@@ -353,7 +353,7 @@ public class MixedTokenOccFuzzTests
             {
                 var i = rng.Next(ctxs.Length);
                 var s = ctxs[i];
-                switch (rng.Next(13))
+                switch (rng.Next(16))
                 {
                     case 0 or 1: // mutate a viewed token row
                     {
@@ -524,6 +524,119 @@ public class MixedTokenOccFuzzTests
                         }
                         ApplySaveToOracle(s);
                         await VerifyCommittedAsync($"seed={seed} step={step} (after recovery save of ctx{i})");
+                        break;
+                    }
+                    case 12: // direct insert of a new row (auto-commit: durable immediately)
+                    {
+                        var key = nextKey++;
+                        var val = rng.Next(-100, 100);
+                        if (rng.Next(2) == 0)
+                        {
+                            trace.Add($"{step}: ctx{i} direct insert tok {key}");
+                            await s.Ctx.InsertAsync(new TokenRow { Id = key, Val = val });
+                            committedTok[key] = val;
+                            versionTok[key] = 1;
+                        }
+                        else
+                        {
+                            trace.Add($"{step}: ctx{i} direct insert plain {key}");
+                            await s.Ctx.InsertAsync(new PlainRow { Id = key, Val = val });
+                            committedPlain[key] = val;
+                        }
+                        await VerifyCommittedAsync($"seed={seed} step={step} (after direct insert of ctx{i})");
+                        break;
+                    }
+                    case 13: // direct update of a viewed row (tracked: entry must accept on success)
+                    {
+                        if (rng.Next(2) == 0)
+                        {
+                            var keys = s.ViewTok.Keys.Where(k => !s.PendingTokDeletes.Contains(k)).ToList();
+                            if (keys.Count == 0) break;
+                            var key = keys[rng.Next(keys.Count)];
+                            var (row, loadedVersion, _) = s.ViewTok[key];
+                            var val = NewVal(row.Val);
+                            row.Val = val;
+                            var stale = !versionTok.TryGetValue(key, out var v) || loadedVersion != v;
+                            if (stale)
+                            {
+                                trace.Add($"{step}: ctx{i} direct update tok {key} (stale -> conflict)");
+                                var ex = await Record.ExceptionAsync(() => s.Ctx.UpdateAsync(row));
+                                Assert.True(ex is DbConcurrencyException,
+                                    $"expected DbConcurrencyException from direct update seed={seed} step={step} ctx{i}, got {ex?.GetType().Name ?? "no exception"}{Tail()}");
+                                await VerifyCommittedAsync($"seed={seed} step={step} (after conflicted direct update of ctx{i})");
+                                await RefreshAsync(i);
+                            }
+                            else
+                            {
+                                trace.Add($"{step}: ctx{i} direct update tok {key} -> {val}");
+                                await s.Ctx.UpdateAsync(row);
+                                committedTok[key] = val;
+                                versionTok[key]++;
+                                s.ViewTok[key] = (row, versionTok[key], val);
+                                s.PendingTokVals.Remove(key); // the entry accepted: nothing left pending
+                                await VerifyCommittedAsync($"seed={seed} step={step} (after direct update of ctx{i})");
+                            }
+                        }
+                        else
+                        {
+                            var keys = s.ViewPlain.Keys.Where(k => !s.PendingPlainDeletes.Contains(k)).ToList();
+                            if (keys.Count == 0) break;
+                            var key = keys[rng.Next(keys.Count)];
+                            var (row, _) = s.ViewPlain[key];
+                            var val = NewVal(row.Val);
+                            row.Val = val;
+                            trace.Add($"{step}: ctx{i} direct update plain {key} -> {val}");
+                            await s.Ctx.UpdateAsync(row); // last-writer-wins; phantom update is silently lost
+                            if (committedPlain.ContainsKey(key))
+                                committedPlain[key] = val;
+                            s.ViewPlain[key] = (row, val);
+                            s.PendingPlainVals.Remove(key);
+                            await VerifyCommittedAsync($"seed={seed} step={step} (after direct plain update of ctx{i})");
+                        }
+                        break;
+                    }
+                    case 14: // direct delete of a viewed row (tracked: entry must be evicted)
+                    {
+                        if (rng.Next(2) == 0)
+                        {
+                            var keys = s.ViewTok.Keys.Where(k => !s.PendingTokDeletes.Contains(k)).ToList();
+                            if (keys.Count == 0) break;
+                            var key = keys[rng.Next(keys.Count)];
+                            var (row, loadedVersion, _) = s.ViewTok[key];
+                            var stale = !versionTok.TryGetValue(key, out var v) || loadedVersion != v;
+                            if (stale)
+                            {
+                                trace.Add($"{step}: ctx{i} direct delete tok {key} (stale -> conflict)");
+                                var ex = await Record.ExceptionAsync(() => s.Ctx.DeleteAsync(row));
+                                Assert.True(ex is DbConcurrencyException,
+                                    $"expected DbConcurrencyException from direct delete seed={seed} step={step} ctx{i}, got {ex?.GetType().Name ?? "no exception"}{Tail()}");
+                                await VerifyCommittedAsync($"seed={seed} step={step} (after conflicted direct delete of ctx{i})");
+                                await RefreshAsync(i);
+                            }
+                            else
+                            {
+                                trace.Add($"{step}: ctx{i} direct delete tok {key}");
+                                await s.Ctx.DeleteAsync(row);
+                                committedTok.Remove(key);
+                                versionTok.Remove(key);
+                                s.ViewTok.Remove(key);
+                                s.PendingTokVals.Remove(key);
+                                await VerifyCommittedAsync($"seed={seed} step={step} (after direct delete of ctx{i})");
+                            }
+                        }
+                        else
+                        {
+                            var keys = s.ViewPlain.Keys.Where(k => !s.PendingPlainDeletes.Contains(k)).ToList();
+                            if (keys.Count == 0) break;
+                            var key = keys[rng.Next(keys.Count)];
+                            var (row, _) = s.ViewPlain[key];
+                            trace.Add($"{step}: ctx{i} direct delete plain {key}");
+                            await s.Ctx.DeleteAsync(row); // phantom delete is a silent no-op
+                            committedPlain.Remove(key);
+                            s.ViewPlain.Remove(key);
+                            s.PendingPlainVals.Remove(key);
+                            await VerifyCommittedAsync($"seed={seed} step={step} (after direct plain delete of ctx{i})");
+                        }
                         break;
                     }
                     default: // refresh
