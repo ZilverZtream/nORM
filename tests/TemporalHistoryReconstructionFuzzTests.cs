@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -16,52 +17,38 @@ namespace nORM.Tests;
 
 /// <summary>
 /// Seeded oracle machine for temporal history integrity: random rounds of
-/// adds, updates, deletes, and same-key re-adds, with a wall-clock checkpoint
-/// and a full oracle state snapshot after every SaveChanges. Every checkpoint
-/// is then replayed through AsOf and must reconstruct the exact state — a
-/// missed version, an unclosed validity window, or a wrong-row ValidTo close
-/// surfaces as a reconstruction mismatch at some point in time.
+/// adds, updates, deletes, and same-key re-adds, with a checkpoint taken from
+/// the DATABASE clock and a full oracle state snapshot after every SaveChanges.
+/// Every checkpoint is then replayed through AsOf and must reconstruct the
+/// exact state — a missed version, an unclosed validity window, or a wrong-row
+/// ValidTo close surfaces as a reconstruction mismatch at some point in time.
+/// Checkpoints use the server clock so the machine also runs against live
+/// providers without client/server clock-skew false positives.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class TemporalHistoryReconstructionFuzzTests
 {
     [Table("ThrRow_Test")]
-    private class Row
+    internal class Row
     {
         [Key] public int Id { get; set; }
         public int V { get; set; }
         public string S { get; set; } = "";
     }
 
-    [Theory]
-    [InlineData(20260714)]
-    [InlineData(1337)]
-    [InlineData(902_211_558)]
-    public async Task AsOf_reconstructs_every_checkpoint_state(int seed)
+    internal static async Task RunReconstructionFuzzAsync(DbContext ctx, int seed, int rounds, Func<Task<DateTime>> serverNowAsync)
     {
         var rng = new Random(seed);
-        var cn = new SqliteConnection("Data Source=:memory:");
-        cn.Open();
-        using var _cn = cn;
-        using (var cmd = cn.CreateCommand())
-        {
-            cmd.CommandText = "CREATE TABLE ThrRow_Test (Id INTEGER PRIMARY KEY, V INTEGER NOT NULL, S TEXT NOT NULL)";
-            cmd.ExecuteNonQuery();
-        }
-        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<Row>() };
-        opts.EnableTemporalVersioning();
-        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
-
         var tracked = new Dictionary<int, Row>();
         var model = new Dictionary<int, (int V, string S)>();
         var checkpoints = new List<(DateTime Ts, Dictionary<int, (int V, string S)> State)>();
         var nextId = 1;
 
         await Task.Delay(50);
-        var beforeAll = DateTime.UtcNow;
+        var beforeAll = await serverNowAsync();
         await Task.Delay(50);
 
-        for (var round = 0; round < 10; round++)
+        for (var round = 0; round < rounds; round++)
         {
             var mutations = rng.Next(1, 4);
             for (var m = 0; m < mutations; m++)
@@ -100,7 +87,7 @@ public class TemporalHistoryReconstructionFuzzTests
 
             await ctx.SaveChangesAsync();
             await Task.Delay(50);
-            checkpoints.Add((DateTime.UtcNow, new Dictionary<int, (int, string)>(model)));
+            checkpoints.Add((await serverNowAsync(), new Dictionary<int, (int, string)>(model)));
             await Task.Delay(50);
         }
 
@@ -122,5 +109,34 @@ public class TemporalHistoryReconstructionFuzzTests
                     $"seed={seed} ts={ts:O} id={id}: expected {state[id]} got {reconstructed[id]}");
             }
         }
+    }
+
+    [Theory]
+    [InlineData(20260714)]
+    [InlineData(1337)]
+    [InlineData(902_211_558)]
+    public async Task AsOf_reconstructs_every_checkpoint_state(int seed)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var _cn = cn;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE ThrRow_Test (Id INTEGER PRIMARY KEY, V INTEGER NOT NULL, S TEXT NOT NULL)";
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<Row>() };
+        opts.EnableTemporalVersioning();
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        await RunReconstructionFuzzAsync(ctx, seed, rounds: 10, async () =>
+        {
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "SELECT strftime('%Y-%m-%d %H:%M:%f', 'now')";
+            var text = (string)(await cmd.ExecuteScalarAsync())!;
+            return DateTime.SpecifyKind(
+                DateTime.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.None),
+                DateTimeKind.Utc);
+        });
     }
 }
