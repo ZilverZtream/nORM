@@ -296,6 +296,10 @@ namespace nORM.Query
 
         private bool CanUsePooledPlanCommand<TResult>(QueryPlan plan, IReadOnlyList<object?>? paramValues)
             => _ctx.RawProvider.SupportsQueryPlanPreparedCommandCache &&
+               // Closure-folded SQL (marked by *_unused placeholders) is execution-specific;
+               // the pooled command caches the FIRST plan's SQL by fingerprint and would
+               // execute it for every later capture (the plan cache already re-translates).
+               !HasClosureFoldedIntoSql(plan) &&
                _ctx.Options.CommandInterceptors.Count == 0 &&
                (plan.CompiledParameters.Count == 0 || paramValues != null) &&
                !plan.IsScalar &&

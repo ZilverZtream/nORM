@@ -121,7 +121,8 @@ namespace nORM.Query
                         _ctx.RawProvider.GetType().GetHashCode(), mappingHash)
                 .Extend((int)_ctx.Options.ClientEvaluationPolicy);
 
-            if (_planCache.TryGet(fingerprint, out var cached))
+            if (_planCache.TryGet(fingerprint, out var cached)
+                && !HasClosureFoldedIntoSql(cached))
             {
                 parameterValues = ExtractParameterValues(filtered, cached);
                 return RebindGroupJoinClosures(cached, filtered);
@@ -152,7 +153,6 @@ namespace nORM.Query
                 parameterValues = ExtractParameterValues(filtered, plan);
                 return plan;
             }
-            plan = _planCache.GetOrAdd(fingerprint, _ =>
             {
                 using var translator = new QueryTranslator(_ctx);
                 var before = GC.GetAllocatedBytesForCurrentThread();
@@ -163,16 +163,45 @@ namespace nORM.Query
                 Interlocked.Increment(ref _planSizeSamples);
                 var clonedParams = new Dictionary<string, object>(p.Parameters);
                 var clonedCompiledParams = new List<string>(p.CompiledParameters);
-                return p with
+                plan = p with
                 {
                     Fingerprint = fingerprint,
                     Parameters = clonedParams,
                     CompiledParameters = clonedCompiledParams
                 };
-            });
+            }
+
+            // Translators that FOLD a closure-captured value into the SQL itself
+            // (StringComparison args, TimeOnly.Add deltas, ToString format strings, ...)
+            // mark the fold with a reserved *_unused compiled-param placeholder. Such
+            // SQL is execution-specific: caching it would replay the first execution's
+            // folded values on every later call with different captures, so these
+            // plans translate fresh per execution and are never stored.
+            if (HasClosureFoldedIntoSql(plan))
+            {
+                parameterValues = ExtractParameterValues(filtered, plan);
+                return plan;
+            }
+
+            plan = _planCache.GetOrAdd(fingerprint, _ => plan);
 
             parameterValues = ExtractParameterValues(filtered, plan);
             return RebindGroupJoinClosures(plan, filtered);
+        }
+
+        /// <summary>
+        /// True when the plan's SQL embeds a closure-captured value (marked by the
+        /// reserved *_unused compiled-param placeholders every folding translator
+        /// creates for extractor alignment), making the SQL execution-specific.
+        /// </summary>
+        private static bool HasClosureFoldedIntoSql(QueryPlan plan)
+        {
+            for (var i = 0; i < plan.CompiledParameters.Count; i++)
+            {
+                if (IsUnusedCompiledParameter(plan.CompiledParameters[i]))
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
