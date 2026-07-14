@@ -23,7 +23,15 @@ namespace nORM.Migration
             => diff.AlteredColumns.Select(static item => item.Table.Name)
                 .Concat(diff.AddedColumns.Select(static item => item.Table.Name))
                 .Concat(diff.DroppedColumns
-                    .Where(static item => RequiresRecreateForAddedColumn(item.Column))
+                    .Where(static item => RequiresRecreateForAddedColumn(item.Column)
+                        // Restoring a NOT NULL column with no default via ADD COLUMN fails on
+                        // populated tables ("Cannot add a NOT NULL column with default value
+                        // NULL"), and adding a DEFAULT clause would drift the restored schema.
+                        // Recreating instead backfills the type-appropriate zero in the
+                        // INSERT ... SELECT while the column definition stays exact.
+                        || (!item.Column.IsNullable
+                            && string.IsNullOrEmpty(item.Column.DefaultValue)
+                            && !IsComputedColumn(item.Column)))
                     .Select(static item => item.Table.Name))
                 .Concat(diff.AddedForeignKeys.Select(static item => item.Table.Name))
                 .Concat(diff.DroppedForeignKeys.Select(static item => item.Table.Name))
