@@ -41,6 +41,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         public required Type Clr;
         public required int TypeIndex;
         public bool Nullable;
+        public string? DefaultValue;
     }
 
     // Type changes whose value coercion round-trips losslessly through SQLite
@@ -110,6 +111,15 @@ public class SqliteMigrationDataPreservationFuzzTests
             baseline.Add(new ColSpec { Name = "Ck0", Clr = typeof(int), TypeIndex = 0, Nullable = false });
         }
 
+        // ── Optional DEFAULT-carrying column (default must survive; a dropped
+        // defaulted column restores with the default backfilled) ───────────
+        var withDefault = rng.Next(4) == 0;
+        var dropDefaultCol = withDefault && rng.Next(2) == 0;
+        if (withDefault)
+        {
+            baseline.Add(new ColSpec { Name = "D0", Clr = typeof(int), TypeIndex = 0, Nullable = false, DefaultValue = "42" });
+        }
+
         // ── Optional FK child table (parent recreates must not orphan it) ──
         var withChild = rng.Next(2) == 0;
 
@@ -144,6 +154,10 @@ public class SqliteMigrationDataPreservationFuzzTests
                 else if (col.Name == "Ck0")
                 {
                     value = rng.Next(1, 500); // strictly positive — satisfies CHECK (Ck0 > 0)
+                }
+                else if (col.Name == "D0")
+                {
+                    value = rng.Next(100, 999); // explicit values distinct from the DEFAULT 42
                 }
                 else if (col.Nullable && rng.Next(4) == 0)
                 {
@@ -180,7 +194,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         // ── Random mutations (at most one per column) ─────────────────────
         var target = baseline.Select(c => new ColSpec
         {
-            Name = c.Name, Clr = c.Clr, TypeIndex = c.TypeIndex, Nullable = c.Nullable
+            Name = c.Name, Clr = c.Clr, TypeIndex = c.TypeIndex, Nullable = c.Nullable, DefaultValue = c.DefaultValue
         }).ToList();
         var renames = new Dictionary<string, string>(StringComparer.Ordinal); // old -> new
         var dropped = new List<ColSpec>();
@@ -188,7 +202,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         // Indexed columns participate in mutations: dropping one must drop its
         // index (a recreate re-emitting an index over a missing column is broken
         // SQL), and renaming one must carry the index to the new column name.
-        var touched = new HashSet<string>(StringComparer.Ordinal) { "U0", "Ck0" };
+        var touched = new HashSet<string>(StringComparer.Ordinal) { "U0", "Ck0", "D0" };
         var typeChanged = new HashSet<string>(StringComparer.Ordinal);
         var previousNames = new Dictionary<string, string>(StringComparer.Ordinal); // target col -> PreviousName
 
@@ -259,6 +273,13 @@ public class SqliteMigrationDataPreservationFuzzTests
             }
         }
 
+        if (dropDefaultCol)
+        {
+            var d0 = target.Single(c => c.Name == "D0");
+            target.Remove(d0);
+            dropped.Add(d0);
+        }
+
         if (added.Count == 0 && dropped.Count == 0 && renames.Count == 0 && !TargetDiffers(baseline, target, previousNames))
             return; // no-op case
 
@@ -300,6 +321,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         AssertIndexes(cn, targetIndexes, withUnique, detail + " (after Up)");
         if (withCheck) AssertCheckEnforced(cn, detail + " (after Up)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Up)");
+        if (withDefault && !dropDefaultCol) AssertDefaultApplied(cn, detail + " (after Up)");
         var afterUp = Snapshot(cn, target.Select(c => c.Name));
         Assert.True(before.Count == afterUp.Count, $"row count changed on Up: {detail} — {before.Count} -> {afterUp.Count}");
         foreach (var col in target)
@@ -333,6 +355,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         AssertIndexes(cn, baselineIndexes, withUnique, detail + " (after Down)");
         if (withCheck) AssertCheckEnforced(cn, detail + " (after Down)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Down)");
+        if (withDefault) AssertDefaultApplied(cn, detail + " (after Down)");
         var afterDown = Snapshot(cn, baseline.Select(c => c.Name));
         Assert.True(before.Count == afterDown.Count, $"row count changed on Down: {detail} — {before.Count} -> {afterDown.Count}");
         var droppedByName = dropped.ToDictionary(d => d.Name, StringComparer.Ordinal);
@@ -383,6 +406,7 @@ public class SqliteMigrationDataPreservationFuzzTests
                 Name = c.Name,
                 ClrType = c.Clr.FullName!,
                 IsNullable = c.Nullable,
+                DefaultValue = c.DefaultValue,
             };
             if (previousNames != null && previousNames.TryGetValue(c.Name, out var prev))
                 schema.PreviousName = prev;
@@ -503,6 +527,52 @@ public class SqliteMigrationDataPreservationFuzzTests
         Assert.True(checkViolation, $"CHECK constraint no longer enforced {detail} — violating insert accepted");
     }
 
+    private static void AssertDefaultApplied(SqliteConnection cn, string detail)
+    {
+        // Insert a row OMITTING the defaulted column (copying every other column
+        // from an existing row, freshening the unique column) — the declared
+        // DEFAULT must fill it. A rebuild that lost the DEFAULT clause fails the
+        // NOT NULL instead, and one that mangled it yields the wrong value.
+        var insertCols = new List<string>();
+        using (var info = cn.CreateCommand())
+        {
+            info.CommandText = "SELECT name FROM pragma_table_info('FuzzMig') WHERE name NOT IN ('Id', 'D0')";
+            using var reader = info.ExecuteReader();
+            while (reader.Read())
+                insertCols.Add(reader.GetString(0));
+        }
+        var selectList = string.Join(", ", insertCols.Select(c => c == "U0" ? "987654322" : c));
+        long probeId;
+        using (var insert = cn.CreateCommand())
+        {
+            insert.CommandText =
+                $"INSERT INTO FuzzMig ({string.Join(", ", insertCols)}) SELECT {selectList} FROM FuzzMig LIMIT 1; " +
+                "SELECT last_insert_rowid()";
+            try
+            {
+                probeId = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            }
+            catch (SqliteException ex)
+            {
+                using var master = cn.CreateCommand();
+                master.CommandText = "SELECT sql FROM sqlite_master WHERE type='table' AND name='FuzzMig'";
+                throw new InvalidOperationException(
+                    $"default probe insert failed {detail}; live DDL: {master.ExecuteScalar()}", ex);
+            }
+        }
+        try
+        {
+            using var read = cn.CreateCommand();
+            read.CommandText = $"SELECT D0 FROM FuzzMig WHERE Id = {probeId}";
+            var applied = Convert.ToInt64(read.ExecuteScalar(), CultureInfo.InvariantCulture);
+            Assert.True(applied == 42, $"DEFAULT not applied {detail}: expected 42 got {applied}");
+        }
+        finally
+        {
+            Exec(cn, $"DELETE FROM FuzzMig WHERE Id = {probeId}");
+        }
+    }
+
     // Numeric-aware equality for type-changed columns: the new affinity's
     // storage form may render differently ('5.0' vs 5) while the value is intact.
     private static bool CoercedEquals(object expected, object actual)
@@ -598,6 +668,9 @@ public class SqliteMigrationDataPreservationFuzzTests
 
     private static object RestoredBackfillValue(ColSpec col)
     {
+        // A restored column with a declared DEFAULT backfills that default.
+        if (col.DefaultValue != null)
+            return long.Parse(col.DefaultValue, CultureInfo.InvariantCulture);
         if (col.Nullable)
             return DBNull.Value;
         // TEXT-affinity columns backfill '', numeric ones 0 — mirrors the
