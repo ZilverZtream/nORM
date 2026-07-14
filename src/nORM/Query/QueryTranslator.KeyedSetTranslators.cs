@@ -144,8 +144,7 @@ namespace nORM.Query
             {
                 if (SourceHasTakeOrSkip(source))
                     return sql;
-                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
-                return idx < 0 ? sql : sql[..idx];
+                return RemoveTrailingOrderByUnlessPaged(sql);
             }
         }
 
@@ -332,8 +331,7 @@ namespace nORM.Query
             {
                 if (SourceHasTakeOrSkip(source))
                     return sql;
-                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
-                return idx < 0 ? sql : sql[..idx];
+                return RemoveTrailingOrderByUnlessPaged(sql);
             }
         }
 

@@ -200,12 +200,6 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(
                         $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.");
                 }
-                if (SourceHasTakeOrSkip(node.Arguments[0]))
-                {
-                    throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} after Take/Skip is not part of the v1 provider-mobile contract.");
-                }
-
                 var orderKeys = ExtractOrderByKeys(node.Arguments[0]);
                 if (orderKeys.Count == 0)
                 {
@@ -247,7 +241,7 @@ namespace nORM.Query
                 var orderByForSourceWindow = BuildWhileOrderBy(t, orderKeys, subMapping, srcAlias);
                 var orderByForCumulativeWindow = BuildWhileOrderBy(t, orderKeys, subMapping, indexedAlias);
                 var orderByForOuter = BuildWhileOrderBy(t, orderKeys, subMapping, outerAlias);
-                var sourceSql = RemoveTrailingOrderBy(subPlan.Sql);
+                var sourceSql = RemoveTrailingOrderByUnlessPaged(subPlan.Sql);
 
                 t._sql.Append("SELECT * FROM (SELECT ").Append(indexedAlias).Append(".*, ")
                     .Append("SUM(CASE WHEN NOT (").Append(predSql).Append(") THEN 1 ELSE 0 END) OVER (ORDER BY ")
@@ -293,11 +287,6 @@ namespace nORM.Query
                 return result;
             }
 
-            private static string RemoveTrailingOrderBy(string sql)
-            {
-                var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
-                return idx < 0 ? sql : sql[..idx];
-            }
         }
 
         /// <summary>

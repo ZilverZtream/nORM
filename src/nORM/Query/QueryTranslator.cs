@@ -465,6 +465,26 @@ namespace nORM.Query
             return false;
         }
 
+        /// <summary>
+        /// Strips a trailing ORDER BY so the SQL can embed in a derived table —
+        /// unless a paging clause follows it. Every provider emits its paging
+        /// tokens (LIMIT/OFFSET/FETCH) after the ORDER BY they depend on, so
+        /// cutting from the ORDER BY would amputate the paging clause and
+        /// silently widen the row set (TakeLast/SkipLast and Take/Skip windows
+        /// page this way).
+        /// </summary>
+        private static string RemoveTrailingOrderByUnlessPaged(string sql)
+        {
+            var idx = sql.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return sql;
+            var tail = sql.AsSpan(idx);
+            if (tail.Contains(" LIMIT ", StringComparison.OrdinalIgnoreCase)
+                || tail.Contains(" OFFSET ", StringComparison.OrdinalIgnoreCase)
+                || tail.Contains(" FETCH ", StringComparison.OrdinalIgnoreCase))
+                return sql;
+            return sql[..idx];
+        }
+
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
