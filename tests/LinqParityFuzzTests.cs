@@ -328,6 +328,18 @@ public class LinqParityFuzzTests
             var s = rng.Next(0, 6);
             var n = rng.Next(1, 8);
             var shape = rng.Next(4);
+            // Split-query mode runs the dependent fetch through a different
+            // execution strategy; both must produce the identical graph.
+            var split = rng.Next(2) == 0;
+
+            List<NavRow> Load(INormQueryable<NavRow> source)
+            {
+                var included = source.Include(r => r.Kids);
+                var query = split
+                    ? included.AsSplitQuery().AsNoTracking()
+                    : included.AsNoTracking();
+                return ((System.Linq.IQueryable<NavRow>)query).ToList();
+            }
 
             List<NavRow> actual;
             List<Row> expectedParents;
@@ -336,25 +348,23 @@ public class LinqParityFuzzTests
                 switch (shape)
                 {
                     case 0:
-                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>().Where(r => r.IntVal >= k))
-                            .Include(r => r.Kids).AsNoTracking().ToList().OrderBy(r => r.Id).ToList();
+                        actual = Load((INormQueryable<NavRow>)ctx.Query<NavRow>().Where(r => r.IntVal >= k))
+                            .OrderBy(r => r.Id).ToList();
                         expectedParents = Rows.Where(r => r.IntVal >= k).OrderBy(r => r.Id).ToList();
                         break;
                     case 1:
-                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>().Where(r => r.Flag || r.IntVal < k))
-                            .Include(r => r.Kids).AsNoTracking().ToList().OrderBy(r => r.Id).ToList();
+                        actual = Load((INormQueryable<NavRow>)ctx.Query<NavRow>().Where(r => r.Flag || r.IntVal < k))
+                            .OrderBy(r => r.Id).ToList();
                         expectedParents = Rows.Where(r => r.Flag || r.IntVal < k).OrderBy(r => r.Id).ToList();
                         break;
                     case 2:
-                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>()
-                                .OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(s).Take(n))
-                            .Include(r => r.Kids).AsNoTracking().ToList();
+                        actual = Load((INormQueryable<NavRow>)ctx.Query<NavRow>()
+                            .OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(s).Take(n));
                         expectedParents = Rows.OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(s).Take(n).ToList();
                         break;
                     default:
-                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>()
-                                .Where(r => r.IntVal >= k).OrderByDescending(r => r.Created).ThenBy(r => r.Id).Take(n))
-                            .Include(r => r.Kids).AsNoTracking().ToList();
+                        actual = Load((INormQueryable<NavRow>)ctx.Query<NavRow>()
+                            .Where(r => r.IntVal >= k).OrderByDescending(r => r.Created).ThenBy(r => r.Id).Take(n));
                         expectedParents = Rows.Where(r => r.IntVal >= k).OrderByDescending(r => r.Created).ThenBy(r => r.Id).Take(n).ToList();
                         break;
                 }
@@ -362,7 +372,7 @@ public class LinqParityFuzzTests
             catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
             {
                 throw new InvalidOperationException(
-                    $"include shape threw (seed={seed} case={i} shape={shape} k={k} s={s} n={n})", ex);
+                    $"include shape threw (seed={seed} case={i} shape={shape} split={split} k={k} s={s} n={n})", ex);
             }
 
             Assert.True(expectedParents.Select(r => r.Id).SequenceEqual(actual.Select(r => r.Id)),
