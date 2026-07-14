@@ -123,6 +123,8 @@ namespace nORM.Query
         /// anything was inlined. Injected filter fragments are outside the user's
         /// expression tree, so their values can never bind through compiled slots.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure lifting evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure lifting reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class StandaloneCapturedValueInliner : ExpressionVisitor
         {
             public bool Inlined { get; private set; }

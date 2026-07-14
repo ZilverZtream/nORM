@@ -513,6 +513,8 @@ namespace nORM.Query
         /// compiled-parameter slots. Mirrors ParameterValueExtractor's walk: one
         /// substitution per top-level constant-resolvable member, no descent below it.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure lifting evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure lifting reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class CapturedValueInliner : ExpressionVisitor
         {
             private readonly QueryTranslator _t;

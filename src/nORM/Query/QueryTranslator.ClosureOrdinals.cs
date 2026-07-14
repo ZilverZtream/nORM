@@ -135,6 +135,8 @@ namespace nORM.Query
         /// ParameterValueExtractor uses: constants are skipped wholesale, and a
         /// closure member match does not descend into its children.
         /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Closure lifting evaluates expression trees at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Closure lifting reflects over closure members; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ClosureOccurrenceNumberer : ExpressionVisitor
         {
             private readonly Dictionary<Expression, int> _ordinals;
