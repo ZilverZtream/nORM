@@ -65,6 +65,11 @@ namespace nORM.Query
         // ConvertToProvider to the extracted value so a closure compared against a converter
         // column binds the PROVIDER representation (same contract as Where-side closures).
         public System.Collections.Generic.Dictionary<string, nORM.Mapping.IValueConverter>? SharedParamConverters { get; set; }
+        // The projection (or order-key) lambda's own parameters — the outer ROW references.
+        // Correlated subqueries emitted inside the projection resolve exactly these against
+        // the outer alias; any OTHER free parameter (a compiled query's value parameter) is
+        // NOT a row reference and must bind as a compiled parameter slot instead.
+        public System.Collections.Generic.IReadOnlyList<ParameterExpression>? OuterRowParameters { get; set; }
 
         public SelectClauseVisitor(TableMapping mapping, List<string> groupBy, DatabaseProvider provider, string? outerAlias = null, DbContext? ctx = null)
         {

@@ -371,4 +371,177 @@ public class CorrelatedScalarAggregateSubqueryTests
                 .Where(p => ctx.Query<Child>().Where(c => c.ParentId == p.Id).Take(2).Sum(c => c.Amount) > 10)
                 .ToListAsync());
     }
+
+    [Fact]
+    public async Task Sibling_projection_aggregates_bind_independent_slots()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // Two ctx captures and two distinct closures in ONE projection — each
+        // subquery must reserve its own alignment slot and bind its own cut.
+        foreach (var (cutA, cutB) in new[] { (15, 40), (5, 20) })
+        {
+            var expected = parents
+                .Select(p => (p.Id,
+                    N: children.Count(c => c.ParentId == p.Id && c.Amount >= cutA),
+                    S: children.Any(c => c.ParentId == p.Id && c.Amount >= cutB)
+                        ? (int?)children.Where(c => c.ParentId == p.Id && c.Amount >= cutB).Sum(c => c.Amount)
+                        : null))
+                .OrderBy(t => t.Id).ToList();
+            var actual = (await ctx.Query<Parent>()
+                .Select(p => new
+                {
+                    p.Id,
+                    N = ctx.Query<Child>().Count(c => c.ParentId == p.Id && c.Amount >= cutA),
+                    S = (int?)ctx.Query<Child>().Where(c => c.ParentId == p.Id && c.Amount >= cutB).Sum(c => c.Amount)
+                })
+                .ToListAsync()).Select(x => (x.Id, x.N, x.S)).OrderBy(t => t.Id).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"cuts=({cutA},{cutB}): expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
+    public async Task Projection_aggregate_between_closure_members_keeps_slot_alignment()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // Closures BEFORE, INSIDE, and AFTER the aggregate in document order —
+        // the ctx capture sits between value-bearing slots and must not shift them.
+        foreach (var (before, mid, after) in new[] { (100, 15, 3), (7, 40, 11) })
+        {
+            var expected = parents
+                .Select(p => (A: p.Threshold + before,
+                    N: children.Count(c => c.ParentId == p.Id && c.Amount >= mid),
+                    B: p.Id * after))
+                .OrderBy(t => t.B).ToList();
+            var actual = (await ctx.Query<Parent>()
+                .Select(p => new
+                {
+                    A = p.Threshold + before,
+                    N = ctx.Query<Child>().Count(c => c.ParentId == p.Id && c.Amount >= mid),
+                    B = p.Id * after
+                })
+                .ToListAsync()).Select(x => (x.A, x.N, x.B)).OrderBy(t => t.B).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"({before},{mid},{after}): expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
+    public async Task Projected_chain_aggregates_translate_in_projection()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // Where + Select chains under Min/Max/Average and a Distinct count.
+        var expected = parents
+            .Select(p => (p.Id,
+                Mn: children.Where(c => c.ParentId == p.Id).Select(c => (int?)c.Amount).Min(),
+                Mx: children.Where(c => c.ParentId == p.Id).Select(c => (int?)c.Amount).Max(),
+                Av: children.Any(c => c.ParentId == p.Id)
+                    ? (double?)children.Where(c => c.ParentId == p.Id).Average(c => c.Amount)
+                    : null,
+                D: children.Where(c => c.ParentId == p.Id).Select(c => c.Amount).Distinct().Count()))
+            .OrderBy(t => t.Id).ToList();
+        var actual = (await ctx.Query<Parent>()
+            .Select(p => new
+            {
+                p.Id,
+                Mn = (int?)ctx.Query<Child>().Where(c => c.ParentId == p.Id).Select(c => c.Amount).Min(),
+                Mx = (int?)ctx.Query<Child>().Where(c => c.ParentId == p.Id).Select(c => c.Amount).Max(),
+                Av = (double?)ctx.Query<Child>().Where(c => c.ParentId == p.Id).Average(c => c.Amount),
+                D = ctx.Query<Child>().Where(c => c.ParentId == p.Id).Select(c => c.Amount).Distinct().Count()
+            })
+            .ToListAsync()).Select(x => (x.Id, x.Mn, x.Mx, x.Av, x.D)).OrderBy(t => t.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task Self_type_nested_aggregate_in_projection_uses_distinct_alias()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The subquery targets the SAME entity type as the outer query — the
+        // inner FROM must bind its own alias, not the outer one.
+        var expected = parents
+            .Select(p => (p.Id, N: parents.Count(p2 => p2.Id > p.Id)))
+            .OrderBy(t => t.Id).ToList();
+        var actual = (await ctx.Query<Parent>()
+            .Select(p => new { p.Id, N = ctx.Query<Parent>().Count(p2 => p2.Id > p.Id) })
+            .ToListAsync()).Select(x => (x.Id, x.N)).OrderBy(t => t.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task Projection_aggregate_composed_in_arithmetic_translates()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The aggregate is a binary-expression OPERAND, not the whole member.
+        foreach (var (mul, add) in new[] { (2, 5), (3, 1) })
+        {
+            var expected = parents
+                .Select(p => (p.Id, V: children.Count(c => c.ParentId == p.Id) * mul + add))
+                .OrderBy(t => t.Id).ToList();
+            var actual = (await ctx.Query<Parent>()
+                .Select(p => new { p.Id, V = ctx.Query<Child>().Count(c => c.ParentId == p.Id) * mul + add })
+                .ToListAsync()).Select(x => (x.Id, x.V)).OrderBy(t => t.Id).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"({mul},{add}): expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    public sealed class ParentChildCountDto
+    {
+        public int Id { get; set; }
+        public int N { get; set; }
+    }
+
+    private static readonly Func<DbContext, int, Task<List<ParentChildCountDto>>> _parentCountsByCut =
+        Norm.CompileQuery((DbContext c, int cut) =>
+            c.Query<Parent>().Select(p => new ParentChildCountDto
+            {
+                Id = p.Id,
+                N = c.Query<Child>().Count(ch => ch.ParentId == p.Id && ch.Amount >= cut)
+            }));
+
+    [Fact]
+    public async Task Compiled_query_with_projection_aggregate_binds_the_free_parameter()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The compiled lambda's DbContext is a FREE PARAMETER — the projection
+        // subquery consumes it without a closure slot, and the cut re-binds
+        // per invocation.
+        foreach (var cut in new[] { 15, 45 })
+        {
+            var expected = parents
+                .Select(p => (p.Id, N: children.Count(ch => ch.ParentId == p.Id && ch.Amount >= cut)))
+                .OrderBy(t => t.Id).ToList();
+            var actual = (await _parentCountsByCut(ctx, cut))
+                .Select(x => (x.Id, x.N)).OrderBy(t => t.Id).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"cut={cut}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
 }

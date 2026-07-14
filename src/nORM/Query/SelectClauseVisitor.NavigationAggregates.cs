@@ -502,6 +502,12 @@ namespace nORM.Query
                 // not a row reference — never a correlation target.
                 if (typeof(DbContext).IsAssignableFrom(free.Type))
                     continue;
+                // A compiled query's free VALUE parameter is not a row reference either:
+                // correlating it maps it to the outer alias, where a bare parameter
+                // renders as nothing and corrupts the SQL. Leave it free so the
+                // sub-translation binds it as a compiled parameter slot.
+                if (OuterRowParameters != null && !OuterRowParameters.Contains(free))
+                    continue;
                 correlated[free] = (_mapping, _outerAlias);
             }
 

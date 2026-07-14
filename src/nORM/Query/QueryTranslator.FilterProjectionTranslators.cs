@@ -379,7 +379,8 @@ namespace nORM.Query
                                 ForceOrdinalStringProjections = t._forceOrdinalStringProjections,
                                 SharedParams = t._params,
                                 SharedCompiledParams = t._compiledParams,
-                                SharedParamConverters = t._paramConverters
+                                SharedParamConverters = t._paramConverters,
+                                OuterRowParameters = pendingProjection.Parameters
                             };
                             var projSelect = selectVisitor.Translate(pendingProjection.Body);
                             t._detectedCollections.AddRange(selectVisitor.DetectedCollections);
@@ -757,7 +758,7 @@ namespace nORM.Query
                         && navMember.Expression is ParameterExpression
                         && t._mapping.Relations.ContainsKey(navMember.Member.Name))
                     {
-                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias, ctx: t._ctx) { SharedParams = t._params, SharedCompiledParams = t._compiledParams, SharedParamConverters = t._paramConverters };
+                        var scv = new SelectClauseVisitor(t._mapping, t._groupBy, t._provider, info.Alias, ctx: t._ctx) { SharedParams = t._params, SharedCompiledParams = t._compiledParams, SharedParamConverters = t._paramConverters, OuterRowParameters = keySelector.Parameters };
                         var navSql = scv.Translate(navAggCall);
                         t._orderBy.Add((navSql, ascending));
                         FastExpressionVisitorPool.Return(visitor);
