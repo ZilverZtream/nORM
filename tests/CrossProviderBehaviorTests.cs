@@ -208,11 +208,15 @@ public class CrossProviderBehaviorTests
             ? new DbContextOptions { RequireMatchedRowOccSemantics = false }
             : new DbContextOptions();
 
+    // The sqlserver arm is excluded from the two UPDATE-based OCC lock-step tests:
+    // SQL Server's OCC update now carries an OUTPUT INSERTED clause to hydrate the
+    // regenerated ROWVERSION (native syntax SQLite cannot execute). Real-server
+    // coverage lives in CrudStateMachineFuzzLiveTests' OCC machine, which drives
+    // interleaved conflicts and consecutive saves against actual SQL Server.
     [Theory]
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
-    [InlineData("sqlserver")]
     public async Task LockStep_OCC_FreshToken_AllProviders_Succeeds(string kind)
     {
         var (cn, ctx) = CreateDb(kind, OccDdl, OccOpts(kind));
@@ -231,7 +235,6 @@ public class CrossProviderBehaviorTests
     [InlineData("sqlite")]
     [InlineData("mysql")]
     [InlineData("postgres")]
-    [InlineData("sqlserver")]
     [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
     public async Task LockStep_OCC_StaleToken_AllProviders_ThrowsConcurrencyException(string kind)
     {

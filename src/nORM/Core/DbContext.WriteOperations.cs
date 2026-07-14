@@ -730,7 +730,13 @@ namespace nORM.Core
                 whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
             }
             var where = string.Join(" AND ", whereParts);
-            return $"UPDATE {map.EscTable} SET {setSb} WHERE {where}";
+            // Server-generated tokens (ROWVERSION) regenerate on every UPDATE; the
+            // provider's OUTPUT clause reads the fresh value back so the tracked
+            // instance can save again (see ExecuteUpdateBatch's reader path).
+            var tokenOutput = map.TimestampColumn != null && _p.SupportsNativeRowVersion
+                ? _p.GetUpdateTokenOutputClause(map)
+                : string.Empty;
+            return $"UPDATE {map.EscTable} SET {setSb}{tokenOutput} WHERE {where}";
         }
 
         private string BuildDeleteBatch(TableMapping map, int startParamIndex)

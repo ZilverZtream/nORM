@@ -30,6 +30,14 @@ namespace nORM.Providers
         public virtual Column[] GetInsertColumns(TableMapping m) => m.InsertColumns;
 
         /// <summary>
+        /// Clause emitted between SET and WHERE of an UPDATE to read back a
+        /// server-generated concurrency token (SQL Server ROWVERSION), so the
+        /// tracked instance can save again without a false stale-token conflict.
+        /// Empty on providers whose tokens are client-managed.
+        /// </summary>
+        internal virtual string GetUpdateTokenOutputClause(TableMapping m) => string.Empty;
+
+        /// <summary>
         /// Builds a parameterized <c>INSERT</c> statement for the specified table
         /// mapping, caching the generated SQL for future use.
         /// </summary>

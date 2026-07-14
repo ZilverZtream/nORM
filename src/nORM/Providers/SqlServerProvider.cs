@@ -47,6 +47,13 @@ namespace nORM.Providers
             => m.InsertColumns.Where(c => !c.IsTimestamp).ToArray();
 
         /// <summary>
+        /// ROWVERSION regenerates on every UPDATE; read the fresh token back inline
+        /// so the tracked instance's next save compares against the current value.
+        /// </summary>
+        internal override string GetUpdateTokenOutputClause(TableMapping m)
+            => m.TimestampColumn is { } tokenColumn ? $" OUTPUT INSERTED.{tokenColumn.EscCol}" : string.Empty;
+
+        /// <summary>
         /// SQL Server uses TOP(n)/OFFSET-FETCH paging syntax rather than LIMIT.
         /// </summary>
         public override bool UsesFetchOffsetPaging => true;

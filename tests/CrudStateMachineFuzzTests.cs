@@ -66,13 +66,19 @@ public class CrudStateMachineFuzzTests
             cmd.ExecuteNonQuery();
         }
 
-        SqliteConnection Open()
+        DbContext OpenCtx()
         {
             var cn = new SqliteConnection(cs);
             cn.Open();
-            return cn;
+            return new DbContext(cn, new SqliteProvider());
         }
 
+        await RunExplicitKeyMachineAsync(OpenCtx, seed, steps: 200);
+    }
+
+    /// <summary>Explicit-key machine body, shared with the live-provider variant.</summary>
+    internal static async Task RunExplicitKeyMachineAsync(Func<DbContext> openCtx, int seed, int steps)
+    {
         var rng = new Random(seed);
         var committed = new Dictionary<int, RowState>();
         var working = new Dictionary<int, RowState>();
@@ -80,10 +86,10 @@ public class CrudStateMachineFuzzTests
         var deletedCommittedKeys = new List<int>();
         var nextKey = 1;
 
-        var ctx = new DbContext(Open(), new SqliteProvider());
+        var ctx = openCtx();
         try
         {
-            for (var step = 0; step < 200; step++)
+            for (var step = 0; step < steps; step++)
             {
                 var op = rng.Next(12);
                 switch (op)
@@ -174,11 +180,11 @@ public class CrudStateMachineFuzzTests
                         working = new Dictionary<int, RowState>(committed);
                         tracked.Clear();
                         deletedCommittedKeys.Clear();
-                        ctx = new DbContext(Open(), new SqliteProvider());
+                        ctx = openCtx();
                         // Verify through a throwaway context so the MAIN context's
                         // tracking state stays empty — the next ops then exercise the
                         // detached Update / Remove paths on a coin flip.
-                        using (var verifyCtx = new DbContext(Open(), new SqliteProvider()))
+                        using (var verifyCtx = openCtx())
                             await VerifyAsync(verifyCtx, committed, $"seed={seed} step={step} (fresh context after discard)");
                         if (rng.Next(2) == 0)
                         {
@@ -194,7 +200,7 @@ public class CrudStateMachineFuzzTests
             committed = new Dictionary<int, RowState>(working);
             ctx.Dispose();
 
-            ctx = new DbContext(Open(), new SqliteProvider());
+            ctx = openCtx();
             await VerifyAsync(ctx, committed, $"seed={seed} final (fresh context)");
         }
         finally
@@ -247,23 +253,29 @@ public class CrudStateMachineFuzzTests
             cmd.ExecuteNonQuery();
         }
 
-        SqliteConnection Open()
+        DbContext OpenCtx()
         {
             var cn = new SqliteConnection(cs);
             cn.Open();
-            return cn;
+            return new DbContext(cn, new SqliteProvider());
         }
 
+        await RunGenKeyMachineAsync(OpenCtx, seed, steps: 200);
+    }
+
+    /// <summary>Generated-key machine body, shared with the live-provider variant.</summary>
+    internal static async Task RunGenKeyMachineAsync(Func<DbContext> openCtx, int seed, int steps)
+    {
         var rng = new Random(seed);
         var committed = new Dictionary<int, RowState>();
         var working = new Dictionary<int, RowState>();
         var tracked = new Dictionary<int, MutGenRow>();
         var pendingAdds = new List<(MutGenRow Entity, RowState State)>();
 
-        var ctx = new DbContext(Open(), new SqliteProvider());
+        var ctx = openCtx();
         try
         {
-            for (var step = 0; step < 200; step++)
+            for (var step = 0; step < steps; step++)
             {
                 var op = rng.Next(12);
                 switch (op)
@@ -344,8 +356,8 @@ public class CrudStateMachineFuzzTests
                         pendingAdds.Clear();
                         working = new Dictionary<int, RowState>(committed);
                         tracked.Clear();
-                        ctx = new DbContext(Open(), new SqliteProvider());
-                        using (var verifyCtx = new DbContext(Open(), new SqliteProvider()))
+                        ctx = openCtx();
+                        using (var verifyCtx = openCtx())
                             await VerifyGenAsync(verifyCtx, committed, $"seed={seed} step={step} (fresh context after discard)");
                         foreach (var row in await ctx.Query<MutGenRow>().ToListAsync())
                             tracked[row.Id] = row;
@@ -363,7 +375,7 @@ public class CrudStateMachineFuzzTests
             committed = new Dictionary<int, RowState>(working);
             ctx.Dispose();
 
-            ctx = new DbContext(Open(), new SqliteProvider());
+            ctx = openCtx();
             await VerifyGenAsync(ctx, committed, $"seed={seed} final (fresh context)");
         }
         finally
@@ -416,24 +428,31 @@ public class CrudStateMachineFuzzTests
             cmd.ExecuteNonQuery();
         }
 
-        SqliteConnection Open()
+        DbContext OpenCtx()
         {
             var cn = new SqliteConnection(cs);
             cn.Open();
-            return cn;
+            return new DbContext(cn, new SqliteProvider(), RelOptions());
         }
 
-        static nORM.Configuration.DbContextOptions Options() => new()
-        {
-            OnModelCreating = mb =>
-            {
-                mb.Entity<RelParent>().HasKey(p => p.Id);
-                mb.Entity<RelChild>().HasKey(c => c.Id);
-                mb.Entity<RelParent>().HasMany(p => p.Children).WithOne()
-                                      .HasForeignKey(c => c.ParentId, p => p.Id);
-            }
-        };
+        await RunRelationshipMachineAsync(OpenCtx, seed, steps: 200);
+    }
 
+    /// <summary>Fluent relationship model shared by the SQLite and live variants.</summary>
+    internal static nORM.Configuration.DbContextOptions RelOptions() => new()
+    {
+        OnModelCreating = mb =>
+        {
+            mb.Entity<RelParent>().HasKey(p => p.Id);
+            mb.Entity<RelChild>().HasKey(c => c.Id);
+            mb.Entity<RelParent>().HasMany(p => p.Children).WithOne()
+                                  .HasForeignKey(c => c.ParentId, p => p.Id);
+        }
+    };
+
+    /// <summary>Relationship machine body, shared with the live-provider variant.</summary>
+    internal static async Task RunRelationshipMachineAsync(Func<DbContext> openCtx, int seed, int steps)
+    {
         var rng = new Random(seed);
         var parents = new Dictionary<int, string>();          // working view
         var children = new Dictionary<int, (int ParentId, int Val)>();
@@ -452,10 +471,10 @@ public class CrudStateMachineFuzzTests
         var trace = new List<string>();
         string Tail() => "\nops:\n" + string.Join("\n", trace.TakeLast(50));
 
-        var ctx = new DbContext(Open(), new SqliteProvider(), Options());
+        var ctx = openCtx();
         try
         {
-            for (var step = 0; step < 200; step++)
+            for (var step = 0; step < steps; step++)
             {
                 switch (rng.Next(12))
                 {
@@ -587,7 +606,7 @@ public class CrudStateMachineFuzzTests
                         trackedParents.Clear();
                         trackedChildren.Clear();
                         pendingNavChildren.Clear();
-                        ctx = new DbContext(Open(), new SqliteProvider(), Options());
+                        ctx = openCtx();
                         trace.Add($"{step}: discard");
                         await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} step={step} (fresh context after discard){Tail()}");
                         foreach (var p in await ctx.Query<RelParent>().ToListAsync())
@@ -604,7 +623,7 @@ public class CrudStateMachineFuzzTests
             committedChildren = new Dictionary<int, (int, int)>(children);
             ctx.Dispose();
 
-            ctx = new DbContext(Open(), new SqliteProvider(), Options());
+            ctx = openCtx();
             await VerifyRelAsync(ctx, committedParents, committedChildren, $"seed={seed} final (fresh context){Tail()}");
         }
         finally

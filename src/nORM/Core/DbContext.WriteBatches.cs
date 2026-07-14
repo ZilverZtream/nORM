@@ -249,7 +249,35 @@ namespace nORM.Core
             if (batch.Count > 1 && _p.SupportsPreparedBatchCommands)
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
-            var updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+            int updated;
+            if (map.TimestampColumn != null && _p.SupportsNativeRowVersion)
+            {
+                // Each UPDATE carries an OUTPUT clause returning the regenerated
+                // token (one result set per statement, empty when the row did not
+                // match). Hydrate the fresh token into the entity so the same
+                // context's next save of this row compares against the current
+                // value instead of throwing a false stale-token conflict.
+                updated = 0;
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, ct).ConfigureAwait(false);
+                var entryIndex = 0;
+                do
+                {
+                    if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    {
+                        var tokenValue = reader.GetValue(0);
+                        var updatedEntity = batch[entryIndex].Entity;
+                        if (updatedEntity != null && tokenValue != DBNull.Value)
+                            map.TimestampColumn.Setter(updatedEntity, tokenValue);
+                        updated++;
+                    }
+                    entryIndex++;
+                }
+                while (await reader.NextResultAsync(ct).ConfigureAwait(false) && entryIndex < batch.Count);
+            }
+            else
+            {
+                updated = await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+            }
             // S1 - Optimistic-concurrency rowcount check.
             // For matched-row providers (UseAffectedRowsSemantics=false): 0 rows updated means
             // the WHERE clause (pk + token) did not match, so the token was stale - throw.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -57,13 +57,19 @@ public class OccInterleavingFuzzTests
             cmd.ExecuteNonQuery();
         }
 
-        SqliteConnection Open()
+        DbContext OpenCtx()
         {
             var cn = new SqliteConnection(cs);
             cn.Open();
-            return cn;
+            return new DbContext(cn, new SqliteProvider());
         }
 
+        await RunOccMachineAsync(OpenCtx, seed, steps: 160);
+    }
+
+    /// <summary>Two-context OCC machine body, shared with the live-provider variant.</summary>
+    internal static async Task RunOccMachineAsync(Func<DbContext> openCtx, int seed, int steps)
+    {
         var rng = new Random(seed);
         var committedVal = new Dictionary<int, int>();
         var version = new Dictionary<int, int>();
@@ -72,8 +78,8 @@ public class OccInterleavingFuzzTests
         string Tail() => "\nops:\n" + string.Join("\n", trace.TakeLast(40));
 
         var ctxs = new[] { new CtxState(), new CtxState() };
-        ctxs[0].Ctx = new DbContext(Open(), new SqliteProvider());
-        ctxs[1].Ctx = new DbContext(Open(), new SqliteProvider());
+        ctxs[0].Ctx = openCtx();
+        ctxs[1].Ctx = openCtx();
 
         async Task RefreshAsync(int i)
         {
@@ -89,7 +95,7 @@ public class OccInterleavingFuzzTests
 
         async Task VerifyCommittedAsync(string context)
         {
-            using var verifyCtx = new DbContext(Open(), new SqliteProvider());
+            using var verifyCtx = openCtx();
             var rows = (await verifyCtx.Query<OccRow>().ToListAsync()).OrderBy(r => r.Id).ToList();
             var expected = committedVal.OrderBy(kv => kv.Key).ToList();
             Assert.True(rows.Count == expected.Count,
@@ -117,7 +123,7 @@ public class OccInterleavingFuzzTests
 
         try
         {
-            for (var step = 0; step < 160; step++)
+            for (var step = 0; step < steps; step++)
             {
                 var i = rng.Next(2);
                 var s = ctxs[i];
@@ -220,3 +226,4 @@ public class OccInterleavingFuzzTests
         }
     }
 }
+
