@@ -111,6 +111,33 @@ namespace nORM.Core
             return h;
         }
 
+        private int _globalFiltersHashCached;
+        private bool _globalFiltersHashComputed;
+
+        /// <summary>
+        /// Stable hash of the registered global-filter set (entity type + filter
+        /// expression shape and inline constant values). Part of the plan-cache key:
+        /// injected SUBQUERY filters are not visible in the top-level filtered
+        /// expression, so two contexts whose filters differ can otherwise produce
+        /// identical fingerprints and replay each other's filtered plans — a
+        /// cross-tenant leak through the process-global cache. Filters whose values
+        /// come from live closures are fold-no-cache at the injection site, so a
+        /// shape-plus-constants hash is sufficient here.
+        /// </summary>
+        internal int GetGlobalFiltersHash()
+        {
+            if (_globalFiltersHashComputed) return _globalFiltersHashCached;
+            int h = 0;
+            foreach (var kvp in Options.GlobalFilters.OrderBy(static k => k.Key.FullName, StringComparer.Ordinal))
+            {
+                foreach (var filter in kvp.Value)
+                    h = HashCode.Combine(h, kvp.Key, nORM.Query.ExpressionFingerprint.Compute(filter));
+            }
+            _globalFiltersHashCached = h;
+            _globalFiltersHashComputed = true;
+            return h;
+        }
+
         /// <summary>
         /// Tracks types that were used as query roots via ctx.Query&lt;T&gt;().
         /// These are "real" entity types, as opposed to DTO projection result types.

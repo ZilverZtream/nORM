@@ -119,7 +119,11 @@ namespace nORM.Query
                 .ComputeForPlanCache(filtered)
                 .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
                         _ctx.RawProvider.GetType().GetHashCode(), mappingHash)
-                .Extend((int)_ctx.Options.ClientEvaluationPolicy);
+                .Extend((int)_ctx.Options.ClientEvaluationPolicy)
+                // Injected SUBQUERY filters never appear in the top-level filtered
+                // expression: without the filter-set hash, contexts with different
+                // global filters share a fingerprint and replay each other's plans.
+                .Extend(_ctx.GetGlobalFiltersHash());
 
             if (_planCache.TryGet(fingerprint, out var cached)
                 && !HasClosureFoldedIntoSql(cached))

@@ -248,6 +248,76 @@ public class CorrelatedSubqueryGlobalFilterTests
         Assert.True(emps[1].Dept == null, "emp 2 eager-loaded the other tenant's dept");
     }
 
+    [Table("CsgfOpenParent_Test")]
+    public class OpenParent
+    {
+        [Key] public int Id { get; set; }
+    }
+
+    [Table("CsgfChild_Test")]
+    public class OpenChild
+    {
+        [Key] public int Id { get; set; }
+        public int ParentId { get; set; }
+        public string Tenant { get; set; } = "";
+    }
+
+    [Fact]
+    public async Task Subquery_filters_do_not_poison_the_shared_plan_cache()
+    {
+        // The plan cache is process-global and keyed on the FILTERED top-level
+        // expression. Here the top-level entity carries NO filter, so two
+        // contexts whose CHILD filters differ produce identical top-level
+        // expressions — the second context must not replay the first's
+        // injected subquery filter.
+        var cs = $"Data Source=file:csgfpc_{Guid.NewGuid():N}?mode=memory&cache=shared";
+        using var keeper = new SqliteConnection(cs);
+        keeper.Open();
+        using (var cmd = keeper.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE CsgfOpenParent_Test (Id INTEGER PRIMARY KEY);
+                CREATE TABLE CsgfChild_Test (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Tenant TEXT NOT NULL);
+                INSERT INTO CsgfOpenParent_Test VALUES (1);
+                INSERT INTO CsgfChild_Test VALUES (1, 1, 'T1'), (2, 1, 'T1'), (3, 1, 'T2');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        // ONE shared call site (the service-method pattern): both contexts run
+        // the identical expression shape, so the plan-cache key must
+        // discriminate on the FILTER SET, not the expression alone. The filters
+        // are constant-shaped — closure-captured values would mark the plan
+        // fold-no-cache and dodge the cache instead of exercising it.
+        static async Task<int> CountChildren(DbContext ctx)
+        {
+            var rows = await ctx.Query<OpenParent>()
+                .Select(p => new { p.Id, N = ctx.Query<OpenChild>().Count(c => c.ParentId == p.Id) })
+                .ToListAsync();
+            return rows.Single().N;
+        }
+
+        var cnA = new SqliteConnection(cs);
+        cnA.Open();
+        var optsA = new DbContextOptions();
+        optsA.AddGlobalFilter<OpenChild>(c => c.Tenant == "T1");
+        await using (var ctxA = new DbContext(cnA, new SqliteProvider(), optsA))
+        {
+            Assert.Equal(2, await CountChildren(ctxA));
+        }
+
+        var cnB = new SqliteConnection(cs);
+        cnB.Open();
+        var optsB = new DbContextOptions();
+        optsB.AddGlobalFilter<OpenChild>(c => c.Tenant == "T2");
+        await using (var ctxB = new DbContext(cnB, new SqliteProvider(), optsB))
+        {
+            var n = await CountChildren(ctxB);
+            Assert.True(n == 1,
+                $"tenant-B context counted {n} children — the shared plan cache replayed tenant A's injected subquery filter");
+        }
+    }
+
     [Fact]
     public async Task Bulk_update_respects_global_filters()
     {
