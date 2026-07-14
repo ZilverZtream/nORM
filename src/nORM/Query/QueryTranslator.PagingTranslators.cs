@@ -323,14 +323,18 @@ namespace nORM.Query
 
         private static Expression ApplyTailPaging(QueryTranslator t, MethodCallExpression node, bool isTake)
         {
-            // TakeLast/SkipLast directly after a Take/Skip window must count from the
-            // end of the WINDOW. The flat flip-order shortcut below would emit a single
+            // TakeLast/SkipLast after a Take/Skip window must count from the end of
+            // the WINDOW. The flat flip-order shortcut below would emit a single
             // `ORDER BY … DESC LIMIT/OFFSET` that pages the FULL table, so wrap the
             // windowed source as a derived table (same machinery as Reverse-after-window)
             // with the source's order keys re-derived and FLIPPED on the outer SELECT,
-            // then page the outer with the tail count.
+            // then page the outer with the tail count. The window may sit below other
+            // operators when the whole chain is wrap-eligible (entity-shaped rows,
+            // extracted order keys stay truthful) — the sub-translation carries the
+            // interleaved operators.
             if (node.Arguments[0] is MethodCallExpression tailWinSrc
-                && tailWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+                && (tailWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip)
+                    || (SourceHasTakeOrSkip(node.Arguments[0]) && IsTailWrapEligibleSource(node.Arguments[0]))))
             {
                 var subPlan = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMap);
                 t._mapping = subMap;
@@ -444,6 +448,45 @@ namespace nORM.Query
             // reverse of just N rows.
             t._postReverseResult = true;
             return source;
+        }
+
+        /// <summary>
+        /// A tail operator can wrap its windowed source as a derived table only when
+        /// every operator between the tail and the root keeps the rows entity-shaped
+        /// and keeps the extracted order keys truthful: projections change the output
+        /// columns the outer ORDER BY re-derives against, Reverse inverts the ordering
+        /// the extracted keys describe, and joins/set-ops/reshapes change the row
+        /// source entirely.
+        /// </summary>
+        private static bool IsTailWrapEligibleSource(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case nameof(Queryable.Take):
+                    case nameof(Queryable.Skip):
+                    case "TakeLast":
+                    case "SkipLast":
+                    case "TakeWhile":
+                    case "SkipWhile":
+                    case "Where":
+                    case "OrderBy":
+                    case "OrderByDescending":
+                    case "ThenBy":
+                    case "ThenByDescending":
+                    case "Distinct":
+                    case "AsNoTracking":
+                    case "Query": // the `ctx.Query<T>()` chain root
+                        break;
+                    default:
+                        return false;
+                }
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+            return true;
         }
 
         /// <summary>

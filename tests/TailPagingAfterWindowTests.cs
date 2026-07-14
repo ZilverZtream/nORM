@@ -118,6 +118,72 @@ public class TailPagingAfterWindowTests
     }
 
     [Fact]
+    public async Task TakeLast_after_Distinct_over_a_window_matches_linq()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        foreach (var r in rows) ctx.Add(r);
+        await ctx.SaveChangesAsync();
+
+        var expected = rows.OrderBy(r => r.Val).Take(6).Distinct().TakeLast(2).Select(r => r.Id).ToList();
+        var actual = (await ctx.Query<Row>().OrderBy(r => r.Val).Take(6).Distinct().TakeLast(2).ToListAsync())
+            .Select(r => r.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task TakeLast_after_TakeWhile_over_a_window_matches_linq()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        foreach (var r in rows) ctx.Add(r);
+        await ctx.SaveChangesAsync();
+
+        var expected = rows.OrderBy(r => r.Val).Take(8).TakeWhile(r => r.Id > 2).TakeLast(3)
+            .Select(r => r.Id).ToList();
+        var actual = (await ctx.Query<Row>().OrderBy(r => r.Val).Take(8).TakeWhile(r => r.Id > 2).TakeLast(3).ToListAsync())
+            .Select(r => r.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task SkipLast_after_double_filtered_Skip_window_matches_linq()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        foreach (var r in rows) ctx.Add(r);
+        await ctx.SaveChangesAsync();
+
+        var expected = rows.OrderByDescending(r => r.Val).Skip(2).Where(r => r.Id != 5).Where(r => r.Id > 1)
+            .SkipLast(3).Select(r => r.Id).ToList();
+        var actual = (await ctx.Query<Row>().OrderByDescending(r => r.Val).Skip(2).Where(r => r.Id != 5).Where(r => r.Id > 1)
+            .SkipLast(3).ToListAsync()).Select(r => r.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
+    public async Task Nested_tail_paging_over_a_window_matches_linq()
+    {
+        var (keeper, ctx, rows) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        foreach (var r in rows) ctx.Add(r);
+        await ctx.SaveChangesAsync();
+
+        var expected = rows.OrderBy(r => r.Val).Take(9).TakeLast(5).TakeLast(2).Select(r => r.Id).ToList();
+        var actual = (await ctx.Query<Row>().OrderBy(r => r.Val).Take(9).TakeLast(5).TakeLast(2).ToListAsync())
+            .Select(r => r.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+    }
+
+    [Fact]
     public async Task TakeLast_after_filtered_window_matches_linq()
     {
         var (keeper, ctx, rows) = CreateDb();
