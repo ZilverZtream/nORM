@@ -693,7 +693,7 @@ public class LinqParityFuzzTests
         var m = rng.Next(0, 5);
         var sumCut = rng.Next(-10, 15);
         var avgCut = rng.Next(-3, 3) + 0.25;
-        var shape = rng.Next(9);
+        var shape = rng.Next(12);
 
         List<int> expected;
         List<int> actual;
@@ -771,6 +771,45 @@ public class LinqParityFuzzTests
                             && ctx.Query<Row>().Any(r2 => r2.Id == c.ParentId && r2.IntVal >= m - 2)))
                         .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
                     break;
+                case 8:
+                    // Correlated First over an ordered, scalar-projected subquery in a predicate.
+                    // The oracle guards empty groups with Any (First-over-empty throws); nORM's
+                    // empty subquery yields SQL NULL which the comparison excludes — same result.
+                    expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            && Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                                .OrderBy(c => c.Id).Select(c => c.ChildVal).First() > sumCut)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => c.ChildVal).First() > sumCut)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                case 9:
+                    // Correlated Last = First of the reversed ordering.
+                    expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            && Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                                .OrderBy(c => c.Id).Select(c => c.ChildVal).Last() > sumCut)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => c.ChildVal).Last() > sumCut)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                case 10:
+                {
+                    // Correlated ElementAt(idx): LIMIT 1 OFFSET idx. Oracle guards Count > idx
+                    // (ElementAt-out-of-range throws); nORM's out-of-range OFFSET yields NULL.
+                    var idx = m % 3;
+                    expected = Rows.Where(r => Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k).Count() > idx
+                            && Children.Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                                .OrderBy(c => c.Id).Select(c => c.ChildVal).ElementAt(idx) > sumCut)
+                        .Select(r => r.Id).OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Where(r => ctx.Query<Child>().Where(c => c.ParentId == r.Id && c.ChildVal >= k)
+                            .OrderBy(c => c.Id).Select(c => c.ChildVal).ElementAt(idx) > sumCut)
+                        .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                }
                 default:
                     // PROJECTION-side correlated count: the ctx capture inside the
                     // projection reserves its own alignment slot and the inner
