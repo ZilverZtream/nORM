@@ -307,6 +307,21 @@ namespace nORM.Migration
                     down.Add(BuildImplicitUniqueIndexSql(table, droppedCol));
             }
 
+            // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new. When the
+            // table is recreated in a given direction the rename is folded into that recreate's
+            // INSERT ... SELECT (old->new on Up, new->old on Down); emitting a standalone RENAME then
+            // would target a column the recreate already renamed and fail. Only rename here for the
+            // direction(s) where the table is not recreated. Renames MUST precede the index blocks
+            // below: a rebuilt index for a renamed column references the NEW name on Up (and the OLD
+            // name on Down), which only exists after the rename in that direction has run.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+            {
+                if (!upRecreatedTables.Contains(table.Name))
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+                if (!downRecreatedTables.Contains(table.Name))
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+            }
+
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
             {
                 if (!upRecreatedTables.Contains(table.Name))
@@ -369,19 +384,6 @@ namespace nORM.Migration
             {
                 if (!downRecreatedTables.Contains(table.Name))
                     down.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
-            }
-
-            // Rename columns — SQLite 3.25+ supports ALTER TABLE t RENAME COLUMN old TO new. When the
-            // table is recreated in a given direction the rename is folded into that recreate's
-            // INSERT ... SELECT (old->new on Up, new->old on Down); emitting a standalone RENAME then
-            // would target a column the recreate already renamed and fail. Only rename here for the
-            // direction(s) where the table is not recreated.
-            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
-            {
-                if (!upRecreatedTables.Contains(table.Name))
-                    up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
-                if (!downRecreatedTables.Contains(table.Name))
-                    down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
             }
 
             // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can

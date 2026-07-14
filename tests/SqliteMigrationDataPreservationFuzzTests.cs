@@ -106,7 +106,10 @@ public class SqliteMigrationDataPreservationFuzzTests
         // ── Optional FK child table (parent recreates must not orphan it) ──
         var withChild = rng.Next(2) == 0;
 
-        var baselineTable = BuildTable(baseline, indexedColumns: indexedColumns, uniqueColumn: withUnique ? "U0" : null);
+        // Index NAMES stay keyed to the baseline column so a rename keeps the
+        // index identity while pointing it at the renamed column.
+        var baselineIndexes = indexedColumns.ToDictionary(c => c, IndexName, StringComparer.Ordinal);
+        var baselineTable = BuildTable(baseline, indexNamesByColumn: baselineIndexes, uniqueColumn: withUnique ? "U0" : null);
         var childTable = withChild ? BuildChildTable() : null;
         var gen = new SqliteMigrationSqlGenerator();
         var createDiff = new SchemaDiff { AddedTables = { baselineTable } };
@@ -171,9 +174,10 @@ public class SqliteMigrationDataPreservationFuzzTests
         var renames = new Dictionary<string, string>(StringComparer.Ordinal); // old -> new
         var dropped = new List<ColSpec>();
         var added = new List<string>();
-        // Indexed columns keep their definitions this round — the indexes
-        // themselves must ride through any recreate untouched.
-        var touched = new HashSet<string>(indexedColumns, StringComparer.Ordinal) { "U0" };
+        // Indexed columns participate in mutations: dropping one must drop its
+        // index (a recreate re-emitting an index over a missing column is broken
+        // SQL), and renaming one must carry the index to the new column name.
+        var touched = new HashSet<string>(StringComparer.Ordinal) { "U0" };
         var typeChanged = new HashSet<string>(StringComparer.Ordinal);
         var previousNames = new Dictionary<string, string>(StringComparer.Ordinal); // target col -> PreviousName
 
@@ -247,7 +251,17 @@ public class SqliteMigrationDataPreservationFuzzTests
         if (added.Count == 0 && dropped.Count == 0 && renames.Count == 0 && !TargetDiffers(baseline, target, previousNames))
             return; // no-op case
 
-        var targetTable = BuildTable(target, previousNames, indexedColumns, withUnique ? "U0" : null);
+        // Post-mutation index map: dropped columns lose their index; renamed
+        // columns keep the ORIGINAL index name on the NEW column name.
+        var droppedSet = new HashSet<string>(dropped.Select(d => d.Name), StringComparer.Ordinal);
+        var targetIndexes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (col, ixName) in baselineIndexes)
+        {
+            if (droppedSet.Contains(col)) continue;
+            targetIndexes[renames.TryGetValue(col, out var renamed) ? renamed : col] = ixName;
+        }
+
+        var targetTable = BuildTable(target, previousNames, targetIndexes, withUnique ? "U0" : null);
         var oldSnapshot = new SchemaSnapshot { Tables = { baselineTable } };
         var newSnapshot = new SchemaSnapshot { Tables = { targetTable } };
         if (childTable != null)
@@ -272,7 +286,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         }
 
         AssertSchema(cn, target, detail + " (after Up)");
-        AssertIndexes(cn, indexedColumns, withUnique, detail + " (after Up)");
+        AssertIndexes(cn, targetIndexes, withUnique, detail + " (after Up)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Up)");
         var afterUp = Snapshot(cn, target.Select(c => c.Name));
         Assert.True(before.Count == afterUp.Count, $"row count changed on Up: {detail} — {before.Count} -> {afterUp.Count}");
@@ -304,7 +318,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         }
 
         AssertSchema(cn, baseline, detail + " (after Down)");
-        AssertIndexes(cn, indexedColumns, withUnique, detail + " (after Down)");
+        AssertIndexes(cn, baselineIndexes, withUnique, detail + " (after Down)");
         if (withChild) AssertChildIntegrity(cn, childBefore, detail + " (after Down)");
         var afterDown = Snapshot(cn, baseline.Select(c => c.Name));
         Assert.True(before.Count == afterDown.Count, $"row count changed on Down: {detail} — {before.Count} -> {afterDown.Count}");
@@ -339,7 +353,7 @@ public class SqliteMigrationDataPreservationFuzzTests
     }
 
     private static TableSchema BuildTable(List<ColSpec> cols, Dictionary<string, string>? previousNames = null,
-        List<string>? indexedColumns = null, string? uniqueColumn = null)
+        Dictionary<string, string>? indexNamesByColumn = null, string? uniqueColumn = null)
     {
         var t = new TableSchema { Name = "FuzzMig" };
         t.Columns.Add(new ColumnSchema
@@ -359,8 +373,8 @@ public class SqliteMigrationDataPreservationFuzzTests
             };
             if (previousNames != null && previousNames.TryGetValue(c.Name, out var prev))
                 schema.PreviousName = prev;
-            if (indexedColumns != null && indexedColumns.Contains(c.Name))
-                schema.Indexes.Add(new ColumnIndexSchema { Name = IndexName(c.Name), IsUnique = false, Order = 0 });
+            if (indexNamesByColumn != null && indexNamesByColumn.TryGetValue(c.Name, out var ixName))
+                schema.Indexes.Add(new ColumnIndexSchema { Name = ixName, IsUnique = false, Order = 0 });
             if (uniqueColumn != null && c.Name == uniqueColumn)
                 schema.Indexes.Add(new ColumnIndexSchema { Name = IndexName(c.Name), IsUnique = true, Order = 0 });
             t.Columns.Add(schema);
@@ -386,7 +400,7 @@ public class SqliteMigrationDataPreservationFuzzTests
         return t;
     }
 
-    private static void AssertIndexes(SqliteConnection cn, List<string> indexedColumns, bool withUnique, string detail)
+    private static void AssertIndexes(SqliteConnection cn, Dictionary<string, string> indexNamesByColumn, bool withUnique, string detail)
     {
         var live = new Dictionary<string, bool>(StringComparer.Ordinal);
         using (var cmd = cn.CreateCommand())
@@ -396,12 +410,24 @@ public class SqliteMigrationDataPreservationFuzzTests
             while (reader.Read())
                 live[reader.GetString(0)] = reader.GetInt32(1) == 1;
         }
-        var expected = indexedColumns.Select(IndexName)
+        var expected = indexNamesByColumn.Values
             .Concat(withUnique ? new[] { IndexName("U0") } : Array.Empty<string>())
             .OrderBy(x => x, StringComparer.Ordinal).ToList();
         var actual = live.Keys.OrderBy(x => x, StringComparer.Ordinal).ToList();
         Assert.True(expected.SequenceEqual(actual),
             $"index drift {detail}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+
+        // Each surviving index must cover the column it is expected to cover —
+        // a rename that leaves the index behind (or points it at the wrong
+        // column) is silent index loss.
+        foreach (var (colName, ixName) in indexNamesByColumn)
+        {
+            using var info = cn.CreateCommand();
+            info.CommandText = $"SELECT name FROM pragma_index_info('{ixName}')";
+            var liveCol = info.ExecuteScalar() as string;
+            Assert.True(string.Equals(liveCol, colName, StringComparison.Ordinal),
+                $"index column drift {detail} index={ixName}: expected {colName} got {liveCol ?? "<missing>"}");
+        }
         if (withUnique)
         {
             Assert.True(live[IndexName("U0")],
@@ -428,10 +454,10 @@ public class SqliteMigrationDataPreservationFuzzTests
             }
             Assert.True(uniqueViolation, $"unique index no longer enforced {detail} — duplicate U0 accepted");
         }
-        foreach (var col in indexedColumns)
+        foreach (var ixName in indexNamesByColumn.Values)
         {
-            Assert.False(live[IndexName(col)],
-                $"non-unique index came back UNIQUE {detail} col={col}");
+            Assert.False(live[ixName],
+                $"non-unique index came back UNIQUE {detail} index={ixName}");
         }
     }
 
