@@ -189,6 +189,23 @@ namespace nORM.Core
                     await cmd.DisposeAsync().ConfigureAwait(false);
                 }
             }
+            CaptureOwnedSnapshotsAfterLoad(owners);
+        }
+
+        /// <summary>
+        /// After owned collections are loaded, capture each tracked owner's owned-collection
+        /// content snapshot so a later collection edit (add / remove / child-scalar change)
+        /// is detected as a change. Owners are tracked BEFORE this load populated the
+        /// collections, so their snapshot would otherwise reflect the empty pre-load state
+        /// and edits would silently drop.
+        /// </summary>
+        private void CaptureOwnedSnapshotsAfterLoad(System.Collections.IList owners)
+        {
+            foreach (var owner in owners)
+            {
+                if (owner == null) continue;
+                ChangeTracker.GetEntryOrDefault(owner)?.CaptureOwnedCollectionSnapshots();
+            }
         }
 
         /// <summary>
@@ -214,6 +231,7 @@ namespace nORM.Core
                         MaterializeAndAssignOwnedRow(reader, ownedMap, pkCol, ownerByPk, fkOrdinal);
                 }
             }
+            CaptureOwnedSnapshotsAfterLoad(owners);
         }
 
         /// <summary>

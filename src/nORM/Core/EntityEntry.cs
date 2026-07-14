@@ -124,6 +124,82 @@ namespace nORM.Core
             }
         }
 
+        /// Owned-collection content snapshots: per nav property, a multiset of each
+        /// child's column-value signature captured when the collection was loaded.
+        /// Used to detect owned-collection edits (add / remove / child-scalar change),
+        /// which are otherwise invisible to column-only change detection and would be
+        /// silently dropped — the owned sync only runs for a Modified owner.
+        internal Dictionary<string, List<string>>? OwnedCollectionSnapshots { get; private set; }
+
+        /// <summary>
+        /// Captures the current owned-collection contents as the snapshot baseline.
+        /// Called after the owned collections are loaded and after SaveChanges succeeds.
+        /// </summary>
+        internal void CaptureOwnedCollectionSnapshots()
+        {
+            if (_mapping.OwnedCollections == null || _mapping.OwnedCollections.Count == 0) return;
+            var entity = Entity;
+            if (entity == null) return;
+
+            OwnedCollectionSnapshots ??= new Dictionary<string, List<string>>();
+            foreach (var ocm in _mapping.OwnedCollections)
+                OwnedCollectionSnapshots[ocm.NavigationProperty.Name] = OwnedContentSignatures(ocm, entity);
+        }
+
+        private static List<string> OwnedContentSignatures(nORM.Mapping.OwnedCollectionMapping ocm, object owner)
+        {
+            var signatures = new List<string>();
+            var collection = ocm.CollectionGetter(owner);
+            if (collection is System.Collections.IEnumerable items)
+            {
+                foreach (var item in items)
+                {
+                    if (item == null) continue;
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var col in ocm.Columns)
+                    {
+                        sb.Append(col.Getter(item)?.ToString() ?? "\0");
+                        sb.Append('\x1f');
+                    }
+                    signatures.Add(sb.ToString());
+                }
+            }
+            signatures.Sort(StringComparer.Ordinal); // multiset compare, order-insensitive
+            return signatures;
+        }
+
+        /// <summary>
+        /// Compares each owned collection's current content signature multiset against
+        /// its snapshot and returns true when a child was added, removed, or edited.
+        /// </summary>
+        internal bool HasOwnedCollectionChanges()
+        {
+            if (_mapping.OwnedCollections == null || _mapping.OwnedCollections.Count == 0) return false;
+            var entity = Entity;
+            if (entity == null) return false;
+
+            foreach (var ocm in _mapping.OwnedCollections)
+            {
+                var current = OwnedContentSignatures(ocm, entity);
+                var snapshot = OwnedCollectionSnapshots != null
+                    && OwnedCollectionSnapshots.TryGetValue(ocm.NavigationProperty.Name, out var snap)
+                    ? snap
+                    : null;
+                if (snapshot == null)
+                {
+                    // No baseline captured (collection never loaded). A populated
+                    // collection with no snapshot is a change; an empty one is not.
+                    if (current.Count > 0) return true;
+                    continue;
+                }
+                if (snapshot.Count != current.Count) return true;
+                for (var i = 0; i < current.Count; i++)
+                    if (!string.Equals(snapshot[i], current[i], StringComparison.Ordinal))
+                        return true;
+            }
+            return false;
+        }
+
         /// <summary>
         /// Compares each tracked many-to-many collection against its snapshot and returns
         /// true when the association set has changed (an item added or removed). Change
@@ -295,6 +371,11 @@ namespace nORM.Core
             // baseline with the post-edit state and lose removals.
             if (State == EntityState.Unchanged && ManyToManySnapshots == null)
                 CaptureManyToManySnapshots();
+            // Same guard for owned collections: the owned-collection loader may have
+            // already captured the loaded contents; this lazy init runs at DetectChanges
+            // time (after any user edit), so re-capturing would lose the baseline.
+            if (State == EntityState.Unchanged && OwnedCollectionSnapshots == null)
+                CaptureOwnedCollectionSnapshots();
 
             if (Entity is INotifyPropertyChanged notify)
             {
@@ -458,6 +539,11 @@ namespace nORM.Core
             // sync never runs (silent association-write loss).
             hasChanges |= HasManyToManyChanges();
 
+            // Owned-collection edits (add / remove / child-scalar change) are likewise
+            // invisible to column-only detection; without this the owner stays Unchanged
+            // and its owned-collection sync never runs (silent owned-write loss).
+            hasChanges |= HasOwnedCollectionChanges();
+
             if (hasChanges)
                 State = EntityState.Modified;
             else if (State == EntityState.Modified)
@@ -473,6 +559,7 @@ namespace nORM.Core
             UpgradeToFullTracking();
             CaptureOriginalValues();
             CaptureManyToManySnapshots();
+            CaptureOwnedCollectionSnapshots();
             State = EntityState.Unchanged;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.
