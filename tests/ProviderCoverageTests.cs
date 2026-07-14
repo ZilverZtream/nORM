@@ -169,7 +169,9 @@ public class DatabaseProviderBaseTests
         Assert.Contains("__NormTemporalTags", sql);
         Assert.Contains("@tag", sql);
         Assert.DoesNotContain("@ts", sql);
-        Assert.Contains("datetime('now')", sql);
+        // Millisecond-precision database clock (strftime %f) so tag timestamps
+        // discriminate sub-second temporal versions.
+        Assert.Contains("strftime('%Y-%m-%d %H:%M:%f', 'now')", sql);
     }
 
     [Fact]
