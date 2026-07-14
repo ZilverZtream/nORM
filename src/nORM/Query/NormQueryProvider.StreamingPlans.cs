@@ -215,7 +215,30 @@ namespace nORM.Query
             var arg = node.Arguments[4];
             while (arg is UnaryExpression { NodeType: ExpressionType.Quote } quote)
                 arg = quote.Operand;
-            return arg as LambdaExpression;
+            if (arg is not LambdaExpression selector)
+                return null;
+
+            // Mirror translation's Select-projected outer handling: the projection is
+            // composed INTO the result selector there, moving the projection's closure
+            // captures into the lifted body. Closure values must be collected from the
+            // SAME composed shape or the slot ordering (and count) diverges and cached
+            // plans replay the first execution's projection closures.
+            var outer = node.Arguments[0];
+            while (outer is MethodCallExpression { Arguments.Count: >= 1 } outerCall
+                   && outerCall.Method.Name != nameof(Queryable.Select))
+                outer = outerCall.Arguments[0];
+            if (outer is MethodCallExpression { Arguments.Count: 2 } selectCall
+                && selectCall.Method.Name == nameof(Queryable.Select))
+            {
+                var projArg = selectCall.Arguments[1];
+                while (projArg is UnaryExpression { NodeType: ExpressionType.Quote } projQuote)
+                    projArg = projQuote.Operand;
+                if (projArg is LambdaExpression { Parameters.Count: 1 } projection
+                    && projection.Body.Type == selector.Parameters[0].Type
+                    && projection.Body.Type != projection.Parameters[0].Type)
+                    return QueryTranslator.ComposeThroughOuterProjection(projection, selector);
+            }
+            return selector;
         }
 
         private sealed class GroupJoinFinder : ExpressionVisitor

@@ -559,7 +559,7 @@ public class LinqParityFuzzTests
         for (var i = 0; i < cases; i++)
         {
             var predicate = GeneratePredicate(rng);
-            var joinKind = rng.Next(6);
+            var joinKind = rng.Next(8);
             var caseRng = new Random(rng.Next());
 
             IQueryable<Row> parents = ctx.Query<Row>().Where(predicate);
@@ -637,6 +637,39 @@ public class LinqParityFuzzTests
                             .ToList().OrderBy(x => x.Id).ToList();
                         Assert.True(db.SequenceEqual(oracle),
                             $"closure groupjoin key mismatch seed={seed} case={i} m={m}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    case 6: // DTO-projected outer with DUPLICATE join keys + closure in the
+                            // result selector — one result per outer ROW (PK segmentation),
+                            // and cached plans must rebind the current closure value
+                    {
+                        var m = caseRng.Next(2, 5);
+                        var bonus = caseRng.Next(-10, 10);
+                        var db = parents.Select(p => new { K = p.Id % m, p.IntVal })
+                            .GroupJoin(children, o => o.K, c => c.ParentId % m,
+                                (o, cs) => new { o.IntVal, N = cs.Count() + bonus })
+                            .ToList().OrderBy(x => x.IntVal).ThenBy(x => x.N).ToList();
+                        var oracle = oracleParents.Select(p => new { K = p.Id % m, p.IntVal })
+                            .GroupJoin(oracleChildren, o => o.K, c => c.ParentId % m,
+                                (o, cs) => new { o.IntVal, N = cs.Count() + bonus })
+                            .ToList().OrderBy(x => x.IntVal).ThenBy(x => x.N).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"projected-outer groupjoin mismatch seed={seed} case={i} m={m} bonus={bonus}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
+                        break;
+                    }
+                    case 7: // scalar-projected outer with duplicate keys
+                    {
+                        var m = caseRng.Next(2, 5);
+                        var db = parents.Select(p => p.IntVal % m)
+                            .GroupJoin(children, v => v, c => c.ParentId % m,
+                                (v, cs) => new { V = v, N = cs.Count() })
+                            .ToList().OrderBy(x => x.V).ThenBy(x => x.N).ToList();
+                        var oracle = oracleParents.Select(p => p.IntVal % m)
+                            .GroupJoin(oracleChildren, v => v, c => c.ParentId % m,
+                                (v, cs) => new { V = v, N = cs.Count() })
+                            .ToList().OrderBy(x => x.V).ThenBy(x => x.N).ToList();
+                        Assert.True(db.SequenceEqual(oracle),
+                            $"scalar-outer groupjoin mismatch seed={seed} case={i} m={m}\npredicate: {predicate}\ndb: [{string.Join(" | ", db.Take(8))}]\noracle: [{string.Join(" | ", oracle.Take(8))}]");
                         break;
                     }
                     default: // GroupJoin with filtered count, nullable Max/Min (null on empty), Any

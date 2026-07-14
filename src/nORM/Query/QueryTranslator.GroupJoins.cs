@@ -315,7 +315,7 @@ namespace nORM.Query
         /// the projection's source entity instead, by substituting the projection body
         /// for that parameter. Remaining parameters (the GroupJoin inners) pass through.
         /// </summary>
-        private static LambdaExpression ComposeThroughOuterProjection(
+        internal static LambdaExpression ComposeThroughOuterProjection(
             LambdaExpression projection,
             LambdaExpression consumer)
         {

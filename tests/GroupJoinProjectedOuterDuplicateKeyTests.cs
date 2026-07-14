@@ -123,6 +123,36 @@ public class GroupJoinProjectedOuterDuplicateKeyTests
     }
 
     [Fact]
+    public async Task Projection_closure_rebinds_across_cached_plan_executions()
+    {
+        var (keeper, ctx) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx);
+
+        var emps = await ctx.Query<Emp>().ToListAsync();
+        var tasks = await ctx.Query<TaskRow>().ToListAsync();
+
+        // The modulus lives in the OUTER PROJECTION, which translation composes into
+        // the result selector; the cached plan must rebind the CURRENT value, not
+        // replay the first execution's.
+        for (var m = 2; m <= 4; m++)
+        {
+            var mod = m;
+            var expected = emps.Select(e => e.DeptId % mod)
+                .GroupJoin(tasks, v => v, t => t.DeptId % mod, (v, ts) => new { V = v, N = ts.Count() })
+                .OrderBy(x => x.V).ThenBy(x => x.N).ToList();
+
+            var actual = ctx.Query<Emp>().Select(e => e.DeptId % mod)
+                .GroupJoin(ctx.Query<TaskRow>(), v => v, t => t.DeptId % mod, (v, ts) => new { V = v, N = ts.Count() })
+                .AsEnumerable().OrderBy(x => x.V).ThenBy(x => x.N).ToList();
+
+            Assert.True(expected.SequenceEqual(actual),
+                $"m={mod}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
     public async Task Dto_projected_outer_duplicate_keys_with_closure_in_result_selector()
     {
         var (keeper, ctx) = CreateDb();
