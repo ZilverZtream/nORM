@@ -11,7 +11,14 @@ param(
     [int]$ProviderMatrixSliceTimeoutMinutes = $(if ($env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES) { [int]$env:NORM_PROVIDER_MATRIX_SLICE_TIMEOUT_MINUTES } else { 90 }),
     [int]$BenchmarkStepTimeoutMinutes = $(if ($env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_BENCHMARK_STEP_TIMEOUT_MINUTES } else { 45 }),
     [int]$TestStepTimeoutMinutes = $(if ($env:NORM_TEST_STEP_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_TIMEOUT_MINUTES } else { 45 }),
-    [int]$TestStepHangTimeoutMinutes = $(if ($env:NORM_TEST_STEP_HANG_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_HANG_TIMEOUT_MINUTES } else { 5 })
+    [int]$TestStepHangTimeoutMinutes = $(if ($env:NORM_TEST_STEP_HANG_TIMEOUT_MINUTES) { [int]$env:NORM_TEST_STEP_HANG_TIMEOUT_MINUTES } else { 5 }),
+    # Resume a failed gate from the named step (exact step name as printed in the
+    # "==> <name>" log lines), skipping every step before it. Phases that already
+    # passed on the SAME commit are deterministic evidence and must not be re-run
+    # to validate a fix in a later phase. Requires the working tree and build
+    # outputs from the failed run to be intact (resume skips restore/build too
+    # unless you resume at or before them).
+    [string]$StartAt = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,11 +95,25 @@ function Stop-OrphanedTestHosts {
     } catch { }
 }
 
+# When -StartAt is set, every step before the named one is skipped; the flag
+# flips false at the first matching step and stays false for the rest of the run.
+$script:resumeSkipping = -not [string]::IsNullOrWhiteSpace($StartAt)
+
 function Invoke-Step {
     param(
         [string]$Name,
         [scriptblock]$Command
     )
+
+    if ($script:resumeSkipping) {
+        if ($Name -eq $StartAt) {
+            $script:resumeSkipping = $false
+        }
+        else {
+            Write-Host "==> $Name (skipped - resuming at '$StartAt')"
+            return
+        }
+    }
 
     Write-Host ""
     Write-Host "==> $Name"
@@ -728,6 +749,24 @@ if (-not $SkipBenchmark -and -not $SkipProviderMatrixBenchmark -and $Mode -eq 'r
     }
 }
 
+# A resume that starts at/after the evidence manifest skipped the slice step
+# that normally points $benchmarkResultsPath at the fresh slice run, so reuse
+# the latest existing slice results (the evidence the failed run produced).
+if ($StartAt -in @('benchmark evidence manifest', 'benchmark threshold gate') -and $Mode -eq 'rc' -and
+    $benchmarkResultsPath -eq (Join-Path (Join-Path $benchmarkProjectDir 'BenchmarkDotNet.Artifacts') 'results')) {
+    $sliceRoot = Join-Path $root 'BenchmarkDotNet.Artifacts/provider-slices'
+    $latestSlice = if (Test-Path $sliceRoot) {
+        Get-ChildItem -LiteralPath $sliceRoot -Directory |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -First 1
+    }
+    if (-not $latestSlice) {
+        throw "Resume at '$StartAt' needs provider slice results, but none exist under $sliceRoot."
+    }
+    $benchmarkResultsPath = Join-Path $latestSlice.FullName 'results'
+    Write-Host "Resume: reusing provider slice results at $benchmarkResultsPath"
+}
+
 if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
     Invoke-Step 'benchmark evidence manifest' {
         $benchmarkEvidenceMode = if ($Mode -eq 'full') { 'smoke' } else { $Mode }
@@ -769,6 +808,10 @@ Invoke-Step 'RC artifact manifest' {
         -Configuration $Configuration `
         -StressIterations $StressIterations `
         -BenchmarkSkipped ([bool]$SkipBenchmark)
+}
+
+if ($script:resumeSkipping) {
+    throw "-StartAt '$StartAt' did not match any step name; every step was skipped. Use the exact name from the '==> <name>' log lines."
 }
 
 Write-Host ""
