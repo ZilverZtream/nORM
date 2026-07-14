@@ -613,7 +613,7 @@ public class LinqParityFuzzTests
         var m = rng.Next(0, 5);
         var sumCut = rng.Next(-10, 15);
         var avgCut = rng.Next(-3, 3) + 0.25;
-        var shape = rng.Next(8);
+        var shape = rng.Next(9);
 
         List<int> expected;
         List<int> actual;
@@ -681,7 +681,7 @@ public class LinqParityFuzzTests
                         .Where(r => ctx.Query<Row>().Count(r2 => r2.IntVal == r.IntVal && r2.Id != r.Id) >= m)
                         .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
                     break;
-                default:
+                case 7:
                     // Nested correlation ending on the OUTER entity's type again.
                     expected = Rows.Where(r => Children.Any(c => c.ParentId == r.Id && c.ChildVal >= k
                             && Rows.Any(r2 => r2.Id == c.ParentId && r2.IntVal >= m - 2)))
@@ -690,6 +690,17 @@ public class LinqParityFuzzTests
                         .Where(r => ctx.Query<Child>().Any(c => c.ParentId == r.Id && c.ChildVal >= k
                             && ctx.Query<Row>().Any(r2 => r2.Id == c.ParentId && r2.IntVal >= m - 2)))
                         .AsEnumerable().Select(r => r.Id).OrderBy(x => x).ToList();
+                    break;
+                default:
+                    // PROJECTION-side correlated count: the ctx capture inside the
+                    // projection reserves its own alignment slot and the inner
+                    // closure re-binds across cached plans.
+                    expected = Rows
+                        .Select(r => r.Id * 1000 + Children.Count(c => c.ParentId == r.Id && c.ChildVal >= k))
+                        .OrderBy(x => x).ToList();
+                    actual = ctx.Query<Row>()
+                        .Select(r => new { r.Id, N = ctx.Query<Child>().Count(c => c.ParentId == r.Id && c.ChildVal >= k) })
+                        .AsEnumerable().Select(x => x.Id * 1000 + x.N).OrderBy(x => x).ToList();
                     break;
             }
         }

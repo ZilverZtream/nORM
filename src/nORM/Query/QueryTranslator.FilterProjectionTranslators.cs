@@ -292,10 +292,12 @@ namespace nORM.Query
                             throw new NormUnsupportedFeatureException(
                                 "The query projection requires client-side evaluation — it contains " +
                                 "an expression nORM can't translate to SQL. Common culprits: " +
-                                "(a) a correlated subquery via `ctx.Query<X>().Count/Sum/...(...)` in the projection — " +
-                                "configure a navigation property and use `parent.Children.Count()` / " +
-                                "`parent.Children.Sum(c => c.X)` instead, which nORM emits as a " +
-                                "correlated scalar subquery `(SELECT COUNT(*) FROM Children WHERE FK=parent.PK)`; " +
+                                "(a) a list-valued or non-aggregate subquery via `ctx.Query<X>()...` in the " +
+                                "projection — nORM translates `ctx.Query<X>().Count/Sum/Min/Max/Average(...)` " +
+                                "chains built from Where/Select/OrderBy/Distinct as correlated scalar " +
+                                "subqueries, but subqueries materializing rows (ToList/First/element access) " +
+                                "or using other operators inside the subquery source must be restructured " +
+                                "(navigation Include + in-memory shaping, or a join-shaped query); " +
                                 "(b) a navigation chain using an unsupported multi-hop operator shape; nORM emits " +
                                 "single-hop navigation aggregates and two-hop Count/LongCount/Any over " +
                                 "`p.Children.SelectMany(c => c.GrandChildren)`, but deeper or different operators " +
