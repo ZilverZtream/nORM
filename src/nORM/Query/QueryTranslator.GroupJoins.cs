@@ -36,42 +36,76 @@ namespace nORM.Query
             LambdaExpression? sqlProjectionOverride = null;
             var groupJoinOuterIsEntity = true;
             var groupJoinOuterColumnCount = -1;
+            var distinctOuterKeys = false;
             if (outerQuery is MethodCallExpression outerMce
                 && outerMce.Method.Name == nameof(Queryable.Distinct))
             {
-                if (!TryPrepareDistinctScalarJoinOuter(
+                if (TryPrepareDistinctScalarJoinOuter(
                         outerQuery,
                         outerKeySelector,
                         resultSelector,
                         outerAlias,
                         out var distinctOuter))
                 {
+                    _mapping = distinctOuter.Mapping;
+                    gjOuterFromOverride = distinctOuter.FromSql;
+                    effectiveOuterKeySelector = distinctOuter.OuterKeySelector;
+                    sqlResultSelector = distinctOuter.ResultSelector;
+                    sqlProjectionOverride = CreateScalarGroupJoinSqlProjection(effectiveOuterKeySelector, innerKeySelector);
+                    groupJoinOuterIsEntity = false;
+                    groupJoinOuterColumnCount = 1;
+                }
+                else if (outerMce.Arguments.Count == 1
+                    && outerMce.Arguments[0] is MethodCallExpression distinctSelect
+                    && distinctSelect.Method.Name == nameof(Queryable.Select)
+                    && distinctSelect.Arguments.Count == 2
+                    && StripQuotes(distinctSelect.Arguments[1]) is LambdaExpression { Parameters.Count: 1 } distinctProjection)
+                {
+                    // COMPUTED scalar projection under Distinct: translate the Select-projected
+                    // outer as the full entity (the composed-path below handles the projection),
+                    // ordered by the computed key then PK, and restore Distinct semantics by
+                    // emitting only the first segment per distinct outer key at materialization.
+                    // The derived-table branch above cannot express this shape: its outer
+                    // references would re-translate the computed body against a derived table
+                    // that only exposes the computed output column.
+                    // Closure captures in the projection are fail-closed: the compiled de-dup
+                    // key delegate bakes them at translation, so a cached plan would compare
+                    // segments with the FIRST execution's values while SQL orders by the
+                    // current ones — silently emitting duplicate or fused results.
+                    var composedDistinctKey = ComposeThroughOuterProjection(distinctProjection, outerKeySelector);
+                    var distinctKeyClosures = new List<object?>();
+                    GroupJoinClosureValues.Collect(composedDistinctKey.Body, distinctKeyClosures);
+                    if (distinctKeyClosures.Count > 0)
+                        throw new NormUnsupportedFeatureException(
+                            "GroupJoin over a `.Select(...).Distinct()` outer whose projection captures local " +
+                            "variables isn't supported: the distinct-key comparison would replay the first " +
+                            "execution's captured values from the plan cache. Inline the values as constants, " +
+                            "or materialize the distinct keys first and join client-side.");
+                    outerQuery = outerMce.Arguments[0];
+                    distinctOuterKeys = true;
+                }
+                else
+                {
                     throw new NormUnsupportedFeatureException(
                         "GroupJoin over this `.Distinct()` outer source isn't supported yet. nORM supports " +
-                        "`Select(mappedColumn).Distinct().GroupJoin(...)` by emitting a derived-table " +
-                        "left join, but this shape is more complex. Workarounds: " +
+                        "`Select(...).Distinct().GroupJoin(...)` outers; this shape is more complex. Workarounds: " +
                         "(1) materialize the distinct keys first and project the right-side groups via Contains; " +
                         "(2) push the GroupJoin through first and apply DISTINCT to the result.");
                 }
-
-                _mapping = distinctOuter.Mapping;
-                gjOuterFromOverride = distinctOuter.FromSql;
-                effectiveOuterKeySelector = distinctOuter.OuterKeySelector;
-                sqlResultSelector = distinctOuter.ResultSelector;
-                sqlProjectionOverride = CreateScalarGroupJoinSqlProjection(effectiveOuterKeySelector, innerKeySelector);
-                groupJoinOuterIsEntity = false;
-                groupJoinOuterColumnCount = 1;
             }
-            else if (SourceHasTakeOrSkip(outerQuery))
+            if (gjOuterFromOverride == null && groupJoinOuterIsEntity)
             {
-                var subOuter = TranslateInSubContext(outerQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subOuterMap);
-                _mapping = subOuterMap;
-                MergeSubPlanParameters(subOuter);
-                gjOuterFromOverride = "(" + subOuter.Sql + ") AS " + outerAlias;
-            }
-            else
-            {
-                Visit(outerQuery);
+                if (SourceHasTakeOrSkip(outerQuery))
+                {
+                    var subOuter = TranslateInSubContext(outerQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subOuterMap);
+                    _mapping = subOuterMap;
+                    MergeSubPlanParameters(subOuter);
+                    gjOuterFromOverride = "(" + subOuter.Sql + ") AS " + outerAlias;
+                }
+                else
+                {
+                    Visit(outerQuery);
+                }
             }
             // A Select-projected outer (scalar, DTO or anonymous shape) without Distinct:
             // GroupJoin still yields one result per outer ROW, and projected keys are NOT
@@ -305,7 +339,8 @@ namespace nORM.Query
                 groupJoinOuterColumnCount,
                 OuterIdentitySelector: outerIdentityFunc,
                 ClosureLiftedResultSelector: liftedSelector,
-                ClosureSlotCount: closureSlots
+                ClosureSlotCount: closureSlots,
+                DistinctOuterKeys: distinctOuterKeys
             );
             return node;
         }

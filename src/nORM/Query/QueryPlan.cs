@@ -150,7 +150,13 @@ namespace nORM.Query
         // values as a slot array and the provider rebinds it per execution from the
         // current expression (see NormQueryProvider.RebindGroupJoinClosures).
         Func<object, IEnumerable<object>, object?[], object>? ClosureLiftedResultSelector = null,
-        int ClosureSlotCount = 0
+        int ClosureSlotCount = 0,
+        // Select(computed).Distinct().GroupJoin(...): the outer translates as the full
+        // entity (rows ordered by the computed key, then PK), and Distinct semantics are
+        // restored by emitting only the FIRST segment per distinct outer key — equal-key
+        // segments are adjacent by construction. Each segment still carries its own
+        // correct inner group; duplicates are simply not emitted.
+        bool DistinctOuterKeys = false
     );
 
     /// <summary>

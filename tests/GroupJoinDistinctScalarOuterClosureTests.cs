@@ -67,6 +67,32 @@ public class GroupJoinDistinctScalarOuterClosureTests
         var emps = await ctx.Query<Emp>().ToListAsync();
         var tasks = await ctx.Query<TaskRow>().ToListAsync();
 
+        // Computed projection with a constant: Distinct semantics come from emitting one
+        // result per distinct computed key (LINQ: distinct BEFORE the join), with the
+        // selector closure rebinding per execution from the cached plan.
+        for (var round = 1; round <= 3; round++)
+        {
+            var bonus = round * 1000;
+            var expected = emps.Select(e => e.DeptId % 3).Distinct()
+                .GroupJoin(tasks, v => v, t => t.DeptId % 3, (v, ts) => new { V = v, S = (ts.Sum(t => (int?)t.Hours) ?? 0) + bonus })
+                .OrderBy(x => x.V).ToList();
+
+            var actual = ctx.Query<Emp>().Select(e => e.DeptId % 3).Distinct()
+                .GroupJoin(ctx.Query<TaskRow>(), v => v, t => t.DeptId % 3, (v, ts) => new { V = v, S = (ts.Sum(t => (int?)t.Hours) ?? 0) + bonus })
+                .AsEnumerable().OrderBy(x => x.V).ToList();
+
+            Assert.True(expected.SequenceEqual(actual),
+                $"computed distinct bonus={bonus}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+
+        // A projection that CAPTURES a local variable stays fail-closed: the de-dup key
+        // delegate would replay the first execution's captured value from the plan cache.
+        var captured = 3;
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
+            ctx.Query<Emp>().Select(e => e.DeptId % captured).Distinct()
+                .GroupJoin(ctx.Query<TaskRow>(), v => v, t => t.DeptId, (v, ts) => new { V = v, N = ts.Count() })
+                .ToList());
+
         // Plain-column projection (the supported Distinct shape); the closure lives in
         // the result selector and must rebind per execution from the cached plan.
         for (var round = 1; round <= 3; round++)

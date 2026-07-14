@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -112,6 +112,7 @@ namespace nORM.Query
                 // Segment per OUTER ROW (PK identity) when available; the join key would fuse
                 // distinct outers that share a key value.
                 var segmentSelector = info.OuterIdentitySelector ?? info.OuterKeySelector;
+                var distinctEmitState = new DistinctEmitState();
 
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 {
@@ -122,10 +123,13 @@ namespace nORM.Query
                     {
                         if (currentOuter != null)
                         {
-                            var list = CreateListFromItems(info.InnerType, currentChildren);
-                            // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
-                            var result = info.ResultSelector(currentOuter, list.Cast<object>());
-                            resultList.Add(result);
+                            if (ShouldEmitSegment(info, currentOuter, distinctEmitState))
+                            {
+                                var list = CreateListFromItems(info.InnerType, currentChildren);
+                                // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
+                                var result = info.ResultSelector(currentOuter, list.Cast<object>());
+                                resultList.Add(result);
+                            }
                             currentChildren = [];
                         }
 
@@ -167,7 +171,8 @@ namespace nORM.Query
                     }
                 }
 
-                if (currentOuter != null)
+                if (currentOuter != null
+                    && ShouldEmitSegment(info, currentOuter, distinctEmitState))
                 {
                     var list = CreateListFromItems(info.InnerType, currentChildren);
                     // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
@@ -216,6 +221,31 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Select(computed).Distinct().GroupJoin(...) segments per outer ROW but must
+        /// yield one result per DISTINCT outer key: rows are ordered by the key first,
+        /// so equal-key segments are adjacent and only the first one is emitted. Every
+        /// segment carries an identical inner group for its key, so skipping the rest
+        /// drops no data.
+        /// </summary>
+        private sealed class DistinctEmitState
+        {
+            public object? LastKey;
+            public bool EmittedAny;
+        }
+
+        private static bool ShouldEmitSegment(GroupJoinInfo info, object segmentOuter, DistinctEmitState state)
+        {
+            if (!info.DistinctOuterKeys)
+                return true;
+            var distinctKey = info.OuterKeySelector(segmentOuter) ?? DBNull.Value;
+            if (state.EmittedAny && Equals(state.LastKey, distinctKey))
+                return false;
+            state.LastKey = distinctKey;
+            state.EmittedAny = true;
+            return true;
+        }
+
         internal async IAsyncEnumerable<T> StreamGroupJoinAsync<T>(
             QueryPlan plan,
             DbCommand cmd,
@@ -242,6 +272,7 @@ namespace nORM.Query
             var syncMaterializer = plan.SyncMaterializer;
             // Segment per OUTER ROW (PK identity) when available — see MaterializeGroupJoinAsync.
             var segmentSelector = info.OuterIdentitySelector ?? info.OuterKeySelector;
+            var distinctEmitState = new DistinctEmitState();
 
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
@@ -252,8 +283,11 @@ namespace nORM.Query
                 {
                     if (currentOuter != null)
                     {
-                        var childList = BuildInnerList(info.InnerType, currentChildren);
-                        yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
+                        if (ShouldEmitSegment(info, currentOuter, distinctEmitState))
+                        {
+                            var childList = BuildInnerList(info.InnerType, currentChildren);
+                            yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
+                        }
                         currentChildren = [];
                     }
 
@@ -291,7 +325,8 @@ namespace nORM.Query
                 }
             }
 
-            if (currentOuter != null)
+            if (currentOuter != null
+                && ShouldEmitSegment(info, currentOuter, distinctEmitState))
             {
                 var childList = BuildInnerList(info.InnerType, currentChildren);
                 yield return (T)info.ResultSelector(currentOuter, childList.Cast<object>());
@@ -355,6 +390,7 @@ namespace nORM.Query
 
                 // Segment per OUTER ROW (PK identity) when available — see MaterializeGroupJoinAsync.
                 var segmentSelector = info.OuterIdentitySelector ?? info.OuterKeySelector;
+                var distinctEmitState = new DistinctEmitState();
 
                 while (reader.Read())
                 {
@@ -366,10 +402,13 @@ namespace nORM.Query
                     {
                         if (currentOuter != null)
                         {
-                            var list = CreateListFromItems(info.InnerType, currentChildren);
-                            // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
-                            var result = info.ResultSelector(currentOuter, list.Cast<object>());
-                            resultList.Add(result);
+                            if (ShouldEmitSegment(info, currentOuter, distinctEmitState))
+                            {
+                                var list = CreateListFromItems(info.InnerType, currentChildren);
+                                // ResultSelector expects IEnumerable<object>; .Cast<object>() provides the typed wrapper.
+                                var result = info.ResultSelector(currentOuter, list.Cast<object>());
+                                resultList.Add(result);
+                            }
                             currentChildren = [];
                         }
 
@@ -410,7 +449,8 @@ namespace nORM.Query
                     }
                 }
 
-                if (currentOuter != null)
+                if (currentOuter != null
+                    && ShouldEmitSegment(info, currentOuter, distinctEmitState))
                 {
                     var list = CreateListFromItems(info.InnerType, currentChildren);
                     var result = info.ResultSelector(currentOuter, list.Cast<object>());
