@@ -308,6 +308,78 @@ public class LinqParityFuzzTests
         RunWindowFuzz(ctx, seed, cases: 100);
         RunStringComparisonClosureFuzz(ctx, seed, cases: 80);
         RunGroupedFirstAndCorrelatedAggregateFuzz(ctx, seed, cases: 120);
+        RunIncludeFuzz(ctx, seed, cases: 60);
+    }
+
+    /// <summary>
+    /// Eager-load graph fuzz: seeded filters and windows over the navigation-mapped
+    /// parent with Include(Kids), verified against the in-memory model — the loaded
+    /// parent set AND every parent's child collection must match exactly (a wrong
+    /// dependent-query correlation loads another parent's children; a window that
+    /// leaks into the dependent query drops children silently). AsNoTracking keeps
+    /// instances per-case so tracked-graph fixup cannot carry state across cases.
+    /// </summary>
+    internal static void RunIncludeFuzz(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        for (var i = 0; i < cases; i++)
+        {
+            var k = rng.Next(-4, 4);
+            var s = rng.Next(0, 6);
+            var n = rng.Next(1, 8);
+            var shape = rng.Next(4);
+
+            List<NavRow> actual;
+            List<Row> expectedParents;
+            try
+            {
+                switch (shape)
+                {
+                    case 0:
+                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>().Where(r => r.IntVal >= k))
+                            .Include(r => r.Kids).AsNoTracking().ToList().OrderBy(r => r.Id).ToList();
+                        expectedParents = Rows.Where(r => r.IntVal >= k).OrderBy(r => r.Id).ToList();
+                        break;
+                    case 1:
+                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>().Where(r => r.Flag || r.IntVal < k))
+                            .Include(r => r.Kids).AsNoTracking().ToList().OrderBy(r => r.Id).ToList();
+                        expectedParents = Rows.Where(r => r.Flag || r.IntVal < k).OrderBy(r => r.Id).ToList();
+                        break;
+                    case 2:
+                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>()
+                                .OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(s).Take(n))
+                            .Include(r => r.Kids).AsNoTracking().ToList();
+                        expectedParents = Rows.OrderBy(r => r.IntVal).ThenBy(r => r.Id).Skip(s).Take(n).ToList();
+                        break;
+                    default:
+                        actual = ((INormQueryable<NavRow>)ctx.Query<NavRow>()
+                                .Where(r => r.IntVal >= k).OrderByDescending(r => r.Created).ThenBy(r => r.Id).Take(n))
+                            .Include(r => r.Kids).AsNoTracking().ToList();
+                        expectedParents = Rows.Where(r => r.IntVal >= k).OrderByDescending(r => r.Created).ThenBy(r => r.Id).Take(n).ToList();
+                        break;
+                }
+            }
+            catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+            {
+                throw new InvalidOperationException(
+                    $"include shape threw (seed={seed} case={i} shape={shape} k={k} s={s} n={n})", ex);
+            }
+
+            Assert.True(expectedParents.Select(r => r.Id).SequenceEqual(actual.Select(r => r.Id)),
+                $"include parent mismatch seed={seed} case={i} shape={shape} k={k} s={s} n={n}\n" +
+                $"expected [{string.Join(",", expectedParents.Select(r => r.Id))}] got [{string.Join(",", actual.Select(r => r.Id))}]");
+
+            foreach (var parent in actual)
+            {
+                var expectedKids = Children.Where(c => c.ParentId == parent.Id).OrderBy(c => c.Id).ToList();
+                var actualKids = parent.Kids.OrderBy(c => c.Id).ToList();
+                Assert.True(expectedKids.Count == actualKids.Count
+                        && expectedKids.Zip(actualKids).All(p => p.First.Id == p.Second.Id
+                            && p.First.ChildVal == p.Second.ChildVal && p.First.Tag == p.Second.Tag),
+                    $"include kids mismatch seed={seed} case={i} shape={shape} parent={parent.Id}\n" +
+                    $"expected [{string.Join(",", expectedKids.Select(c => c.Id))}] got [{string.Join(",", actualKids.Select(c => c.Id))}]");
+            }
+        }
     }
 
     /// <summary>
