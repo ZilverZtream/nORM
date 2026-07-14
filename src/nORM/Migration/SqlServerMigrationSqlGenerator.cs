@@ -243,6 +243,12 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
+            // UP-3b: Rename columns BEFORE anything that references the new names —
+            // altered-column statements and rebuilt indexes for a renamed column
+            // reference the post-rename name, which must exist by then.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+                up.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(oldColName)}', '{EscLiteral(newCol.Name)}', 'COLUMN'");
+
             // UP-4: Alter existing columns.
             {
                 foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
@@ -393,6 +399,11 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
                 down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
 
+            // DOWN-3b: Rename columns back BEFORE anything that references the old
+            // names — alteration reverts and restored indexes use pre-rename names.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+                down.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(newCol.Name)}', '{EscLiteral(oldColName)}', 'COLUMN'");
+
             // DOWN-4: Reverse column alterations from UP-4.
             {
                 foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
@@ -507,15 +518,6 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
                 throw new NotSupportedException($"SQL Server does not support direct expression index '{expressionIndex.Name}' on table '{table.Name}'. Use a computed column plus a normal index.");
-
-            // Rename columns — SQL Server uses sp_rename.
-            // Format: EXEC sp_rename 'table.old', 'new', 'COLUMN'
-            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
-            {
-                up.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(oldColName)}', '{EscLiteral(newCol.Name)}', 'COLUMN'");
-                // Down: rename back
-                down.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(newCol.Name)}', '{EscLiteral(oldColName)}', 'COLUMN'");
-            }
 
             return new MigrationSqlStatements(up, down);
         }

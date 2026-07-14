@@ -199,6 +199,12 @@ namespace nORM.Migration
             foreach (var (table, column) in diff.DroppedColumns)
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
 
+            // UP-3b: Rename columns BEFORE anything that references the new names —
+            // altered-column statements and rebuilt indexes for a renamed column
+            // reference the post-rename name, which must exist by then.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+                up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
+
             // UP-4: Alter existing columns.
             // PostgreSQL requires separate ALTER COLUMN statements for type and nullability changes.
             foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
@@ -340,6 +346,11 @@ namespace nORM.Migration
             foreach (var table in diff.AddedTables)
                 down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
 
+            // DOWN-3b: Rename columns back BEFORE anything that references the old
+            // names — alteration reverts and restored indexes use pre-rename names.
+            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
+                down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
+
             // DOWN-4: Reverse column alterations from UP-4.
             foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
                 down.Add($"ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT {Esc(GetPrimaryKeyConstraintName(table, newPkCols))}");
@@ -447,14 +458,6 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
                 down.Add(BuildExpressionIndexSql(table, expressionIndex));
-
-            // Rename columns — PostgreSQL supports ALTER TABLE t RENAME COLUMN old TO new.
-            foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
-            {
-                up.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(oldColName)} TO {Esc(newCol.Name)}");
-                // Down: rename back
-                down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
-            }
 
             return new MigrationSqlStatements(up, down);
         }
