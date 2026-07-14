@@ -29,8 +29,24 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// A Query-rooted subquery TERMINAL — the scalar aggregates plus the boolean
-        /// terminals Any/All/Contains — over an explicit <c>ctx.Query&lt;T&gt;()</c> chain.
+        /// True for First/FirstOrDefault over a Where/Select/ordering/Distinct chain rooted
+        /// at a <c>ctx.Query&lt;T&gt;()</c> call or a captured IQueryable — the ordered
+        /// single-row shape both SelectClauseVisitor (projection) and ExpressionToSqlVisitor
+        /// (predicate) lower to a correlated <c>… LIMIT 1</c> scalar subquery.
+        /// </summary>
+        internal static bool IsQueryRootedScalarFirst(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType != typeof(Queryable))
+                return false;
+            if (node.Method.Name is not (nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)))
+                return false;
+            return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
+        }
+
+        /// <summary>
+        /// A Query-rooted subquery TERMINAL — the scalar aggregates, the ordered single-row
+        /// First/FirstOrDefault, plus the boolean terminals Any/All/Contains — over an
+        /// explicit <c>ctx.Query&lt;T&gt;()</c> chain.
         /// Even when such a terminal has no outer-row reference (its predicate touches
         /// only closures/constants) it must NOT be constant-folded: folding executes a
         /// database query during translation, bakes the result as a literal, and caches
@@ -44,7 +60,7 @@ namespace nORM.Query
             if (node.Method.Name is nameof(Queryable.Any) or nameof(Queryable.All)
                 or nameof(Queryable.Contains))
                 return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
-            return IsQueryRootedScalarAggregate(node);
+            return IsQueryRootedScalarAggregate(node) || IsQueryRootedScalarFirst(node);
         }
 
         private static bool HasQueryRootedSource(Expression? source)
@@ -310,7 +326,7 @@ namespace nORM.Query
                 // projection (SelectClauseVisitor emits it) — admit WITHOUT descending
                 // so the subtree's Query() call and inner lambdas are not re-analyzed
                 // as client-eval leaves.
-                if (IsQueryRootedScalarAggregate(node))
+                if (IsQueryRootedScalarAggregate(node) || IsQueryRootedScalarFirst(node))
                     return node;
 
                 // Check if this is a method that can be translated to SQL

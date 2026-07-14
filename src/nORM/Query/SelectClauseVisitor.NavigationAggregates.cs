@@ -465,7 +465,8 @@ namespace nORM.Query
         {
             if (_ctx == null || SharedParams == null || SharedCompiledParams == null)
                 return false;
-            if (!QueryTranslator.IsQueryRootedScalarAggregate(node))
+            var isFirst = QueryTranslator.IsQueryRootedScalarFirst(node);
+            if (!QueryTranslator.IsQueryRootedScalarAggregate(node) && !isFirst)
                 return false;
 
             var methodName = node.Method.Name;
@@ -488,7 +489,10 @@ namespace nORM.Query
             // binds it against the subquery's own alias.
             if (lambdaArg != null)
             {
+                // Count/First carry a PREDICATE lambda (append as Where); Sum/Min/Max/Average
+                // carry a SELECTOR lambda (append as Select).
                 source = methodName is nameof(Queryable.Count) or nameof(Queryable.LongCount)
+                        or nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)
                     ? Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambdaArg))
                     : Expression.Call(typeof(Queryable), nameof(Queryable.Select), new[] { elementType, lambdaArg.Body.Type }, source, Expression.Quote(lambdaArg));
             }
@@ -562,6 +566,20 @@ namespace nORM.Query
             var orderIdx = tail.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
             if (orderIdx >= 0)
                 tail = tail.Substring(0, orderIdx);
+
+            if (isFirst)
+            {
+                // First/FirstOrDefault: keep the ORDER BY (unlike the aggregate slice) so the
+                // selected row is deterministic and limit to one row. The source must project
+                // a single scalar; otherwise fall through to the client-eval diagnostic.
+                var firstHead = head.StartsWith("DISTINCT ", StringComparison.OrdinalIgnoreCase)
+                    ? head.Substring("DISTINCT ".Length).Trim()
+                    : head;
+                if (ExpressionToSqlVisitor.HasTopLevelComma(firstHead))
+                    return false;
+                sb.Append(_provider.BuildScalarLimitedSubquery(sql));
+                return true;
+            }
 
             if (methodName is nameof(Queryable.Count) or nameof(Queryable.LongCount))
             {
