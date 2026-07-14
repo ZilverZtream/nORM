@@ -128,12 +128,57 @@ public class BulkCudOracleFuzzTests
             await ctx.SaveChangesAsync();
         }
 
+        // Windowed ops order by IntVal with an Id tiebreak: the order must be TOTAL
+        // or the DB and the model can legally pick different rows at a tie on the
+        // window boundary. String keys stay excluded (collation vs culture).
+        (List<int> Keys, string Desc) ModelWindowKeys(
+            Func<Row, bool> modelPred, bool descending, int windowKind, int s, int n, Func<Row, bool>? modelPost)
+        {
+            var ordered = descending
+                ? model.Values.Where(modelPred).OrderByDescending(x => x.IntVal).ThenBy(x => x.Id)
+                : model.Values.Where(modelPred).OrderBy(x => x.IntVal).ThenBy(x => x.Id);
+            IEnumerable<Row> window = windowKind switch
+            {
+                0 => ordered.Take(n),
+                1 => ordered.Skip(s),
+                2 => ordered.Skip(s).Take(n),
+                3 => ordered.TakeLast(n),
+                _ => ordered.Take(n).Where(modelPost!),
+            };
+            var kindDesc = windowKind switch
+            {
+                0 => $"Take({n})",
+                1 => $"Skip({s})",
+                2 => $"Skip({s}).Take({n})",
+                3 => $"TakeLast({n})",
+                _ => $"Take({n}).Where(post)",
+            };
+            return (window.Select(r => r.Id).ToList(), $"{(descending ? "desc" : "asc")} {kindDesc}");
+        }
+
+        IQueryable<Row> BuildDbWindow(
+            DbContext ctx, Expression<Func<Row, bool>> dbPred, bool descending, int windowKind, int s, int n,
+            Expression<Func<Row, bool>>? dbPost)
+        {
+            var ordered = descending
+                ? ctx.Query<Row>().Where(dbPred).OrderByDescending(x => x.IntVal).ThenBy(x => x.Id)
+                : ctx.Query<Row>().Where(dbPred).OrderBy(x => x.IntVal).ThenBy(x => x.Id);
+            return windowKind switch
+            {
+                0 => ordered.Take(n),
+                1 => ordered.Skip(s),
+                2 => ordered.Skip(s).Take(n),
+                3 => ordered.TakeLast(n),
+                _ => ordered.Take(n).Where(dbPost!),
+            };
+        }
+
         await SeedRowsAsync(12);
         await VerifyAsync($"seed={seed} (initial)");
 
         for (var step = 0; step < steps; step++)
         {
-            switch (rng.Next(10))
+            switch (rng.Next(12))
             {
                 case 0 or 1 or 2: // bulk update, one of several setter shapes
                 {
@@ -225,6 +270,69 @@ public class BulkCudOracleFuzzTests
                     Assert.True(affected == victims.Count,
                         $"subset delete affected mismatch seed={seed} step={step}: db={affected} model={victims.Count}{Tail()}");
                     await VerifyAsync($"seed={seed} step={step} (after subset delete)");
+                    break;
+                }
+                case 10: // windowed bulk delete: the ordered/paged window resolves via a keyed subquery
+                {
+                    var (dbPred, modelPred, desc) = GeneratePredicate();
+                    var s = rng.Next(0, 8);
+                    var n = rng.Next(0, 10);
+                    var descending = rng.Next(2) == 0;
+                    var windowKind = rng.Next(5);
+                    var parity = rng.Next(2);
+                    Expression<Func<Row, bool>> dbPost = x => x.Id % 2 == parity;
+                    var (doomedKeys, windowDesc) = ModelWindowKeys(modelPred, descending, windowKind, s, n,
+                        x => x.Id % 2 == parity);
+                    int affected;
+                    try
+                    {
+                        using var ctx = openCtx();
+                        affected = await BuildDbWindow(ctx, dbPred, descending, windowKind, s, n, dbPost)
+                            .ExecuteDeleteAsync();
+                    }
+                    catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+                    {
+                        throw new Xunit.Sdk.XunitException(
+                            $"windowed delete threw {ex.GetType().Name} seed={seed} step={step} window[{windowDesc}] pred[{desc}]: {ex.Message}{Tail()}", ex);
+                    }
+                    foreach (var key in doomedKeys)
+                        model.Remove(key);
+                    trace.Add($"{step}: windowed delete window[{windowDesc}] pred[{desc}] matched={doomedKeys.Count} affected={affected}");
+                    Assert.True(affected == doomedKeys.Count,
+                        $"windowed delete affected mismatch seed={seed} step={step}: db={affected} model={doomedKeys.Count} window[{windowDesc}] pred[{desc}]{Tail()}");
+                    await VerifyAsync($"seed={seed} step={step} (after windowed delete)");
+                    break;
+                }
+                case 11: // windowed bulk update: same windows, value-writing path
+                {
+                    var (dbPred, modelPred, desc) = GeneratePredicate();
+                    var s = rng.Next(0, 8);
+                    var n = rng.Next(0, 10);
+                    var k = rng.Next(-20, 20);
+                    var descending = rng.Next(2) == 0;
+                    var windowKind = rng.Next(5);
+                    var parity = rng.Next(2);
+                    Expression<Func<Row, bool>> dbPost = x => x.Id % 2 == parity;
+                    var (targetKeys, windowDesc) = ModelWindowKeys(modelPred, descending, windowKind, s, n,
+                        x => x.Id % 2 == parity);
+                    int affected;
+                    try
+                    {
+                        using var ctx = openCtx();
+                        affected = await BuildDbWindow(ctx, dbPred, descending, windowKind, s, n, dbPost)
+                            .ExecuteUpdateAsync(u => u.SetProperty(x => x.IntVal, x => x.IntVal + k));
+                    }
+                    catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
+                    {
+                        throw new Xunit.Sdk.XunitException(
+                            $"windowed update threw {ex.GetType().Name} seed={seed} step={step} window[{windowDesc}] pred[{desc}]: {ex.Message}{Tail()}", ex);
+                    }
+                    foreach (var key in targetKeys)
+                        model[key].IntVal += k;
+                    trace.Add($"{step}: windowed update k={k} window[{windowDesc}] pred[{desc}] matched={targetKeys.Count} affected={affected}");
+                    Assert.True(affected == targetKeys.Count,
+                        $"windowed update affected mismatch seed={seed} step={step}: db={affected} model={targetKeys.Count} window[{windowDesc}] pred[{desc}]{Tail()}");
+                    await VerifyAsync($"seed={seed} step={step} (after windowed update)");
                     break;
                 }
                 default: // no-match update: a predicate selecting nothing must touch nothing
