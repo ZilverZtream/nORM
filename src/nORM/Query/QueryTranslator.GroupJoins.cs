@@ -37,6 +37,17 @@ namespace nORM.Query
             var groupJoinOuterIsEntity = true;
             var groupJoinOuterColumnCount = -1;
             var distinctOuterKeys = false;
+            // Entity-shaped `.Distinct()` is a no-op: table rows are key-unique and a
+            // dedup-safe chain (no projection or fan-out below it) cannot duplicate
+            // them — unwrap so the group join translates against the plain source.
+            if (outerQuery is MethodCallExpression entityDistinct
+                && entityDistinct.Method.Name == nameof(Queryable.Distinct)
+                && entityDistinct.Arguments.Count == 1
+                && GetElementType(entityDistinct.Arguments[0]) == outerKeySelector.Parameters[0].Type
+                && IsTailWrapEligibleSource(entityDistinct.Arguments[0]))
+            {
+                outerQuery = entityDistinct.Arguments[0];
+            }
             if (outerQuery is MethodCallExpression outerMce
                 && outerMce.Method.Name == nameof(Queryable.Distinct))
             {

@@ -32,6 +32,17 @@ namespace nORM.Query
             var outerAlias = EscapeAlias("T0");
             var effectiveOuterKeySelector = outerKeySelector;
             var effectiveResultSelector = resultSelector;
+            // Entity-shaped `.Distinct()` is a no-op: table rows are key-unique and a
+            // dedup-safe chain (no projection or fan-out below it) cannot duplicate
+            // them — unwrap so the join translates against the plain source.
+            if (outerQuery is MethodCallExpression entityDistinct
+                && entityDistinct.Method.Name == nameof(Queryable.Distinct)
+                && entityDistinct.Arguments.Count == 1
+                && GetElementType(entityDistinct.Arguments[0]) == outerKeySelector.Parameters[0].Type
+                && IsTailWrapEligibleSource(entityDistinct.Arguments[0]))
+            {
+                outerQuery = entityDistinct.Arguments[0];
+            }
             if (outerQuery is MethodCallExpression outerMce
                 && outerMce.Method.Name == nameof(Queryable.Distinct))
             {
