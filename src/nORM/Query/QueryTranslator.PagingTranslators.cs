@@ -334,6 +334,52 @@ namespace nORM.Query
 
         private static Expression ApplyTailPaging(QueryTranslator t, MethodCallExpression node, bool isTake)
         {
+            // TakeLast/SkipLast directly after a Take/Skip window must count from the
+            // end of the WINDOW. The flat flip-order shortcut below would emit a single
+            // `ORDER BY … DESC LIMIT/OFFSET` that pages the FULL table, so wrap the
+            // windowed source as a derived table (same machinery as Reverse-after-window)
+            // with the source's order keys re-derived and FLIPPED on the outer SELECT,
+            // then page the outer with the tail count.
+            if (node.Arguments[0] is MethodCallExpression tailWinSrc
+                && tailWinSrc.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip))
+            {
+                var subPlan = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var subMap);
+                t._mapping = subMap;
+                t.MergeSubPlanParameters(subPlan);
+                var winAlias = t.EscapeAlias("__wtail" + t._joinCounter++);
+                t._sql.AppendFragment("SELECT * FROM (").Append(subPlan.Sql).AppendFragment(") AS ").Append(winAlias);
+                var orderKeys = ExtractOrderByKeys(node.Arguments[0]);
+                t._orderBy.Clear();
+                if (orderKeys.Count > 0)
+                {
+                    foreach (var (keyLambda, asc) in orderKeys)
+                    {
+                        var okParam = keyLambda.Parameters[0];
+                        if (!t._correlatedParams.ContainsKey(okParam))
+                            t._correlatedParams[okParam] = (subMap, winAlias);
+                        var vctxOk = new VisitorContext(t._ctx, subMap, t._provider, okParam, winAlias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                        var okVisitor = FastExpressionVisitorPool.Get(in vctxOk);
+                        var okSql = okVisitor.Translate(keyLambda.Body);
+                        FastExpressionVisitorPool.Return(okVisitor);
+                        // Same null-rank + TEXT-storage coercions the forward OrderBy
+                        // applied (see ReverseTranslator.TranslateAfterTakeSkipWindow).
+                        var okType = keyLambda.Body.Type;
+                        if (t._provider.RequiresExplicitNullOrderingForNullableKeys
+                            && (!okType.IsValueType || Nullable.GetUnderlyingType(okType) != null))
+                            t._orderBy.Add(($"({okSql} IS NOT NULL)", !asc));
+                        t._orderBy.Add((t.CoerceOrderKeySql(okSql, okType), !asc));
+                    }
+                }
+                else
+                {
+                    foreach (var key in subMap.KeyColumns)
+                        t._orderBy.Add(($"{winAlias}.{key.EscCol}", false));
+                }
+                BindTailCount(t, node, isTake);
+                t._postReverseResult = true;
+                return node;
+            }
+
             // Walk the source first so any upstream OrderBy populates _orderBy.
             var source = t.Visit(node.Arguments[0]);
 
@@ -345,21 +391,55 @@ namespace nORM.Query
             if (t.TryAppendClientSequenceOperator(node))
                 return source;
 
-            // Reject existing _take/_skip composition for now -- combining tail-paging
-            // with start-paging requires double-subquery emit that nORM doesn't yet do.
+            // Reject DEEP paging composition (a Take/Skip buried below other operators):
+            // the immediate-window shape wraps a derived table above, but re-deriving
+            // order keys through interleaved operators is not part of the v1 contract.
             if (t._take.HasValue || t._takeParam != null || t._skip.HasValue || t._skipParam != null)
             {
                 throw new NormUnsupportedFeatureException(
-                    $"{node.Method.Name} cannot compose with an upstream Take/Skip in v1. " +
-                    "Apply TakeLast/SkipLast before any Take/Skip in the chain.");
+                    $"{node.Method.Name} composes with a DIRECTLY preceding Take/Skip window; " +
+                    "with other operators between the window and the tail operator, apply " +
+                    "TakeLast/SkipLast before any Take/Skip in the chain.");
             }
 
-            // Ensure we have something to reverse -- fall back to the entity's key
-            // columns if no explicit OrderBy was applied (mirrors ReverseTranslator).
+            // Ensure we have something to reverse. When a wrapping operator (e.g.
+            // Where after a Take window) consumed the ordering into a subquery,
+            // _orderBy is empty even though the source IS ordered — falling back to
+            // key columns would silently tail-page the wrong sequence. Re-derive the
+            // source chain's OrderBy keys from the expression first; only a truly
+            // unordered source falls back to the entity's key columns (mirrors
+            // ReverseTranslator).
             if (t._orderBy.Count == 0)
             {
-                foreach (var key in t._mapping.KeyColumns)
-                    t._orderBy.Add((key.EscCol, true));
+                var deepKeys = ExtractOrderByKeys(node.Arguments[0]);
+                if (deepKeys.Count > 0)
+                {
+                    // A wrapping operator records its derived-table alias; a flat
+                    // query addresses the root table as T0.
+                    var rootAlias = t._outerDerivedAlias ?? t.EscapeAlias("T0");
+                    foreach (var (keyLambda, asc) in deepKeys)
+                    {
+                        var okParam = keyLambda.Parameters[0];
+                        if (!t._correlatedParams.ContainsKey(okParam))
+                            t._correlatedParams[okParam] = (t._mapping, rootAlias);
+                        var vctxOk = new VisitorContext(t._ctx, t._mapping, t._provider, okParam, rootAlias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth + 1, t._params.Count);
+                        var okVisitor = FastExpressionVisitorPool.Get(in vctxOk);
+                        var okSql = okVisitor.Translate(keyLambda.Body);
+                        FastExpressionVisitorPool.Return(okVisitor);
+                        var okType = keyLambda.Body.Type;
+                        // Unflipped here; the flip loop below reverses rank and key
+                        // together (the null rank is flip-safe by construction).
+                        if (t._provider.RequiresExplicitNullOrderingForNullableKeys
+                            && (!okType.IsValueType || Nullable.GetUnderlyingType(okType) != null))
+                            t._orderBy.Add(($"({okSql} IS NOT NULL)", asc));
+                        t._orderBy.Add((t.CoerceOrderKeySql(okSql, okType), asc));
+                    }
+                }
+                else
+                {
+                    foreach (var key in t._mapping.KeyColumns)
+                        t._orderBy.Add((key.EscCol, true));
+                }
             }
             // Flip the ORDER BY direction so the SQL returns the LAST N rows first.
             for (int i = 0; i < t._orderBy.Count; i++)
@@ -368,9 +448,22 @@ namespace nORM.Query
                 t._orderBy[i] = (col, !asc);
             }
 
-            // Apply Take or Skip on the reversed sequence. Both literal-int and
-            // parameter-bound counts route through the same paging fields as the
-            // standard Take/Skip translators.
+            BindTailCount(t, node, isTake);
+
+            // Tell the materializer to reverse the final list so the caller sees the
+            // original ORDER BY direction. With LIMIT N this is a cheap in-memory
+            // reverse of just N rows.
+            t._postReverseResult = true;
+            return source;
+        }
+
+        /// <summary>
+        /// Binds the TakeLast/SkipLast count onto the reversed sequence. Both
+        /// literal-int and parameter-bound counts route through the same paging
+        /// fields as the standard Take/Skip translators.
+        /// </summary>
+        private static void BindTailCount(QueryTranslator t, MethodCallExpression node, bool isTake)
+        {
             if (t.TryBindPagingParameter(node.Arguments[1], out var paramName))
             {
                 if (isTake) t._takeParam = paramName;
@@ -388,12 +481,6 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"{node.Method.Name} argument could not be bound to a parameter or literal.");
             }
-
-            // Tell the materializer to reverse the final list so the caller sees the
-            // original ORDER BY direction. With LIMIT N this is a cheap in-memory
-            // reverse of just N rows.
-            t._postReverseResult = true;
-            return source;
         }
 
     }
