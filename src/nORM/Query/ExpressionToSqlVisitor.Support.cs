@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Frozen;
 using System.Data;
@@ -53,7 +53,7 @@ namespace nORM.Query
         /// ParameterValueExtractor still walks the original member, shifting
         /// every later positional binding.
         /// </summary>
-        private static class QueryCallMaterializer
+        internal static class QueryCallMaterializer
         {
             public static Expression Materialize(Expression e)
             {

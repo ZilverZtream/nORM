@@ -15,6 +15,7 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
 
+            if (TryEmitCorrelatedQueryableAggregate(node, sb)) return node;
             if (TryVisitConvertToIntegral(node, sb)) return node;
             if (TryVisitConvertChangeType(node, sb)
                 || TryVisitTimeSpanUnary(node, sb)

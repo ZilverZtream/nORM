@@ -49,24 +49,23 @@ public class LinqSubqueryInProjectionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Direct_context_subquery_in_projection_throws_with_navigation_workaround_hint()
+    public async Task Direct_context_subquery_in_projection_translates_as_correlated_count()
     {
-        // The default ClientEvaluationPolicy = Throw — ctx.Query<C>() inside a projection
-        // can't be translated to a correlated SQL subquery without a registered navigation.
+        // ctx.Query<C>() aggregates inside a projection lower to a correlated
+        // scalar subquery — no navigation property required. Carol has zero
+        // children: the subquery must produce 0, not drop the row.
         var ctxLocal = _ctx;
-        var ex = await Assert.ThrowsAnyAsync<System.Exception>(async () =>
-        {
-            await _ctx.Query<SipParent>()
+        var rows = (await _ctx.Query<SipParent>()
                 .Select(p => new
                 {
                     p.Name,
                     Count = ctxLocal.Query<SipChild>().Count(c => c.ParentId == p.Id)
                 })
-                .ToListAsync();
-        });
-        // Error must point at both supported alternatives: navigation property + ClientEvaluationPolicy.
-        Assert.Contains("navigation", ex.Message, System.StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("ClientEvaluationPolicy", ex.Message, System.StringComparison.Ordinal);
+                .ToListAsync())
+            .OrderBy(x => x.Name).ToList();
+
+        Assert.Equal(new[] { ("Alice", 3), ("Bob", 2), ("Carol", 0) },
+            rows.Select(x => (x.Name, x.Count)).ToArray());
     }
 
 

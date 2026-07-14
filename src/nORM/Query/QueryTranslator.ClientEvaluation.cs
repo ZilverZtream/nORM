@@ -12,6 +12,46 @@ namespace nORM.Query
     internal sealed partial class QueryTranslator
     {
         /// <summary>
+        /// True for Count/LongCount/Sum/Min/Max/Average/Any over a chain of
+        /// Where/Select/ordering/Distinct rooted at a `ctx.Query&lt;T&gt;()` call
+        /// or a captured IQueryable — the shapes SelectClauseVisitor lowers to
+        /// a correlated scalar subquery inside a projection.
+        /// </summary>
+        internal static bool IsQueryRootedScalarAggregate(MethodCallExpression node)
+        {
+            if (node.Method.DeclaringType != typeof(Queryable))
+                return false;
+            if (node.Method.Name is not (nameof(Queryable.Count) or nameof(Queryable.LongCount)
+                or nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max)
+                or nameof(Queryable.Average)))
+                return false;
+            var current = node.Arguments.Count > 0 ? node.Arguments[0] : null;
+            while (current is MethodCallExpression mce)
+            {
+                switch (mce.Method.Name)
+                {
+                    case "Where":
+                    case "Select":
+                    case "OrderBy":
+                    case "OrderByDescending":
+                    case "ThenBy":
+                    case "ThenByDescending":
+                    case "Distinct":
+                    case "AsNoTracking":
+                        break;
+                    case "Query": // the `ctx.Query<T>()` chain root
+                        return true;
+                    default:
+                        return false;
+                }
+                if (mce.Arguments.Count == 0) return false;
+                current = mce.Arguments[0];
+            }
+            return current is ConstantExpression { Value: System.Linq.IQueryable }
+                || (current is MemberExpression && typeof(System.Linq.IQueryable).IsAssignableFrom(current.Type));
+        }
+
+        /// <summary>
         /// Analyzes a projection expression to determine if it contains untranslatable operations
         /// that require client-side evaluation.
         /// </summary>
@@ -241,6 +281,14 @@ namespace nORM.Query
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
+                // A Queryable scalar aggregate whose chain roots at a Query call or a
+                // captured IQueryable translates as a correlated scalar subquery in the
+                // projection (SelectClauseVisitor emits it) — admit WITHOUT descending
+                // so the subtree's Query() call and inner lambdas are not re-analyzed
+                // as client-eval leaves.
+                if (IsQueryRootedScalarAggregate(node))
+                    return node;
+
                 // Check if this is a method that can be translated to SQL
                 var declaringType = node.Method.DeclaringType;
 

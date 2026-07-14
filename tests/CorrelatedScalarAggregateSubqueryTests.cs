@@ -218,22 +218,48 @@ public class CorrelatedScalarAggregateSubqueryTests
     }
 
     [Fact]
-    public async Task Correlated_count_in_projection_keeps_the_client_evaluation_policy_contract()
+    public async Task Correlated_count_in_projection_translates_server_side()
     {
         var (keeper, ctx, parents, children) = CreateDb();
         using var _ = keeper;
         await using var __ = ctx;
         await SeedAsync(ctx, parents, children);
 
-        // Explicit ctx.Query subqueries in PROJECTIONS route through the client-
-        // evaluation policy (default Throw) with navigation-property guidance —
-        // the predicate/order-key translation above is the server-side surface.
-        var cut = 15;
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Parent>()
+        // Explicit ctx.Query aggregates in PROJECTIONS lower to correlated scalar
+        // subqueries — including the ctx-capture alignment slot and closures.
+        foreach (var cut in new[] { 15, 30 })
+        {
+            var expected = parents
+                .Select(p => (p.Id, N: children.Count(c => c.ParentId == p.Id && c.Amount >= cut)))
+                .OrderBy(t => t.Id).ToList();
+            var actual = (await ctx.Query<Parent>()
                 .Select(p => new { p.Id, N = ctx.Query<Child>().Count(c => c.ParentId == p.Id && c.Amount >= cut) })
-                .ToListAsync());
-        Assert.Contains("ClientEvaluationPolicy", ex.Message, StringComparison.Ordinal);
+                .ToListAsync()).Select(x => (x.Id, x.N)).OrderBy(t => t.Id).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"cut={cut}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    [Fact]
+    public async Task Correlated_sum_in_projection_translates_server_side()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // Empty subqueries yield SQL NULL; project into int? and mirror with an
+        // Any()-guarded oracle (parent 4 has no children).
+        var expected = parents
+            .Select(p => (p.Id, S: children.Any(c => c.ParentId == p.Id)
+                ? (int?)children.Where(c => c.ParentId == p.Id).Sum(c => c.Amount)
+                : null))
+            .OrderBy(t => t.Id).ToList();
+        var actual = (await ctx.Query<Parent>()
+            .Select(p => new { p.Id, S = (int?)ctx.Query<Child>().Where(c => c.ParentId == p.Id).Sum(c => c.Amount) })
+            .ToListAsync()).Select(x => (x.Id, x.S)).OrderBy(t => t.Id).ToList();
+        Assert.True(expected.SequenceEqual(actual),
+            $"expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
     }
 
     [Fact]

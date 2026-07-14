@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -446,6 +446,180 @@ namespace nORM.Query
                 sb.Append(" AND ").Append(filterSql);
             }
             sb.Append(')');
+        }
+
+        /// <summary>
+        /// Lowers an explicit-queryable scalar aggregate in a projection —
+        /// <c>Select(p =&gt; new { N = ctx.Query&lt;Child&gt;().Count(c =&gt; c.ParentId == p.Id) })</c> —
+        /// to a correlated scalar subquery: the sibling of the navigation-collection
+        /// aggregate emit and of the predicate-side route in ExpressionToSqlVisitor.
+        /// The consumed ctx capture reserves a <c>_ctx_unused</c> alignment slot and the
+        /// sub-translation seeds its compiled-parameter names from the shared list so
+        /// positional bindings stay aligned.
+        /// </summary>
+        private bool TryEmitCorrelatedQueryableAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            if (_ctx == null || SharedParams == null || SharedCompiledParams == null)
+                return false;
+            if (!QueryTranslator.IsQueryRootedScalarAggregate(node))
+                return false;
+
+            var methodName = node.Method.Name;
+            var source = node.Arguments[0];
+            LambdaExpression? lambdaArg = null;
+            if (node.Arguments.Count > 1)
+            {
+                var quoted = node.Arguments[1];
+                while (quoted is UnaryExpression { NodeType: ExpressionType.Quote } q) quoted = q.Operand;
+                lambdaArg = quoted as LambdaExpression;
+                if (lambdaArg == null || lambdaArg.Parameters.Count != 1)
+                    return false;
+            }
+
+            var elementType = source.Type.IsGenericType ? source.Type.GetGenericArguments()[0] : null;
+            if (elementType == null)
+                return false;
+
+            // Compose the predicate/selector into the source so the sub-translation
+            // binds it against the subquery's own alias.
+            if (lambdaArg != null)
+            {
+                source = methodName is nameof(Queryable.Count) or nameof(Queryable.LongCount)
+                    ? Expression.Call(typeof(Queryable), nameof(Queryable.Where), new[] { elementType }, source, Expression.Quote(lambdaArg))
+                    : Expression.Call(typeof(Queryable), nameof(Queryable.Select), new[] { elementType, lambdaArg.Body.Type }, source, Expression.Quote(lambdaArg));
+            }
+
+            ReserveQueryRootClosureSlot(node.Arguments[0]);
+            source = ExpressionToSqlVisitor.QueryCallMaterializer.Materialize(source);
+
+            var mapping = _ctx.GetMapping(elementType);
+            var correlated = new Dictionary<ParameterExpression, (nORM.Mapping.TableMapping Mapping, string Alias)>();
+            var freeCollector = new FreeParameterCollector();
+            freeCollector.Visit(node);
+            foreach (var free in freeCollector.Free)
+            {
+                // A free DbContext parameter (compiled queries) is the Query receiver,
+                // not a row reference — never a correlation target.
+                if (typeof(DbContext).IsAssignableFrom(free.Type))
+                    continue;
+                correlated[free] = (_mapping, _outerAlias);
+            }
+
+            var tempParams = new Dictionary<string, object>();
+            var tempCompiled = new List<string>(SharedCompiledParams);
+            using var sub = QueryTranslator.Create(_ctx, mapping, tempParams, SharedParams.Count, correlated,
+                new HashSet<string>(), tempCompiled, new Dictionary<ParameterExpression, string>(), correlated.Count, recursionDepth: 1);
+            var subPlan = sub.Translate(source);
+            foreach (var kvp in tempParams)
+                SharedParams[kvp.Key] = kvp.Value;
+            foreach (var compiled in tempCompiled)
+            {
+                if (!SharedCompiledParams.Contains(compiled))
+                    SharedCompiledParams.Add(compiled);
+            }
+
+            var sql = subPlan.Sql;
+            var fromIdx = ExpressionToSqlVisitor.FindTopLevelFromIndex(sql);
+            if (fromIdx < 0)
+                return false;
+            var head = sql.Substring("SELECT ".Length, fromIdx - "SELECT ".Length).Trim();
+            var tail = sql.Substring(fromIdx);
+            var orderIdx = tail.LastIndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+            if (orderIdx >= 0)
+                tail = tail.Substring(0, orderIdx);
+
+            if (methodName is nameof(Queryable.Count) or nameof(Queryable.LongCount))
+            {
+                var operand = "*";
+                if (head.StartsWith("DISTINCT ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var projected = head.Substring("DISTINCT ".Length).Trim();
+                    if (!ExpressionToSqlVisitor.HasTopLevelComma(projected))
+                        operand = "DISTINCT " + projected;
+                }
+                sb.Append("(SELECT COUNT(").Append(operand).Append(')').Append(tail).Append(')');
+                return true;
+            }
+
+            var distinct = false;
+            if (head.StartsWith("DISTINCT ", StringComparison.OrdinalIgnoreCase))
+            {
+                distinct = true;
+                head = head.Substring("DISTINCT ".Length).Trim();
+            }
+            if (ExpressionToSqlVisitor.HasTopLevelComma(head))
+                return false;
+
+            var operandType = lambdaArg?.Body.Type ?? elementType;
+            var aggName = methodName switch
+            {
+                nameof(Queryable.Sum) => "SUM",
+                nameof(Queryable.Min) => "MIN",
+                nameof(Queryable.Max) => "MAX",
+                _ => "AVG",
+            };
+            var underlying = Nullable.GetUnderlyingType(operandType) ?? operandType;
+            if (underlying == typeof(decimal))
+                head = _provider.NormalizeDecimalForCompare(head);
+            if (aggName == "AVG")
+                head = _provider.AverageAggregateOperand(head, operandType);
+
+            sb.Append("(SELECT ").Append(aggName).Append('(');
+            if (distinct)
+                sb.Append("DISTINCT ");
+            sb.Append(head).Append(')').Append(tail).Append(')');
+            return true;
+        }
+
+        private void ReserveQueryRootClosureSlot(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                if (mce.Method.Name == "Query")
+                {
+                    var receiver = mce.Object ?? (mce.Arguments.Count > 0 ? mce.Arguments[0] : null);
+                    if (receiver is MemberExpression receiverMember
+                        && QueryTranslator.TryGetConstantValue(receiverMember, out _))
+                    {
+                        ReserveUnusedSharedSlot();
+                    }
+                    return;
+                }
+                if (mce.Arguments.Count == 0) return;
+                current = mce.Arguments[0];
+            }
+            if (current is MemberExpression root
+                && typeof(IQueryable).IsAssignableFrom(root.Type)
+                && QueryTranslator.TryGetConstantValue(root, out _))
+            {
+                ReserveUnusedSharedSlot();
+            }
+        }
+
+        private void ReserveUnusedSharedSlot()
+        {
+            var placeholder = $"{_provider.ParamPrefix}cp{SharedCompiledParams!.Count}_ctx_unused";
+            if (SharedParams != null) SharedParams[placeholder] = DBNull.Value;
+            SharedCompiledParams.Add(placeholder);
+        }
+
+        private sealed class FreeParameterCollector : ExpressionVisitor
+        {
+            private readonly HashSet<ParameterExpression> _bound = new();
+            public HashSet<ParameterExpression> Free { get; } = new();
+
+            protected override Expression VisitLambda<T>(Expression<T> node)
+            {
+                foreach (var p in node.Parameters) _bound.Add(p);
+                return base.VisitLambda(node);
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                if (!_bound.Contains(node)) Free.Add(node);
+                return node;
+            }
         }
 
         /// <summary>

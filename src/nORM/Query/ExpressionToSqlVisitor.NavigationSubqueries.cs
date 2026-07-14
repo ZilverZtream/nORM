@@ -404,7 +404,7 @@ namespace nORM.Query
         /// Finds the first <c> FROM </c> at parenthesis depth zero, skipping string literals,
         /// so a projection containing a nested subquery does not split the SQL mid-expression.
         /// </summary>
-        private static int FindTopLevelFromIndex(string sql)
+        internal static int FindTopLevelFromIndex(string sql)
         {
             var depth = 0;
             var inString = false;
@@ -430,7 +430,7 @@ namespace nORM.Query
             return -1;
         }
 
-        private static bool HasTopLevelComma(string sql)
+        internal static bool HasTopLevelComma(string sql)
         {
             var depth = 0;
             var inString = false;
