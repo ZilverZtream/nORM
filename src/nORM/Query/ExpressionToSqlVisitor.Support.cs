@@ -534,22 +534,27 @@ namespace nORM.Query
         private static void HandleStringEndsWith(ExpressionToSqlVisitor visitor, MethodCallExpression node)
             => EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, ignoreCase: false);
 
+        // The PATTERN (Arguments[0]) precedes the StringComparison (Arguments[1]) in
+        // the extractor's expression-order walk, and a closure pattern now emits a
+        // REAL compiled parameter inside EmitLikePredicate — so the pattern's slot
+        // must be created FIRST or the needle value binds to the comparison's
+        // placeholder position and the predicate silently matches nothing.
         private static void HandleStringContainsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
-            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
             EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.Contains, IsIgnoreCase(node.Arguments[1]));
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
         }
 
         private static void HandleStringStartsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
-            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
             EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.StartsWith, IsIgnoreCase(node.Arguments[1]));
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
         }
 
         private static void HandleStringEndsWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
         {
-            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
             EmitLikePredicate(visitor, node.Object!, node.Arguments[0], LikeOperation.EndsWith, IsIgnoreCase(node.Arguments[1]));
+            ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[1]);
         }
 
         private static void HandleStringEqualsInstanceWithComparison(ExpressionToSqlVisitor visitor, MethodCallExpression node)
@@ -617,22 +622,15 @@ namespace nORM.Query
             }
             visitor._sql.Append(lhs).Append(" LIKE ");
             var escChar = NormValidator.ValidateLikeEscapeChar(visitor._provider.LikeEscapeChar);
-            if (TryGetConstantValue(patternExpr, out var raw) && raw is string s)
+            // Pre-fold ONLY compile-time literals into the pattern. A closure-captured
+            // needle must go through the variable branch below: baking its CURRENT value
+            // into the cached plan made every later execution replay the FIRST needle
+            // (the reserved @cp slot was a DBNull placeholder, so Contains/StartsWith/
+            // EndsWith with a different captured string silently matched — and bulk
+            // ExecuteUpdate/Delete wrote or deleted — the wrong rows on every LIKE-path
+            // provider; SQLite escaped only because its ordinal bypass parameterizes).
+            if (patternExpr is ConstantExpression && TryGetConstantValue(patternExpr, out var raw) && raw is string s)
             {
-                // Reserve a placeholder compiled-param slot when the pattern is a
-                // closure-captured MemberExpression so the ParameterValueExtractor's
-                // value-list stays aligned with the compiled-param name list. Without
-                // this, a Where with `Name.StartsWith(prefix) && Tag == other` shifts
-                // by one and @cp0 gets bound to the prefix value instead of `other` --
-                // silently returning the wrong row set. Same fix shape as 407e03d /
-                // eeff6e7. ConstantExpression literals are exempt since the extractor
-                // only walks MemberExpressions.
-                if (patternExpr is MemberExpression)
-                {
-                    var placeholder = $"{visitor._provider.ParamPrefix}cp{visitor._compiledParams.Count}_unused";
-                    visitor._params[placeholder] = DBNull.Value;
-                    visitor._compiledParams.Add(placeholder);
-                }
                 // Pre-folded constant: bind the lowered pattern when ignoring case so the SQL
                 // doesn't need to wrap it again at run time.
                 var pattern = ignoreCase ? s.ToLowerInvariant() : s;
