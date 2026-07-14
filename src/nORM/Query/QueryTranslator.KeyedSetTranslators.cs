@@ -82,13 +82,19 @@ namespace nORM.Query
             /// C# keyed operators compare string keys ordinally, but PARTITION BY on a
             /// CI-collation provider partitions by the column collation — fusing
             /// "abc"/"ABC" into one group. Wrap string keys in the value-preserving
-            /// binary collation; identity elsewhere.
+            /// binary collation. DateTimeOffset keys compare by INSTANT in C#, while
+            /// offset-suffixed TEXT storage partitions by representation — same
+            /// instant under different offsets would wrongly survive as distinct;
+            /// canonicalize via the provider's group-key hook. Identity elsewhere.
             /// </summary>
             internal static string OrdinalPartitionKey(QueryTranslator t, string sql, Type keyType)
             {
                 var underlying = Nullable.GetUnderlyingType(keyType) ?? keyType;
                 if (underlying == typeof(string) && t._provider.DefaultStringEqualityIsCaseInsensitive)
                     return t._provider.ForceCaseSensitiveStringComparison(sql);
+                if (underlying == typeof(DateTimeOffset)
+                    && t._provider.CanonicalizeDateTimeOffsetGroupKey(sql) is { } canonical)
+                    return canonical;
                 return sql;
             }
 
