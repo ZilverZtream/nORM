@@ -747,6 +747,20 @@ namespace nORM.Core
                     for (var i = 0; i < relation.PrincipalKeys.Count; i++)
                         principalKeyValues[i] = relation.PrincipalKeys[i].Getter(principal);
 
+                    // Added dependents may be linked only by navigation (their FK is
+                    // still default until fixup runs — which skips deleted principals,
+                    // so without this they would INSERT with a dangling FK).
+                    HashSet<object>? collectionMembers = null;
+                    if (relation.NavProp.GetValue(principal) is System.Collections.IEnumerable membersEnumerable
+                        && membersEnumerable is not string)
+                    {
+                        foreach (var member in membersEnumerable)
+                        {
+                            if (member != null)
+                                (collectionMembers ??= new HashSet<object>(ReferenceEqualityComparer.Instance)).Add(member);
+                        }
+                    }
+
                     foreach (var dependentEntry in dependents)
                     {
                         if (dependentEntry.State is EntityState.Deleted or EntityState.Detached)
@@ -757,6 +771,30 @@ namespace nORM.Core
                         var matches = true;
                         for (var i = 0; i < relation.ForeignKeys.Count && matches; i++)
                             matches = Equals(relation.ForeignKeys[i].Getter(dependent), principalKeyValues[i]);
+
+                        if (!matches && dependentEntry.State == EntityState.Added)
+                        {
+                            if (collectionMembers != null && collectionMembers.Contains(dependent))
+                            {
+                                matches = true;
+                            }
+                            else
+                            {
+                                foreach (var navProp in dependentEntry.Mapping.ReferenceNavigations)
+                                {
+                                    if (navProp.PropertyType != principalEntry.Mapping.Type)
+                                        continue;
+                                    object? navValue;
+                                    try { navValue = navProp.GetValue(dependent); }
+                                    catch { continue; }
+                                    if (ReferenceEquals(navValue, principal))
+                                    {
+                                        matches = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                         if (!matches)
                             continue;
 

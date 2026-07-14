@@ -710,10 +710,7 @@ public class CrudStateMachineFuzzTests
                                 && !pendingPrincipals.Contains(pk)
                                 && children.All(kv => kv.Value.ParentId != pk
                                     || trackedChildren.ContainsKey(kv.Key)
-                                    || pendingNavChildren.TryGetValue(kv.Key, out var np) && np == pk)
-                                // Added-with-nav children have unaligned FKs the cascade
-                                // cannot match; keep the machine on contracted ground.
-                                && !children.Any(kv => kv.Value.ParentId == pk && pendingRefChildren.Contains(kv.Key)))
+                                    || pendingNavChildren.TryGetValue(kv.Key, out var np) && np == pk))
                             .ToList();
                         if (eligible.Count == 0) break;
                         var pkDel = eligible[rng.Next(eligible.Count)];
@@ -724,6 +721,7 @@ public class CrudStateMachineFuzzTests
                             children.Remove(ck);
                             trackedChildren.Remove(ck);
                             pendingNavChildren.Remove(ck);
+                            pendingRefChildren.Remove(ck);
                             fkEdited.Remove(ck);
                             navRetargeted.Remove(ck);
                         }
