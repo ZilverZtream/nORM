@@ -98,28 +98,51 @@ public class CrudStateMachineFuzzTests
                         working[key] = state;
                         break;
                     }
-                    case 3 or 4 or 5: // mutate a tracked row
+                    case 3 or 4 or 5: // mutate: tracked instance, or a detached update of an untracked key
                     {
-                        if (tracked.Count == 0) break;
-                        var key = tracked.Keys.ElementAt(rng.Next(tracked.Count));
-                        var state = RandomState(rng);
-                        var entity = tracked[key];
-                        entity.IntVal = state.IntVal;
-                        entity.Name = state.Name;
-                        entity.Amount = state.Amount;
-                        entity.Flag = state.Flag;
-                        working[key] = state;
+                        var untracked = working.Keys.Where(k => !tracked.ContainsKey(k)).ToList();
+                        if (untracked.Count > 0 && rng.Next(2) == 0)
+                        {
+                            var key = untracked[rng.Next(untracked.Count)];
+                            var state = RandomState(rng);
+                            var entity = new MutRow { Id = key, IntVal = state.IntVal, Name = state.Name, Amount = state.Amount, Flag = state.Flag };
+                            ctx.Update(entity);
+                            tracked[key] = entity;
+                            working[key] = state;
+                        }
+                        else if (tracked.Count > 0)
+                        {
+                            var key = tracked.Keys.ElementAt(rng.Next(tracked.Count));
+                            var state = RandomState(rng);
+                            var entity = tracked[key];
+                            entity.IntVal = state.IntVal;
+                            entity.Name = state.Name;
+                            entity.Amount = state.Amount;
+                            entity.Flag = state.Flag;
+                            working[key] = state;
+                        }
                         break;
                     }
-                    case 6: // remove a tracked row
+                    case 6: // remove: tracked instance, or a detached stub for an untracked key
                     {
-                        if (tracked.Count == 0) break;
-                        var key = tracked.Keys.ElementAt(rng.Next(tracked.Count));
-                        ctx.Remove(tracked[key]);
-                        tracked.Remove(key);
-                        working.Remove(key);
-                        if (committed.ContainsKey(key))
-                            deletedCommittedKeys.Add(key);
+                        var untracked = working.Keys.Where(k => !tracked.ContainsKey(k)).ToList();
+                        if (untracked.Count > 0 && rng.Next(2) == 0)
+                        {
+                            var key = untracked[rng.Next(untracked.Count)];
+                            ctx.Remove(new MutRow { Id = key });
+                            working.Remove(key);
+                            if (committed.ContainsKey(key))
+                                deletedCommittedKeys.Add(key);
+                        }
+                        else if (tracked.Count > 0)
+                        {
+                            var key = tracked.Keys.ElementAt(rng.Next(tracked.Count));
+                            ctx.Remove(tracked[key]);
+                            tracked.Remove(key);
+                            working.Remove(key);
+                            if (committed.ContainsKey(key))
+                                deletedCommittedKeys.Add(key);
+                        }
                         break;
                     }
                     case 7: // re-add a previously deleted committed key
@@ -138,7 +161,11 @@ public class CrudStateMachineFuzzTests
                     {
                         await ctx.SaveChangesAsync();
                         committed = new Dictionary<int, RowState>(working);
-                        await VerifyAsync(ctx, committed, $"seed={seed} step={step} (same context after save)");
+                        var verified = await VerifyAsync(ctx, committed, $"seed={seed} step={step} (same context after save)");
+                        // The verify query tracked every row through the identity map;
+                        // mirror that so the machine's tracked set matches reality.
+                        foreach (var row in verified)
+                            tracked[row.Id] = row;
                         break;
                     }
                     default: // discard: dispose without saving, reload through a fresh context
@@ -148,11 +175,16 @@ public class CrudStateMachineFuzzTests
                         tracked.Clear();
                         deletedCommittedKeys.Clear();
                         ctx = new DbContext(Open(), new SqliteProvider());
-                        await VerifyAsync(ctx, committed, $"seed={seed} step={step} (fresh context after discard)");
-                        // Re-track the committed rows through the fresh context so
-                        // later mutations run against tracked instances.
-                        foreach (var row in await ctx.Query<MutRow>().ToListAsync())
-                            tracked[row.Id] = row;
+                        // Verify through a throwaway context so the MAIN context's
+                        // tracking state stays empty — the next ops then exercise the
+                        // detached Update / Remove paths on a coin flip.
+                        using (var verifyCtx = new DbContext(Open(), new SqliteProvider()))
+                            await VerifyAsync(verifyCtx, committed, $"seed={seed} step={step} (fresh context after discard)");
+                        if (rng.Next(2) == 0)
+                        {
+                            foreach (var row in await ctx.Query<MutRow>().ToListAsync())
+                                tracked[row.Id] = row;
+                        }
                         break;
                     }
                 }
@@ -171,7 +203,7 @@ public class CrudStateMachineFuzzTests
         }
     }
 
-    private static async Task VerifyAsync(DbContext ctx, Dictionary<int, RowState> expected, string context)
+    private static async Task<List<MutRow>> VerifyAsync(DbContext ctx, Dictionary<int, RowState> expected, string context)
     {
         var rows = (await ctx.Query<MutRow>().ToListAsync()).OrderBy(r => r.Id).ToList();
         var expectedRows = expected.OrderBy(kv => kv.Key).ToList();
@@ -193,5 +225,7 @@ public class CrudStateMachineFuzzTests
                 $"db:    ({row.Id}, {row.IntVal}, \"{row.Name}\", {row.Amount}, {row.Flag})\n" +
                 $"model: ({key}, {state.IntVal}, \"{state.Name}\", {state.Amount}, {state.Flag})");
         }
+
+        return rows;
     }
 }

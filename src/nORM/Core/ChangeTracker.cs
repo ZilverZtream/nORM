@@ -171,6 +171,17 @@ namespace nORM.Core
                                 "the same key is already being tracked. Mutate the tracked instance, or remove it (and " +
                                 "save) before adding the replacement.");
                         }
+                        if (state == EntityState.Modified)
+                        {
+                            // Update with a detached instance over a tracked key: adopting
+                            // Modified onto the OTHER instance's entry leaves its unchanged
+                            // values in place — change detection then finds no diff and the
+                            // detached instance's values silently vanish (lost update).
+                            throw new InvalidOperationException(
+                                $"Cannot update an instance of '{mapping.Type.Name}' with key '{pk}': another instance with " +
+                                "the same key is already being tracked. Mutate the tracked instance instead, or detach it " +
+                                "before attaching the replacement values.");
+                        }
                         // Different CLR instance with same PK — update state but don't downgrade
                         // from a dirty state to Unchanged.
                         if (!(pkEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
