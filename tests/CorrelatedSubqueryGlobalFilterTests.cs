@@ -191,6 +191,23 @@ public class CorrelatedSubqueryGlobalFilterTests
     }
 
     [Fact]
+    public async Task Simple_property_filter_query_does_not_bypass_global_filters_via_fast_path()
+    {
+        // A single-property equality query is the fast-path shape. The fast path
+        // must defer to the filtered path when a global filter is present, or it
+        // returns the other tenant's rows. Both tenants' children share ParentId=1.
+        var (keeper, ctx) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+
+        var rows = (await ctx.Query<Child>().Where(c => c.ParentId == 1).ToListAsync())
+            .OrderBy(c => c.Id).ToList();
+
+        Assert.All(rows, r => Assert.Equal("T1", r.Tenant));
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
     public async Task Reference_navigation_scalar_respects_principal_global_filters()
     {
         var (keeper, ctx) = CreateRefNavDb();
