@@ -530,7 +530,9 @@ namespace nORM.Query
                 _sql.Append(existing);
                 return node;
             }
-            var paramName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+            // __qv marks a whole-query-parameter slot so the compiled-query pipeline
+            // pairs it by name instead of document-order position.
+            var paramName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex() + "__qv";
             AddParameter(paramName, DBNull.Value);
             _paramMap[node] = paramName;
             _sql.Append(paramName);

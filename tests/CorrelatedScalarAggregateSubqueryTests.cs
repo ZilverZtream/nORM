@@ -544,4 +544,101 @@ public class CorrelatedScalarAggregateSubqueryTests
                 $"cut={cut}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
         }
     }
+
+    private static readonly Func<DbContext, int, Task<List<Parent>>> _parentsByInnerCut =
+        Norm.CompileQuery((DbContext c, int cut) =>
+            c.Query<Parent>().Where(p =>
+                c.Query<Child>().Count(ch => ch.ParentId == p.Id && ch.Amount >= cut) >= 1));
+
+    [Fact]
+    public async Task Compiled_query_binds_value_parameter_inside_predicate_subquery()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The value parameter lives INSIDE the subquery lambda on the predicate
+        // route — it must bind through the shared parameter map, not correlate.
+        foreach (var cut in new[] { 15, 45 })
+        {
+            var expected = parents
+                .Where(p => children.Count(ch => ch.ParentId == p.Id && ch.Amount >= cut) >= 1)
+                .Select(p => p.Id).OrderBy(i => i).ToList();
+            var actual = (await _parentsByInnerCut(ctx, cut)).Select(p => p.Id).OrderBy(i => i).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"cut={cut}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    private static readonly Func<DbContext, (int Lo, int Hi), Task<List<ParentChildCountDto>>> _filteredParentCounts =
+        Norm.CompileQuery((DbContext c, (int Lo, int Hi) v) =>
+            c.Query<Parent>()
+                .Where(p => p.Id >= v.Lo)
+                .Select(p => new ParentChildCountDto
+                {
+                    Id = p.Id,
+                    N = c.Query<Child>().Count(ch => ch.ParentId == p.Id && ch.Amount >= v.Hi)
+                }));
+
+    [Fact]
+    public async Task Compiled_query_aligns_where_and_projection_value_parameters()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // TWO value parameters: one in the WHERE (registered during clause
+        // translation) and one inside the projection aggregate (registered at
+        // Build time). The positional value sources must not swap them — Lo and
+        // Hi are chosen so a swap changes both the row set and the counts.
+        foreach (var (lo, hi) in new[] { (2, 15), (1, 45) })
+        {
+            var expected = parents
+                .Where(p => p.Id >= lo)
+                .Select(p => (p.Id, N: children.Count(ch => ch.ParentId == p.Id && ch.Amount >= hi)))
+                .OrderBy(t => t.Id).ToList();
+            var actual = (await _filteredParentCounts(ctx, (lo, hi)))
+                .Select(x => (x.Id, x.N)).OrderBy(t => t.Id).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"lo={lo},hi={hi}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
+
+    private static readonly Func<DbContext, (int Cut, int Skip), Task<List<ParentChildCountDto>>> _pagedParentCounts =
+        Norm.CompileQuery((DbContext c, (int Cut, int Skip) v) =>
+            c.Query<Parent>()
+                .Select(p => new ParentChildCountDto
+                {
+                    Id = p.Id,
+                    N = c.Query<Child>().Count(ch => ch.ParentId == p.Id && ch.Amount >= v.Cut)
+                })
+                .OrderBy(d => d.Id)
+                .Skip(v.Skip));
+
+    [Fact]
+    public async Task Compiled_query_aligns_projection_and_paging_value_parameters()
+    {
+        var (keeper, ctx, parents, children) = CreateDb();
+        using var _ = keeper;
+        await using var __ = ctx;
+        await SeedAsync(ctx, parents, children);
+
+        // The paging operator sits AFTER the Select in the tree, so its value
+        // parameter follows the projection's in document order — but paging is
+        // translated as a clause while the projection registers at Build time.
+        // A registration-order mismatch would bind Cut as the OFFSET and the
+        // Skip count into the subquery comparison.
+        foreach (var (cut, skip) in new[] { (15, 1), (45, 2) })
+        {
+            var expected = parents
+                .Select(p => (p.Id, N: children.Count(ch => ch.ParentId == p.Id && ch.Amount >= cut)))
+                .OrderBy(t => t.Id).Skip(skip).ToList();
+            var actual = (await _pagedParentCounts(ctx, (cut, skip)))
+                .Select(x => (x.Id, x.N)).ToList();
+            Assert.True(expected.SequenceEqual(actual),
+                $"cut={cut},skip={skip}: expected [{string.Join(",", expected)}] got [{string.Join(",", actual)}]");
+        }
+    }
 }

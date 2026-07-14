@@ -148,7 +148,12 @@ namespace nORM.Query
                 var key = (p, node.Member.Name);
                 if (!_memberParamMap.TryGetValue(key, out var paramName))
                 {
-                    paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+                    // The __qm<Member> marker names the query-parameter member this slot
+                    // binds, so the compiled-query pipeline pairs it BY NAME. Positional
+                    // document-order pairing breaks for these slots: the projection is
+                    // rendered at Build time, after clause-translated slots registered,
+                    // while the value-source walk runs in document order.
+                    paramName = $"{_provider.ParamPrefix}p{_paramIndex++}__qm{node.Member.Name}";
                     _params[paramName] = DBNull.Value;
                     _compiledParams.Add(paramName);
                     _memberParamMap[key] = paramName;

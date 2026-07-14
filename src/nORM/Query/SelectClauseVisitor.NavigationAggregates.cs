@@ -511,7 +511,12 @@ namespace nORM.Query
                 correlated[free] = (_mapping, _outerAlias);
             }
 
-            var tempParams = new Dictionary<string, object>();
+            // Both dicts seed with the outer's entries so @p numbering (derived from
+            // _params.Count inside the sub-translation's visitor contexts) and @cp
+            // numbering continue globally — a restarted name collides with an outer
+            // slot and the name-deduping copy-back merges two distinct values into
+            // one parameter. Seeds copy back onto themselves.
+            var tempParams = new Dictionary<string, object>(SharedParams);
             var tempCompiled = new List<string>(SharedCompiledParams);
             using var sub = QueryTranslator.Create(_ctx, mapping, tempParams, SharedParams.Count, correlated,
                 new HashSet<string>(), tempCompiled, new Dictionary<ParameterExpression, string>(), correlated.Count, recursionDepth: 1);

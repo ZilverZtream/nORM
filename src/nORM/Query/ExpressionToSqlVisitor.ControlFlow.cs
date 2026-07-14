@@ -39,7 +39,10 @@ namespace nORM.Query
                 _sql.Append(existing);
                 return node;
             }
-            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
+            // __qv marks a whole-query-parameter slot so the compiled-query pipeline
+            // pairs it by name instead of document-order position (projection slots
+            // register at Build time, out of document order).
+            var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}__qv";
             _params[paramName] = DBNull.Value;
             _compiledParams.Add(paramName);
             _paramMap[node] = paramName;

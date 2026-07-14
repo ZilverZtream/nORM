@@ -221,7 +221,12 @@ namespace nORM.Query
             // Clear()s these collections — sharing them with the outer would wipe the
             // outer's accumulated params and compiled-param registrations the moment the
             // sub-translator goes out of `using`. Copy both back before dispose.
-            var tempParams = new Dictionary<string, object>();
+            // Seed with the outer's entries so @p numbering (derived from _params.Count
+            // inside the sub-translation's visitor contexts) continues globally: a
+            // restarted @p name collides with an outer slot and the name-deduping
+            // copy-back MERGES two distinct values into one parameter. The seeded
+            // entries copy back onto themselves.
+            var tempParams = new Dictionary<string, object>(_params);
             // Seed with the outer's compiled-param names so the sub-translator's
             // @cp numbering continues globally instead of restarting at @cp0: a
             // restarted name collides with an outer (or sibling/nested) subquery's
@@ -334,13 +339,14 @@ namespace nORM.Query
         {
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
-            var tempParams = new Dictionary<string, object>();
-            // Seed with the outer's compiled-param names so the sub-translator's
-            // @cp numbering continues globally instead of restarting at @cp0: a
-            // restarted name collides with an outer (or sibling/nested) subquery's
-            // slot and the name-deduping copy-back below then MERGES two distinct
-            // closures into one parameter — the second closure silently binds the
-            // first one's value. The seeded prefix is deduped away on copy-back.
+            // Seed both dicts with the outer's entries so @p numbering (derived from
+            // _params.Count inside the sub-translation's visitor contexts) and @cp
+            // numbering continue globally instead of restarting: a restarted name
+            // collides with an outer (or sibling/nested) subquery's slot and the
+            // name-deduping copy-back below then MERGES two distinct values into one
+            // parameter — the second one silently binds the first one's value. The
+            // seeded entries copy back onto themselves.
+            var tempParams = new Dictionary<string, object>(_params);
             var tempCompiled = new List<string>(_compiledParams);
             using var subTranslator = QueryTranslator.Create(_ctx, mapping, tempParams, _paramIndex, _parameterMappings, new HashSet<string>(), tempCompiled, _paramMap, _parameterMappings.Count, recursionDepth: _recursionDepth + 1);
             var subPlan = subTranslator.Translate(source);
@@ -483,7 +489,11 @@ namespace nORM.Query
             var rootType = GetRootElementType(source);
             var mapping = _ctx.GetMapping(rootType);
             var freshCorrelatedForIn = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
-            var tempParams = new Dictionary<string, object>();
+            // Seeded with the outer's entries so @p numbering (derived from _params.Count
+            // inside the sub-translation's visitor contexts) continues globally — a
+            // restarted name collides with an outer slot and the copy-back merges two
+            // distinct values into one parameter.
+            var tempParams = new Dictionary<string, object>(_params);
             // Seed with the outer's compiled-param names so the sub-translator's
             // @cp numbering continues globally instead of restarting at @cp0: a
             // restarted name collides with an outer (or sibling/nested) subquery's
@@ -574,8 +584,11 @@ namespace nORM.Query
             var freshCorrelated = new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>();
             var rootType = GetRootElementType(filteredSource);
             var mapping = _ctx.GetMapping(rootType);
-            var existsTempParams = new Dictionary<string, object>();
-            var existsTempCompiled = new List<string>();
+            // Seeded with the outer's entries so @p / @cp numbering continues globally —
+            // a restarted name collides with an outer slot and the copy-back merges two
+            // distinct values into one parameter. Seeds copy back onto themselves.
+            var existsTempParams = new Dictionary<string, object>(_params);
+            var existsTempCompiled = new List<string>(_compiledParams);
             using var existsTranslator = QueryTranslator.Create(
                 _ctx, mapping, existsTempParams, _paramIndex,
                 freshCorrelated, new HashSet<string>(),

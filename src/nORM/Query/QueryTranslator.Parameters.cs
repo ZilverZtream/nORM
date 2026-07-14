@@ -81,6 +81,10 @@ namespace nORM.Query
                 return;
 
             var indexText = parameterName.Substring(generatedPrefix.Length);
+            // Strip a __qv / __qm<Member> query-parameter source marker before parsing.
+            var markerStart = indexText.IndexOf("__", StringComparison.Ordinal);
+            if (markerStart >= 0)
+                indexText = indexText.Substring(0, markerStart);
             if (!int.TryParse(indexText, out var index))
                 return;
 
@@ -129,7 +133,11 @@ namespace nORM.Query
             {
                 if (!_paramMap.TryGetValue(parameter, out parameterName!))
                 {
-                    parameterName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                    // __qv / __qm<Member> markers name the query-parameter source so the
+                    // compiled-query pipeline pairs these slots by name — paging slots
+                    // register at clause time while projection slots register at Build
+                    // time, so document-order positional pairing would cross-bind them.
+                    parameterName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex() + "__qv";
                     AddParameter(parameterName, DBNull.Value);
                     _paramMap[parameter] = parameterName;
                 }
@@ -138,7 +146,10 @@ namespace nORM.Query
 
             if (expression is MemberExpression member && HasUncorrelatedParameterRoot(member))
             {
-                parameterName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex();
+                var marker = member.Expression is ParameterExpression
+                    ? "__qm" + member.Member.Name
+                    : string.Empty;
+                parameterName = _ctx.RawProvider.ParamPrefix + "p" + _parameterManager.GetNextIndex() + marker;
                 AddParameter(parameterName, DBNull.Value);
                 return true;
             }

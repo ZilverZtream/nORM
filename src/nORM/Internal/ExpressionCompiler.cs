@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -123,12 +123,14 @@ namespace nORM.Internal
         {
             private readonly ParameterExpression _queryParameter;
             private readonly int _expectedCount;
+            private readonly bool _closuresOnly;
             private readonly List<CompiledParameterValueSource> _sources;
 
-            public CompiledParameterValueSourceCollector(ParameterExpression queryParameter, int expectedCount)
+            public CompiledParameterValueSourceCollector(ParameterExpression queryParameter, int expectedCount, bool closuresOnly = false)
             {
                 _queryParameter = queryParameter;
                 _expectedCount = expectedCount;
+                _closuresOnly = closuresOnly;
                 _sources = new List<CompiledParameterValueSource>(expectedCount);
             }
 
@@ -142,7 +144,7 @@ namespace nORM.Internal
 
             protected override Expression VisitParameter(ParameterExpression node)
             {
-                if (_sources.Count < _expectedCount && ReferenceEquals(node, _queryParameter))
+                if (!_closuresOnly && _sources.Count < _expectedCount && ReferenceEquals(node, _queryParameter))
                 {
                     _sources.Add(CompiledParameterValueSource.FromQueryValue());
                     return node;
@@ -158,7 +160,8 @@ namespace nORM.Internal
 
                 if (ReferenceEquals(node.Expression, _queryParameter))
                 {
-                    _sources.Add(CompiledParameterValueSource.FromQueryMember(node.Member));
+                    if (!_closuresOnly)
+                        _sources.Add(CompiledParameterValueSource.FromQueryMember(node.Member));
                     return node;
                 }
 
@@ -170,6 +173,53 @@ namespace nORM.Internal
 
                 return base.VisitMember(node);
             }
+        }
+
+        /// <summary>
+        /// Parses the __qv / __qm&lt;Member&gt; query-parameter source marker the translator
+        /// appends to generated parameter names whose value comes from the compiled query's
+        /// value parameter. Marked slots pair BY NAME instead of by document-order position:
+        /// projection-rendered slots register at Build time, after clause-translated slots,
+        /// so positional pairing would cross-bind them. Requires digits immediately before
+        /// the marker so structurally similar names never false-positive.
+        /// </summary>
+        private static bool TryParseQueryParamMarker(string parameterName, out string? memberName)
+        {
+            memberName = null;
+            var markerStart = parameterName.IndexOf("__", StringComparison.Ordinal);
+            if (markerStart <= 0 || !char.IsDigit(parameterName[markerStart - 1]))
+                return false;
+
+            var marker = parameterName.Substring(markerStart);
+            if (marker == "__qv")
+                return true;
+            if (marker.StartsWith("__qm", StringComparison.Ordinal) && marker.Length > 4)
+            {
+                memberName = marker.Substring(4);
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TryBuildMarkedValueSource(string parameterName, Type queryParameterType, out CompiledParameterValueSource source)
+        {
+            source = default;
+            if (!TryParseQueryParamMarker(parameterName, out var memberName))
+                return false;
+
+            if (memberName == null)
+            {
+                source = CompiledParameterValueSource.FromQueryValue();
+                return true;
+            }
+
+            var member = (MemberInfo?)queryParameterType.GetField(memberName)
+                         ?? queryParameterType.GetProperty(memberName);
+            if (member == null)
+                return false;
+
+            source = CompiledParameterValueSource.FromQueryMember(member);
+            return true;
         }
 
         public static Func<T, TResult> CompileExpression<T, TResult>(Expression<Func<T, TResult>> expr)
@@ -323,7 +373,7 @@ namespace nORM.Internal
                         fixedParams = fpList.ToArray();
                     }
                     var valueSources = BuildCompiledParameterValueSources(
-                        filtered, capturedExpr.Parameters[1], p.CompiledParameters.Count);
+                        filtered, capturedExpr.Parameters[1], p.CompiledParameters);
                     return (p, p.CompiledParameters, paramSet, fixedParams, valueSources);
                 });
 
@@ -550,7 +600,7 @@ namespace nORM.Internal
                         fixedParams = fpList.ToArray();
                     }
                     var valueSources = BuildCompiledParameterValueSources(
-                        filtered, capturedExpr.Parameters[1], p.CompiledParameters.Count);
+                        filtered, capturedExpr.Parameters[1], p.CompiledParameters);
                     return (p, p.CompiledParameters, paramSet, fixedParams, valueSources);
                 });
 
@@ -580,13 +630,53 @@ namespace nORM.Internal
         }
 
         private static CompiledParameterValueSource[] BuildCompiledParameterValueSources(
-            Expression filteredExpression, ParameterExpression queryParameter, int expectedCount)
+            Expression filteredExpression, ParameterExpression queryParameter, IReadOnlyList<string> parameterNames)
         {
-            if (expectedCount == 0)
+            if (parameterNames.Count == 0)
                 return Array.Empty<CompiledParameterValueSource>();
 
-            return new CompiledParameterValueSourceCollector(queryParameter, expectedCount)
+            var markedCount = 0;
+            foreach (var name in parameterNames)
+            {
+                if (TryParseQueryParamMarker(name, out _))
+                    markedCount++;
+            }
+
+            if (markedCount == 0)
+            {
+                return new CompiledParameterValueSourceCollector(queryParameter, parameterNames.Count)
+                    .Collect(filteredExpression);
+            }
+
+            // Marked slots (query-parameter sourced) resolve by name; the remaining slots
+            // are closure captures, paired positionally against the document-order closure
+            // stream. A resolution shortfall returns an empty array so the caller's legacy
+            // fallback handles the shape instead of silently cross-binding values.
+            var closureSources = new CompiledParameterValueSourceCollector(
+                    queryParameter, parameterNames.Count - markedCount, closuresOnly: true)
                 .Collect(filteredExpression);
+            var sources = new CompiledParameterValueSource[parameterNames.Count];
+            var closureIndex = 0;
+            for (int i = 0; i < parameterNames.Count; i++)
+            {
+                if (TryBuildMarkedValueSource(parameterNames[i], queryParameter.Type, out var marked))
+                {
+                    sources[i] = marked;
+                }
+                else if (TryParseQueryParamMarker(parameterNames[i], out _))
+                {
+                    return Array.Empty<CompiledParameterValueSource>(); // marked but unresolvable member
+                }
+                else if (closureIndex < closureSources.Length)
+                {
+                    sources[i] = closureSources[closureIndex++];
+                }
+                else
+                {
+                    return Array.Empty<CompiledParameterValueSource>();
+                }
+            }
+            return sources;
         }
 
         private static object?[] BuildCompiledParameterValues<TParam>(
