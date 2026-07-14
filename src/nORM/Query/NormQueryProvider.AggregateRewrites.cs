@@ -213,15 +213,24 @@ namespace nORM.Query
             result = default!;
             // Try to detect "isMax" (true = MAX, false = MIN, null = no match).
             bool? isMax = null;
-            // Math.Max(acc, x) / Math.Min(acc, x) - order-insensitive args.
+            // Math.Max(acc, sel(x)) / Math.Min(acc, sel(x)) - order-insensitive args;
+            // the non-accumulator side may be the raw element or any selector over it
+            // (a member access or computed expression), which becomes the MAX/MIN
+            // selector below.
+            Expression elemExpr = elemParam;
             if (fold.Body is MethodCallExpression mathCall
                 && mathCall.Method.DeclaringType == typeof(Math)
                 && mathCall.Arguments.Count == 2
-                && ((mathCall.Arguments[0] == accParam && mathCall.Arguments[1] == elemParam)
-                    || (mathCall.Arguments[0] == elemParam && mathCall.Arguments[1] == accParam)))
+                && mathCall.Method.Name is nameof(Math.Max) or nameof(Math.Min))
             {
-                if (mathCall.Method.Name == nameof(Math.Max)) isMax = true;
-                else if (mathCall.Method.Name == nameof(Math.Min)) isMax = false;
+                Expression? other = null;
+                if (mathCall.Arguments[0] == accParam) other = mathCall.Arguments[1];
+                else if (mathCall.Arguments[1] == accParam) other = mathCall.Arguments[0];
+                if (other != null && !ReferencesParameter(other, accParam))
+                {
+                    isMax = mathCall.Method.Name == nameof(Math.Max);
+                    elemExpr = other;
+                }
             }
             // Conditional: x [>/<] acc ? x : acc - or acc [>/<] x ? acc : x.
             else if (fold.Body is ConditionalExpression cond
@@ -244,11 +253,14 @@ namespace nORM.Query
 
             // Peel `source = Select(r => proj)` so the synthesized Max/Min selector
             // projects an entity column rather than identity-over-scalar (same
-            // trick as TryRewriteAggregateToSum's outer-Select unwrap).
+            // trick as TryRewriteAggregateToSum's outer-Select unwrap). When the
+            // fold already carries a selector (Math.Max(acc, x.Member)) it IS the
+            // projection — no peel needed.
             Expression aggSource = source;
-            Expression projBody = elemParam;
+            Expression projBody = elemExpr;
             ParameterExpression projParam = elemParam;
-            if (source is MethodCallExpression preSel
+            if (elemExpr == elemParam
+                && source is MethodCallExpression preSel
                 && preSel.Method.DeclaringType == typeof(System.Linq.Queryable)
                 && preSel.Method.Name == nameof(System.Linq.Queryable.Select)
                 && preSel.Arguments.Count == 2
@@ -337,6 +349,40 @@ namespace nORM.Query
             {
                 decimal a = System.Convert.ToDecimal(seed), b = System.Convert.ToDecimal(sqlValue);
                 return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            if (accType == typeof(float))
+            {
+                float a = System.Convert.ToSingle(seed), b = System.Convert.ToSingle(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            if (accType == typeof(uint))
+            {
+                uint a = System.Convert.ToUInt32(seed), b = System.Convert.ToUInt32(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            if (accType == typeof(ulong))
+            {
+                ulong a = System.Convert.ToUInt64(seed), b = System.Convert.ToUInt64(sqlValue);
+                return isMax ? Math.Max(a, b) : Math.Min(a, b);
+            }
+            // Non-numeric comparable accumulators (DateTime, TimeSpan, string, …).
+            // The scalar execute can hand back the provider's raw storage form
+            // (SQLite stores DateTime as TEXT), so coerce to the seed's type first.
+            if (seed is IComparable comparableSeed)
+            {
+                object typedSqlValue;
+                try
+                {
+                    typedSqlValue = sqlValue.GetType() == seed.GetType()
+                        ? sqlValue
+                        : System.Convert.ChangeType(sqlValue, seed.GetType(), System.Globalization.CultureInfo.InvariantCulture);
+                }
+                catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+                {
+                    throw new NormUnsupportedFeatureException(
+                        $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
+                }
+                return (comparableSeed.CompareTo(typedSqlValue) >= 0) == isMax ? seed : typedSqlValue;
             }
             throw new NormUnsupportedFeatureException(
                 $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
@@ -560,6 +606,8 @@ namespace nORM.Query
             if (accType == typeof(double))  return (double)System.Convert.ToDouble(seed) + (double)System.Convert.ToDouble(sumValue);
             if (accType == typeof(float))   return (float)System.Convert.ToSingle(seed)  + (float)System.Convert.ToSingle(sumValue);
             if (accType == typeof(decimal)) return (decimal)System.Convert.ToDecimal(seed) + (decimal)System.Convert.ToDecimal(sumValue);
+            if (accType == typeof(uint))    return (uint)System.Convert.ToUInt32(seed)    + (uint)System.Convert.ToUInt32(sumValue);
+            if (accType == typeof(ulong))   return (ulong)System.Convert.ToUInt64(seed)   + (ulong)System.Convert.ToUInt64(sumValue);
             throw new NormUnsupportedFeatureException(
                 $"Aggregate sum-fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
         }

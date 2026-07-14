@@ -439,10 +439,15 @@ public sealed class ProviderMobilityTranslationLayerTests
     {
         var providerType = typeof(NormQueryProvider);
 
+        // Comparable accumulators (DateTime here) combine via direct comparison;
+        // only a non-comparable accumulator still fails closed.
         var minMax = providerType.GetMethod("CombineMinMax", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(minMax);
+        var earlier = new DateTime(2024, 1, 1);
+        var later = new DateTime(2025, 6, 1);
+        Assert.Equal(later, minMax!.Invoke(null, new object[] { earlier, later, typeof(DateTime), true }));
         var minMaxEx = Assert.Throws<TargetInvocationException>(() =>
-            minMax!.Invoke(null, new object[] { DateTime.UtcNow, DateTime.UtcNow, typeof(DateTime), true }));
+            minMax.Invoke(null, new object[] { new object(), new object(), typeof(object), true }));
         Assert.IsType<NormUnsupportedFeatureException>(minMaxEx.InnerException);
 
         var sum = providerType.GetMethod("AddSeedToSum", BindingFlags.NonPublic | BindingFlags.Static);
