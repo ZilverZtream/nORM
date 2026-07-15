@@ -26,7 +26,11 @@ decimal exact compare, Convert rounding + date diff. All fixed live on the three
 ## Open items
 
 - [ ] Sustain live parity across all four providers in CI (needs live creds; keep them test-only).
-- [ ] Audit `src/nORM/Query/` for any remaining unconditional provider syntax (must use hooks).
+- [x] Audit `src/nORM/Query/` for unconditional provider syntax (NH-0501): the query layer is
+      provider-agnostic - zero `is <Provider>` checks; the last one (constant regex-argument
+      inlining) is now the `DatabaseProvider.InlinesConstantRegexArguments` hook. (The mobility
+      translator, scaffold provider-kind, and connection factory legitimately dispatch on provider
+      type - they are not query-SQL generation.)
 - [ ] Verify strict-mode admit/deny list against the full feature enum.
 
 ## Verification

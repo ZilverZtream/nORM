@@ -527,6 +527,17 @@ namespace nORM.Providers
                 $"Regex.Replace is not supported by provider '{GetType().Name}'.");
 
         /// <summary>
+        /// Whether a constant <c>Regex.IsMatch</c> / <c>Regex.Replace</c> pattern or replacement
+        /// argument must be emitted as an inline SQL string literal instead of a parameter.
+        /// Default is <c>false</c> (parameterise). SQL Server overrides it to <c>true</c> because
+        /// it decodes the pattern literal at translation time to build a LIKE/PATINDEX shape, so
+        /// it needs the literal text rather than a runtime parameter. Keeping this a provider
+        /// capability (not an <c>is SqlServerProvider</c> check in the query layer) preserves the
+        /// provider-mobility contract.
+        /// </summary>
+        internal virtual bool InlinesConstantRegexArguments => false;
+
+        /// <summary>
         /// Case-insensitive variant of <see cref="GetRegexMatchSql"/>. Default
         /// falls back to wrapping both sides in LOWER() which is portable but
         /// loses Unicode case-folding nuance; providers with a native case-

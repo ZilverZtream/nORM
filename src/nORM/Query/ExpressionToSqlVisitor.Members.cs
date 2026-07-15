@@ -763,7 +763,7 @@ namespace nORM.Query
 
         private string GetRegexPatternSql(Expression patternExpr)
         {
-            if (_provider is SqlServerProvider
+            if (_provider.InlinesConstantRegexArguments
                 && TryGetConstantValue(patternExpr, out var raw)
                 && raw is string pattern)
             {
@@ -775,7 +775,7 @@ namespace nORM.Query
 
         private string GetRegexReplacementSql(Expression replacementExpr)
         {
-            if (_provider is SqlServerProvider
+            if (_provider.InlinesConstantRegexArguments
                 && TryGetConstantValue(replacementExpr, out var raw)
                 && raw is string replacement)
             {

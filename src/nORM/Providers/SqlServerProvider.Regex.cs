@@ -19,6 +19,11 @@ namespace nORM.Providers
 {
     public sealed partial class SqlServerProvider
     {
+        // SQL Server decodes the constant regex pattern/replacement literal at translation time
+        // (TryDecodeSqlStringLiteral) to build a LIKE/PATINDEX shape, so it requires an inline
+        // literal rather than a parameter. See DatabaseProvider.InlinesConstantRegexArguments.
+        internal override bool InlinesConstantRegexArguments => true;
+
         /// <summary>
         /// T-SQL has no native regex primitive. nORM translates a deliberately
         /// small ASCII-safe Regex.IsMatch subset to LIKE/PATINDEX-compatible
