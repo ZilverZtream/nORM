@@ -23,7 +23,7 @@ public class PackageConsumerIntegrationTests
     {
         var root = FindRepositoryRoot();
         EnsureRuntimePackage(root);
-        var packagePath = Path.Combine(root, "src", "bin", "Release", $"nORM.{PackageVersion}.nupkg");
+        var packagePath = Path.Combine(root, "src", "bin", "Release", $"Normad.{PackageVersion}.nupkg");
 
         using var archive = ZipFile.OpenRead(packagePath);
         Assert.Contains(archive.Entries, entry =>
@@ -35,8 +35,8 @@ public class PackageConsumerIntegrationTests
     {
         var root = FindRepositoryRoot();
         EnsureRuntimePackage(root);
-        var packagePath = Path.Combine(root, "src", "bin", "Release", $"nORM.{PackageVersion}.nupkg");
-        var symbolsPath = Path.Combine(root, "src", "bin", "Release", $"nORM.{PackageVersion}.snupkg");
+        var packagePath = Path.Combine(root, "src", "bin", "Release", $"Normad.{PackageVersion}.nupkg");
+        var symbolsPath = Path.Combine(root, "src", "bin", "Release", $"Normad.{PackageVersion}.snupkg");
 
         using (var archive = ZipFile.OpenRead(packagePath))
         {
@@ -45,7 +45,7 @@ public class PackageConsumerIntegrationTests
             AssertPackageEntry(archive, "README.md");
             AssertPackageEntry(archive, "analyzers/dotnet/cs/nORM.SourceGenerators.dll");
 
-            var nuspec = ReadEntryText(archive, "nORM.nuspec");
+            var nuspec = ReadEntryText(archive, "Normad.nuspec");
             Assert.Contains("<license type=\"expression\">MIT</license>", nuspec, StringComparison.Ordinal);
             Assert.Contains("<readme>README.md</readme>", nuspec, StringComparison.Ordinal);
             Assert.Contains("<repository type=\"git\" url=\"https://github.com/zilverztream/nORM\"", nuspec, StringComparison.Ordinal);
@@ -151,7 +151,7 @@ public class PackageConsumerIntegrationTests
 
         AssertCurrentPackagesOnly(
             Path.Combine(root, "src", "bin", "Release"),
-            "nORM",
+            "Normad",
             PackageVersion);
         AssertCurrentPackagesOnly(
             Path.Combine(root, "src", "dotnet-norm", "bin", "Release"),
@@ -188,7 +188,7 @@ public class PackageConsumerIntegrationTests
                 <RestoreAdditionalProjectSources>{{packageSource}}</RestoreAdditionalProjectSources>
               </PropertyGroup>
               <ItemGroup>
-                <PackageReference Include="nORM" Version="{{PackageVersion}}" />
+                <PackageReference Include="Normad" Version="{{PackageVersion}}" />
               </ItemGroup>
             </Project>
             """;
@@ -253,7 +253,7 @@ public class PackageConsumerIntegrationTests
 
     private static void EnsureRuntimePackage(string root)
     {
-        CleanPackageOutput(Path.Combine(root, "src", "bin", "Release"), "nORM");
+        CleanPackageOutput(Path.Combine(root, "src", "bin", "Release"), "Normad");
         RunDotNet("pack src/nORM.csproj -c Release --no-restore --nologo", root, null);
     }
 

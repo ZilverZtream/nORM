@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CA2229</NoWarn>
     <GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
-    <PackageId>nORM</PackageId>
+    <PackageId>Normad</PackageId>
     <Version>$(NormVersion)</Version>
     <Authors>Dennis Ostling</Authors>
-    <Description>nORM - The Norm: a high-performance ORM for .NET with LINQ querying, compiled queries, multi-provider support, multi-tenancy, caching, resilience, migrations, and bulk operations.</Description>
-    <PackageTags>ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL;SQLite;PostgreSQL;MySQL</PackageTags>
+    <Description>nORMad - the provider-mobile ORM for .NET: write LINQ once and run the same code across SQLite, SQL Server, PostgreSQL, and MySQL. Compiled queries, change tracking, multi-tenancy, temporal history, caching, resilience, migrations, and provider-native bulk operations. (API namespace: nORM.)</Description>
+    <PackageTags>nORMad;nORM;ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL;SQLite;PostgreSQL;MySQL;provider-mobile</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/zilverztream/nORM</PackageProjectUrl>
     <RepositoryUrl>https://github.com/zilverztream/nORM</RepositoryUrl>
