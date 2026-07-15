@@ -602,9 +602,13 @@ namespace nORM.Core
                     for (var i = 0; i < relation.PrincipalKeys.Count; i++)
                         principalKeyValues[i] = relation.PrincipalKeys[i].Getter(principal);
 
-                    // Added dependents may be linked only by navigation (their FK is
-                    // still default until fixup runs — which skips deleted principals,
-                    // so without this they would INSERT with a dangling FK).
+                    // A dependent can be linked to the principal by navigation rather
+                    // than by its current FK value. An Added dependent's FK is still
+                    // default until fixup runs; a persisted dependent re-parented via a
+                    // reference navigation keeps its stale FK — in both cases because
+                    // fixup skips deleted principals. Honor the navigation for both so an
+                    // Added child does not INSERT with a dangling FK and a persisted
+                    // re-parented child cascades with the principal it now points at.
                     HashSet<object>? collectionMembers = null;
                     if (relation.NavProp.GetValue(principal) is System.Collections.IEnumerable membersEnumerable
                         && membersEnumerable is not string)
@@ -627,25 +631,56 @@ namespace nORM.Core
                         for (var i = 0; i < relation.ForeignKeys.Count && matches; i++)
                             matches = Equals(relation.ForeignKeys[i].Getter(dependent), principalKeyValues[i]);
 
-                        if (!matches && dependentEntry.State == EntityState.Added)
+                        if (!matches)
                         {
-                            if (collectionMembers != null && collectionMembers.Contains(dependent))
+                            var added = dependentEntry.State == EntityState.Added;
+
+                            // Collection membership is honored for Added dependents only: a
+                            // persisted child moved out by a deliberate FK edit can linger in
+                            // its former parent's collection (a stale membership that fixup does
+                            // not scrub), so honoring it here would over-cascade the child with
+                            // a principal it no longer belongs to.
+                            if (added && collectionMembers != null && collectionMembers.Contains(dependent))
                             {
                                 matches = true;
                             }
                             else
                             {
-                                foreach (var navProp in dependentEntry.Mapping.ReferenceNavigations)
+                                // Reference navigation is honored when the FK cannot speak for
+                                // the relationship: an Added dependent has no persisted FK yet,
+                                // and a persisted dependent re-parented via reference navigation
+                                // keeps a stale FK because fixup skips deleted principals. A
+                                // deliberately edited FK outranks a stale navigation (fixup
+                                // reconciles the nav to it), so a persisted dependent whose FK
+                                // changed this save is not matched by navigation.
+                                var honorNav = added;
+                                if (!honorNav)
                                 {
-                                    if (navProp.PropertyType != principalEntry.Mapping.Type)
-                                        continue;
-                                    object? navValue;
-                                    try { navValue = navProp.GetValue(dependent); }
-                                    catch { continue; }
-                                    if (ReferenceEquals(navValue, principal))
+                                    honorNav = true;
+                                    for (var i = 0; i < relation.ForeignKeys.Count; i++)
                                     {
-                                        matches = true;
-                                        break;
+                                        if (dependentEntry.HasColumnValueChanged(relation.ForeignKeys[i]))
+                                        {
+                                            honorNav = false;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (honorNav)
+                                {
+                                    foreach (var navProp in dependentEntry.Mapping.ReferenceNavigations)
+                                    {
+                                        if (navProp.PropertyType != principalEntry.Mapping.Type)
+                                            continue;
+                                        object? navValue;
+                                        try { navValue = navProp.GetValue(dependent); }
+                                        catch { continue; }
+                                        if (ReferenceEquals(navValue, principal))
+                                        {
+                                            matches = true;
+                                            break;
+                                        }
                                     }
                                 }
                             }
