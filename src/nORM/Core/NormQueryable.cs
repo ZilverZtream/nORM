@@ -52,6 +52,17 @@ namespace nORM.Core
             });
             return (IQueryable<T>)factory(ctx);
         }
+
+        /// <summary>
+        /// Creates a queryable source for the specified entity type backed by the provided
+        /// context. Alias for <see cref="Query{T}(DbContext)"/>, provided for parity with the
+        /// Entity Framework Core <c>DbContext.Set&lt;T&gt;()</c> entry point so that existing
+        /// muscle memory works unchanged.
+        /// </summary>
+        /// <typeparam name="T">The entity type to query.</typeparam>
+        /// <param name="ctx">The <see cref="DbContext"/> that provides access to the database.</param>
+        /// <returns>An <see cref="IQueryable{T}"/> to compose and execute queries.</returns>
+        public static IQueryable<T> Set<T>(this DbContext ctx) where T : class => ctx.Query<T>();
     }
 
     /// <summary>

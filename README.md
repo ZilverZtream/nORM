@@ -204,6 +204,9 @@ public class User
 
 ### LINQ Queries
 
+`context.Query<T>()` opens a queryable; `context.Set<T>()` is a drop-in alias for
+Entity Framework Core muscle memory - both return the same `IQueryable<T>`.
+
 ```csharp
 // Familiar EF Core-style syntax on provider-tested query paths
 var users = await context.Query<User>()
