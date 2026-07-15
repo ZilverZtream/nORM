@@ -12,8 +12,9 @@ documented" bar.
 - [ ] **Hosting integration:** `AddNorm` / `AddNorm<TContext>` / `AddNormFactory<TContext>` +
       `INormDbContextFactory<TContext>` with correct scoped lifetime and disposal. *(Done.)*
 - [ ] **Entry-point parity:** `context.Set<T>()` alias for `Query<T>()`. *(Done.)*
-- [ ] **Write mental-model documented:** clear guidance on direct-write (`InsertAsync`/…) vs
-      tracked (`Add` + `SaveChangesAsync`) — when to use which and the hazards.
+- [x] **Write mental-model documented** (NH-1201): `docs/write-model.md` covers direct-write
+      (`InsertAsync`/…) vs tracked (`Add` + `SaveChangesAsync`) vs bulk/set-based — when to use
+      which, a decision table, and the mixing-modes reconciliation.
 - [ ] **Key convention decision made** (see open items) — implement per the decision or document
       the explicit-key requirement as deliberate.
 - [ ] Getting-started + per-area docs exist and match the code; the naming story (published as
@@ -32,7 +33,7 @@ enforce the surface continuously.
       documented explicit-keys philosophy and can affect legitimately keyless entities that have
       an `Id` column, so it is **not** a safe unilateral change — needs an explicit call.
 - [ ] Consider `AddDbContextPool`-style pooling (requires context-reset semantics) — evaluate.
-- [ ] Write the direct-vs-tracked write-model doc (Domain 2 dependency).
+- [x] Direct-vs-tracked write-model doc written (NH-1201): `docs/write-model.md`, linked from README.
 - [ ] Freeze the API: declare no-more-breaking-changes and lock the baseline.
 
 ## Verification

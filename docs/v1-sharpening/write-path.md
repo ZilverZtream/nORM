@@ -29,7 +29,7 @@ machine is fully green; a 1600-seed sweep post-KILL-42 was clean.
 ## Open items
 
 - [ ] Sustain the state-machine fuzzer dry window across all three machines; record seed ranges.
-- [ ] Write the direct-vs-tracked write-model guidance doc (Domain 12 dependency).
+- [x] Direct-vs-tracked write-model guidance doc written (NH-1201): `docs/write-model.md`.
 - [ ] Confirm retry-write invariants (Domain 9) hold under fault injection: reset rolled-back
       db-generated keys on retry; never retry past commit-attempted.
 

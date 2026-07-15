@@ -251,6 +251,10 @@ await context.UpdateAsync(user);
 await context.DeleteAsync(user);
 ```
 
+nORM supports both direct writes (above) and EF Core-style change tracking
+(`Add`/`Remove` + `SaveChangesAsync`). See the [write model guide](docs/write-model.md)
+for when to use which, and how the two interact.
+
 ### Bulk Operations
 
 ```csharp
