@@ -262,9 +262,13 @@ namespace nORM.Core
                     // The user cleared a reference nav that was loaded non-null →
                     // disassociate by nulling the FK. A never-loaded null nav is not
                     // recorded, so its still-valid FK is left intact. Never touch a
-                    // key or already-null FK.
+                    // key, an already-null FK, or a REQUIRED (non-nullable) FK — a
+                    // required relationship cannot be severed by nulling its FK (that
+                    // would unbox null into a value-type column and throw), so its FK
+                    // is left intact for the same reason a never-loaded nav's is.
                     if (entry.LoadedReferenceNavs?.Contains(navProp.Name) == true
                         && !fk.IsKey
+                        && fk.IsNullable
                         && fk.Getter(dependent) != null
                         && entry.State != EntityState.Added)
                     {
