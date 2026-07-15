@@ -6,14 +6,18 @@ SQLite table-recreate, and advisory-locked concurrent deploys.
 ## 1.0 exit criteria
 
 - [ ] The migration data-preservation fuzzer (up/down oracle over random schemas + data) runs
-      **dry for a sustained window** with zero new kills.
-- [ ] Every `Down` is runnable standalone and restores dropped NOT NULL columns with the pinned
-      type-zero backfill contract — no unrunnable-standalone migrations.
-- [ ] SQLite table-recreate: exactly one recreate per table per direction; rename folds into the
-      recreate; `SchemaDiff.Table` reference inconsistencies are handled.
-- [ ] Temporal/provider DDL precision is correct (e.g. MySQL DATETIME(6)/TIME(6), TINYINT
-      UNSIGNED, temporal-default rewrite).
+      **dry for a sustained window** with zero new kills. (NH-0401: dry on the current tree - 220
+      tests; the sustained multi-week window is open.)
+- [x] Every `Down` is runnable standalone and restores dropped NOT NULL columns with the pinned
+      type-zero backfill contract — no unrunnable-standalone migrations (NH-0401).
+- [x] SQLite table-recreate: exactly one recreate per table per direction; rename folds into the
+      recreate; `SchemaDiff.Table` reference inconsistencies are handled (NH-0401).
+- [x] Temporal/provider DDL precision is correct at the SQL-generation level (MySQL
+      DATETIME(6)/TIME(6), TINYINT UNSIGNED, temporal-default rewrite) — `MigrationSqlGeneration`
+      green (NH-0401); live-DB round-trip re-verified on the live gate.
 - [ ] Concurrent deploys are advisory-locked per provider; safe rename detection documented.
+      (NH-0401: rename detection + `[RenameColumn]` doc contract green; per-provider live
+      advisory-lock deferred to the live provider gate.)
 
 ## Current confidence
 
@@ -23,10 +27,11 @@ invariant and rename-fold are in place.
 
 ## Open items
 
-- [ ] Sustain the preservation fuzzer dry window; record schema/seed ranges.
+- [~] Sustain the preservation fuzzer dry window; record schema/seed ranges. (NH-0401 recorded a
+      220-test dry run; the multi-week window is calendar time.)
 - [ ] Re-verify advisory-lock behaviour on live SQL Server / PostgreSQL / MySQL under concurrent
       deploy.
-- [ ] Confirm rename detection vs DROP+ADD boundary is documented and matches `[RenameColumn]`.
+- [x] Rename detection vs DROP+ADD boundary is documented and matches `[RenameColumn]` (NH-0401).
 
 ## Verification
 
