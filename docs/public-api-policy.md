@@ -79,6 +79,8 @@ v1.0 contract:
 | `nORM.Scaffolding.ScaffoldOptions.EmitViewEntities` / `nORM.Scaffolding.ScaffoldOptions.EmitQueryArtifacts` | Stable - scaffold query-artifact opt-ins | `DatabaseScaffolderDiagnosticsTests`, `DatabaseScaffolderOutputTests`, `LiveProviderScaffoldingQueryArtifactTests`, `LiveProviderScaffoldCliQueryArtifactTests` | `docs/scaffolding.md`, `src/dotnet-norm/README.md`, `README.md` |
 | `nORM.Internal.ConcurrentLruCache<TKey, TValue>` | Stable for v1.0 compatibility; deprecated namespace closed to new public additions | `ConcurrentLruCachePublicApiTests`, `ConcurrentLruCacheStressTests`, `NamespacePolicyContractTests` | `docs/namespace-policy.md`; planned v1.x relocation to `nORM.Caching` with type forwarding |
 | `nORM.Internal.ParameterOptimizer` | Stable for v1.0 compatibility; deprecated namespace closed to new public additions | `ParameterOptimizerPublicApiTests`, `CompileTimeQueryParameterParityTests`, `NamespacePolicyContractTests` | `docs/namespace-policy.md`; planned v1.x relocation to `nORM.Diagnostics` with type forwarding |
+| `Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(...)` / `AddNorm<TContext>(...)` / `AddNormFactory<TContext>(...)` | Stable - hosting / DI integration | `NormServiceCollectionExtensionsTests` | `README.md` dependency-injection section |
+| `nORM.Core.INormDbContextFactory<TContext>` | Stable - caller-owned context factory | `NormServiceCollectionExtensionsTests` | `README.md` dependency-injection section |
 
 `PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
 any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.

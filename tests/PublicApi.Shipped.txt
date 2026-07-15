@@ -128,6 +128,9 @@ F:nORM.Execution.AdaptiveTimeoutManager.OperationType.StoredProcedure:nORM.Execu
 F:nORM.Execution.AdaptiveTimeoutManager.OperationType.Transaction:nORM.Execution.AdaptiveTimeoutManager.OperationType
 F:nORM.Execution.AdaptiveTimeoutManager.OperationType.Update:nORM.Execution.AdaptiveTimeoutManager.OperationType
 F:nORM.Execution.AdaptiveTimeoutManager.OperationType.value__:System.Int32
+M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.Func{nORM.Providers.DatabaseProvider},System.Action{nORM.Configuration.DbContextOptions},Microsoft.Extensions.DependencyInjection.ServiceLifetime):Microsoft.Extensions.DependencyInjection.IServiceCollection
+M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,`0}):Microsoft.Extensions.DependencyInjection.IServiceCollection
+M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,`0},Microsoft.Extensions.DependencyInjection.ServiceLifetime):Microsoft.Extensions.DependencyInjection.IServiceCollection
 M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogBulkOperation(Microsoft.Extensions.Logging.ILogger,System.String,System.String,System.Int32,System.TimeSpan):System.Void
 M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogError(Microsoft.Extensions.Logging.ILogger,nORM.Core.NormException,System.Int32):System.Void
 M:Microsoft.Extensions.Logging.DbContextLoggingExtensions.LogQuery(Microsoft.Extensions.Logging.ILogger,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.TimeSpan,System.Int32):System.Void
@@ -384,6 +387,7 @@ M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.IMemoryMonitor.GetAvailableMemory():System.Int64
+M:nORM.Core.INormDbContextFactory{`0}.CreateDbContext():`0
 M:nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Core.INormQueryable{`0}.AsAsyncEnumerable(System.Threading.CancellationToken):System.Collections.Generic.IAsyncEnumerable{`0}
 M:nORM.Core.INormQueryable{`0}.AsNoTracking():nORM.Core.INormQueryable{`0}
@@ -1533,6 +1537,7 @@ P:nORM.SourceGeneration.CompiledMaterializerStore.Evictions:System.Int64
 P:nORM.SourceGeneration.CompiledMaterializerStore.HitRate:System.Double
 P:nORM.SourceGeneration.CompiledMaterializerStore.Hits:System.Int64
 P:nORM.SourceGeneration.CompiledMaterializerStore.Misses:System.Int64
+T:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
 T:Microsoft.Extensions.Logging.DbContextLoggingExtensions
 T:nORM.Configuration.AmbientTransactionEnlistmentPolicy
 T:nORM.Configuration.CheckConstraintConfiguration
@@ -1586,6 +1591,7 @@ T:nORM.Core.DbContextTransaction
 T:nORM.Core.EntityEntry
 T:nORM.Core.EntityState
 T:nORM.Core.IMemoryMonitor
+T:nORM.Core.INormDbContextFactory{`0}
 T:nORM.Core.INormIncludableQueryable{`0,`1}
 T:nORM.Core.INormQueryable{`0}
 T:nORM.Core.Json

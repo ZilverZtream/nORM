@@ -263,6 +263,73 @@ Bulk operation semantics, fallback/native provider paths, transactions, tenant
 checks, and cache invalidation are part of the v1 contract. See
 [Bulk Operation Contract](docs/bulk-operations.md).
 
+## Dependency Injection (ASP.NET Core)
+
+nORM registers on `IServiceCollection`, so ASP.NET Core and generic-host apps get a
+scoped `DbContext` with a container-managed lifetime - one context (and connection) per
+request, disposed automatically when the scope ends:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using nORM.Core;
+using nORM.Providers;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Registers DbContext as Scoped; a fresh provider + options are built per context.
+builder.Services.AddNorm(
+    builder.Configuration.GetConnectionString("Default")!,
+    () => new SqlServerProvider(),
+    options => options.UseInMemoryCache());
+```
+
+Inject `DbContext` (or your own subclass) straight into controllers, minimal-API
+handlers, or services:
+
+```csharp
+app.MapGet("/users/{id:int}", async (int id, DbContext db) =>
+    await db.Query<User>().Where(u => u.Id == id).FirstOrDefaultAsync());
+```
+
+### Custom context classes
+
+Subclass `DbContext`, register it with the generic overload, and inject your type:
+
+```csharp
+public sealed class AppDbContext : DbContext
+{
+    public AppDbContext(string connectionString, DatabaseProvider provider)
+        : base(connectionString, provider) { }
+}
+
+builder.Services.AddNorm(sp => new AppDbContext(
+    builder.Configuration.GetConnectionString("Default")!, new SqlServerProvider()));
+```
+
+### Contexts outside a request scope
+
+For singletons, background services, or parallel work, register a factory and create
+short-lived, caller-owned contexts on demand:
+
+```csharp
+builder.Services.AddNormFactory(sp => new AppDbContext(
+    builder.Configuration.GetConnectionString("Default")!, new SqlServerProvider()));
+
+public sealed class Worker(INormDbContextFactory<AppDbContext> factory) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await using var db = factory.CreateDbContext(); // caller owns and disposes it
+        // ... use db ...
+    }
+}
+```
+
+`AddNorm` and `AddNorm<TContext>` default to `ServiceLifetime.Scoped`; pass a different
+`ServiceLifetime` if you need one. Because nORM builds mappings and materializers by
+reflection, the connection-string `AddNorm` overload is annotated
+`RequiresUnreferencedCode`/`RequiresDynamicCode`; see [AOT & trimming](docs/aot-trimming.md).
+
 ## Advanced Features
 
 ### Zero-Configuration Database Discovery

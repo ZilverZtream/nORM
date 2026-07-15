@@ -20,6 +20,7 @@ The list is enforced by `NamespacePolicyContractTests`.
 | `nORM.Enterprise` | Stable provider API | Enterprise integration extension points; opt-in |
 | `nORM.Internal` | **Deprecated namespace, tracked for v1.x relocation** | Existing public types here remain reachable for compatibility. New types must NOT be added; existing entries (e.g., `ConcurrentLruCache<T, TValue>`, `ParameterOptimizer`) are scheduled for relocation to `nORM.Caching` / `nORM.Diagnostics` in a v1.x release with type forwarders. |
 | `Microsoft.Extensions.Logging` | Stable user API (extension methods) | Hosts `DbContextLoggingExtensions` (and any future `Microsoft.Extensions.*` extensions) per the standard convention of registering extension methods under the namespace of the type they extend. |
+| `Microsoft.Extensions.DependencyInjection` | Stable user API (extension methods) | Hosts `NormServiceCollectionExtensions` (`AddNorm`, `AddNormFactory`) so nORM registers on `IServiceCollection` for ASP.NET Core / generic-host apps, per the standard convention of registering DI extension methods under this namespace. |
 
 ## Rules
 
