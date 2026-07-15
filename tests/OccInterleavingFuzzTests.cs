@@ -35,6 +35,10 @@ public class OccInterleavingFuzzTests
     {
         public DbContext Ctx = null!;
         public Dictionary<int, (OccRow Row, int LoadedVersion)> View = new();
+        // The value each viewed row was loaded/last-saved with. A mutation back to this
+        // value is a net no-op: nORM emits no UPDATE for an unchanged row, so it neither
+        // conflicts nor bumps the token. The oracle must ignore such no-ops.
+        public Dictionary<int, int> LoadedVals = new();
         public Dictionary<int, int> PendingVals = new();
         public HashSet<int> PendingDeletes = new();
         public List<(OccRow Row, int Val)> PendingAdds = new();
@@ -45,6 +49,9 @@ public class OccInterleavingFuzzTests
     [InlineData(42)]
     [InlineData(987654)]
     [InlineData(31337)]
+    [InlineData(800046)]
+    [InlineData(800071)]
+    [InlineData(800095)]
     public async Task Interleaved_saves_conflict_exactly_when_stale(int seed)
     {
         var dbName = $"occfuzz_{seed}_{Guid.NewGuid():N}";
@@ -86,8 +93,12 @@ public class OccInterleavingFuzzTests
             var s = ctxs[i];
             s.Ctx.ChangeTracker.Clear();
             s.View = new Dictionary<int, (OccRow, int)>();
+            s.LoadedVals = new Dictionary<int, int>();
             foreach (var row in await s.Ctx.Query<OccRow>().ToListAsync())
+            {
                 s.View[row.Id] = (row, version[row.Id]);
+                s.LoadedVals[row.Id] = row.Val;
+            }
             s.PendingVals.Clear();
             s.PendingDeletes.Clear();
             s.PendingAdds.Clear();
@@ -136,7 +147,12 @@ public class OccInterleavingFuzzTests
                         var key = keys[rng.Next(keys.Count)];
                         var val = rng.Next(-100, 100);
                         s.View[key].Row.Val = val;
-                        s.PendingVals[key] = val;
+                        // A mutation that lands back on the loaded value is a net no-op —
+                        // nORM emits no UPDATE, so the row cannot conflict or bump its token.
+                        if (s.LoadedVals.TryGetValue(key, out var lv) && val == lv)
+                            s.PendingVals.Remove(key);
+                        else
+                            s.PendingVals[key] = val;
                         trace.Add($"{step}: ctx{i} mutate {key} -> {val}");
                         break;
                     }
@@ -190,18 +206,21 @@ public class OccInterleavingFuzzTests
                                 committedVal[key] = val;
                                 version[key]++;
                                 s.View[key] = (s.View[key].Row, version[key]);
+                                s.LoadedVals[key] = val;   // new saved baseline for this ctx
                             }
                             foreach (var key in s.PendingDeletes)
                             {
                                 committedVal.Remove(key);
                                 version.Remove(key);
                                 s.View.Remove(key);
+                                s.LoadedVals.Remove(key);
                             }
                             foreach (var (row, val) in s.PendingAdds)
                             {
                                 committedVal[row.Id] = val;
                                 version[row.Id] = 1;
                                 s.View[row.Id] = (row, 1);
+                                s.LoadedVals[row.Id] = val;
                             }
                             s.PendingVals.Clear();
                             s.PendingDeletes.Clear();
