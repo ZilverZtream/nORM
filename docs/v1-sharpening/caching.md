@@ -21,8 +21,12 @@ probes — a reminder that cache-tag coverage needs adversarial, not happy-path,
 
 ## Open items
 
-- [ ] Add a differential cache-staleness fuzzer (write X, assert cached read of any dependent
-      query is invalidated) covering multi-table, correlated, and nav-aggregate reads.
+- [x] Differential cache-staleness fuzzer added (NH-0801): random shape x random write vs a fresh
+      uncached oracle over the same DB; dry over 120 seeds and teeth-proven (a sabotage variant
+      fails on a genuinely stale cache). Covers correlated COUNT/SUM + parent-scalar shapes and
+      insert/delete/update writes. (Explicit JOIN-projection staleness stays covered by the
+      targeted `MultiTableCacheInvalidation` tests; extending the fuzzer to join/window shapes is
+      tracked IMPLEMENTATION-DEBT in NH-0801.)
 - [ ] Verify bulk-write invalidation covers all touched tables (cross-check Domain 3).
 - [ ] Confirm bounded-cache limits and diagnostics match `docs/cache-policy.md`.
 
