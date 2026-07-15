@@ -92,6 +92,12 @@ specific work that turns each 🟡 → 🟢.
 
 ## Working the framework
 
+Execution happens through **enforced, granular hardening tickets** in
+[`docs/hardening/`](../hardening/README.md) (`NH-NNNN`, grouped by domain). Each domain here
+decomposes into subdomain tickets; a domain flips 🟢 only when all of its tickets are
+`Verified` — and "Verified" is gated by a validator (NH-0001), not by ticking a box in a doc.
+That layer is what stops a broad checkbox from being closed by the smallest visible fix.
+
 - Pick the domain with the most open correctness risk first; correctness gates everything.
 - Close items, update the domain doc's checklist and status, and only mark GREEN when the
   verification commands pass on a clean tree.
