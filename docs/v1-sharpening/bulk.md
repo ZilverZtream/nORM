@@ -6,12 +6,17 @@ staging, and interaction with tenant filters and cache invalidation.
 ## 1.0 exit criteria
 
 - [ ] The bulk-CUD oracle fuzzer runs **dry for a sustained window** with zero new kills.
+      (NH-0301: dry on the current tree - 126 tests; the sustained multi-week window is open.)
 - [ ] Native and fallback paths produce identical results on every provider; the chosen path is
-      documented and threshold-driven.
+      documented and threshold-driven. (NH-0301: batched/fallback parity green on SQLite; native
+      paths on live SQL Server / PostgreSQL / MySQL deferred to the live provider gate.)
 - [ ] Converter columns stage and round-trip by `Converter.ProviderType` with **no silent
       precision/format loss** (e.g. no DATETIME(0) sub-second truncation via UPDATE…JOIN).
-- [ ] Bulk paths apply `col.Converter` + `ParameterAssign.AssignValue` — never a raw bypass.
-- [ ] Bulk writes honour tenant boundaries and invalidate cache tags for every touched table.
+      (Live-verified fix on MySQL + SQL Server; re-run on the live gate.)
+- [x] Bulk paths apply `col.Converter` + `ParameterAssign.AssignValue` — never a raw bypass
+      (NH-0301).
+- [x] Bulk writes honour tenant boundaries and invalidate cache tags for every touched table
+      (NH-0301: `BulkTenantIsolation` + `BulkCacheInvalidation` green).
 
 ## Current confidence
 
@@ -21,10 +26,11 @@ apply the converter (raw-Guid-as-TEXT corruption closed).
 
 ## Open items
 
-- [ ] Sustain the bulk oracle dry window; record seed ranges.
+- [~] Sustain the bulk oracle dry window; record seed ranges. (NH-0301 recorded a 126-test dry
+      run; the multi-week window is calendar time.)
 - [ ] Re-verify converter fidelity for every provider type after any converter/staging change.
-- [ ] Confirm bulk-update/delete cache invalidation covers correlated/multi-table reads
-      (cross-check Domain 8).
+- [x] Bulk-update/delete cache invalidation is covered (NH-0301: `BulkCacheInvalidation` green;
+      correlated/multi-table cache-tag coverage cross-checked in Domain 8 / NH-0801).
 
 ## Verification
 
