@@ -270,6 +270,8 @@ public class LinqParityFuzzTests
     [InlineData(1)]
     [InlineData(777_000_111)]
     [InlineData(31337)]
+    [InlineData(500_009)]
+    [InlineData(500_150)]
     public async System.Threading.Tasks.Task Generated_query_shapes_match_linq_to_objects(int seed)
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
