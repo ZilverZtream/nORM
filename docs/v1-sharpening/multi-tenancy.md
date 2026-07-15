@@ -20,9 +20,13 @@ tenant column resolves from `Options.TenantColumnName`. Native RLS paths exist p
 
 ## Open items
 
-- [ ] Add/confirm an adversarial cross-tenant leak sweep (reads, writes, bulk, Include, cache).
-- [ ] Verify cache keys include the tenant discriminator on every cacheable path (Domain 8).
-- [ ] Confirm native RLS behaviour on live SQL Server / PostgreSQL / MySQL.
+- [x] Adversarial cross-tenant leak sweep confirmed green (NH-0701): 157 tests across reads,
+      writes, bulk, Include/nav, M2M, owned collections, compiled queries, result/plan-cache
+      poisoning, fail-closed, and global-filter bypass.
+- [x] Cache keys include the tenant discriminator on every cacheable path (NH-0701):
+      `MultiTenantResultCachePoisoning` + `MultiTenantPlanCache` green.
+- [ ] Confirm native RLS behaviour on live SQL Server / PostgreSQL / MySQL (deferred to the live
+      provider gate; needs credentials).
 
 ## Verification
 
