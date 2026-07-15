@@ -116,4 +116,46 @@ public class CascadeDeleteReparentedChildTests
             keeper.Dispose();
         }
     }
+
+    [Trait("Category", TestCategory.Fast)]
+    [Fact]
+    public async Task Child_reparented_by_fk_edit_stays_tracked_when_former_principal_is_deleted()
+    {
+        var (open, keeper) = MakeRelDb($"track_{Guid.NewGuid():N}");
+        try
+        {
+            var ctx = open();
+            var p6 = new RelParent { Id = 6, Name = "p6" };
+            var p5 = new RelParent { Id = 5, Name = "p5" };
+            var p7 = new RelParent { Id = 7, Name = "p7" };
+            var c = new RelChild { Id = 100, Val = 1 };
+            p6.Children.Add(c);                 // graph child: sits in p6.Children, FK fixed to 6
+            ctx.Add(p6);
+            ctx.Add(p5);
+            ctx.Add(p7);
+            await ctx.SaveChangesAsync();
+
+            c.ParentId = 5;                     // FK edit off p6 -> p5; c still lingers in p6.Children
+            await ctx.SaveChangesAsync();
+
+            // Deleting the FORMER principal must not detach c — it belongs to p5 now. Detaching it
+            // (because it lingers in p6's collection) would silently strip its change tracking and
+            // drop the later reparent below.
+            ctx.Remove(p6);
+            await ctx.SaveChangesAsync();
+
+            c.Parent = p7;                      // reparent to p7 — only persists if c stayed tracked
+            await ctx.SaveChangesAsync();
+            ctx.Dispose();
+
+            using var fresh = open();
+            var kids = (await fresh.Query<RelChild>().ToListAsync()).OrderBy(k => k.Id).ToList();
+            Assert.Single(kids);
+            Assert.Equal(7, kids[0].ParentId);  // reparent took effect → c was still tracked
+        }
+        finally
+        {
+            keeper.Dispose();
+        }
+    }
 }

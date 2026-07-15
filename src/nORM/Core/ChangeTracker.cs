@@ -389,7 +389,27 @@ namespace nORM.Core
 
                                 if (_entriesByReference.TryGetValue(child, out var childEntry))
                                 {
-                                    queue.Enqueue((child, childEntry.Mapping, depth + 1));
+                                    // Only cascade-detach a child that genuinely belongs to this
+                                    // principal: its FK still references the principal, or it is Added
+                                    // (never persisted, linked only by navigation). A persisted child
+                                    // re-parented by a deliberate FK edit can linger in this now-stale
+                                    // collection; detaching it would silently strip its change tracking
+                                    // and drop any later mutation.
+                                    var belongs = childEntry.State == EntityState.Added;
+                                    if (!belongs)
+                                    {
+                                        belongs = true;
+                                        for (var i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
+                                        {
+                                            if (!Equals(relation.ForeignKeys[i].Getter(child), relation.PrincipalKeys[i].Getter(entity)))
+                                            {
+                                                belongs = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (belongs)
+                                        queue.Enqueue((child, childEntry.Mapping, depth + 1));
                                 }
                             }
                         }
