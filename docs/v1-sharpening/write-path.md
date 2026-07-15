@@ -7,17 +7,18 @@ change tracking, identity map, cascade delete, relationship fixup, and graph wri
 
 - [ ] The CRUD state-machine fuzzer (explicit-key, generated-key, and relationship machines;
       keys / relationship-graphs / OCC-interleavings / fault injection vs SQLite + a live server)
-      runs **dry for a sustained window** with zero new correctness kills.
-- [ ] No silent data loss on any write path: delete-then-re-add, detached-update,
+      runs **dry for a sustained window** with zero new correctness kills. (NH-0201: dry on the
+      current tree - 59 tests; the sustained multi-week window is the cross-cutting bar, open.)
+- [x] No silent data loss on any write path: delete-then-re-add, detached-update,
       nav-retarget/reparent cascade, required-nav clear, tracked-dependent cascade, and
-      direct+bulk tracker sync are all covered and green.
-- [ ] Cascade semantics are exact: `CascadeMarkDeletedDependents` (mark by FK/nav) and the
+      direct+bulk tracker sync are all covered and green (NH-0201).
+- [x] Cascade semantics are exact: `CascadeMarkDeletedDependents` (mark by FK/nav) and the
       accept-phase `CascadeDelete` (detach graph members) only ever touch entities that
-      genuinely belong to the principal.
-- [ ] Relationship fixup covers both directions (collection add and reference/graph add),
-      pending db-generated-key fixups, and FK-edit-outranks-stale-nav.
-- [ ] The direct-write vs tracked-write mental model is documented (when to use which, and the
-      hazards) — see Domain 12.
+      genuinely belong to the principal (NH-0201; KILL 40/42 regressions).
+- [x] Relationship fixup covers both directions (collection add and reference/graph add),
+      pending db-generated-key fixups, and FK-edit-outranks-stale-nav (NH-0201).
+- [x] The direct-write vs tracked-write mental model is documented (when to use which, and the
+      hazards) — see Domain 12 (NH-1201, `docs/write-model.md`).
 
 ## Current confidence
 
@@ -30,8 +31,9 @@ machine is fully green; a 1600-seed sweep post-KILL-42 was clean.
 
 - [ ] Sustain the state-machine fuzzer dry window across all three machines; record seed ranges.
 - [x] Direct-vs-tracked write-model guidance doc written (NH-1201): `docs/write-model.md`.
-- [ ] Confirm retry-write invariants (Domain 9) hold under fault injection: reset rolled-back
-      db-generated keys on retry; never retry past commit-attempted.
+- [x] Retry-write invariants (Domain 9) hold under fault injection (NH-0201,
+      `SaveChangesFaultInjectionAtomicity`): reset rolled-back db-generated keys on retry; never
+      retry past commit-attempted.
 
 ## Verification
 
