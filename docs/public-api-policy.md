@@ -1,7 +1,8 @@
 # Public API Policy
 
-nORM is approaching a v1.0 API freeze. Public API changes must be intentional,
-reviewed, and reflected in the shipped API baseline.
+nORM is pre-1.0 (0.x); the public API is being stabilized toward a future 1.0
+(see `RELEASE.md`). Public API changes must still be intentional, reviewed, and
+reflected in the shipped API baseline.
 
 ## Baseline
 

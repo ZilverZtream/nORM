@@ -1,13 +1,15 @@
 # Release Checklist
 
-Use this checklist for every v1 release candidate and stable release.
+Use this checklist when cutting a genuine release candidate or stable release.
+nORM is currently pre-1.0 (0.x): release candidates are cut only when the bar in
+`RELEASE.md` is met, never on a cadence.
 
 ## Version Transitions
 
 `Directory.Build.props` carries `NormVersion`, the single source of truth for every package and
 the changelog. Every transition below requires updating `NormVersion` in `Directory.Build.props`
 **and** appending a matching section to `CHANGELOG.md` (one PR, same commit). The release gate's
-`Assert-CurrentPackageOutput` step then refuses any stale `nORM.*.nupkg` / `dotnet-norm.*.nupkg`
+`Assert-CurrentPackageOutput` step then refuses any stale `Normad.*.nupkg` / `dotnet-norm.*.nupkg`
 that does not match `NormVersion` byte-for-byte.
 
 | Phase | `NormVersion` example | When |
