@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CA2229</NoWarn>
     <GeneratePackageOnBuild Condition="'$(Configuration)'=='Release'">true</GeneratePackageOnBuild>
-    <PackageId>Normad</PackageId>
+    <PackageId>TheNorm</PackageId>
     <Version>$(NormVersion)</Version>
     <Authors>Dennis Ostling</Authors>
-    <Description>nORMad - the provider-mobile ORM for .NET: write LINQ once and run the same code across SQLite, SQL Server, PostgreSQL, and MySQL. Compiled queries, change tracking, multi-tenancy, temporal history, caching, resilience, migrations, and provider-native bulk operations. (API namespace: nORM.)</Description>
-    <PackageTags>nORMad;nORM;ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL;SQLite;PostgreSQL;MySQL;provider-mobile</PackageTags>
+    <Description>nORM - the provider-mobile ORM for .NET: write LINQ once and run the same code across SQLite, SQL Server, PostgreSQL, and MySQL. Compiled queries, change tracking, multi-tenancy, temporal history, caching, resilience, migrations, and provider-native bulk operations. Published as the TheNorm package because the nORM id is taken; the API namespace is nORM.</Description>
+    <PackageTags>nORM;TheNorm;ORM;Database;LINQ;Performance;Entity Framework;Dapper;SQL;SQLite;PostgreSQL;MySQL;provider-mobile</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/zilverztream/nORM</PackageProjectUrl>
     <RepositoryUrl>https://github.com/zilverztream/nORM</RepositoryUrl>

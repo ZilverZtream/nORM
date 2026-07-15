@@ -1,9 +1,9 @@
-﻿# nORMad - The Provider-Mobile ORM for .NET
+﻿# nORM - The Provider-Mobile ORM for .NET
 
-> **Naming.** The framework is **nORMad**. It publishes to NuGet as the **`Normad`**
-> package - the `nORM` id is held by an unrelated legacy project - while its API
-> namespace and `dotnet norm` CLI keep the original `nORM` name. So you
-> `dotnet add package Normad` and write `using nORM;`.
+> **Naming.** nORM is meant to be *the norm* - the standard ORM you reach for. It
+> publishes on NuGet as the **`TheNorm`** package because the `nORM` id is held by
+> an unrelated 2011 project; the API namespace and `dotnet norm` CLI keep the `nORM`
+> name. So you `dotnet add package TheNorm` and write `using nORM;`.
 
 nORM is a modern Object-Relational Mapping (ORM) library for .NET built around one
 idea: **the same application code should run, unchanged, on SQLite, SQL Server,
@@ -16,7 +16,7 @@ ORM: LINQ queries, change tracking, migrations, multi-tenancy, temporal history,
 compiled queries, and provider-native bulk operations - and it stays competitive
 with hand-written ADO.NET on the hot path (see [Performance](#performance)).
 
-## Why Choose nORMad?
+## Why Choose nORM?
 
 ### 1. Provider mobility is the product, not a footnote
 

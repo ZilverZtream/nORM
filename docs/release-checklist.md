@@ -9,7 +9,7 @@ nORM is currently pre-1.0 (0.x): release candidates are cut only when the bar in
 `Directory.Build.props` carries `NormVersion`, the single source of truth for every package and
 the changelog. Every transition below requires updating `NormVersion` in `Directory.Build.props`
 **and** appending a matching section to `CHANGELOG.md` (one PR, same commit). The release gate's
-`Assert-CurrentPackageOutput` step then refuses any stale `Normad.*.nupkg` / `dotnet-norm.*.nupkg`
+`Assert-CurrentPackageOutput` step then refuses any stale `TheNorm.*.nupkg` / `dotnet-norm.*.nupkg`
 that does not match `NormVersion` byte-for-byte.
 
 | Phase | `NormVersion` example | When |

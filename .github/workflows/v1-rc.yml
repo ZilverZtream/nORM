@@ -154,7 +154,7 @@ jobs:
           if (-not $version) { throw 'Could not read NormVersion from Directory.Build.props.' }
 
           $expectedPackages = @(
-            "src/bin/Release/Normad.$version.nupkg",
+            "src/bin/Release/TheNorm.$version.nupkg",
             "src/dotnet-norm/bin/Release/dotnet-norm.$version.nupkg"
           )
 

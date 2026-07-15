@@ -620,7 +620,7 @@ if ($Mode -eq 'rc' -and -not $SkipBenchmark) {
     }
 }
 Invoke-Step 'clean package outputs before build' {
-    Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'Normad'
+    Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'TheNorm'
     Clear-PackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm'
 }
 Invoke-Step 'restore' { dotnet restore $solutionPath }
@@ -793,13 +793,13 @@ if (-not $SkipBenchmark -and $Mode -in @('full', 'rc')) {
 }
 
 Invoke-Step 'clean package outputs' {
-    Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'Normad'
+    Clear-PackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'TheNorm'
     Clear-PackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm'
 }
-Invoke-Step 'pack Normad' { dotnet pack $runtimeProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
+Invoke-Step 'pack TheNorm' { dotnet pack $runtimeProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
 Invoke-Step 'pack dotnet-norm' { dotnet pack $toolProjectPath -c $Configuration --no-build --include-symbols -p:SymbolPackageFormat=snupkg }
 Invoke-Step 'validate package outputs' {
-    Assert-CurrentPackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'Normad' $normVersion
+    Assert-CurrentPackageOutput (Join-Path (Join-Path $root 'src') "bin\$Configuration") 'TheNorm' $normVersion
     Assert-CurrentPackageOutput (Join-Path (Join-Path (Join-Path $root 'src') 'dotnet-norm') "bin\$Configuration") 'dotnet-norm' $normVersion
 }
 Invoke-Step 'RC artifact manifest' {
