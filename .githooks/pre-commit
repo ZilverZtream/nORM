@@ -1,0 +1,15 @@
+#!/bin/sh
+# nORM hardening pre-commit hook.
+# Installed via scripts/install_hardening_hooks.ps1 (sets core.hooksPath=.githooks).
+#
+# It enforces docs/hardening ticket $NORM_HARDENING_TICKET against the staged change set.
+# Non-hardening commits are unaffected: with NORM_HARDENING_TICKET unset the hook is a no-op,
+# so it never blocks ordinary work. Agents/developers set NORM_HARDENING_TICKET=NH-NNNN before
+# committing a hardening change (see docs/hardening/README.md).
+if [ -z "$NORM_HARDENING_TICKET" ]; then
+  exit 0
+fi
+echo "hardening pre-commit: validating $NORM_HARDENING_TICKET against staged changes"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate_hardening_ticket.ps1 \
+  -Ticket "$NORM_HARDENING_TICKET" -StagedOnly -IgnoreUntracked
+exit $?

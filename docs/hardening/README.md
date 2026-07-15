@@ -103,11 +103,20 @@ a Parity-audit classification in the owning ticket. This prevents quietly narrow
 
 ## Enforcement
 
-> **Status of this process: In Progress — NOT yet enforced.** Per the rule this very document
-> defines, the process is not "done" until a validator + git hook enforce it. That is ticket
-> **NH-0001** (the nORM analogue of the compiler's MLH-0001). Until `scripts/validate_hardening_ticket.ps1`
-> exists and a pre-commit/pre-push hook invokes it — with demonstrated failing runs (bad id,
-> out-of-allowed-path, Verified-with-open-criteria, unclassified restriction) — this README is
-> itself only `In Progress`. No overclaim, including here.
+The gate is `scripts/validate_hardening_ticket.ps1` (ticket **NH-0001**). It rejects a
+malformed / missing / Draft ticket id, changed files outside a ticket's Allowed paths,
+`Status: Verified` while any acceptance criterion is open or partial, and unclassified
+restriction-language added to source. A pre-commit hook (`.githooks/pre-commit`, installed by
+`scripts/install_hardening_hooks.ps1`) runs it against the staged change set.
+
+### Developer / agent workflow
+
+- Validate before committing a hardening change:
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate_hardening_ticket.ps1 -Ticket NH-NNNN`
+- To gate the commit itself, install the hook once (`scripts/install_hardening_hooks.ps1`) and set
+  `NORM_HARDENING_TICKET=NH-NNNN` before `git commit`. With the variable unset the hook is a
+  no-op, so ordinary commits are never blocked.
+- `-NoDiff` validates ticket structure only; `-StagedOnly -IgnoreUntracked` (what the hook uses)
+  validates the staged change set against the ticket.
 
 See `ticket-template.md` for the required fields.
