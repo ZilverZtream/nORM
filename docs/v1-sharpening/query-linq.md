@@ -7,7 +7,8 @@ providers.
 ## 1.0 exit criteria
 
 - [ ] The LINQ-parity differential fuzzer (seeded shapes vs LINQ-to-Objects oracle) runs **dry
-      for a sustained window** (weeks of active dev, zero new correctness kills).
+      for a sustained window** (weeks of active dev, zero new correctness kills). (NH-0101: dry on
+      the current tree - 351 tests; the sustained multi-week window is the cross-cutting bar, open.)
 - [ ] Every supported LINQ shape is enumerated in `docs/linq-support.md` and covered by a
       live cross-provider parity test; the matrix matches the code.
 - [ ] Unsupported shapes fail **deterministically and identically** across providers with a
@@ -27,7 +28,8 @@ equality and case-sensitivity campaigns are closed. Closure/SCV plan-cache bakin
 
 ## Open items
 
-- [ ] Sustain the parity-fuzzer dry window; log every seed sweep and its range.
+- [~] Sustain the parity-fuzzer dry window; log every seed sweep and its range. (NH-0101 recorded
+      a 351-test dry run on the current tree; the multi-week window itself is calendar time.)
 - [ ] Confirm `docs/linq-support.md` and `docs/linq-support-coverage.md` still match the code
       after the DI/Set<T> additions.
 - [ ] Audit remaining `NormUnsupportedFeatureException` throw sites: each must be reachable,
