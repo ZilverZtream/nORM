@@ -52,6 +52,8 @@ public class BulkCudOracleFuzzTests
     [InlineData(42)]
     [InlineData(987654)]
     [InlineData(31337)]
+    [InlineData(700_009)]
+    [InlineData(700_130)]
     public async Task Set_based_writes_match_the_committed_model(int seed)
     {
         var dbName = $"bulkcud_{seed}_{Guid.NewGuid():N}";
