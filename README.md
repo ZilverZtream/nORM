@@ -283,8 +283,8 @@ builder.Services.AddNorm(
     options => options.UseInMemoryCache());
 ```
 
-Inject `DbContext` (or your own subclass) straight into controllers, minimal-API
-handlers, or services:
+Inject `DbContext` (or your own derived context) straight into controllers,
+minimal-API handlers, or services:
 
 ```csharp
 app.MapGet("/users/{id:int}", async (int id, DbContext db) =>
@@ -293,7 +293,7 @@ app.MapGet("/users/{id:int}", async (int id, DbContext db) =>
 
 ### Custom context classes
 
-Subclass `DbContext`, register it with the generic overload, and inject your type:
+Define your own context deriving from `DbContext`, register it with the generic overload, and inject your type:
 
 ```csharp
 public sealed class AppDbContext : DbContext

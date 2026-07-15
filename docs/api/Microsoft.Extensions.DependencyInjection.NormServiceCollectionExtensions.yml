@@ -1,0 +1,880 @@
+### YamlMime:ManagedReference
+items:
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  commentId: T:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  id: NormServiceCollectionExtensions
+  parent: Microsoft.Extensions.DependencyInjection
+  children:
+  - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.Func{nORM.Providers.DatabaseProvider},System.Action{nORM.Configuration.DbContextOptions},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0})
+  - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  langs:
+  - csharp
+  - vb
+  name: NormServiceCollectionExtensions
+  nameWithType: NormServiceCollectionExtensions
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  type: Class
+  source:
+    remote:
+      path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NormServiceCollectionExtensions
+    path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+    startLine: 19
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.DependencyInjection
+  summary: >-
+    Registers nORM with an <xref href="Microsoft.Extensions.DependencyInjection.IServiceCollection" data-throw-if-not-resolved="false"></xref> so a
+
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> participates in dependency injection with a
+
+    container-managed lifetime, mirroring the ASP.NET Core hosting model
+
+    (<code>builder.Services.AddNorm(...)</code>). The extension methods live in the
+
+    <code>Microsoft.Extensions.DependencyInjection</code> namespace so they surface on
+
+    <xref href="Microsoft.Extensions.DependencyInjection.IServiceCollection" data-throw-if-not-resolved="false"></xref> without an extra <code>using</code>, following the
+
+    standard convention for <code>Microsoft.Extensions.*</code> integrations.
+  example: []
+  syntax:
+    content: public static class NormServiceCollectionExtensions
+    content.vb: Public Module NormServiceCollectionExtensions
+  inheritance:
+  - System.Object
+  inheritedMembers:
+  - System.Object.Equals(System.Object)
+  - System.Object.Equals(System.Object,System.Object)
+  - System.Object.GetHashCode
+  - System.Object.GetType
+  - System.Object.MemberwiseClone
+  - System.Object.ReferenceEquals(System.Object,System.Object)
+  - System.Object.ToString
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.Func{nORM.Providers.DatabaseProvider},System.Action{nORM.Configuration.DbContextOptions},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  commentId: M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.Func{nORM.Providers.DatabaseProvider},System.Action{nORM.Configuration.DbContextOptions},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  id: AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.Func{nORM.Providers.DatabaseProvider},System.Action{nORM.Configuration.DbContextOptions},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  langs:
+  - csharp
+  - vb
+  name: AddNorm(IServiceCollection, string, Func<DatabaseProvider>, Action<DbContextOptions>?, ServiceLifetime)
+  nameWithType: NormServiceCollectionExtensions.AddNorm(IServiceCollection, string, Func<DatabaseProvider>, Action<DbContextOptions>?, ServiceLifetime)
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection, string, System.Func<nORM.Providers.DatabaseProvider>, System.Action<nORM.Configuration.DbContextOptions>?, Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddNorm
+    path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.DependencyInjection
+  summary: >-
+    Registers a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> built from a connection string and a provider
+
+    factory. A fresh <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref> is created and configured for each
+
+    context, so no configuration state is shared between instances. The default
+
+    <xref href="Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped" data-throw-if-not-resolved="false"></xref> lifetime yields one context - and one
+
+    connection - per DI scope, which the container disposes when the scope ends.
+  example: []
+  syntax:
+    content: >-
+      [RequiresUnreferencedCode("nORM builds entity mappings and materializers by reflecting over entity types; trimming may remove required members. See docs/aot-trimming.md.")]
+
+      [RequiresDynamicCode("nORM uses Expression-based query translation and reflection-emit materializers and is not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      public static IServiceCollection AddNorm(this IServiceCollection services, string connectionString, Func<DatabaseProvider> providerFactory, Action<DbContextOptions>? configureOptions = null, ServiceLifetime lifetime = ServiceLifetime.Scoped)
+    parameters:
+    - id: services
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The service collection to add the registration to.
+    - id: connectionString
+      type: System.String
+      description: The provider connection string.
+    - id: providerFactory
+      type: System.Func{nORM.Providers.DatabaseProvider}
+      description: >-
+        Factory that returns the <xref href="nORM.Providers.DatabaseProvider" data-throw-if-not-resolved="false"></xref> for each context. A new
+
+        provider is requested per created context.
+    - id: configureOptions
+      type: System.Action{nORM.Configuration.DbContextOptions}
+      description: Optional callback to configure per-context options.
+    - id: lifetime
+      type: Microsoft.Extensions.DependencyInjection.ServiceLifetime
+      description: >-
+        The <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> service lifetime. Defaults to
+
+        <xref href="Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped" data-throw-if-not-resolved="false"></xref>.
+    return:
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The same <code class="paramref">services</code> instance for chaining.
+    content.vb: >-
+      <RequiresUnreferencedCode("nORM builds entity mappings and materializers by reflecting over entity types; trimming may remove required members. See docs/aot-trimming.md.")>
+
+      <RequiresDynamicCode("nORM uses Expression-based query translation and reflection-emit materializers and is not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      Public Shared Function AddNorm(services As IServiceCollection, connectionString As String, providerFactory As Func(Of DatabaseProvider), configureOptions As Action(Of DbContextOptions) = Nothing, lifetime As ServiceLifetime = ServiceLifetime.Scoped) As IServiceCollection
+  overload: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM builds entity mappings and materializers by reflecting over entity types; trimming may remove required members. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM uses Expression-based query translation and reflection-emit materializers and is not NativeAOT-compatible. See docs/aot-trimming.md.
+  nameWithType.vb: NormServiceCollectionExtensions.AddNorm(IServiceCollection, String, Func(Of DatabaseProvider), Action(Of DbContextOptions), ServiceLifetime)
+  fullName.vb: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection, String, System.Func(Of nORM.Providers.DatabaseProvider), System.Action(Of nORM.Configuration.DbContextOptions), Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  name.vb: AddNorm(IServiceCollection, String, Func(Of DatabaseProvider), Action(Of DbContextOptions), ServiceLifetime)
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  commentId: M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  id: AddNorm``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  langs:
+  - csharp
+  - vb
+  name: AddNorm<TContext>(IServiceCollection, Func<IServiceProvider, TContext>, ServiceLifetime)
+  nameWithType: NormServiceCollectionExtensions.AddNorm<TContext>(IServiceCollection, Func<IServiceProvider, TContext>, ServiceLifetime)
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm<TContext>(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func<System.IServiceProvider, TContext>, Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddNorm
+    path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+    startLine: 80
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.DependencyInjection
+  summary: >-
+    Registers a custom <code class="typeparamref">TContext</code> produced by an explicit factory,
+
+    which may resolve additional services from the <xref href="System.IServiceProvider" data-throw-if-not-resolved="false"></xref>. The
+
+    default <xref href="Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped" data-throw-if-not-resolved="false"></xref> lifetime yields one context per DI
+
+    scope, disposed by the container at scope end. Inject <code class="typeparamref">TContext</code>.
+  example: []
+  syntax:
+    content: 'public static IServiceCollection AddNorm<TContext>(this IServiceCollection services, Func<IServiceProvider, TContext> contextFactory, ServiceLifetime lifetime = ServiceLifetime.Scoped) where TContext : DbContext'
+    parameters:
+    - id: services
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The service collection to add the registration to.
+    - id: contextFactory
+      type: System.Func{System.IServiceProvider,{TContext}}
+      description: Factory that builds the context from the scope's services.
+    - id: lifetime
+      type: Microsoft.Extensions.DependencyInjection.ServiceLifetime
+      description: The context service lifetime. Defaults to <xref href="Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped" data-throw-if-not-resolved="false"></xref>.
+    typeParameters:
+    - id: TContext
+    return:
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The same <code class="paramref">services</code> instance for chaining.
+    content.vb: Public Shared Function AddNorm(Of TContext As DbContext)(services As IServiceCollection, contextFactory As Func(Of IServiceProvider, TContext), lifetime As ServiceLifetime = ServiceLifetime.Scoped) As IServiceCollection
+  overload: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm*
+  nameWithType.vb: NormServiceCollectionExtensions.AddNorm(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext), ServiceLifetime)
+  fullName.vb: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Of TContext)(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func(Of System.IServiceProvider, TContext), Microsoft.Extensions.DependencyInjection.ServiceLifetime)
+  name.vb: AddNorm(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext), ServiceLifetime)
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0})
+  commentId: M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0})
+  id: AddNormFactory``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0})
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  langs:
+  - csharp
+  - vb
+  name: AddNormFactory<TContext>(IServiceCollection, Func<IServiceProvider, TContext>)
+  nameWithType: NormServiceCollectionExtensions.AddNormFactory<TContext>(IServiceCollection, Func<IServiceProvider, TContext>)
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory<TContext>(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func<System.IServiceProvider, TContext>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddNormFactory
+    path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+    startLine: 105
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.DependencyInjection
+  summary: >-
+    Registers an <xref href="nORM.Core.INormDbContextFactory%601" data-throw-if-not-resolved="false"></xref> singleton that produces
+
+    caller-owned <code class="typeparamref">TContext</code> instances on demand. Use it for
+
+    singletons, background services, or parallel work that must control context
+
+    lifetime explicitly instead of relying on a DI scope. Contexts returned by the
+
+    factory are owned - and must be disposed - by the caller.
+  example: []
+  syntax:
+    content: 'public static IServiceCollection AddNormFactory<TContext>(this IServiceCollection services, Func<IServiceProvider, TContext> contextFactory) where TContext : DbContext'
+    parameters:
+    - id: services
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The service collection to add the registration to.
+    - id: contextFactory
+      type: System.Func{System.IServiceProvider,{TContext}}
+      description: Factory that builds a context from the root <xref href="System.IServiceProvider" data-throw-if-not-resolved="false"></xref>.
+    typeParameters:
+    - id: TContext
+    return:
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The same <code class="paramref">services</code> instance for chaining.
+    content.vb: Public Shared Function AddNormFactory(Of TContext As DbContext)(services As IServiceCollection, contextFactory As Func(Of IServiceProvider, TContext)) As IServiceCollection
+  overload: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory*
+  nameWithType.vb: NormServiceCollectionExtensions.AddNormFactory(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext))
+  fullName.vb: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory(Of TContext)(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func(Of System.IServiceProvider, TContext))
+  name.vb: AddNormFactory(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext))
+references:
+- uid: Microsoft.Extensions.DependencyInjection.IServiceCollection
+  commentId: T:Microsoft.Extensions.DependencyInjection.IServiceCollection
+  parent: Microsoft.Extensions.DependencyInjection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.iservicecollection
+  name: IServiceCollection
+  nameWithType: IServiceCollection
+  fullName: Microsoft.Extensions.DependencyInjection.IServiceCollection
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: Microsoft.Extensions.DependencyInjection
+  commentId: N:Microsoft.Extensions.DependencyInjection
+  href: https://learn.microsoft.com/dotnet/api/microsoft
+  name: Microsoft.Extensions.DependencyInjection
+  nameWithType: Microsoft.Extensions.DependencyInjection
+  fullName: Microsoft.Extensions.DependencyInjection
+  spec.csharp:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.DependencyInjection
+    name: DependencyInjection
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection
+  spec.vb:
+  - uid: Microsoft
+    name: Microsoft
+    href: https://learn.microsoft.com/dotnet/api/microsoft
+  - name: .
+  - uid: Microsoft.Extensions
+    name: Extensions
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions
+  - name: .
+  - uid: Microsoft.Extensions.DependencyInjection
+    name: DependencyInjection
+    href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection
+- uid: System.Object
+  commentId: T:System.Object
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object
+  nameWithType: object
+  fullName: object
+  nameWithType.vb: Object
+  fullName.vb: Object
+  name.vb: Object
+- uid: System.Object.Equals(System.Object)
+  commentId: M:System.Object.Equals(System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  name: Equals(object)
+  nameWithType: object.Equals(object)
+  fullName: object.Equals(object)
+  nameWithType.vb: Object.Equals(Object)
+  fullName.vb: Object.Equals(Object)
+  name.vb: Equals(Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.Equals(System.Object,System.Object)
+  commentId: M:System.Object.Equals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  name: Equals(object, object)
+  nameWithType: object.Equals(object, object)
+  fullName: object.Equals(object, object)
+  nameWithType.vb: Object.Equals(Object, Object)
+  fullName.vb: Object.Equals(Object, Object)
+  name.vb: Equals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.Equals(System.Object,System.Object)
+    name: Equals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.GetHashCode
+  commentId: M:System.Object.GetHashCode
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  name: GetHashCode()
+  nameWithType: object.GetHashCode()
+  fullName: object.GetHashCode()
+  nameWithType.vb: Object.GetHashCode()
+  fullName.vb: Object.GetHashCode()
+  spec.csharp:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetHashCode
+    name: GetHashCode
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gethashcode
+  - name: (
+  - name: )
+- uid: System.Object.GetType
+  commentId: M:System.Object.GetType
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  name: GetType()
+  nameWithType: object.GetType()
+  fullName: object.GetType()
+  nameWithType.vb: Object.GetType()
+  fullName.vb: Object.GetType()
+  spec.csharp:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.GetType
+    name: GetType
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.gettype
+  - name: (
+  - name: )
+- uid: System.Object.MemberwiseClone
+  commentId: M:System.Object.MemberwiseClone
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  name: MemberwiseClone()
+  nameWithType: object.MemberwiseClone()
+  fullName: object.MemberwiseClone()
+  nameWithType.vb: Object.MemberwiseClone()
+  fullName.vb: Object.MemberwiseClone()
+  spec.csharp:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.MemberwiseClone
+    name: MemberwiseClone
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone
+  - name: (
+  - name: )
+- uid: System.Object.ReferenceEquals(System.Object,System.Object)
+  commentId: M:System.Object.ReferenceEquals(System.Object,System.Object)
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  name: ReferenceEquals(object, object)
+  nameWithType: object.ReferenceEquals(object, object)
+  fullName: object.ReferenceEquals(object, object)
+  nameWithType.vb: Object.ReferenceEquals(Object, Object)
+  fullName.vb: Object.ReferenceEquals(Object, Object)
+  name.vb: ReferenceEquals(Object, Object)
+  spec.csharp:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: System.Object.ReferenceEquals(System.Object,System.Object)
+    name: ReferenceEquals
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.referenceequals
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: System.Object.ToString
+  commentId: M:System.Object.ToString
+  parent: System.Object
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  name: ToString()
+  nameWithType: object.ToString()
+  fullName: object.ToString()
+  nameWithType.vb: Object.ToString()
+  fullName.vb: Object.ToString()
+  spec.csharp:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: System.Object.ToString
+    name: ToString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object.tostring
+  - name: (
+  - name: )
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  href: nORM.html
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Core
+    name: Core
+    href: nORM.Core.html
+- uid: System
+  commentId: N:System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System
+  nameWithType: System
+  fullName: System
+- uid: nORM.Configuration.DbContextOptions
+  commentId: T:nORM.Configuration.DbContextOptions
+  parent: nORM.Configuration
+  href: nORM.Configuration.DbContextOptions.html
+  name: DbContextOptions
+  nameWithType: DbContextOptions
+  fullName: nORM.Configuration.DbContextOptions
+- uid: Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped
+  commentId: F:Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.servicelifetime#microsoft-extensions-dependencyinjection-servicelifetime-scoped
+  name: Scoped
+  nameWithType: ServiceLifetime.Scoped
+  fullName: Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm*
+  commentId: Overload:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm
+  href: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.html#Microsoft_Extensions_DependencyInjection_NormServiceCollectionExtensions_AddNorm_Microsoft_Extensions_DependencyInjection_IServiceCollection_System_String_System_Func_nORM_Providers_DatabaseProvider__System_Action_nORM_Configuration_DbContextOptions__Microsoft_Extensions_DependencyInjection_ServiceLifetime_
+  name: AddNorm
+  nameWithType: NormServiceCollectionExtensions.AddNorm
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Func{nORM.Providers.DatabaseProvider}
+  commentId: T:System.Func{nORM.Providers.DatabaseProvider}
+  parent: System
+  definition: System.Func`1
+  href: https://learn.microsoft.com/dotnet/api/system.func-1
+  name: Func<DatabaseProvider>
+  nameWithType: Func<DatabaseProvider>
+  fullName: System.Func<nORM.Providers.DatabaseProvider>
+  nameWithType.vb: Func(Of DatabaseProvider)
+  fullName.vb: System.Func(Of nORM.Providers.DatabaseProvider)
+  name.vb: Func(Of DatabaseProvider)
+  spec.csharp:
+  - uid: System.Func`1
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-1
+  - name: <
+  - uid: nORM.Providers.DatabaseProvider
+    name: DatabaseProvider
+    href: nORM.Providers.DatabaseProvider.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`1
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Providers.DatabaseProvider
+    name: DatabaseProvider
+    href: nORM.Providers.DatabaseProvider.html
+  - name: )
+- uid: System.Action{nORM.Configuration.DbContextOptions}
+  commentId: T:System.Action{nORM.Configuration.DbContextOptions}
+  parent: System
+  definition: System.Action`1
+  href: https://learn.microsoft.com/dotnet/api/system.action-1
+  name: Action<DbContextOptions>
+  nameWithType: Action<DbContextOptions>
+  fullName: System.Action<nORM.Configuration.DbContextOptions>
+  nameWithType.vb: Action(Of DbContextOptions)
+  fullName.vb: System.Action(Of nORM.Configuration.DbContextOptions)
+  name.vb: Action(Of DbContextOptions)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Configuration.DbContextOptions
+    name: DbContextOptions
+    href: nORM.Configuration.DbContextOptions.html
+  - name: )
+- uid: Microsoft.Extensions.DependencyInjection.ServiceLifetime
+  commentId: T:Microsoft.Extensions.DependencyInjection.ServiceLifetime
+  parent: Microsoft.Extensions.DependencyInjection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.servicelifetime
+  name: ServiceLifetime
+  nameWithType: ServiceLifetime
+  fullName: Microsoft.Extensions.DependencyInjection.ServiceLifetime
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: System.Func`1
+  commentId: T:System.Func`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-1
+  name: Func<TResult>
+  nameWithType: Func<TResult>
+  fullName: System.Func<TResult>
+  nameWithType.vb: Func(Of TResult)
+  fullName.vb: System.Func(Of TResult)
+  name.vb: Func(Of TResult)
+  spec.csharp:
+  - uid: System.Func`1
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`1
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.action-1
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.IServiceProvider
+  commentId: T:System.IServiceProvider
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.iserviceprovider
+  name: IServiceProvider
+  nameWithType: IServiceProvider
+  fullName: System.IServiceProvider
+- uid: System.Func{System.IServiceProvider,{TContext}}
+  commentId: T:System.Func{System.IServiceProvider,``0}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<IServiceProvider, TContext>
+  nameWithType: Func<IServiceProvider, TContext>
+  fullName: System.Func<System.IServiceProvider, TContext>
+  nameWithType.vb: Func(Of IServiceProvider, TContext)
+  fullName.vb: System.Func(Of System.IServiceProvider, TContext)
+  name.vb: Func(Of IServiceProvider, TContext)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: System.IServiceProvider
+    name: IServiceProvider
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iserviceprovider
+  - name: ','
+  - name: " "
+  - name: TContext
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.IServiceProvider
+    name: IServiceProvider
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.iserviceprovider
+  - name: ','
+  - name: " "
+  - name: TContext
+  - name: )
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: nORM.Core.INormDbContextFactory`1
+  commentId: T:nORM.Core.INormDbContextFactory`1
+  href: nORM.Core.INormDbContextFactory-1.html
+  name: INormDbContextFactory<TContext>
+  nameWithType: INormDbContextFactory<TContext>
+  fullName: nORM.Core.INormDbContextFactory<TContext>
+  nameWithType.vb: INormDbContextFactory(Of TContext)
+  fullName.vb: nORM.Core.INormDbContextFactory(Of TContext)
+  name.vb: INormDbContextFactory(Of TContext)
+  spec.csharp:
+  - uid: nORM.Core.INormDbContextFactory`1
+    name: INormDbContextFactory
+    href: nORM.Core.INormDbContextFactory-1.html
+  - name: <
+  - name: TContext
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormDbContextFactory`1
+    name: INormDbContextFactory
+    href: nORM.Core.INormDbContextFactory-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TContext
+  - name: )
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory*
+  commentId: Overload:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory
+  href: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.html#Microsoft_Extensions_DependencyInjection_NormServiceCollectionExtensions_AddNormFactory__1_Microsoft_Extensions_DependencyInjection_IServiceCollection_System_Func_System_IServiceProvider___0__
+  name: AddNormFactory
+  nameWithType: NormServiceCollectionExtensions.AddNormFactory
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory
