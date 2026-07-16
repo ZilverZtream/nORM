@@ -1450,6 +1450,7 @@ P:nORM.Migration.TableSchema.ExpressionIndexes:System.Collections.Generic.List{n
 P:nORM.Migration.TableSchema.ForeignKeys:System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
 P:nORM.Migration.TableSchema.IsTemporal:System.Boolean
 P:nORM.Migration.TableSchema.Name:System.String
+P:nORM.Migration.TableSchema.TenantColumnName:System.String
 P:nORM.Navigation.LazyNavigationCollection{`0}.Count:System.Int32
 P:nORM.Navigation.LazyNavigationCollection{`0}.IsReadOnly:System.Boolean
 P:nORM.Navigation.LazyNavigationCollection{`0}.Item:`0

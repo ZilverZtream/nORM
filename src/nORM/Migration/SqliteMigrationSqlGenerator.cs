@@ -394,6 +394,12 @@ namespace nORM.Migration
                     down.Add(BuildIndexSql(table, indexName, isUnique, columnNames, descending));
             }
 
+            // Temporal companions LAST: history mirrors and trigger re-emission reference the
+            // main table's post-change shape in each direction, which the statements above
+            // establish. Trigger-emulated versioning would otherwise silently stop (recreate
+            // drops the triggers) or silently exclude changed columns from history.
+            EmitTemporalDdl(up, down, diff, upRecreatedTables, downRecreatedTables);
+
             // MG-2: Return PRAGMA statements in pre/post transaction segments so callers can
             // execute them outside the migration transaction (required by SQLite documentation).
             var preUp    = needsUpFkPragma   ? (IReadOnlyList<string>)new[] { "PRAGMA foreign_keys=off" } : null;

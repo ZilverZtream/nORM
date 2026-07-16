@@ -42,6 +42,13 @@ namespace nORM.Migration
         /// (e.g. SQL Server system-versioning) propagates schema changes itself and stays unflagged.
         /// </summary>
         public bool IsTemporal { get; set; }
+        /// <summary>
+        /// Name of the tenant-discriminator column when the entity is tenant-scoped; null otherwise.
+        /// Populated by <see cref="SchemaSnapshotBuilder.Build(DbContext)"/>. Temporal migration DDL
+        /// needs it because the regenerated versioning triggers scope their history-close statements
+        /// to the same tenant.
+        /// </summary>
+        public string? TenantColumnName { get; set; }
         /// <summary>Columns defined on the table.</summary>
         public List<ColumnSchema> Columns { get; init; } = new();
         /// <summary>Foreign key constraints defined on this table.</summary>

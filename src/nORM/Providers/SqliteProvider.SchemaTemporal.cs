@@ -118,54 +118,21 @@ namespace nORM.Providers
             !t.IsValueType || (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>));
 
         /// <summary>
-        /// Generates trigger definitions that maintain the temporal history table.
+        /// Generates trigger definitions that maintain the temporal history table. The DDL text
+        /// lives in <see cref="SqliteTemporalDdl"/>, shared with the migration generator so a
+        /// migration that reshapes a temporal table re-emits IDENTICAL triggers from the new schema.
         /// </summary>
         /// <param name="mapping">The mapping describing the source table.</param>
         /// <returns>DDL statements creating the triggers.</returns>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
-            var table = Escape(mapping.TableName);
-            var history = Escape(mapping.TableName + "_History");
-            var columnList = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
-            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
-            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
-            var keyCondition = mapping.KeyColumns.Length > 0
-                ? string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"))
-                : "1=1";
-            // Scope the history close to the same tenant. The history table is not itself PK-unique
-            // (its key includes __ValidFrom), so matching on the entity key alone could close another
-            // tenant's open history row; adding the tenant predicate keeps temporal writes tenant-isolated
-            // like every other write path (SEC-MT). No-op when the tenant column is already part of the key.
-            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
-                keyCondition += $" AND {Escape(tc.Name)} = OLD.{Escape(tc.Name)}";
-
-            // strftime %f carries milliseconds — datetime('now') is second-precision,
-            // which collapses versions written within one second and answers AsOf
-            // timestamps between sub-second updates with the wrong version. The
-            // millisecond text compares lexically with both the second-precision
-            // rows of pre-existing history tables and the fractional format
-            // Microsoft.Data.Sqlite binds for .NET DateTime parameters.
-            const string nowExpr = "strftime('%Y-%m-%d %H:%M:%f', 'now')";
-            return @$"
-CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
-BEGIN
-    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
-    VALUES ({nowExpr}, '9999-12-31', 'I', {newColumns});
-END;
-
-CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
-BEGIN
-    UPDATE {history} SET __ValidTo = {nowExpr} WHERE __ValidTo = '9999-12-31' AND {keyCondition};
-    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
-    VALUES ({nowExpr}, '9999-12-31', 'U', {newColumns});
-END;
-
-CREATE TRIGGER IF NOT EXISTS {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
-BEGIN
-    UPDATE {history} SET __ValidTo = {nowExpr} WHERE __ValidTo = '9999-12-31' AND {keyCondition};
-    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})
-    VALUES ({nowExpr}, {nowExpr}, 'D', {oldColumns});
-END;";
+            var statements = SqliteTemporalDdl.BuildTriggersSql(
+                Escape,
+                mapping.TableName,
+                mapping.Columns.Select(c => c.Name).ToArray(),
+                mapping.KeyColumns.Select(c => c.Name).ToArray(),
+                mapping.TenantColumn?.Name);
+            return "\n" + string.Join("\n\n", statements);
         }
 
         /// <summary>

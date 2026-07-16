@@ -260,7 +260,7 @@ namespace nORM.Migration
             var tableByType = new Dictionary<Type, TableSchema>();
             foreach (var map in allMappings)
             {
-                var table = new TableSchema { Name = map.TableName, IsTemporal = markTemporal };
+                var table = new TableSchema { Name = map.TableName, IsTemporal = markTemporal, TenantColumnName = map.TenantColumn?.Name };
 
                 // Count PK columns so that composite PKs do not produce per-column UNIQUE constraints.
                 var pkCount = map.Columns.Count(c => c.IsKey);
