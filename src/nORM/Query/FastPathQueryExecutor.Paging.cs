@@ -153,7 +153,7 @@ namespace nORM.Query
             return sql.ToString();
         }
 
-        private static Task<List<T>> ExecuteFilteredOrderedPageList<T>(DbContext ctx, ComplexQueryInfo info, CancellationToken ct) where T : class, new()
+        private static Task<List<T>> ExecuteFilteredOrderedPageList<T>(DbContext ctx, ComplexQueryInfo info, bool track, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             info = ApplyConvertersToPredicates(map, info);
@@ -163,7 +163,7 @@ namespace nORM.Query
 
             var ensureTask = ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
-                return ExecuteFilteredOrderedPageListSlowAsync<T>(ensureTask, ctx, sql, info, map, ct);
+                return ExecuteFilteredOrderedPageListSlowAsync<T>(ensureTask, ctx, sql, info, map, track, ct);
 
             var timeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (ctx.RawProvider.SupportsFastPathPreparedCommandCache &&
@@ -175,7 +175,7 @@ namespace nORM.Query
                     sql,
                     timeout,
                     command => BindFilteredOrderedPageParameters(command, ctx, info));
-                return ExecuteFilteredOrderedPagePreparedListAsync<T>(prepared, ctx, info, map, ct);
+                return ExecuteFilteredOrderedPagePreparedListAsync<T>(prepared, ctx, info, map, track, ct);
             }
 
             var cmd = ctx.CreateCommand();
@@ -184,12 +184,12 @@ namespace nORM.Query
             BindFilteredOrderedPageParameters(cmd, ctx, info);
 
             if (ctx.RawProvider.PrefersSyncFastPathExecution)
-                return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, info.TakeCount, map, ct, sync: true);
+                return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, info.TakeCount, map, track, ct, sync: true);
 
-            return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, info.TakeCount, map, ct, sync: false);
+            return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, info.TakeCount, map, track, ct, sync: false);
         }
 
-        private static async Task<List<T>> ExecuteFilteredOrderedPageListSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, ComplexQueryInfo info, TableMapping map, CancellationToken ct) where T : class, new()
+        private static async Task<List<T>> ExecuteFilteredOrderedPageListSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, ComplexQueryInfo info, TableMapping map, bool track, CancellationToken ct) where T : class, new()
         {
             await ensureTask.ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
@@ -203,12 +203,14 @@ namespace nORM.Query
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
 
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
         }
 
-        private static async Task<List<T>> ExecuteFilteredOrderedPagePreparedListAsync<T>(DbContext.FastPathPreparedCommand prepared, DbContext ctx, ComplexQueryInfo info, TableMapping map, CancellationToken ct) where T : class, new()
+        private static async Task<List<T>> ExecuteFilteredOrderedPagePreparedListAsync<T>(DbContext.FastPathPreparedCommand prepared, DbContext ctx, ComplexQueryInfo info, TableMapping map, bool track, CancellationToken ct) where T : class, new()
         {
             await prepared.Gate.WaitAsync(ct).ConfigureAwait(false);
             try
@@ -232,6 +234,8 @@ namespace nORM.Query
                         results.Add(materializer(reader));
                 }
 
+                if (track)
+                    TrackMaterializedResults(ctx, map, results);
                 if (map.OwnedCollections.Count > 0 && results.Count > 0)
                     await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
                 return results;

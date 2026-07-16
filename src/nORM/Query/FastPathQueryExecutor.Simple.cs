@@ -33,7 +33,7 @@ namespace nORM.Query
         /// Non-async entry point - does SQL lookup and command setup synchronously,
         /// then dispatches to async materialization. Avoids one async state machine allocation.
         /// </summary>
-        private static Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
+        private static Task<object> ExecuteSimpleWhereAsObject<T>(DbContext ctx, WhereInfo info, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
@@ -67,7 +67,7 @@ namespace nORM.Query
             // Skip EnsureConnectionAsync await when connection is already ready
             var ensureTask = ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
-                return ExecuteSimpleWhereSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, ct);
+                return ExecuteSimpleWhereSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, track, ct);
 
             var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
@@ -77,12 +77,12 @@ namespace nORM.Query
 
             // Sync materialization for providers without true async I/O
             if (ctx.RawProvider.PrefersSyncFastPathExecution)
-                return ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(cmd, ctx, takeCount, ct, sync: true);
+                return ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(cmd, ctx, takeCount, track, ct, sync: true);
 
-            return ExecuteSimpleWhereMaterializeAsync<T>(cmd, ctx, takeCount, ct);
+            return ExecuteSimpleWhereMaterializeAsync<T>(cmd, ctx, takeCount, track, ct);
         }
 
-        private static Task<List<T>> ExecuteSimpleWhereList<T>(DbContext ctx, WhereInfo info, int? takeCount, CancellationToken ct) where T : class, new()
+        private static Task<List<T>> ExecuteSimpleWhereList<T>(DbContext ctx, WhereInfo info, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             if (!map.ColumnsByName.TryGetValue(info.Property, out var column))
@@ -114,7 +114,7 @@ namespace nORM.Query
 
             var ensureTask = ctx.EnsureConnectionAsync(ct);
             if (!ensureTask.IsCompletedSuccessfully)
-                return ExecuteSimpleWhereListSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, ct);
+                return ExecuteSimpleWhereListSlowAsync<T>(ensureTask, ctx, sql, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, track, ct);
 
             var timeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (ctx.RawProvider.SupportsFastPathPreparedCommandCache &&
@@ -130,7 +130,7 @@ namespace nORM.Query
                         if (!isNull && !isBoolTrue && !isBoolFalse)
                             command.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
                     });
-                return ExecuteSimpleWherePreparedListAsync<T>(prepared, ctx, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, ct);
+                return ExecuteSimpleWherePreparedListAsync<T>(prepared, ctx, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, track, ct);
             }
 
             var cmd = ctx.CreateCommand();
@@ -140,9 +140,9 @@ namespace nORM.Query
                 cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
 
             if (ctx.RawProvider.PrefersSyncFastPathExecution)
-                return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, takeCount, map, ct, sync: true);
+                return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, takeCount, map, track, ct, sync: true);
 
-            return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, takeCount, map, ct, sync: false);
+            return ExecuteSimpleWhereListMaterializeAsync<T>(cmd, ctx, takeCount, map, track, ct, sync: false);
         }
 
         private static async Task<List<T>> ExecuteSimpleWherePreparedListAsync<T>(
@@ -154,6 +154,7 @@ namespace nORM.Query
             bool isBoolFalse,
             int? takeCount,
             TableMapping map,
+            bool track,
             CancellationToken ct) where T : class, new()
         {
             await prepared.Gate.WaitAsync(ct).ConfigureAwait(false);
@@ -179,6 +180,8 @@ namespace nORM.Query
                         results.Add(materializer(reader));
                 }
 
+                if (track)
+                    TrackMaterializedResults(ctx, map, results);
                 if (map.OwnedCollections.Count > 0 && results.Count > 0)
                     await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
                 return results;
@@ -189,7 +192,7 @@ namespace nORM.Query
             }
         }
 
-        private static async Task<object> ExecuteSimpleWhereSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, bool isBoolFalse, int? takeCount, CancellationToken ct) where T : class, new()
+        private static async Task<object> ExecuteSimpleWhereSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, bool isBoolFalse, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
             await ensureTask.ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
@@ -202,15 +205,17 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
-            // Load owned collections (OwnsMany) if configured
             var map = ctx.GetMapping(typeof(T));
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
+            // Load owned collections (OwnsMany) if configured
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
         }
 
         /// <summary>Materializes WHERE results and loads owned collections (sync read + async owned-collection load).</summary>
-        private static async Task<object> ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct, bool sync) where T : class, new()
+        private static async Task<object> ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, bool track, CancellationToken ct, bool sync) where T : class, new()
         {
             var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
@@ -238,14 +243,16 @@ namespace nORM.Query
                 while (await asyncReader.ReadAsync(ct).ConfigureAwait(false))
                     results.Add(materializer(asyncReader));
             }
-            // Load owned collections (OwnsMany) if configured
             var map = ctx.GetMapping(typeof(T));
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
+            // Load owned collections (OwnsMany) if configured
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
         }
 
-        private static async Task<object> ExecuteSimpleWhereMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
+        private static async Task<object> ExecuteSimpleWhereMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
             var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
@@ -254,15 +261,17 @@ namespace nORM.Query
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
 
-            // Load owned collections (OwnsMany) if configured
             var map = ctx.GetMapping(typeof(T));
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
+            // Load owned collections (OwnsMany) if configured
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
 
             return results;
         }
 
-        private static async Task<List<T>> ExecuteSimpleWhereListSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, bool isBoolFalse, int? takeCount, TableMapping map, CancellationToken ct) where T : class, new()
+        private static async Task<List<T>> ExecuteSimpleWhereListSlowAsync<T>(Task<System.Data.Common.DbConnection> ensureTask, DbContext ctx, string sql, WhereInfo info, bool isNull, bool isBoolTrue, bool isBoolFalse, int? takeCount, TableMapping map, bool track, CancellationToken ct) where T : class, new()
         {
             await ensureTask.ConfigureAwait(false);
             await using var cmd = ctx.CreateCommand();
@@ -277,12 +286,14 @@ namespace nORM.Query
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
                 results.Add(materializer(reader));
 
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
         }
 
-        private static async Task<List<T>> ExecuteSimpleWhereListMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, TableMapping map, CancellationToken ct, bool sync) where T : class, new()
+        private static async Task<List<T>> ExecuteSimpleWhereListMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, TableMapping map, bool track, CancellationToken ct, bool sync) where T : class, new()
         {
             var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
             var materializer = GetSyncMaterializer<T>(ctx);
@@ -311,6 +322,8 @@ namespace nORM.Query
                     results.Add(materializer(reader));
             }
 
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);
             return results;
@@ -318,10 +331,10 @@ namespace nORM.Query
         /// <summary>
         /// Single async method - eliminates the extra async state machine from a wrapper approach.
         /// </summary>
-        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
-            => await ExecuteSimpleTakeList<T>(ctx, takeCount, ct).ConfigureAwait(false);
+        private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, bool track, CancellationToken ct) where T : class, new()
+            => await ExecuteSimpleTakeList<T>(ctx, takeCount, track, ct).ConfigureAwait(false);
 
-        private static async Task<List<T>> ExecuteSimpleTakeList<T>(DbContext ctx, int? takeCount, CancellationToken ct) where T : class, new()
+        private static async Task<List<T>> ExecuteSimpleTakeList<T>(DbContext ctx, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));
             string sql = GetSqlTemplate<T>(ctx);
@@ -340,6 +353,8 @@ namespace nORM.Query
             {
                 results.Add(materializer(reader));
             }
+            if (track)
+                TrackMaterializedResults(ctx, map, results);
             // Load owned collections (OwnsMany) if configured
             if (map.OwnedCollections.Count > 0 && results.Count > 0)
                 await ctx.LoadOwnedCollectionsAsync(results.Cast<object>().ToList(), map, ct).ConfigureAwait(false);

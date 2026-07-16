@@ -126,13 +126,13 @@ namespace nORM.Query
                     return false;
 
                 // Use async/await wrapper instead of ContinueWith to avoid closure allocation
-                result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount, ct);
+                result = ExecuteSimpleWhereAsObject<T>(ctx, whereInfo, takeCount, ShouldTrackResults<T>(expr, ctx), ct);
                 return true;
             }
             if (IsSimpleTakePattern(expr, out takeCount))
             {
                 // Use async/await wrapper instead of ContinueWith to avoid closure allocation
-                result = ExecuteSimpleTakeAsObject<T>(ctx, takeCount, ct);
+                result = ExecuteSimpleTakeAsObject<T>(ctx, takeCount, ShouldTrackResults<T>(expr, ctx), ct);
                 return true;
             }
             return false;
@@ -159,12 +159,12 @@ namespace nORM.Query
                 if (!map.ColumnsByName.ContainsKey(whereInfo.Property))
                     return false;
 
-                result = ExecuteSimpleWhereList<T>(ctx, whereInfo, takeCount, ct);
+                result = ExecuteSimpleWhereList<T>(ctx, whereInfo, takeCount, ShouldTrackResults<T>(expr, ctx), ct);
                 return true;
             }
             if (IsSimpleTakePattern(expr, out takeCount))
             {
-                result = ExecuteSimpleTakeList<T>(ctx, takeCount, ct);
+                result = ExecuteSimpleTakeList<T>(ctx, takeCount, ShouldTrackResults<T>(expr, ctx), ct);
                 return true;
             }
             if (ctx.Options.CommandInterceptors.Count == 0 &&
@@ -174,7 +174,7 @@ namespace nORM.Query
                 if (!HasFilteredOrderedPageColumns(map, pageInfo))
                     return false;
 
-                result = ExecuteFilteredOrderedPageList<T>(ctx, pageInfo, ct);
+                result = ExecuteFilteredOrderedPageList<T>(ctx, pageInfo, ShouldTrackResults<T>(expr, ctx), ct);
                 return true;
             }
             if (cacheUnsupportedMiss)
@@ -260,6 +260,47 @@ namespace nORM.Query
             if (provider.UsesFetchOffsetPaging)
                 return sql.Replace("SELECT ", $"SELECT TOP({limit}) ");
             return sql + $" LIMIT {limit}";
+        }
+
+        /// <summary>
+        /// Decides whether fast-path results must join the change tracker, mirroring the full
+        /// pipeline's rules: the context default is TrackAll, the element type is a query root,
+        /// and the expression chain does not opt out via AsNoTracking.
+        /// </summary>
+        private static bool ShouldTrackResults<T>(Expression expr, DbContext ctx) where T : class
+            => ctx.Options.DefaultTrackingBehavior != QueryTrackingBehavior.NoTracking
+               && ctx.IsMapped(typeof(T))
+               && !HasAsNoTrackingCall(expr);
+
+        private static bool HasAsNoTrackingCall(Expression e)
+        {
+            while (e is MethodCallExpression m && m.Arguments.Count >= 1)
+            {
+                if (m.Method.Name == "AsNoTracking")
+                    return true;
+                e = m.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Mirrors QueryExecutor.ProcessEntity for fast-path results: materialized query-root
+        /// entities join the change tracker exactly like the full pipeline does (identity-map
+        /// dedup via the entry's canonical instance, Unchanged snapshot, lazy-loading wiring).
+        /// Without this, entities loaded through the fast path were invisible to SaveChanges
+        /// and their edits were silently lost.
+        /// </summary>
+        private static void TrackMaterializedResults<T>(DbContext ctx, TableMapping map, List<T> results) where T : class
+        {
+            for (int i = 0; i < results.Count; i++)
+            {
+                var entity = results[i];
+                if (entity is null) continue;
+                var entry = ctx.ChangeTracker.Track(entity, EntityState.Unchanged, map);
+                var tracked = (T)entry.Entity!;
+                nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading(tracked, ctx);
+                results[i] = tracked;
+            }
         }
 
         // C# string equality is ordinal; providers whose default collation folds case (MySQL,
