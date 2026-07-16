@@ -25,8 +25,13 @@ tenant column resolves from `Options.TenantColumnName`. Native RLS paths exist p
       poisoning, fail-closed, and global-filter bypass.
 - [x] Cache keys include the tenant discriminator on every cacheable path (NH-0701):
       `MultiTenantResultCachePoisoning` + `MultiTenantPlanCache` green.
-- [ ] Confirm native RLS behaviour on live SQL Server / PostgreSQL / MySQL (deferred to the live
-      provider gate; needs credentials).
+- [x] Confirm native RLS behaviour on live SQL Server / PostgreSQL / MySQL. (Closed 2026-07-16:
+      `LiveProviderNativeTenantSecurityTests` 4/4 non-vacuous on the live servers — SQL Server's
+      RLS policy blocks direct cross-tenant access, PostgreSQL's policy blocks when the role is
+      subject to RLS, and the native session context is written on both RLS-capable providers.
+      MySQL is a DESIGN EXCEPTION, not a gap: the engine has no row-level security, so
+      `SupportsNativeTenantSessionContext` stays false there and nORM's generated-path tenant
+      enforcement (the NH-0701 adversarial sweep above) is the isolation mechanism.)
 
 ## Verification
 
