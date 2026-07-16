@@ -80,6 +80,111 @@ public class MigrationBoundaryDataPreservationTests
             }
     }
 
+    private static SqliteConnection CreateSeededBaseline(out List<object?[]> before)
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        var gen = new SqliteMigrationSqlGenerator();
+        Apply(cn, null, gen.GenerateSql(new SchemaDiff { AddedTables = { BuildTable(withExtra: false) } }).Up, null);
+
+        using (var ins = cn.CreateCommand())
+        {
+            ins.CommandText = "INSERT INTO MigBoundary (Dec, Dto, G, S, B, U) VALUES (@d, @o, @g, @s, @b, @u);";
+            ins.Parameters.AddWithValue("@d", "1.00000000000000005");
+            ins.Parameters.AddWithValue("@o", "2020-06-15 12:00:00+05:00");
+            ins.Parameters.AddWithValue("@g", "a1b2c3d4-e5f6-4708-9a0b-c1d2e3f4a5b6");
+            ins.Parameters.AddWithValue("@s", "café \U0001F600 it's \"quoted\"");
+            ins.Parameters.AddWithValue("@b", new byte[] { 0, 1, 255, 128, 42 });
+            ins.Parameters.AddWithValue("@u", 9_000_000_000_000_000_000L);
+            ins.ExecuteNonQuery();
+        }
+        before = Snapshot(cn);
+        return cn;
+    }
+
+    [Fact]
+    public void Add_not_null_column_without_default_fails_loud_at_generation()
+    {
+        // The generator refuses to invent a backfill: an ADD NOT NULL with no DefaultValue is a
+        // usage error caught at SQL-GENERATION time with an actionable message, never a silent
+        // implicit backfill (and never a runtime constraint failure halfway through a migration).
+        var target = BuildTable(withExtra: false);
+        target.Columns.Add(new ColumnSchema { Name = "Extra", ClrType = typeof(int).FullName!, IsNullable = false });
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false) } },
+            new SchemaSnapshot { Tables = { target } });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => new SqliteMigrationSqlGenerator().GenerateSql(diff));
+        Assert.Contains("DefaultValue", ex.Message);
+    }
+
+    [Fact]
+    public void Add_not_null_column_with_default_backfills_and_preserves_boundary_data()
+    {
+        using var cn = CreateSeededBaseline(out var before);
+
+        // Up: ADD a NOT NULL int column WITH an explicit default - existing rows get the default.
+        var target = BuildTable(withExtra: false);
+        target.Columns.Add(new ColumnSchema { Name = "Extra", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "7" });
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false) } },
+            new SchemaSnapshot { Tables = { target } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+
+        AssertSnapshotsEqual(before, Snapshot(cn));   // prior columns byte-exact
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM MigBoundary WHERE Extra = 7;";
+            Assert.Equal(1, Convert.ToInt32(c.ExecuteScalar()));   // explicit-default backfill
+        }
+
+        // Down: DROP it - full recreate again, data byte-exact, column gone.
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+        AssertSnapshotsEqual(before, Snapshot(cn));
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM pragma_table_info('MigBoundary') WHERE name = 'Extra';";
+            Assert.Equal(0, Convert.ToInt32(c.ExecuteScalar()));
+        }
+    }
+
+    [Fact]
+    public void Drop_column_preserves_remaining_boundary_data_and_down_restores_the_column()
+    {
+        using var cn = CreateSeededBaseline(out _);
+
+        // Give the baseline an extra droppable column with a value, then snapshot the KEEPER columns.
+        Exec(cn, "ALTER TABLE MigBoundary ADD COLUMN Extra INTEGER NULL;");
+        Exec(cn, "UPDATE MigBoundary SET Extra = 77;");
+        var keepersBefore = Snapshot(cn);   // Snapshot reads only the keeper columns
+
+        // Up: DROP the column (SQLite full-table recreate of the keepers).
+        var withExtra = BuildTable(withExtra: true);
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { withExtra } },
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false) } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+
+        AssertSnapshotsEqual(keepersBefore, Snapshot(cn));   // keepers byte-exact through the recreate
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM pragma_table_info('MigBoundary') WHERE name = 'Extra';";
+            Assert.Equal(0, Convert.ToInt32(c.ExecuteScalar()));
+        }
+
+        // Down: the column comes back (nullable -> NULL per the documented contract: dropped-column
+        // data is gone; re-added columns read NULL) and the keepers stay byte-exact.
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+        AssertSnapshotsEqual(keepersBefore, Snapshot(cn));
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM MigBoundary WHERE Extra IS NULL;";
+            Assert.Equal(1, Convert.ToInt32(c.ExecuteScalar()));
+        }
+    }
+
     [Fact]
     public void Add_nullable_column_preserves_boundary_data_up_and_down()
     {
