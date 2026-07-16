@@ -83,6 +83,19 @@ namespace nORM.Query
                 // Wait() between Release() and the check, causing removal of a semaphore still in use.
             }
         }
+        /// <summary>
+        /// The result cache participates only OUTSIDE transactions. A read inside an active
+        /// transaction observes uncommitted state - caching it lets a rollback poison later
+        /// readers with never-committed rows, and serving a cached pre-transaction entry inside
+        /// the transaction would hide its own writes. Covers both the explicit connection
+        /// transaction and an ambient System.Transactions scope.
+        /// </summary>
+        private bool ResultCacheUsable(QueryPlan plan)
+            => plan.IsCacheable
+               && _ctx.Options.CacheProvider != null
+               && _ctx.CurrentTransaction == null
+               && System.Transactions.Transaction.Current == null;
+
         private string BuildCacheKeyFromPlan<TResult>(QueryPlan plan, IReadOnlyDictionary<string, object> parameters)
         {
             var hasher = new XxHash128();

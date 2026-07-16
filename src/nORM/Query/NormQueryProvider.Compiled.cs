@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -54,7 +54,7 @@ namespace nORM.Query
             }
             // For cached queries (rare), use closure-based path.
             // For non-cached queries (common), inline execution directly to avoid closure allocation.
-            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            if (ResultCacheUsable(plan))
             {
                 var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
                 Func<Task<TResult>> queryExecutorFactory = () => ExecuteCompiledDictAsync<TResult>(plan, finalParameters, sw, ct);
@@ -155,7 +155,7 @@ namespace nORM.Query
         private Task<TResult> ExecuteCompiledInternalArrayAsync<TResult>(QueryPlan plan, object?[] parameterValues, CancellationToken ct)
         {
             // For the caching path (rare), use async method.
-            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            if (ResultCacheUsable(plan))
             {
                 return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
             }
@@ -262,7 +262,7 @@ namespace nORM.Query
         private Task<TResult> ExecuteCompiledPreparedAsync<TResult>(QueryPlan plan, object?[] parameterValues, KeyValuePair<string, object>[]? fixedParams, CancellationToken ct)
         {
             // For the caching path (rare), fall back to standard compiled path.
-            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            if (ResultCacheUsable(plan))
                 return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
 
             // Ensure connection is ready (fast no-op when already open).
@@ -372,7 +372,7 @@ namespace nORM.Query
             KeyValuePair<string, object>[]? fixedParams,
             CompiledQueryState state, CancellationToken ct)
         {
-            if (plan.IsCacheable && _ctx.Options.CacheProvider != null)
+            if (ResultCacheUsable(plan))
                 return ExecuteCompiledInternalArrayCachedAsync<TResult>(plan, parameterValues, ct);
 
             var ensureTask = _ctx.EnsureConnectionAsync(ct);
