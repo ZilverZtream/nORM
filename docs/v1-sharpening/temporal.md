@@ -35,9 +35,12 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
       covered by the millisecond-trigger fix and `TemporalHistoryReconstructionFuzzTests`, and
       the generators' fractional-precision DDL (MySQL DATETIME(6)/TIME(6), temporal-default(6))
       is pinned at the SQL-text level.)
-- [~] Confirm temporal + tenant + soft-delete interactions are covered. (NH-0601: temporal+tenant
-      green - `TemporalTriggerTenantScope`, `TenantTemporalProviderSwap`; soft-delete interaction
-      not specifically confirmed yet.)
+- [x] Confirm temporal + tenant + soft-delete interactions are covered. (NH-0601: temporal+tenant
+      green - `TemporalTriggerTenantScope`, `TenantTemporalProviderSwap`. Soft-delete closed
+      2026-07-16 by differential probe, CORRECT with zero code changes: a global filter composes
+      with AsOf over the RECONSTRUCTED era state — visible while live with era values, hidden
+      after the soft delete, current view hidden, history chain complete (the soft delete is an
+      ordinary versioned update). Pinned by `SoftDeleteTemporalInteractionContractTests`.)
 - [x] Temporal-aware migrations (NH-0612): migrations on trigger-emulated temporal tables now
       mirror the history schema in lock-step and re-emit the versioning triggers from the
       post-change schema on all four generators - a SQLite recreate previously KILLED versioning
