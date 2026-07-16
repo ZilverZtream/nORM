@@ -37,8 +37,13 @@ namespace nORM.Execution
                 // data (the write may have succeeded before the timeout was raised), so timeout
                 // exceptions are not retryable on either the query or the save path.
                 // This aligns with DbContext.IsRetryableException which already excludes timeouts.
-                catch (Exception ex) when (ex is DbException or System.IO.IOException or System.Net.Sockets.SocketException)
+                // The read pipeline wraps provider exceptions in NormException before they reach
+                // this strategy, so the filter and the policy predicate both classify by the
+                // UNWRAPPED provider exception - otherwise a transient DbException surfacing as
+                // NormException escaped without any retry and the policy was dead code on reads.
+                catch (Exception ex) when (UnwrapForRetry(ex) is DbException or System.IO.IOException or System.Net.Sockets.SocketException)
                 {
+                    var providerEx = UnwrapForRetry(ex);
                     var normEx = ex is NormException ? ex as NormException : new NormException(ex.Message, null, null, ex);
                     _ctx.Options.Logger?.LogError(normEx!, retryCount);
 
@@ -51,7 +56,7 @@ namespace nORM.Execution
                     bool shouldRetry;
                     try
                     {
-                        shouldRetry = _policy.ShouldRetry(ex);
+                        shouldRetry = _policy.ShouldRetry(providerEx);
                     }
                     catch
                     {
@@ -75,6 +80,18 @@ namespace nORM.Execution
                     retryCount++;
                 }
             }
+        }
+
+        /// <summary>
+        /// The provider exception a wrapped failure should be classified by: NormException
+        /// wrappers are peeled to their innermost non-NormException cause.
+        /// </summary>
+        private static Exception UnwrapForRetry(Exception ex)
+        {
+            var current = ex;
+            while (current is NormException && current.InnerException is { } inner)
+                current = inner;
+            return current;
         }
     }
 }

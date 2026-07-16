@@ -1,4 +1,4 @@
-using nORM.Core;
+﻿using nORM.Core;
 using nORM.Internal;
 using nORM.Mapping;
 using nORM.Providers;
@@ -108,7 +108,11 @@ namespace nORM.Query
         public static bool TryExecute<T>(Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result) where T : class, new()
         {
             result = default!;
-            if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null)
+            // RetryPolicy bail: the fast path executes OUTSIDE RetryingExecutionStrategy, so a
+            // transient failure here would surface without any retry - the policy would be
+            // silently dead for exactly the most common queries. Fall back to the full
+            // pipeline, which wraps execution in the strategy.
+            if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
                 return false;
             if (IsSimpleCountPattern(expr, out var hasPredicate))
             {
@@ -141,7 +145,11 @@ namespace nORM.Query
         public static bool TryExecuteList<T>(Expression expr, DbContext ctx, CancellationToken ct, out object result) where T : class, new()
         {
             result = default!;
-            if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null)
+            // RetryPolicy bail: the fast path executes OUTSIDE RetryingExecutionStrategy, so a
+            // transient failure here would surface without any retry - the policy would be
+            // silently dead for exactly the most common queries. Fall back to the full
+            // pipeline, which wraps execution in the strategy.
+            if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
                 return false;
 
             var cacheUnsupportedMiss = ShouldCacheUnsupportedListMiss(expr);
