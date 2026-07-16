@@ -30,7 +30,7 @@ value-unchanged mutations as non-writes (a version oracle must not count no-ops 
       70-test dry run; the multi-week window is calendar time.)
 - [x] Explicit fault-injection tests for the retry-write invariants exist and pass (NH-0901,
       `SaveChangesFaultInjectionAtomicity`).
-- [ ] Verify deadlock-resilient path on live SQL Server.
+- [x] Verify deadlock-resilient path on live SQL Server: the 2026-07-16 Category=LiveProvider run (1867/1867 green on all three servers) included the live deadlock tests.
 - [x] Read-path retry interplay (NH-0902): read retries were DEAD CODE - NormException wrapping
       defeated the retry strategy filter and the fast path bypassed the strategy entirely; both
       fixed and the retry-x-cache, idempotence, fail-loud, and timeout-wiring contracts pinned
