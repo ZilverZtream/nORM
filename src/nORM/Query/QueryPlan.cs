@@ -128,7 +128,13 @@ namespace nORM.Query
         // semantic table set (root + joins) that ExecuteUpdate/ExecuteDelete use to choose their
         // UPDATE/DELETE form. Correlated-subquery and navigation-aggregate tables belong here but
         // NOT in Tables. Null when it would equal Tables (no subquery-only tables).
-        IReadOnlyCollection<string>? CacheTables = null
+        IReadOnlyCollection<string>? CacheTables = null,
+        // The temporal AsOf timestamp the root query reconstructs at, when present. Eager
+        // loads must read related rows through the SAME history window or the result mixes
+        // eras (historical roots joined to live relations). Safe to bake per plan: AsOf()
+        // embeds the timestamp as an expression CONSTANT, so the plan-cache fingerprint
+        // hashes the full value and every distinct timestamp gets its own plan.
+        DateTime? AsOfTimestamp = null
     );
 
     internal sealed record BulkCudQueryShape(

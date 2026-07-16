@@ -564,8 +564,19 @@ namespace nORM.Query
                         : null,
                     ClosureFoldedIntoSql: _t._closureFoldedIntoSql,
                     CompiledParameterOrdinals: SnapshotSlotOrdinals(_t._compiledParams),
-                    CacheTables: cacheTables
+                    CacheTables: cacheTables,
+                    AsOfTimestamp: _t._asOfTimestamp
                 );
+                // A many-to-many include reads the association table, which is a raw
+                // user-owned table with no history — there is no data to reconstruct the
+                // association at the AsOf timestamp from, and silently joining LIVE
+                // associations onto historical rows would mix eras. Fail loud instead.
+                if (_t._asOfTimestamp.HasValue && plan.M2MIncludes is { Count: > 0 })
+                    throw new NormUnsupportedFeatureException(
+                        "Include of a many-to-many navigation cannot be combined with AsOf: the " +
+                        "association table is not versioned, so the association membership at the " +
+                        "requested timestamp is unknown. Query the historical entities without the " +
+                        "many-to-many Include.");
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }

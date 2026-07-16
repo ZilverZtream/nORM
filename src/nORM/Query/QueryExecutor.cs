@@ -220,7 +220,7 @@ namespace nORM.Query
                     // Convert to IList for EagerLoadAsync compatibility
                     IList iList = list;
                     foreach (var include in plan.Includes)
-                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp).ConfigureAwait(false);
                 }
 
                 // M2M eager loading runs unconditionally (no SplitQuery requirement)
@@ -327,7 +327,7 @@ namespace nORM.Query
                 {
                     foreach (var include in plan.Includes)
                     {
-                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp).ConfigureAwait(false);
                     }
                 }
 
@@ -433,7 +433,7 @@ namespace nORM.Query
                     foreach (var include in plan.Includes)
                     {
                         // Truly synchronous eager load - no GetAwaiter().GetResult().
-                        _includeProcessor.EagerLoad(include, list, plan.NoTracking);
+                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp);
                     }
                 }
 

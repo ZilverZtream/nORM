@@ -40,7 +40,7 @@ namespace nORM.Query
         /// Eagerly loads all relations defined in the <paramref name="include"/> for the given <paramref name="parents"/>
         /// using a single round trip per batch of keys.
         /// </summary>
-        public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking)
+        public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking, DateTime? asOf = null)
         {
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
@@ -106,7 +106,7 @@ namespace nORM.Query
                     paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
@@ -129,7 +129,7 @@ namespace nORM.Query
         /// Called from the synchronous <c>Materialize</c> code path to eliminate
         /// sync-over-async anti-pattern.
         /// </summary>
-        public void EagerLoad(IncludePlan include, IList parents, bool noTracking)
+        public void EagerLoad(IncludePlan include, IList parents, bool noTracking, DateTime? asOf = null)
         {
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
@@ -191,7 +191,7 @@ namespace nORM.Query
                     paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default);
@@ -443,7 +443,33 @@ namespace nORM.Query
             sb.Append(')');
         }
 
-        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd)
+        /// <summary>
+        /// Returns the FROM source for an eager-load level: the live table normally, or —
+        /// when the root query runs under AsOf — the same history-window derived table the
+        /// root FROM uses, so related rows reconstruct at the SAME timestamp instead of
+        /// silently mixing live relations onto historical roots. The timestamp parameter is
+        /// added to <paramref name="cmd"/> once and shared by every level.
+        /// </summary>
+        private string GetFromSource(TableMapping map, DbCommand cmd, DateTime? asOf, string innerAlias)
+        {
+            if (asOf == null)
+                return map.EscTable;
+
+            var pn = _ctx.RawProvider.ParamPrefix + "asof";
+            if (!cmd.Parameters.Contains(pn))
+                cmd.AddParam(pn, _ctx.RawProvider.FormatTemporalAsOfParameterValue(asOf.Value));
+
+            if (_ctx.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
+                return _ctx.RawProvider.GetProviderNativeTemporalAsOfFromClause(map, pn);
+
+            var history = _ctx.RawProvider.Escape(map.TableName + "_History");
+            var cols = string.Join(", ", map.Columns.Select(c => c.EscCol));
+            var validFrom = _ctx.RawProvider.Escape("__ValidFrom");
+            var validTo = _ctx.RawProvider.Escape("__ValidTo");
+            return $"(SELECT {cols} FROM {history} {innerAlias} WHERE {pn} >= {innerAlias}.{validFrom} AND {pn} < {innerAlias}.{validTo})";
+        }
+
+        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd, DateTime? asOf = null)
         {
             var tenantActive = _ctx.Options.TenantProvider != null;
             if (tenantActive)
@@ -463,9 +489,11 @@ namespace nORM.Query
                     var map = mappings[i];
                     var alias = _ctx.RawProvider.Escape("__inc" + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
-                    sb.Append("SELECT ").Append(alias).Append(".* FROM ").Append(map.EscTable).Append(' ').Append(alias)
+                    var fromSource = GetFromSource(map, cmd, asOf,
+                        _ctx.RawProvider.Escape("__incw" + i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    sb.Append("SELECT ").Append(alias).Append(".* FROM ").Append(fromSource).Append(' ').Append(alias)
                       .Append(" WHERE ");
-                    AppendIncludeLevelPredicate(sb, path, mappings, i, alias, paramNames, paramGroups, tenantActive);
+                    AppendIncludeLevelPredicate(sb, path, mappings, i, alias, paramNames, paramGroups, tenantActive, cmd, asOf);
 
                     if (tenantActive)
                     {
@@ -503,7 +531,9 @@ namespace nORM.Query
             string currentAlias,
             List<string> rootParamNames,
             List<string[]> rootParamGroups,
-            bool tenantActive)
+            bool tenantActive,
+            DbCommand cmd,
+            DateTime? asOf)
         {
             var relation = path[level];
             if (level == 0)
@@ -521,9 +551,11 @@ namespace nORM.Query
             }
 
             var previousAlias = _ctx.RawProvider.Escape("__inc" + (level - 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + "_p" + level.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            sb.Append("EXISTS(SELECT 1 FROM ").Append(mappings[level - 1].EscTable).Append(' ').Append(previousAlias)
+            var previousSource = GetFromSource(mappings[level - 1], cmd, asOf,
+                _ctx.RawProvider.Escape("__incw" + (level - 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + "_p" + level.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            sb.Append("EXISTS(SELECT 1 FROM ").Append(previousSource).Append(' ').Append(previousAlias)
               .Append(" WHERE ");
-            AppendIncludeLevelPredicate(sb, path, mappings, level - 1, previousAlias, rootParamNames, rootParamGroups, tenantActive);
+            AppendIncludeLevelPredicate(sb, path, mappings, level - 1, previousAlias, rootParamNames, rootParamGroups, tenantActive, cmd, asOf);
             sb.Append(" AND ");
             AppendRelationJoinPredicate(sb, path[level], currentAlias, previousAlias);
             if (tenantActive)
