@@ -31,7 +31,13 @@ decimal exact compare, Convert rounding + date diff. All fixed live on the three
       inlining) is now the `DatabaseProvider.InlinesConstantRegexArguments` hook. (The mobility
       translator, scaffold provider-kind, and connection factory legitimately dispatch on provider
       type - they are not query-SQL generation.)
-- [ ] Verify strict-mode admit/deny list against the full feature enum.
+- [x] Verify strict-mode admit/deny list against the full feature enum. (Closed 2026-07-16:
+      `ProviderMobilityDecisionCompletenessTests` pins exhaustive coverage of
+      `ProviderMobilityTranslator.Decide` over every `ProviderMobilityFeature` member, the exact
+      10-feature strict-runtime ADMIT set as a reviewed list (a new member or flipped decision
+      breaks the test so the change is deliberate), denied-implies-Error / admitted-implies-
+      Info-or-Warning severity coherence, Unsupported-never-admitted / Portable-and-Emulated-
+      always-admitted, and non-empty reason + suggested fix on every decision.)
 
 ## Verification
 
