@@ -211,9 +211,26 @@ namespace nORM.Query
                     EmitBoolComparison(member, boolVal: false, ExpressionType.Equal);
                     return;
 
-                // Method calls (StartsWith, other Contains shapes, …), and anything else
-                // fall back to a straight NOT(...) — correct for non-nullable operands, and no
-                // worse than the previous behaviour for the rare nullable ones.
+                // Negated string instance predicate (`!col.Contains/StartsWith/EndsWith(...)`):
+                // the inner match is UNKNOWN for a NULL instance and NOT(UNKNOWN) drops the row,
+                // but under the two-valued C# semantics this translator implements for negation
+                // (a null string matches nothing, so the negation of "no match" is TRUE) the NULL
+                // row must be INCLUDED - the same rescue the negated comparison and list-Contains
+                // cases above apply. Only rescue instances that can actually be NULL.
+                case MethodCallExpression strMatch
+                    when strMatch.Object is { } matchInstance
+                        && matchInstance.Type == typeof(string)
+                        && strMatch.Method.Name is nameof(string.Contains) or nameof(string.StartsWith) or nameof(string.EndsWith)
+                        && CouldBeNull(matchInstance):
+                    _sql.Append("(NOT(");
+                    Visit(strMatch);
+                    _sql.Append(") OR (");
+                    Visit(matchInstance);
+                    _sql.Append(" IS NULL))");
+                    return;
+
+                // Method calls (other shapes) and anything else fall back to a straight
+                // NOT(...) — correct for non-nullable operands.
                 default:
                     _sql.Append("(NOT(");
                     Visit(operand);

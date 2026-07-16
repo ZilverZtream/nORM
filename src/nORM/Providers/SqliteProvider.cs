@@ -253,13 +253,16 @@ namespace nORM.Providers
         private static string OrdinalStringMatchCore(string columnSql, string patternSql, OrdinalStringMatch kind)
             => kind switch
             {
-                // An empty pattern matches every (non-null) row in .NET; guard so it does here too.
+                // An empty pattern matches every NON-NULL row in .NET. The empty-pattern arm must
+                // require the column to be non-null: a bare `length(pattern) = 0` is TRUE regardless
+                // of the column, silently matching NULL rows that .NET (and LIKE '%' on other
+                // providers, which is UNKNOWN for NULL) would exclude.
                 OrdinalStringMatch.Contains
-                    => $"(length({patternSql}) = 0 OR instr({columnSql}, {patternSql}) > 0)",
+                    => $"(({columnSql} IS NOT NULL AND length({patternSql}) = 0) OR instr({columnSql}, {patternSql}) > 0)",
                 OrdinalStringMatch.StartsWith
                     => $"(substr({columnSql}, 1, length({patternSql})) = {patternSql})",
                 OrdinalStringMatch.EndsWith
-                    => $"(length({patternSql}) = 0 OR substr({columnSql}, -length({patternSql})) = {patternSql})",
+                    => $"(({columnSql} IS NOT NULL AND length({patternSql}) = 0) OR substr({columnSql}, -length({patternSql})) = {patternSql})",
                 _ => throw new ArgumentOutOfRangeException(nameof(kind))
             };
 
