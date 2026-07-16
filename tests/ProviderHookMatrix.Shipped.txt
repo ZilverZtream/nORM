@@ -41,6 +41,7 @@ ForceCaseSensitiveStringComparison
 FormatBooleanPredicate
 FormatDateUsingDotNetPattern
 FormatFixedDecimalSql
+FormatTemporalAsOfParameterValue
 GenerateCreateHistoryTableSql
 GenerateDropNativeTenantPolicySql
 GenerateNativeTenantPolicySql
@@ -170,6 +171,7 @@ ForceCaseSensitiveStringComparison
 FormatBooleanPredicate
 FormatDateUsingDotNetPattern
 FormatFixedDecimalSql
+FormatTemporalAsOfParameterValue
 GenerateCreateHistoryTableSql
 GenerateTemporalTriggersSql
 GetBitwiseXorSql

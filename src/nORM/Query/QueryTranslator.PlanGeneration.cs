@@ -325,7 +325,7 @@ namespace nORM.Query
                     {
                         alias ??= _t.EscapeAlias("T0");
                         var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
-                        _t.AddLiteralParameter(timeParamName, _t._asOfTimestamp.Value);
+                        _t.AddLiteralParameter(timeParamName, _t._provider.FormatTemporalAsOfParameterValue(_t._asOfTimestamp.Value));
                         if (_t._ctx.Options.TemporalStorageMode == TemporalStorageMode.ProviderNative)
                         {
                             fromClause = _t._provider.GetProviderNativeTemporalAsOfFromClause(_t._mapping, timeParamName);

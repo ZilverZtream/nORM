@@ -87,4 +87,49 @@ public class TemporalAsOfBoundaryContractTests
         Assert.Equal("EMPTY", await AsOfV(firstFrom.AddMilliseconds(-50))); // before first version
         Assert.Equal("V3", await AsOfV(DateTime.UtcNow.AddSeconds(1)));     // after last -> current
     }
+
+    [Table("AsOfZeroMs_Row")]
+    private class ZeroMsRow
+    {
+        [Key] public int Id { get; set; }
+        public int V { get; set; }
+    }
+
+    /// <summary>
+    /// Deterministic regression for the trailing-zero-millisecond boundary: the triggers store
+    /// fixed three-decimal text ("...53.590"), but the driver's default DateTime text trims
+    /// trailing fractional zeros ("...53.59"), which sorts BEFORE the stored form in the lexical
+    /// window comparison - an AsOf at such a transition instant silently returned the OLD
+    /// version (and matched BOTH windows). Seeds the history with zero-ending boundaries
+    /// directly so the case does not depend on the wall clock.
+    /// </summary>
+    [Fact]
+    public async Task AsOf_at_a_trailing_zero_millisecond_boundary_returns_the_new_version()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var _cn = cn;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE AsOfZeroMs_Row (Id INTEGER PRIMARY KEY, V INTEGER NOT NULL);" +
+                "INSERT INTO AsOfZeroMs_Row VALUES (1, 2);" +
+                "CREATE TABLE AsOfZeroMs_Row_History (__VersionId INTEGER PRIMARY KEY AUTOINCREMENT, __ValidFrom TEXT NOT NULL, __ValidTo TEXT NOT NULL, __Operation TEXT NOT NULL, Id INTEGER NOT NULL, V INTEGER NOT NULL);" +
+                "INSERT INTO AsOfZeroMs_Row_History (__ValidFrom, __ValidTo, __Operation, Id, V) VALUES " +
+                "('2026-01-01 10:00:00.500', '2026-01-01 10:00:01.590', 'I', 1, 1)," +
+                "('2026-01-01 10:00:01.590', '9999-12-31', 'U', 1, 2);";
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<ZeroMsRow>() };
+        opts.EnableTemporalVersioning();
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+
+        var boundary = new DateTime(2026, 1, 1, 10, 0, 1, 590, DateTimeKind.Unspecified);
+        var got = await ctx.Query<ZeroMsRow>().AsOf(boundary).Where(r => r.Id == 1).ToListAsync();
+        var only = Assert.Single(got);   // matching BOTH windows was part of the failure mode
+        Assert.Equal(2, only.V);         // exact instant -> NEW version
+
+        var justBefore = await ctx.Query<ZeroMsRow>().AsOf(boundary.AddMilliseconds(-1)).Where(r => r.Id == 1).ToListAsync();
+        Assert.Equal(1, Assert.Single(justBefore).V);
+    }
 }

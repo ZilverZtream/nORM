@@ -709,6 +709,7 @@ M:nORM.Providers.DatabaseProvider.ForceCaseSensitiveStringComparison(System.Stri
 M:nORM.Providers.DatabaseProvider.FormatBooleanPredicate(System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
+M:nORM.Providers.DatabaseProvider.FormatTemporalAsOfParameterValue(System.DateTime):System.Object
 M:nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.DatabaseProvider.GenerateDropNativeTenantPolicySql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.DatabaseProvider.GenerateNativeTenantPolicySql(nORM.Mapping.TableMapping,System.String):System.String
@@ -985,6 +986,7 @@ M:nORM.Providers.SqliteProvider.ForceCaseSensitiveStringComparison(System.String
 M:nORM.Providers.SqliteProvider.FormatBooleanPredicate(System.String,System.Boolean):System.String
 M:nORM.Providers.SqliteProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
+M:nORM.Providers.SqliteProvider.FormatTemporalAsOfParameterValue(System.DateTime):System.Object
 M:nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.SqliteProvider.GetBitwiseXorSql(System.String,System.String):System.String

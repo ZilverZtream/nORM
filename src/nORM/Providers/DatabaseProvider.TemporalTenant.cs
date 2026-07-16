@@ -77,6 +77,18 @@ namespace nORM.Providers
                 $"{GetType().Name} does not support provider-native temporal tables.");
 
         /// <summary>
+        /// Converts an AsOf timestamp to the value actually bound for history-window comparison.
+        /// The default passes the <see cref="DateTime"/> through - providers whose history
+        /// columns are real datetime types compare natively. Providers that store validity
+        /// windows as TEXT and compare lexically (SQLite) override this to bind a string whose
+        /// format matches the trigger-written text EXACTLY; the driver's default DateTime text
+        /// trims trailing fractional zeros, which sorts BEFORE the stored fixed-width
+        /// milliseconds and silently returns the OLD version at exact boundaries.
+        /// </summary>
+        /// <param name="timestamp">The AsOf timestamp being bound.</param>
+        public virtual object FormatTemporalAsOfParameterValue(DateTime timestamp) => timestamp;
+
+        /// <summary>
         /// Returns the provider-specific <c>FROM</c> source for an as-of read against
         /// a provider-native temporal table.
         /// </summary>

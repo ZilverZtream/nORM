@@ -136,6 +136,17 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// SQLite validity windows are TEXT compared lexically. The triggers write fixed
+        /// three-decimal milliseconds (strftime %f), but Microsoft.Data.Sqlite's default
+        /// DateTime text trims trailing fractional zeros - "53.59" sorts BEFORE "53.590", so
+        /// an AsOf at an exact transition instant whose milliseconds end in zero matched the
+        /// OLD version's window too. Bind the timestamp as fixed three-decimal text so the
+        /// lexical comparison aligns with the stored format.
+        /// </summary>
+        public override object FormatTemporalAsOfParameterValue(DateTime timestamp)
+            => timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>
         /// Creates temporal tags using SQLite's database clock so tag timestamps
         /// are comparable to trigger-generated history windows.
         /// </summary>
