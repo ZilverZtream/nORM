@@ -85,6 +85,20 @@ namespace nORM.Query
             if (equalsInstanceCi != null) dict.Add(equalsInstanceCi, HandleStringEqualsInstanceWithComparison);
             var equalsStaticCi = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(string), typeof(StringComparison) });
             if (equalsStaticCi != null) dict.Add(equalsStaticCi, HandleStringEqualsStaticWithComparison);
+            // char-needle overloads: identical semantics to a one-character string, so they
+            // share the string handlers — EmitLikePredicate parameterizes the needle and the
+            // char value binds like any pattern. Without these registrations the shape fell
+            // through to the provider TranslateFunction tail, which only SQLite implements
+            // for Contains/StartsWith/EndsWith: the same query worked there and threw on
+            // every server provider.
+            var containsChar = typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(char) });
+            if (containsChar != null) dict.Add(containsChar, HandleStringContains);
+            var startsChar = typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(char) });
+            if (startsChar != null) dict.Add(startsChar, HandleStringStartsWith);
+            var endsChar = typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(char) });
+            if (endsChar != null) dict.Add(endsChar, HandleStringEndsWith);
+            var containsCharCi = typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(char), typeof(StringComparison) });
+            if (containsCharCi != null) dict.Add(containsCharCi, HandleStringContainsWithComparison);
             return dict;
         }
 

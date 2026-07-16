@@ -35,9 +35,19 @@ equality and case-sensitivity campaigns are closed. Closure/SCV plan-cache bakin
       matrix<->coverage cross-check) is green; the one gap was that the matrix never stated the
       `Set<T>()` alias applies to every row - an intro note now says both entry points are the
       same queryable.)
-- [ ] Audit remaining `NormUnsupportedFeatureException` throw sites: each must be reachable,
+- [~] Audit remaining `NormUnsupportedFeatureException` throw sites: each must be reachable,
       tested, and documented (no accidental silent fallbacks). Per feedback, prefer implementing
-      over throw-pinning where a shape is portable.
+      over throw-pinning where a shape is portable. (Audited 2026-07-16: 152 sites — 150 genuine
+      guards (savepoint types, grouped/aggregated bulk CUD, strict-mobility boundaries,
+      override-me provider-hook defaults, culture-sensitive string modes); 2 defensive
+      fallbacks reachable only from third-party providers (String.cs IndexOf/Replace
+      TranslateFunction-null tails — kept as fail-loud extension-point guards). ONE portable gap
+      found and IMPLEMENTED: char-needle `Contains`/`StartsWith`/`EndsWith` (+
+      `Contains(char, StringComparison)`) previously translated only on SQLite and threw on all
+      three servers; now registered on the shared string handlers, pinned fast + live.
+      REMAINING: negative contract tests for the untested guard throws — non-constant
+      StringComparison modes (Compare/IndexOf/Replace), SQLite ignore-case Replace,
+      DateTime.ParseExact unsupported format.)
 
 ## Verification
 

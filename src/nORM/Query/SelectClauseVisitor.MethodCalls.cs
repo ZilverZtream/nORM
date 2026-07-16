@@ -193,8 +193,10 @@ namespace nORM.Query
                     || node.Method.Name == nameof(string.EndsWith)
                     || node.Method.Name == nameof(string.Contains))
                 && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var rawPattern)
-                && rawPattern is string patternStr)
+                && (rawPattern is string || rawPattern is char))
             {
+                // A char needle behaves as its one-character string on every branch below.
+                var patternStr = rawPattern as string ?? ((char)rawPattern!).ToString();
                 // 2-arg overload: extract the StringComparison and lower both
                 // sides for ignore-case variants -- SQLite LIKE is BINARY by
                 // default but LOWER/LIKE-LOWER is the portable equivalent. The

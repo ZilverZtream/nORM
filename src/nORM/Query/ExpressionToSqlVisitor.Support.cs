@@ -648,10 +648,13 @@ namespace nORM.Query
             // EndsWith with a different captured string silently matched — and bulk
             // ExecuteUpdate/Delete wrote or deleted — the wrong rows on every LIKE-path
             // provider; SQLite escaped only because its ordinal bypass parameterizes).
-            if (patternExpr is ConstantExpression && TryGetConstantValue(patternExpr, out var raw) && raw is string s)
+            if (patternExpr is ConstantExpression && TryGetConstantValue(patternExpr, out var raw)
+                && (raw is string || raw is char))
             {
                 // Pre-folded constant: bind the lowered pattern when ignoring case so the SQL
-                // doesn't need to wrap it again at run time.
+                // doesn't need to wrap it again at run time. A char needle folds as its
+                // one-character string.
+                var s = raw as string ?? ((char)raw!).ToString();
                 var pattern = ignoreCase ? s.ToLowerInvariant() : s;
                 visitor.AppendConstant(visitor.CreateSafeLikePattern(pattern, op), typeof(string));
                 visitor._sql.Append($" ESCAPE '{escChar}'");
