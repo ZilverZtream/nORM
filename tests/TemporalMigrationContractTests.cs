@@ -391,6 +391,32 @@ public class TemporalMigrationContractTests
         Assert.Equal(3, Scalar(cn, "SELECT COUNT(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'TmigGone!_a%' ESCAPE '!';"));
     }
 
+    // ── Tenant-scoped temporal tables ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void Regenerated_triggers_keep_the_tenant_predicate_in_the_history_close()
+    {
+        TableSchema Tenant(bool withExtra)
+        {
+            var t = BuildTable("TmigTen", withExtra);
+            t.TenantColumnName = "TenantId";
+            t.Columns.Add(new ColumnSchema { Name = "TenantId", ClrType = typeof(int).FullName!, IsNullable = false });
+            return t;
+        }
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { Tenant(true) } },
+            new SchemaSnapshot { Tables = { Tenant(false) } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        // Both directions' regenerated update triggers must scope the history close to the
+        // tenant - the history table is not PK-unique, so a lost tenant predicate could close
+        // another tenant's open history row.
+        var upTrigger = sql.Up.Single(s => s.StartsWith("CREATE TRIGGER", StringComparison.Ordinal) && s.Contains("TmigTen_au", StringComparison.Ordinal));
+        Assert.Contains("\"TenantId\" = OLD.\"TenantId\"", upTrigger, StringComparison.Ordinal);
+        var downTrigger = sql.Down.Single(s => s.StartsWith("CREATE TRIGGER", StringComparison.Ordinal) && s.Contains("TmigTen_au", StringComparison.Ordinal));
+        Assert.Contains("\"TenantId\" = OLD.\"TenantId\"", downTrigger, StringComparison.Ordinal);
+    }
+
     // ── Non-temporal tables stay untouched ────────────────────────────────────────────────
 
     [Fact]

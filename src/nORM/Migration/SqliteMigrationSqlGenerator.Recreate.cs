@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using nORM.Configuration;
@@ -218,11 +218,19 @@ namespace nORM.Migration
             return null;
         }
 
-        private static TableSchema CopyTable(string name, IEnumerable<ColumnSchema> cols,
+        private static TableSchema CopyTable(TableSchema baseTable, IEnumerable<ColumnSchema> cols,
             IEnumerable<ForeignKeySchema> fks, IEnumerable<CheckConstraintSchema> checks,
             IEnumerable<ExpressionIndexSchema> expressionIndexes)
         {
-            var t = new TableSchema { Name = name };
+            // Carry the temporal metadata: the reconstructed schema feeds the versioning-trigger
+            // re-emission, and a lost TenantColumnName would silently drop the tenant predicate
+            // from the regenerated triggers' history-close condition.
+            var t = new TableSchema
+            {
+                Name = baseTable.Name,
+                IsTemporal = baseTable.IsTemporal,
+                TenantColumnName = baseTable.TenantColumnName
+            };
             t.Columns.AddRange(cols);
             t.ForeignKeys.AddRange(fks);
             t.CheckConstraints.AddRange(checks);
@@ -305,7 +313,7 @@ namespace nORM.Migration
                 diff.DroppedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint.ConstraintName),
                 diff.AddedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint));
 
-            return CopyTable(baseTable.Name, cols, fks, checks, baseTable.ExpressionIndexes);
+            return CopyTable(baseTable, cols, fks, checks, baseTable.ExpressionIndexes);
         }
 
         /// <summary>
@@ -355,13 +363,13 @@ namespace nORM.Migration
                 diff.AddedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint.ConstraintName),
                 diff.DroppedCheckConstraints.Where(x => NameEquals(x.Table.Name, tableName)).Select(x => x.CheckConstraint));
 
-            return CopyTable(baseTable.Name, cols, fks, checks, Array.Empty<ExpressionIndexSchema>());
+            return CopyTable(baseTable, cols, fks, checks, Array.Empty<ExpressionIndexSchema>());
         }
 
         /// <summary>
         /// Emits a single Up table-recreation that applies every recreate-requiring change to a table
         /// at once (altered columns, added/dropped columns, added/dropped FKs and CHECK constraints).
-        /// Doing it once — rather than once per change — prevents the per-change recreations from
+        /// Doing it once â€” rather than once per change â€” prevents the per-change recreations from
         /// clobbering one another (most damagingly on the Down path).
         /// </summary>
         private static void EmitUpRecreate(List<string> up, SchemaDiff diff, string tableName)
