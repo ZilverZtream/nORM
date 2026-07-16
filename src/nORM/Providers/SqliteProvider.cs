@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using nORM.Query;
@@ -155,6 +156,20 @@ namespace nORM.Providers
         /// standard tradeoff. Other providers' DECIMAL is precise so they keep identity.
         /// </summary>
         public override string NormalizeDecimalForCompare(string sql) => $"CAST({sql} AS REAL)";
+
+        /// <summary>
+        /// Name of the registered collation that orders decimal TEXT at full 28-digit precision.
+        /// </summary>
+        internal const string DecimalOrderCollation = "NORM_DECIMAL";
+
+        /// <summary>
+        /// Full-precision decimal ORDER BY key. Unlike <see cref="NormalizeDecimalForCompare"/>
+        /// (CAST AS REAL, which loses precision beyond ~16 significant digits), this orders by the
+        /// registered <see cref="DecimalOrderCollation"/> collation, which parses the canonical decimal
+        /// TEXT and compares via <see cref="decimal.Compare"/> at full precision. Ordering only -
+        /// arithmetic and aggregation keep the REAL coercion.
+        /// </summary>
+        internal override string OrderByDecimalKeySql(string sql) => $"({sql}) COLLATE {DecimalOrderCollation}";
 
         /// <summary>
         /// Exact decimal key for TEXT-stored decimals: strip trailing fraction zeros
@@ -560,6 +575,29 @@ namespace nORM.Providers
                     ? input
                     : Regex.Replace(input, pattern, replacement ?? string.Empty),
                 isDeterministic: true);
+
+            // Full-precision decimal ordering: SQLite stores decimal as canonical TEXT, and lexical
+            // BINARY ordering is wrong for magnitude while CAST-AS-REAL loses precision beyond ~16
+            // significant digits. This collation parses both operands and compares via decimal.Compare
+            // at full 28-digit precision. Applied only where OrderByDecimalKeySql emits COLLATE NORM_DECIMAL.
+            sqlite.CreateCollation(DecimalOrderCollation, static (x, y) => CompareCanonicalDecimalText(x, y));
+        }
+
+        /// <summary>
+        /// Compares two canonical decimal TEXT values at full precision for the NORM_DECIMAL collation.
+        /// Both operands are nORM's stored canonical decimal text; parse invariantly and compare via
+        /// <see cref="decimal.Compare"/>. Falls back to ordinal text comparison only if an operand is not
+        /// a parseable decimal (defensive - nORM always stores parseable canonical text).
+        /// </summary>
+        internal static int CompareCanonicalDecimalText(string? x, string? y)
+        {
+            if (ReferenceEquals(x, y)) return 0;
+            if (x is null) return -1;
+            if (y is null) return 1;
+            if (decimal.TryParse(x, NumberStyles.Number, CultureInfo.InvariantCulture, out var dx)
+                && decimal.TryParse(y, NumberStyles.Number, CultureInfo.InvariantCulture, out var dy))
+                return decimal.Compare(dx, dy);
+            return string.CompareOrdinal(x, y);
         }
         
         /// <summary>

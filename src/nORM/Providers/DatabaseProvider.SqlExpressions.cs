@@ -201,6 +201,16 @@ namespace nORM.Providers
         public virtual string NormalizeDecimalForCompare(string sql) => sql;
 
         /// <summary>
+        /// The sort key for a decimal ORDER BY / ThenBy. Server providers (SQL Server / PostgreSQL /
+        /// MySQL) order the native DECIMAL exactly, so the default reuses
+        /// <see cref="NormalizeDecimalForCompare"/> (identity). SQLite stores decimal as TEXT and the
+        /// ordinary comparison coercion is CAST AS REAL (IEEE-754, precise only to ~16 significant
+        /// digits), so SqliteProvider overrides this to a full-precision decimal collation for ordering.
+        /// Ordering only: arithmetic and aggregation keep <see cref="NormalizeDecimalForCompare"/>.
+        /// </summary>
+        internal virtual string OrderByDecimalKeySql(string sql) => NormalizeDecimalForCompare(sql);
+
+        /// <summary>
         /// Canonical decimal TEXT for EXACT equality / grouping / dedup on providers
         /// that store decimal as text. <see cref="NormalizeDecimalForCompare"/>'s REAL
         /// coercion is right for ordering and arithmetic but is IEEE-754 double, so two

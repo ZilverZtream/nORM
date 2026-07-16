@@ -88,4 +88,32 @@ public class DecimalOrderingContractTests
             .AsNoTracking().Where(e => e.Val == a).Select(e => e.Id).ToList();
         Assert.Equal(new[] { 1 }, hitA);
     }
+
+    [Fact]
+    public async Task OrderBy_decimal_is_full_precision_beyond_16_significant_digits()
+    {
+        // Two decimals that agree to 16 significant digits and both round to exactly 1.0 as a double,
+        // so a CAST-AS-REAL sort key would merge them and order by the tiebreak. The full-precision
+        // NORM_DECIMAL collation orders them by true value. Smaller value carries the LARGER Id so a
+        // tiebreak-by-Id ordering (the REAL-coercion failure mode) would differ from the correct order.
+        var rows = new (int Id, decimal Val)[]
+        {
+            (1, 1.00000000000000006m),   // larger value, smaller Id
+            (2, 1.00000000000000005m),   // smaller value, larger Id
+        };
+        using var ctx = new DbContext(Open(), new SqliteProvider());
+        foreach (var (id, val) in rows) await ctx.InsertAsync(new D { Id = id, Val = val });
+
+        var norm = ((INormQueryable<D>)ctx.Query<D>())
+            .AsNoTracking().OrderBy(e => e.Val).ThenBy(e => e.Id).Select(e => e.Id).ToList();
+
+        // True value order: 1.00000000000000005 (Id 2) before 1.00000000000000006 (Id 1).
+        Assert.Equal(new[] { 2, 1 }, norm);
+        Assert.Equal(rows.OrderBy(r => r.Val).ThenBy(r => r.Id).Select(r => r.Id).ToList(), norm);
+
+        // Descending is the exact reverse (the collation flips cleanly).
+        var desc = ((INormQueryable<D>)ctx.Query<D>())
+            .AsNoTracking().OrderByDescending(e => e.Val).ThenBy(e => e.Id).Select(e => e.Id).ToList();
+        Assert.Equal(new[] { 1, 2 }, desc);
+    }
 }

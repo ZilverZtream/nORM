@@ -528,7 +528,7 @@ namespace nORM.Query
         private string CoerceOrderKeySql(string sql, Type keyType)
         {
             var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
-            if (u == typeof(decimal)) return _provider.NormalizeDecimalForCompare(sql);
+            if (u == typeof(decimal)) return _provider.OrderByDecimalKeySql(sql);
             if (u == typeof(TimeSpan)) return _provider.NormalizeTimeSpanForCompare(sql);
             if (u == typeof(DateTimeOffset)) return _provider.NormalizeDateTimeOffsetForCompare(sql);
             return sql;
