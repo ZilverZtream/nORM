@@ -82,7 +82,7 @@ public class CacheStalenessFuzzTests
             DbContext MakeCached() => NewContext(keeper.ConnectionString, cache);
             DbContext MakeFresh() => NewContext(keeper.ConnectionString, null);
 
-            var shape = rng.Next(0, 3);
+            var shape = rng.Next(0, 5);
             var target = rng.Next(1, parentCount + 1);
 
             await using var ctx = MakeCached();
@@ -140,12 +140,26 @@ public class CacheStalenessFuzzTests
                 var rows = cacheable ? proj.Cacheable(TimeSpan.FromMinutes(5)).ToList() : proj.ToList();
                 return rows.Select(r => (r.Id, r.M)).ToList();
             }
-            default: // correlated child Val sum for all parents (reads Parent + Child)
+            case 2: // correlated child Val sum for all parents (reads Parent + Child)
             {
                 var proj = q.OrderBy(p => p.Id)
                     .Select(p => new { p.Id, M = ctx.Query<Child>().Where(c => c.ParentId == p.Id).Sum(c => c.Val) });
                 var rows = cacheable ? proj.Cacheable(TimeSpan.FromMinutes(5)).ToList() : proj.ToList();
                 return rows.Select(r => (r.Id, r.M)).ToList();
+            }
+            case 3: // explicit JOIN projection (reads Parent + Child through the join, not a subquery)
+            {
+                var proj = q.Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.Id, M = c.Val })
+                    .OrderBy(x => x.Id).ThenBy(x => x.M);
+                var rows = cacheable ? proj.Cacheable(TimeSpan.FromMinutes(5)).ToList() : proj.ToList();
+                return rows.Select(r => (r.Id, r.M)).ToList();
+            }
+            default: // window function over Parent (ROW_NUMBER through the ranked pipeline)
+            {
+                var proj = q.OrderBy(p => p.Id)
+                    .WithRowNumber((p, rn) => new { p.Id, Rn = rn });
+                var rows = cacheable ? proj.Cacheable(TimeSpan.FromMinutes(5)).ToList() : proj.ToList();
+                return rows.Select(r => (r.Id, (int)r.Rn)).ToList();
             }
         }
     }
