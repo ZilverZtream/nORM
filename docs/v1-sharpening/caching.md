@@ -27,6 +27,11 @@ probes â€” a reminder that cache-tag coverage needs adversarial, not happy-
       insert/delete/update writes. (RESOLVED 2026-07-16: the fuzzer now generates explicit JOIN-projection and ROW_NUMBER window shapes too - 5 shapes x 120 seeds, dry.)
 - [x] Verify bulk-write invalidation covers all touched tables: every write route (direct/batched SaveChanges, BulkInsert/Update/Delete, ExecuteUpdate/ExecuteDelete) individually pinned by `CacheWriteRouteInvalidationContractTests` (NH-0802).
 - [x] Confirm bounded-cache limits and diagnostics match `docs/cache-policy.md`: NormMemoryCacheProvider 10,240-entry bound matches; churn coverage cited to the release-gate suites (NH-0802). Also landed there: transaction-rollback cache-poisoning fix, connection-private database cache identity, non-positive-TTL contracts.
+- [x] Live-database-swap cache identity (NH-0802 post-Verified cell, 2026-07-16): the key derived
+      database identity from the connection STRING, which `ChangeDatabase()` leaves stale while
+      repointing the live connection - a cacheable read after the swap served the previous
+      database's rows. The key now also includes the live `Connection.Database` name; pinned by
+      `CacheDatabaseSwapContractTests` (live, probe-before-fix verified).
 
 ## Verification
 

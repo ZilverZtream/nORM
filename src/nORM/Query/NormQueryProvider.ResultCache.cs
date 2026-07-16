@@ -113,6 +113,13 @@ namespace nORM.Query
             var dbIdentity = NormalizeConnectionStringForCacheKey(_ctx.Connection.ConnectionString);
             AppendUtf8(hasher, "DB".AsSpan());
             AppendLengthPrefixedUtf8(hasher, dbIdentity.AsSpan());
+            // The connection string is a STALE identity once ChangeDatabase() has repointed the
+            // live connection: providers update Connection.Database but keep the original
+            // string, so a cacheable read after the swap would silently serve the PREVIOUS
+            // database's rows. Key on the live database name as well (constant "main" for
+            // SQLite, where the per-connection id below covers connection-private databases).
+            AppendUtf8(hasher, "DBNAME".AsSpan());
+            AppendLengthPrefixedUtf8(hasher, (_ctx.RawConnection.Database ?? string.Empty).AsSpan());
             // Connection-private databases (SQLite ':memory:' without shared cache) have
             // IDENTICAL connection strings but DIFFERENT data per connection - a shared cache
             // provider would serve one database's rows for another. Key them per connection
