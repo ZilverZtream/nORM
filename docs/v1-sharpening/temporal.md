@@ -29,6 +29,12 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
 - [~] Confirm temporal + tenant + soft-delete interactions are covered. (NH-0601: temporal+tenant
       green - `TemporalTriggerTenantScope`, `TenantTemporalProviderSwap`; soft-delete interaction
       not specifically confirmed yet.)
+- [~] Temporal-aware migrations (NH-0612): migrations on trigger-emulated temporal tables now
+      mirror the history schema in lock-step and re-emit the versioning triggers from the
+      post-change schema on all four generators - a SQLite recreate previously KILLED versioning
+      silently, and ADD COLUMN never reached history on any provider. SQLite closed behaviourally
+      (`TemporalMigrationContractTests`); servers closed at the SQL-text level
+      (`ServerTemporalMigrationDdlContractTests`); live behavioural runs pending.
 
 ## Verification
 
