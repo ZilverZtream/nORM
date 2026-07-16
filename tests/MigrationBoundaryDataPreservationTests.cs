@@ -186,6 +186,91 @@ public class MigrationBoundaryDataPreservationTests
     }
 
     [Fact]
+    public void Rename_column_keeps_data_byte_exact_both_directions()
+    {
+        using var cn = CreateSeededBaseline(out var before);
+
+        // Up: rename S -> Label (PreviousName drives the rename through the recreate).
+        var target = BuildTable(withExtra: false);
+        var sCol = target.Columns.Single(c => c.Name == "S");
+        sCol.Name = "Label";
+        sCol.PreviousName = "S";
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false) } },
+            new SchemaSnapshot { Tables = { target } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+
+        // Data byte-exact under the new name (compare per-column: S's values now live in Label).
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT Dec, Dto, G, Label, B, U FROM MigBoundary ORDER BY Id;";
+            using var r = c.ExecuteReader();
+            Assert.True(r.Read());
+            Assert.Equal(before[0][1], r.GetValue(0));
+            Assert.Equal(before[0][2], r.GetValue(1));
+            Assert.Equal(before[0][3], r.GetValue(2));
+            Assert.Equal(before[0][4], r.GetValue(3));   // S's value, now in Label
+            Assert.True(((byte[])before[0][5]!).AsSpan().SequenceEqual((byte[])r.GetValue(4)));
+            Assert.Equal(before[0][6], r.GetValue(5));
+        }
+
+        // Down: rename back; the original snapshot query must succeed and match byte-for-byte.
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+        AssertSnapshotsEqual(before, Snapshot(cn));
+    }
+
+    [Fact]
+    public void Combined_add_rename_drop_round_trip_restores_schema_and_data()
+    {
+        using var cn = CreateSeededBaseline(out _);
+
+        // Give the baseline a droppable column so one diff can add + rename + drop at once.
+        Exec(cn, "ALTER TABLE MigBoundary ADD COLUMN Extra INTEGER NULL;");
+        Exec(cn, "UPDATE MigBoundary SET Extra = 77;");
+        var keepersBefore = Snapshot(cn);
+        var schemaBefore = SchemaInfo(cn);
+
+        var oldTable = BuildTable(withExtra: true);
+        var newTable = BuildTable(withExtra: false);          // drops Extra
+        var sCol = newTable.Columns.Single(c => c.Name == "S");
+        sCol.Name = "Label";                                   // renames S -> Label
+        sCol.PreviousName = "S";
+        newTable.Columns.Add(new ColumnSchema { Name = "Added", ClrType = typeof(string).FullName!, IsNullable = true });
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { oldTable } },
+            new SchemaSnapshot { Tables = { newTable } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+
+        // After the full round trip: schema identical (names/types/notnull/pk) except the dropped
+        // column's value (documented contract: dropped data is gone, restored column reads NULL).
+        Assert.Equal(schemaBefore, SchemaInfo(cn));
+        var after = Snapshot(cn);
+        AssertSnapshotsEqual(keepersBefore, after);
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM MigBoundary WHERE Extra IS NULL;";
+            Assert.Equal(1, Convert.ToInt32(c.ExecuteScalar()));
+        }
+    }
+
+    private static string SchemaInfo(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name, type, [notnull], pk FROM pragma_table_info('MigBoundary') ORDER BY name;";
+        using var r = cmd.ExecuteReader();
+        var sb = new System.Text.StringBuilder();
+        while (r.Read())
+            sb.Append(r.GetString(0)).Append(':').Append(r.GetString(1)).Append(':')
+              .Append(r.GetInt64(2)).Append(':').Append(r.GetInt64(3)).Append(';');
+        return sb.ToString();
+    }
+
+    [Fact]
     public void Add_nullable_column_preserves_boundary_data_up_and_down()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
