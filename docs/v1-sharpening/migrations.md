@@ -15,9 +15,9 @@ SQLite table-recreate, and advisory-locked concurrent deploys.
 - [x] Temporal/provider DDL precision is correct at the SQL-generation level (MySQL
       DATETIME(6)/TIME(6), TINYINT UNSIGNED, temporal-default rewrite) — `MigrationSqlGeneration`
       green (NH-0401); live-DB round-trip re-verified on the live gate.
-- [ ] Concurrent deploys are advisory-locked per provider; safe rename detection documented.
+- [x] Concurrent deploys are advisory-locked per provider; safe rename detection documented.
       (NH-0401: rename detection + `[RenameColumn]` doc contract green; per-provider live
-      advisory-lock deferred to the live provider gate.)
+      advisory-lock CLOSED 2026-07-16 via `MigrationAdvisoryLockLiveTests` — see open items.)
 
 ## Current confidence
 
@@ -31,8 +31,11 @@ invariant and rename-fold are in place.
       220-test dry run; env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` — set
       `NORM_MIGRATION_FUZZ_SWEEP="start:count"`; seeds 902000+ swept dry 2026-07-16. The sustained
       window accumulates in the log.)
-- [ ] Re-verify advisory-lock behaviour on live SQL Server / PostgreSQL / MySQL under concurrent
-      deploy.
+- [x] Re-verify advisory-lock behaviour on live SQL Server / PostgreSQL / MySQL under concurrent
+      deploy. (Closed 2026-07-16: `MigrationAdvisoryLockLiveTests` runs two concurrent
+      `ApplyMigrationsAsync` per server against an in-process-compiled probe migration that
+      sleeps inside `Up()` to widen the race window — the DDL and marker insert run exactly
+      once, the history table records one row, and both runners complete; 3/3 live green.)
 - [x] Rename detection vs DROP+ADD boundary is documented and matches `[RenameColumn]` (NH-0401).
 
 ## Verification
