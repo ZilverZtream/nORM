@@ -23,18 +23,30 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
 
 ## Open items
 
-- [~] Sustain the reconstruction fuzzer dry window. (NH-0601 recorded a 50-test dry run; the
-      multi-week window is calendar time.)
-- [ ] Verify sub-second precision on all four providers' history triggers/storage.
+- [~] Sustain the reconstruction fuzzer dry window. (NH-0601 recorded a 50-test dry run;
+      env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` via
+      `NORM_TEMPORAL_FUZZ_SWEEP="start:count"` — seeds 702000-702079 swept dry 2026-07-16.)
+- [x] Verify sub-second precision on all four providers' history triggers/storage. (Closed
+      2026-07-16 by the differential evidence already running live: the reconstruction machine
+      writes versions ~50-100ms apart and takes SERVER-CLOCK checkpoints between them — a
+      second-precision trigger or storage column would collapse adjacent versions and fail the
+      checkpoint oracle. `LiveProviderTemporal*` + `TemporalMigrationLiveBehaviourTests` are
+      26/26 non-vacuous on live SQL Server/PostgreSQL/MySQL (re-verified today), SQLite is
+      covered by the millisecond-trigger fix and `TemporalHistoryReconstructionFuzzTests`, and
+      the generators' fractional-precision DDL (MySQL DATETIME(6)/TIME(6), temporal-default(6))
+      is pinned at the SQL-text level.)
 - [~] Confirm temporal + tenant + soft-delete interactions are covered. (NH-0601: temporal+tenant
       green - `TemporalTriggerTenantScope`, `TenantTemporalProviderSwap`; soft-delete interaction
       not specifically confirmed yet.)
-- [~] Temporal-aware migrations (NH-0612): migrations on trigger-emulated temporal tables now
+- [x] Temporal-aware migrations (NH-0612): migrations on trigger-emulated temporal tables now
       mirror the history schema in lock-step and re-emit the versioning triggers from the
       post-change schema on all four generators - a SQLite recreate previously KILLED versioning
       silently, and ADD COLUMN never reached history on any provider. SQLite closed behaviourally
       (`TemporalMigrationContractTests`); servers closed at the SQL-text level
-      (`ServerTemporalMigrationDdlContractTests`); live behavioural runs pending.
+      (`ServerTemporalMigrationDdlContractTests`) AND behaviourally on the live servers
+      (`TemporalMigrationLiveBehaviourTests` against the normtest application database — seed
+      versions, generator ADD COLUMN migration, post-migration write reaches history, AsOf spans
+      the migration; re-verified non-vacuous 2026-07-16).
 
 ## Verification
 
