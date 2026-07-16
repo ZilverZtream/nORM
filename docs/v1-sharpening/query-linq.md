@@ -30,8 +30,11 @@ equality and case-sensitivity campaigns are closed. Closure/SCV plan-cache bakin
 
 - [~] Sustain the parity-fuzzer dry window; log every seed sweep and its range. (NH-0101 recorded
       a 351-test dry run on the current tree; the multi-week window itself is calendar time.)
-- [ ] Confirm `docs/linq-support.md` and `docs/linq-support-coverage.md` still match the code
-      after the DI/Set<T> additions.
+- [x] Confirm `docs/linq-support.md` and `docs/linq-support-coverage.md` still match the code
+      after the DI/Set<T> additions. (Confirmed 2026-07-16: the doc-contract suite (55 tests,
+      matrix<->coverage cross-check) is green; the one gap was that the matrix never stated the
+      `Set<T>()` alias applies to every row - an intro note now says both entry points are the
+      same queryable.)
 - [ ] Audit remaining `NormUnsupportedFeatureException` throw sites: each must be reachable,
       tested, and documented (no accidental silent fallbacks). Per feedback, prefer implementing
       over throw-pinning where a shape is portable.

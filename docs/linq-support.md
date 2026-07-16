@@ -5,6 +5,11 @@ server-side translation for the query shapes below, explicit client-evaluation
 rules for projections, and deterministic exceptions for shapes outside the
 matrix.
 
+Every row applies identically to both query entry points: `ctx.Query<T>()` and
+its EF-parity alias `ctx.Set<T>()` return the same queryable, so examples
+written as `ctx.Query<X>()` (including correlated-subquery sources) work
+unchanged with `ctx.Set<X>()`.
+
 Status values:
 
 - Supported: intended v1 behavior for SQL Server, SQLite, PostgreSQL, and MySQL.
