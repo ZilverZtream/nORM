@@ -27,7 +27,9 @@ value-unchanged mutations as non-writes (a version oracle must not count no-ops 
 ## Open items
 
 - [~] Sustain the OCC fuzzer dry window; record interleaving seed ranges. (NH-0901 recorded a
-      70-test dry run; the multi-week window is calendar time.)
+      70-test dry run; env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` via
+      `NORM_OCC_FUZZ_SWEEP` and `NORM_RETRY_FUZZ_SWEEP` ("start:count") — seeds 1102000+ and
+      1202000+ swept dry 2026-07-16; the sustained window accumulates in the log.)
 - [x] Explicit fault-injection tests for the retry-write invariants exist and pass (NH-0901,
       `SaveChangesFaultInjectionAtomicity`).
 - [x] Verify deadlock-resilient path on live SQL Server: the 2026-07-16 Category=LiveProvider run (1867/1867 green on all three servers) included the live deadlock tests.

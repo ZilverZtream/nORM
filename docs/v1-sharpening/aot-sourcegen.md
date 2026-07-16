@@ -27,8 +27,10 @@ diagnostics. Source-gen materializer correctness is fuzzed.
 
 - [x] AOT diagnostic scan is at zero on the current tree (NH-1101); re-run after every
       public-API/reflection change (`dotnet publish ... -p:PublishAot=true`, grep `IL\d{4}`).
-- [~] Sustain the source-gen correctness fuzzer dry window. (NH-1101 recorded a dry run; the
-      multi-week window is calendar time.)
+- [~] Sustain the source-gen correctness fuzzer dry window. (NH-1101 recorded a dry run. Note:
+      the source-gen suites are DETERMINISTIC equivalence batteries, not seeded fuzzers, so there
+      is no seed range to sweep — the window accumulates through the `SourceGen*` suites being
+      green in every full Fast run, recorded here rather than in the seed ledger.)
 - [x] `docs/aot-trimming.md` and README AOT claims are consistent after DI/Set<T> (NH-1101: the DI
       overload is annotated and `Set<T>` inherits the class-level RUC/RDC on `NormQueryable`).
 

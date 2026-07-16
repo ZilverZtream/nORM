@@ -166,6 +166,23 @@ public class MixedTokenOccFuzzTests
             (PendingPlainAdds.Count > 0 ? 1 : 0) + (PendingPlainVals.Count > 0 ? 1 : 0) + (PendingPlainDeletes.Count > 0 ? 1 : 0);
     }
 
+    /// <summary>
+    /// Environment-directed seed sweep for building the release dry window: set
+    /// NORM_OCC_FUZZ_SWEEP to "start:count" to run that seed range through the mixed-token
+    /// interleaving machine. Unset, this fact is a no-op so the fixed seeds stay the baseline.
+    /// </summary>
+    [Fact]
+    public async Task Environment_directed_seed_sweep()
+    {
+        var spec = Environment.GetEnvironmentVariable("NORM_OCC_FUZZ_SWEEP");
+        if (string.IsNullOrEmpty(spec)) return;
+        var parts = spec.Split(':');
+        var start = int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+        var count = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+        for (var s = start; s < start + count; s++)
+            await Mixed_token_and_plain_saves_conflict_and_recover_exactly(s);
+    }
+
     [Theory]
     [InlineData(20260714)]
     [InlineData(42)]
