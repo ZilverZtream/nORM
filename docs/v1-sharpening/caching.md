@@ -1,4 +1,4 @@
-# Domain 8 — Caching
+﻿# Domain 8 â€” Caching
 
 **Scope:** bounded cache policy (lifetimes, limits, diagnostics), cache tag correctness, and
 invalidation so a cached read is never stale after a write to any table it depends on.
@@ -6,7 +6,7 @@ invalidation so a cached read is never stale after a write to any table it depen
 ## 1.0 exit criteria
 
 - [ ] A cacheable query tags **every** table it reads (including correlated subqueries), so a
-      write to any of them invalidates the cached result — no silent stale reads.
+      write to any of them invalidates the cached result â€” no silent stale reads.
 - [ ] Cache is bounded (documented max size / eviction); memory cannot grow unbounded.
 - [ ] Cache keys include tenant + relevant discriminators; no cross-tenant or cross-parameter
       bleed.
@@ -17,7 +17,7 @@ invalidation so a cached read is never stale after a write to any table it depen
 Strong. A silent stale-read was closed: a cacheable query with a correlated subquery tagged only
 the root table, so a child write left a stale cached result. Fixed via ambient referenced-table
 scope so `plan.Tables` covers all read tables. Found by an adversarial probe after ~10 passing
-probes — a reminder that cache-tag coverage needs adversarial, not happy-path, testing.
+probes â€” a reminder that cache-tag coverage needs adversarial, not happy-path, testing.
 
 ## Open items
 
@@ -27,8 +27,8 @@ probes — a reminder that cache-tag coverage needs adversarial, not happy-path,
       insert/delete/update writes. (Explicit JOIN-projection staleness stays covered by the
       targeted `MultiTableCacheInvalidation` tests; extending the fuzzer to join/window shapes is
       tracked IMPLEMENTATION-DEBT in NH-0801.)
-- [ ] Verify bulk-write invalidation covers all touched tables (cross-check Domain 3).
-- [ ] Confirm bounded-cache limits and diagnostics match `docs/cache-policy.md`.
+- [x] Verify bulk-write invalidation covers all touched tables: every write route (direct/batched SaveChanges, BulkInsert/Update/Delete, ExecuteUpdate/ExecuteDelete) individually pinned by `CacheWriteRouteInvalidationContractTests` (NH-0802).
+- [x] Confirm bounded-cache limits and diagnostics match `docs/cache-policy.md`: NormMemoryCacheProvider 10,240-entry bound matches; churn coverage cited to the release-gate suites (NH-0802). Also landed there: transaction-rollback cache-poisoning fix, connection-private database cache identity, non-positive-TTL contracts.
 
 ## Verification
 

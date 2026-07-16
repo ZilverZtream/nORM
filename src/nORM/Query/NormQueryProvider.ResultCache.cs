@@ -25,7 +25,10 @@ namespace nORM.Query
         private TResult ExecuteWithCacheSync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, TimeSpan expiration, Func<TResult> factory)
         {
             var cache = _ctx.Options.CacheProvider;
-            if (cache == null)
+            // A non-positive expiration means "expires immediately": execute uncached instead of
+            // letting the memory cache throw an opaque ArgumentOutOfRangeException AFTER the data
+            // was already fetched. No TryGet either - an immediately-expired entry must not serve.
+            if (cache == null || expiration <= TimeSpan.Zero)
                 return factory();
 
             if (cache.TryGet(cacheKey, out TResult? cached))
@@ -60,7 +63,8 @@ namespace nORM.Query
         private async Task<TResult> ExecuteWithCacheAsync<TResult>(string cacheKey, IReadOnlyCollection<string> tables, TimeSpan expiration, Func<Task<TResult>> factory, CancellationToken ct)
         {
             var cache = _ctx.Options.CacheProvider;
-            if (cache == null)
+            // Non-positive expiration = "expires immediately": execute uncached (see sync twin).
+            if (cache == null || expiration <= TimeSpan.Zero)
                 return await factory().ConfigureAwait(false);
             if (cache.TryGet(cacheKey, out TResult? cached))
                 return cached!;

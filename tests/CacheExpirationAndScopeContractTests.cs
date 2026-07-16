@@ -75,6 +75,21 @@ public class CacheExpirationAndScopeContractTests
     }
 
     [Fact]
+    public void Non_positive_expirations_are_rejected_at_the_call_site()
+    {
+        using var cn = Seed((1, 10));
+        using var cache = new NormMemoryCacheProvider();
+        using var ctx = Ctx(cn, cache);
+
+        // Cacheable validates eagerly with a clear message - the query never runs with a
+        // meaningless TTL and nothing deeper throws after data was already fetched.
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ((INormQueryable<Row>)ctx.Query<Row>()).AsNoTracking().Cacheable(TimeSpan.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ((INormQueryable<Row>)ctx.Query<Row>()).AsNoTracking().Cacheable(TimeSpan.FromMinutes(-1)));
+    }
+
+    [Fact]
     public async Task Two_contexts_on_the_same_database_share_cache_entries()
     {
         using var cn = Seed((1, 10));
