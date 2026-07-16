@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
@@ -127,10 +127,16 @@ public class TemporalMigrationLiveBehaviourTests
         }
 
         // Best-effort cleanup from previous runs (triggers/functions die with their tables).
+        // Postgres folds unquoted identifiers to lowercase, and nORM quotes the mapped name,
+        // so the raw DDL must quote there; MySQL/SQL Server accept the plain form.
+        var tbl = kind == "postgres" ? "\"TmigLiveB\"" : "TmigLiveB";
+        var hist = kind == "postgres" ? "\"TmigLiveB_History\"" : "TmigLiveB_History";
         ExecIgnore(factory!,
-            "DROP TABLE TmigLiveB_History", "DROP TABLE TmigLiveB",
+            $"DROP TABLE {hist}", $"DROP TABLE {tbl}",
             "DROP FUNCTION IF EXISTS \"TmigLiveB_TemporalFunction\"()");
-        ExecIgnore(factory!, "CREATE TABLE TmigLiveB (Id INT PRIMARY KEY, V INT NOT NULL)");
+        ExecIgnore(factory!, kind == "postgres"
+            ? "CREATE TABLE \"TmigLiveB\" (\"Id\" INT PRIMARY KEY, \"V\" INT NOT NULL)"
+            : $"CREATE TABLE {tbl} (Id INT PRIMARY KEY, V INT NOT NULL)");
 
         var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<RowV1>() };
         opts.EnableTemporalVersioning();
@@ -167,11 +173,11 @@ public class TemporalMigrationLiveBehaviourTests
             using (var cn = factory!())
             using (var cmd = cn.CreateCommand())
             {
-                cmd.CommandText = "UPDATE TmigLiveB SET V = 3, W = 42 WHERE Id = 1";
+                cmd.CommandText = kind == "postgres" ? "UPDATE \"TmigLiveB\" SET \"V\" = 3, \"W\" = 42 WHERE \"Id\" = 1" : "UPDATE TmigLiveB SET V = 3, W = 42 WHERE Id = 1";
                 Assert.Equal(1, cmd.ExecuteNonQuery());
             }
-            Assert.Equal(1, Scalar(factory!, "SELECT COUNT(*) FROM TmigLiveB_History WHERE V = 3 AND W = 42"));
-            Assert.True(Scalar(factory!, "SELECT COUNT(*) FROM TmigLiveB_History") >= 3);
+            Assert.Equal(1, Scalar(factory!, kind == "postgres" ? "SELECT COUNT(*) FROM \"TmigLiveB_History\" WHERE \"V\" = 3 AND \"W\" = 42" : "SELECT COUNT(*) FROM TmigLiveB_History WHERE V = 3 AND W = 42"));
+            Assert.True(Scalar(factory!, kind == "postgres" ? "SELECT COUNT(*) FROM \"TmigLiveB_History\"" : "SELECT COUNT(*) FROM TmigLiveB_History") >= 3);
 
             // AsOf spans the migration through the post-migration model.
             var opts2 = new DbContextOptions { OnModelCreating = mb => mb.Entity<RowV2>() };
