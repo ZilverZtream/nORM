@@ -103,4 +103,78 @@ public class IncludeAsOfConsistencyContractTests
         Assert.Equal(new[] { "1:99", "2:20" },
             live.Single().Children.OrderBy(c => c.Id).Select(c => $"{c.Id}:{c.Val}").ToArray());
     }
+
+    [Table("IaocDept")]
+    public class Dept
+    {
+        [Key] public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public List<Emp> Emps { get; set; } = new();
+    }
+
+    [Table("IaocEmp")]
+    public class Emp
+    {
+        [Key] public int Id { get; set; }
+        public int DeptId { get; set; }
+        public Dept? Dept { get; set; }
+    }
+
+    [Fact]
+    public async Task Reference_nav_include_under_as_of_reconstructs_the_principal_era()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var _cn = cn;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE IaocDept (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
+                CREATE TABLE IaocEmp (Id INTEGER PRIMARY KEY, DeptId INTEGER NOT NULL);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Dept>().HasKey(d => d.Id);
+                mb.Entity<Emp>().HasKey(e => e.Id);
+                mb.Entity<Dept>().HasMany(d => d.Emps).WithOne(e => e.Dept!).HasForeignKey(e => e.DeptId, d => d.Id);
+            }
+        };
+        opts.EnableTemporalVersioning();
+        await using var ctx = new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
+
+        async Task<DateTime> ServerNowAsync()
+        {
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "SELECT strftime('%Y-%m-%d %H:%M:%f', 'now')";
+            var text = (string)(await cmd.ExecuteScalarAsync())!;
+            return DateTime.SpecifyKind(DateTime.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.None), DateTimeKind.Utc);
+        }
+
+        var dept = new Dept { Id = 1, Title = "old" };
+        var emp = new Emp { Id = 1, DeptId = 1 };
+        ctx.Add(dept);
+        ctx.Add(emp);
+        await ctx.SaveChangesAsync();
+        await Task.Delay(60);
+        var t1 = await ServerNowAsync();   // dept title is "old"
+        await Task.Delay(60);
+
+        dept.Title = "renamed";            // principal updated after t1
+        await ctx.SaveChangesAsync();
+
+        // The reference-nav eager load must reconstruct the PRINCIPAL at the root's
+        // timestamp: at t1 the department was titled "old", not "renamed".
+        var historic = await ((INormQueryable<Emp>)ctx.Query<Emp>())
+            .Include(e => e.Dept!).AsOf(t1).ToListAsync();
+        Assert.Equal("old", historic.Single().Dept!.Title);
+
+        // Without AsOf the live principal comes back.
+        var live = await ((INormQueryable<Emp>)ctx.Query<Emp>())
+            .Include(e => e.Dept!).ToListAsync();
+        Assert.Equal("renamed", live.Single().Dept!.Title);
+    }
 }
