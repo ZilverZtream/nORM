@@ -186,6 +186,11 @@ the runtime model.
   tables and triggers are generated from the live table's physical column set,
   so the owned child table's history carries the owner key and the owned rows
   at the requested timestamp correlate to their reconstructed owners.
+- `AsOf` requires a constant or captured timestamp at the call site; a compiled
+  query (`Norm.CompileQuery`) cannot take the timestamp as a delegate parameter
+  and fails deterministically. Each distinct `AsOf` timestamp owns its query
+  plan (the timestamp participates in the plan fingerprint), so compiling a
+  temporal query adds nothing — capture the timestamp and query uncompiled.
 
 ## Test Evidence
 
