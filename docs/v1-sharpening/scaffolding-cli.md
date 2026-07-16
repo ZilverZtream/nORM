@@ -28,7 +28,14 @@ recorded in the public-API additions policy.
 
 - [x] The in-proc compile-check suite is green (NH-1001, 798 tests); the suite keeps it green as
       options evolve.
-- [ ] Confirm CLI command surface (`dotnet norm ...`) is stable and documented before API freeze.
+- [x] Confirm CLI command surface (`dotnet norm ...`) is stable and documented before API freeze.
+      (Closed 2026-07-16: `CliCommandSurfaceContractTests` pins the reviewed verb list
+      (scaffold, dbcontext scaffold, database update/drop, portability certify, migrations add)
+      against the CLI sources — a new or renamed verb breaks the test — and cross-checks every
+      invocation against its doc. Gap fixed en route: `norm database update` and
+      `norm database drop` were undocumented; both now have sections in
+      `docs/design-time-migrations.md` including the advisory-lock exactly-once deploy contract
+      and the --yes/--dry-run/protected-name drop gates.)
 - [x] Verify database-drop safety on live providers. (Closed 2026-07-16:
       `LiveProviderDatabaseDropSafetyTests` 10/10 non-vacuous on live SQL Server/PostgreSQL/
       MySQL + SQLite — protected database names refuse the drop on every server, system-schema

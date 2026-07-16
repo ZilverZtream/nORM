@@ -69,6 +69,35 @@ file are also used as dependency candidates, including nested paths such as
 `lib/net8.0/Dependency.dll` or `runtimes/win-x64/native/Native.dll` under the
 deps-file directory and matching assets in the configured/global NuGet package
 cache.
+
+## Applying migrations: `norm database update`
+
+```bash
+norm database update --connection "..." --provider sqlserver --assembly ./bin/Debug/net8.0/App.Migrations.dll
+```
+
+Applies all pending migrations from the assembly to the target database.
+`--connection`, `--provider` (`sqlserver`, `sqlite`, `postgres`, `mysql`, or the
+matching EF Core provider package name), and `--assembly` are all required.
+Concurrent deploys are safe: every runner serializes behind a provider advisory
+lock (`sp_getapplock` / `pg_try_advisory_lock` / `GET_LOCK`), re-reads the
+pending list after acquiring it, and records applied versions in the
+`__NormMigrationsHistory` table, so two deployers applying the same migration
+run it exactly once. When nothing is pending the command reports that and
+exits successfully.
+
+## Resetting a database: `norm database drop`
+
+```bash
+norm database drop --connection "..." --provider postgres --yes
+norm database drop --connection "..." --provider postgres --dry-run
+```
+
+Destructive, built for resetting TEST databases. The command refuses to run
+without `--yes`; `--dry-run` prints what would be dropped without deleting
+anything. Provider-protected system database names (e.g. `master`, `postgres`,
+`mysql`) refuse the drop outright, and system schemas are excluded from table
+enumeration. On SQLite the database file itself is deleted.
 `runtimeOptions.additionalProbingPaths` from the explicit runtimeconfig file,
 and from the matching `.runtimeconfig.dev.json` sibling when present, are used
 as package roots before the configured/global NuGet package cache.
