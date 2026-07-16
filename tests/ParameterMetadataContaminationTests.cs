@@ -199,8 +199,10 @@ public class ParameterMetadataContaminationTests
         object[] numericValues = { (short)1, (byte)2, 3.0f, 4u, 5UL, (sbyte)6, (ushort)7 };
         var expectedTypes = new[]
         {
+            // ulong (5UL) binds as Int64: nORM stores unsigned 64-bit as signed 64-bit for portable
+            // ordering/arithmetic (in-range values map identically; > long.MaxValue fails loud).
             DbType.Int16, DbType.Byte, DbType.Single, DbType.UInt32,
-            DbType.UInt64, DbType.SByte, DbType.UInt16
+            DbType.Int64, DbType.SByte, DbType.UInt16
         };
 
         for (int i = 0; i < numericValues.Length; i++)

@@ -466,7 +466,12 @@ namespace nORM.Providers
                     {
                         var raw = cols[j].Getter(entity);
                         var conv = cols[j].Converter;
-                        values[j] = (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
+                        var val = (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
+                        // Match every other write path's ulong contract (ParameterAssign.ToStorableInt64):
+                        // store as signed 64-bit, failing loud above long.MaxValue rather than staging a
+                        // wrapped value into the bulk-load DataTable.
+                        if (val is ulong ul) val = nORM.Query.ParameterAssign.ToStorableInt64(ul);
+                        values[j] = val;
                     }
 
                     table.Rows.Add(values);

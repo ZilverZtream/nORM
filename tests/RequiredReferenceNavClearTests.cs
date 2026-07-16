@@ -19,6 +19,7 @@ using RelChild = CrudStateMachineFuzzTests.RelChild;
 /// hold null — so the still-valid FK is left intact (the child keeps its principal)
 /// rather than unboxing null into the value-type column and throwing.
 /// </summary>
+[Trait("Category", TestCategory.Fast)]
 public class RequiredReferenceNavClearTests
 {
     private static (Func<DbContext> open, SqliteConnection keeper) MakeRelDb(string dbName)

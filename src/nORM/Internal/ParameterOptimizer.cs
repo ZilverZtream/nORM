@@ -195,6 +195,14 @@ namespace nORM.Internal
                 {
                     param.DbType = DbType.Int64;
                 }
+                else if (valueType == typeof(ulong))
+                {
+                    // See ParameterAssign.ToStorableInt64: ulong has no portable native representation,
+                    // so it is stored as signed 64-bit. Values in range map identically; a value above
+                    // long.MaxValue fails loud rather than wrap to a negative bit pattern.
+                    param.Value = nORM.Query.ParameterAssign.ToStorableInt64((ulong)value);
+                    param.DbType = DbType.Int64;
+                }
                 else if (valueType == typeof(bool))
                 {
                     param.DbType = DbType.Boolean;
@@ -281,6 +289,12 @@ namespace nORM.Internal
                     if (!_typeMap.TryGetValue(underlying, out var enumDbType))
                         enumDbType = DbType.Object;
                     param.DbType = enumDbType;
+                    if (underlying == typeof(ulong))
+                    {
+                        // ulong-backed enum: store as signed 64-bit with the same range guard.
+                        param.Value = nORM.Query.ParameterAssign.ToStorableInt64((ulong)param.Value!);
+                        param.DbType = DbType.Int64;
+                    }
                 }
                 else if (_typeMap.TryGetValue(valueType, out var mappedType))
                 {

@@ -21,6 +21,7 @@ using RelChild = CrudStateMachineFuzzTests.RelChild;
 /// not cascade with the former principal, even though it can linger in the old
 /// parent's navigation collection.
 /// </summary>
+[Trait("Category", TestCategory.Fast)]
 public class CascadeDeleteReparentedChildTests
 {
     private static (Func<DbContext> open, SqliteConnection keeper) MakeRelDb(string dbName)

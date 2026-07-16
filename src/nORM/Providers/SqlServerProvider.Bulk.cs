@@ -497,7 +497,12 @@ namespace nORM.Providers
                 // converter-encoded value, not the raw model value (which read-back would corrupt).
                 var raw = _columns[i].Getter(_current);
                 var conv = _columns[i].Converter;
-                return (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
+                var val = (conv != null ? conv.ConvertToProvider(raw) : raw) ?? DBNull.Value;
+                // Match every other write path's ulong contract (ParameterAssign.ToStorableInt64):
+                // store as signed 64-bit, failing loud above long.MaxValue rather than letting
+                // SqlBulkCopy persist a wrapped value.
+                if (val is ulong ul) val = nORM.Query.ParameterAssign.ToStorableInt64(ul);
+                return val;
             }
 
             /// <summary>

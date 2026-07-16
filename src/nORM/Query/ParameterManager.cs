@@ -231,8 +231,12 @@ namespace nORM.Query
 
             if (type == typeof(ulong))
             {
-                p.DbType = System.Data.DbType.UInt64;
-                p.Value = v;
+                // No provider has a portable native unsigned 64-bit type, so nORM stores ulong as
+                // signed 64-bit. Values in [0, long.MaxValue] round-trip, order, and compute exactly
+                // like a long; a larger value would wrap to a negative bit pattern (silent corruption
+                // and reversed ordering), so it fails loud instead.
+                p.DbType = System.Data.DbType.Int64;
+                p.Value = ToStorableInt64((ulong)v);
                 return;
             }
 
@@ -262,7 +266,7 @@ namespace nORM.Query
                 else if (underlyingType == typeof(short)) p.DbType = System.Data.DbType.Int16;
                 else if (underlyingType == typeof(byte))  p.DbType = System.Data.DbType.Byte;
                 else if (underlyingType == typeof(uint))  p.DbType = System.Data.DbType.UInt32;
-                else if (underlyingType == typeof(ulong)) p.DbType = System.Data.DbType.UInt64;
+                else if (underlyingType == typeof(ulong)) { p.DbType = System.Data.DbType.Int64; converted = ToStorableInt64((ulong)converted); }
                 else if (underlyingType == typeof(sbyte)) p.DbType = System.Data.DbType.SByte;
                 else if (underlyingType == typeof(ushort)) p.DbType = System.Data.DbType.UInt16;
                 p.Value = converted;
@@ -289,6 +293,24 @@ namespace nORM.Query
             }
 
             AssignValue(p, v);
+        }
+
+        /// <summary>
+        /// Converts a <see cref="ulong"/> to the signed 64-bit value nORM stores it as. Values in
+        /// [0, <see cref="long.MaxValue"/>] map identically and behave exactly like a <see cref="long"/>
+        /// for ordering, comparison, and arithmetic. A larger value has no portable signed-64
+        /// representation - it would wrap to a negative bit pattern and reverse ordering - so it throws
+        /// rather than corrupt the column silently. Applied by every write path (parameter binding and
+        /// provider bulk copy) so the range contract is uniform across providers.
+        /// </summary>
+        internal static long ToStorableInt64(ulong v)
+        {
+            if (v > long.MaxValue)
+                throw new nORM.Core.NormUsageException(
+                    $"Cannot store ulong value {v}: nORM stores unsigned 64-bit integers as signed 64-bit " +
+                    $"for portable ordering and arithmetic across providers, so ulong columns support the " +
+                    $"range [0, {long.MaxValue}]. Value {v} exceeds long.MaxValue.");
+            return unchecked((long)v);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

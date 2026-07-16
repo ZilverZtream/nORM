@@ -65,6 +65,10 @@ namespace nORM.Providers
                             var raw = col.Getter(entity);
                             var conv = col.Converter;
                             var val = conv != null ? conv.ConvertToProvider(raw) : raw;
+                            // Match every other write path's ulong contract (ParameterAssign.ToStorableInt64):
+                            // store as signed 64-bit, failing loud above long.MaxValue rather than letting
+                            // the COPY writer persist a wrapped value.
+                            if (val is ulong ul) val = nORM.Query.ParameterAssign.ToStorableInt64(ul);
                             if (val == null) importer.WriteNull();
                             else importer.Write(val);
                         }

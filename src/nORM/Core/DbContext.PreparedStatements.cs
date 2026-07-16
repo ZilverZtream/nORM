@@ -341,7 +341,27 @@ namespace nORM.Core
                 var type = value.GetType();
                 if (type.IsEnum)
                 {
-                    parameter.Value = Convert.ChangeType(value, Enum.GetUnderlyingType(type));
+                    var underlyingValue = Convert.ChangeType(value, Enum.GetUnderlyingType(type));
+                    if (underlyingValue is ulong enumUlong)
+                    {
+                        // ulong-backed enum: store as signed 64-bit with the same range guard.
+                        parameter.DbType = DbType.Int64;
+                        parameter.Value = nORM.Query.ParameterAssign.ToStorableInt64(enumUlong);
+                    }
+                    else
+                    {
+                        parameter.Value = underlyingValue;
+                    }
+                    return;
+                }
+
+                if (value is ulong ulongValue)
+                {
+                    // See ParameterAssign.ToStorableInt64: ulong has no portable native representation,
+                    // so it is stored as signed 64-bit. In-range values map identically; a value above
+                    // long.MaxValue fails loud rather than wrap to a negative bit pattern.
+                    parameter.DbType = DbType.Int64;
+                    parameter.Value = nORM.Query.ParameterAssign.ToStorableInt64(ulongValue);
                     return;
                 }
 
