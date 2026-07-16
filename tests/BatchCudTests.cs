@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -107,7 +107,7 @@ public class BatchCudTests
     [Fact]
     public async Task ExecuteUpdateAsync_inline_string_concat_of_captured_locals_rejected_with_actionable_message()
     {
-        // Inline string concat of two captured locals is a BinaryExpression — not a literal
+        // Inline string concat of two captured locals is a BinaryExpression â€” not a literal
         // value and not a lambda. The translator can't reduce it to either form. Callers
         // should pre-compute (assign to a local first) or use the lambda overload.
         using var cn = new SqliteConnection("Data Source=:memory:");
@@ -137,17 +137,18 @@ public class BatchCudTests
         cn.Open();
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = "CREATE TABLE User(Id INTEGER, Name TEXT, Archived INTEGER);" +
-                             "INSERT INTO User VALUES(1,'A',0);" +
-                             "INSERT INTO User VALUES(2,'B',0);";
+            cmd.CommandText = "CREATE TABLE KeylessAudit(Code INTEGER, Archived INTEGER);" +
+                             "INSERT INTO KeylessAudit VALUES(1,0);" +
+                             "INSERT INTO KeylessAudit VALUES(2,0);";
             cmd.ExecuteNonQuery();
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
 
         // A paged window resolves its target rows through a keyed subquery; an
         // entity with no key columns has no row identity to resolve against.
+        // Genuinely keyless: no [Key] and no name the EF-parity key convention promotes.
         var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
-            ctx.Query<User>().Where(u => !u.Archived).Take(1).ExecuteDeleteAsync());
+            ctx.Query<KeylessAudit>().Where(a => !a.Archived).Take(1).ExecuteDeleteAsync());
 
         Assert.Contains("key columns", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -203,6 +204,13 @@ public class BatchCudTests
         using var check = cn.CreateCommand();
         check.CommandText = "SELECT COUNT(*) FROM User";
         Assert.Equal(1L, Convert.ToInt64(check.ExecuteScalar()));
+    }
+
+    [System.ComponentModel.DataAnnotations.Schema.Table("KeylessAudit")]
+    private class KeylessAudit
+    {
+        public int Code { get; set; }
+        public bool Archived { get; set; }
     }
 
     private static string ThrowingName()

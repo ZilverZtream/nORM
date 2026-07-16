@@ -303,6 +303,18 @@ namespace nORM.Mapping
             Columns = cols.ToArray();
             ColumnsByName = BuildColumnsByName(Columns, t);
 
+            // EF-parity key convention: when no explicit key is configured ([Key]/HasKey), a
+            // property named "Id" - then "<Type>Id" - becomes the primary key, matching the
+            // assembly-driven snapshot builder's convention so the mapper and design-time model
+            // agree. Explicit configuration always wins; prefixed owned/shadow columns never
+            // match (their PropName carries the prefix).
+            if (!Columns.Any(c => c.IsKey))
+            {
+                var conventionKey = Columns.FirstOrDefault(c => string.Equals(c.PropName, "Id", StringComparison.Ordinal))
+                    ?? Columns.FirstOrDefault(c => string.Equals(c.PropName, t.Name + "Id", StringComparison.Ordinal));
+                conventionKey?.MarkAsConventionKey();
+            }
+
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
