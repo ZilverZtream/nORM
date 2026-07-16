@@ -443,8 +443,8 @@ namespace nORM.Query
                 // coercion one arm could yield decimal 10.5 from '10.5' while the other
                 // yields 10.50 from '10.50', producing inconsistent row shapes for the same
                 // logical value). The flag is scoped per-arm via try/finally.
-                var savedCoerce = t._coerceDecimalProjectionsToReal;
-                t._coerceDecimalProjectionsToReal = true;
+                var savedCoerce = t._exactDecimalProjectionKeys;
+                t._exactDecimalProjectionKeys = true;
                 // LINQ set operations compare strings ordinally, but UNION / INTERSECT / EXCEPT
                 // on CI-collation providers (MySQL, SQL Server) dedup and match by the column
                 // collation — merging "abc"/"ABC" in Union, cross-matching them in Intersect/
@@ -467,7 +467,7 @@ namespace nORM.Query
                 }
                 finally
                 {
-                    t._coerceDecimalProjectionsToReal = savedCoerce;
+                    t._exactDecimalProjectionKeys = savedCoerce;
                     t._forceOrdinalStringProjections = savedOrdinal;
                 }
                 var setOp = node.Method.Name switch

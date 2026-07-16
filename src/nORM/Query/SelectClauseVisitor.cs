@@ -44,7 +44,7 @@ namespace nORM.Query
         // Same precision tradeoff as the rest of the decimal-cluster: REAL is
         // IEEE-754 binary, so results are approximate; SqlServer/Postgres/MySQL
         // use native DECIMAL and don't need this coercion.
-        public bool CoerceDecimalProjectionsToReal { get; set; }
+        public bool ExactDecimalProjectionKeys { get; set; }
 
         // When set, string column references in the projection are wrapped with the provider's
         // value-preserving ordinal collation (OrdinalComparableStringProjection) so set-operation
@@ -338,7 +338,7 @@ namespace nORM.Query
             if (_mapping.TryGetColumnForMemberAccess(node, out var col))
             {
                 var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
-                if (CoerceDecimalProjectionsToReal && memberType == typeof(decimal))
+                if (ExactDecimalProjectionKeys && memberType == typeof(decimal))
                 {
                     // Provider hook: SqliteProvider emits the canonical decimal
                     // text, others identity. Decimal projections from set ops /

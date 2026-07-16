@@ -200,17 +200,20 @@ namespace nORM.Query
 
         // Set by SetOperationTranslator before translating each UNION / INTERSECT /
         // EXCEPT arm. SQLite stores decimal as TEXT and the set-op dedup compares
-        // strings, so '10.5' and '10.50' register as distinct rows. Coercing both
-        // arms with CAST(col AS REAL) makes the dedup numeric. Same precision
-        // tradeoff as the rest of the decimal-cluster - see SCV.CoerceDecimalProjectionsToReal.
-        internal bool _coerceDecimalProjectionsToReal;
+        // strings, so scale variants of the same value ('10.5' vs '10.50') would
+        // register as distinct rows. Each arm's decimal projections emit the
+        // provider's ExactDecimalKeySql (canonical decimal text on SQLite), so the
+        // dedup is scale-insensitive AND exact at full 28-digit precision - values
+        // differing beyond double precision stay distinct, and the projected text
+        // still materializes as the exact decimal value. See SCV.ExactDecimalProjectionKeys.
+        internal bool _exactDecimalProjectionKeys;
 
         // Set by SetOperationTranslator around each UNION / INTERSECT / EXCEPT arm when the
         // element type is string on a CI-collation provider: string projections get the
         // value-preserving OrdinalComparableStringProjection wrap so the set-op dedups and
         // matches byte-wise like LINQ. Plain field (not part of the sub-context snapshot) so it
         // flows into TranslateSubExpression, scoped by try/finally at the set site — the exact
-        // pattern _coerceDecimalProjectionsToReal uses.
+        // pattern _exactDecimalProjectionKeys uses.
         internal bool _forceOrdinalStringProjections;
 
         /// <summary>
