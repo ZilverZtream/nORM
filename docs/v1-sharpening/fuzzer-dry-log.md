@@ -11,5 +11,5 @@ Every entry is a REAL run on the stated tree; kills are recorded as loudly as dr
 | 2026-07-16 | LinqParityFuzzTests (env-directed sweep, full shape battery ~1300 cases/seed) | seeds 502000-502199 (200) | DRY |
 | 2026-07-16 | CrudStateMachineFuzzTests (env-directed sweep, all 3 machines/seed) | seeds 602000-602149 (150) | DRY |
 | 2026-07-16 | TemporalHistoryReconstructionFuzzTests (env-directed sweep, 10 rounds/seed) | seeds 702000-702039 (40) | DRY |
-| 2026-07-16 | BulkCudOracleFuzzTests (env-directed sweep, 150 steps/seed) | seeds 802000-802079 (80) | DRY |
-| 2026-07-16 | SqliteMigrationDataPreservationFuzzTests (env-directed sweep, 60 cases/seed) | seeds 902000-902039 (40) | DRY |
+| 2026-07-16 | BulkCudOracleFuzzTests (env-directed sweep, 150 steps/seed) | seeds 802000-802499 (500) | DRY |
+| 2026-07-16 | SqliteMigrationDataPreservationFuzzTests (env-directed sweep, 60 cases/seed) | seeds 902000-902299 (300) | DRY |
