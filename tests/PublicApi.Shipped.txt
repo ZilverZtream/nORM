@@ -1448,6 +1448,7 @@ P:nORM.Migration.TableSchema.CheckConstraints:System.Collections.Generic.List{nO
 P:nORM.Migration.TableSchema.Columns:System.Collections.Generic.List{nORM.Migration.ColumnSchema}
 P:nORM.Migration.TableSchema.ExpressionIndexes:System.Collections.Generic.List{nORM.Migration.ExpressionIndexSchema}
 P:nORM.Migration.TableSchema.ForeignKeys:System.Collections.Generic.List{nORM.Migration.ForeignKeySchema}
+P:nORM.Migration.TableSchema.IsTemporal:System.Boolean
 P:nORM.Migration.TableSchema.Name:System.String
 P:nORM.Navigation.LazyNavigationCollection{`0}.Count:System.Int32
 P:nORM.Navigation.LazyNavigationCollection{`0}.IsReadOnly:System.Boolean

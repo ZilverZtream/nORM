@@ -40,6 +40,8 @@ namespace nORM.Migration
         ///         <c>[Key]</c>-annotated property. The context-based overload only includes types
         ///         explicitly registered with the fluent model builder.</item>
         ///   <item>Does not include foreign key constraints (no fluent Relation metadata available).</item>
+        ///   <item>Cannot see <see cref="DbContextOptions"/>, so <see cref="TableSchema.IsTemporal"/>
+        ///         is never set - temporal-aware migration DDL requires the context overload.</item>
         ///   <item>May produce duplicate <c>TableSchema</c> entries if two entity types share the
         ///         same <c>[Table]</c> name - see the duplicate-name guard for details.</item>
         /// </list>
@@ -234,13 +236,19 @@ namespace nORM.Migration
         public static SchemaSnapshot Build(DbContext ctx)
         {
             ArgumentNullException.ThrowIfNull(ctx);
-            return BuildFromMappings(ctx.GetAllMappings());
+            // Emulated (nORM-managed) temporal storage versions EVERY mapping the temporal
+            // bootstrap sees, so every mapping-level table is flagged for the migration
+            // generators. Provider-native storage propagates schema changes itself and stays
+            // unflagged. The Assembly overload cannot see context options and never flags.
+            var markTemporal = ctx.Options.IsTemporalVersioningEnabled
+                && ctx.Options.TemporalStorageMode != TemporalStorageMode.ProviderNative;
+            return BuildFromMappings(ctx.GetAllMappings(), markTemporal);
         }
 
         /// <summary>
         /// Builds a <see cref="SchemaSnapshot"/> from a set of resolved <see cref="TableMapping"/> instances.
         /// </summary>
-        private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings)
+        private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings, bool markTemporal = false)
         {
             ArgumentNullException.ThrowIfNull(mappings);
 
@@ -252,7 +260,7 @@ namespace nORM.Migration
             var tableByType = new Dictionary<Type, TableSchema>();
             foreach (var map in allMappings)
             {
-                var table = new TableSchema { Name = map.TableName };
+                var table = new TableSchema { Name = map.TableName, IsTemporal = markTemporal };
 
                 // Count PK columns so that composite PKs do not produce per-column UNIQUE constraints.
                 var pkCount = map.Columns.Count(c => c.IsKey);

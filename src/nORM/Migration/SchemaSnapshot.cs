@@ -33,6 +33,15 @@ namespace nORM.Migration
     {
         /// <summary>Name of the table.</summary>
         public string Name { get; set; } = string.Empty;
+        /// <summary>
+        /// True when the table is versioned by nORM-managed (trigger-emulated) temporal storage.
+        /// Populated by <see cref="SchemaSnapshotBuilder.Build(DbContext)"/> when the context has
+        /// temporal versioning enabled in an emulated storage mode. Migration generators mirror
+        /// schema changes onto the table's <c>&lt;Name&gt;_History</c> companion in lock-step and
+        /// re-emit the versioning triggers from the new schema. Provider-native temporal storage
+        /// (e.g. SQL Server system-versioning) propagates schema changes itself and stays unflagged.
+        /// </summary>
+        public bool IsTemporal { get; set; }
         /// <summary>Columns defined on the table.</summary>
         public List<ColumnSchema> Columns { get; init; } = new();
         /// <summary>Foreign key constraints defined on this table.</summary>
