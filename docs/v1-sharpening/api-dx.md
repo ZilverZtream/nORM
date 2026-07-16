@@ -61,5 +61,10 @@ enforce the surface continuously.
 
 ## Risks
 
-The API freeze is a one-way door for 1.0 â€” every deferred decision (key convention, pooling,
-`Set<T>` vs `Query<T>` naming) must be resolved *before* the freeze, not after.
+The API freeze is a one-way door for 1.0 â€” every deferred decision must be resolved *before*
+the freeze, not after. STATUS 2026-07-16: the three decisions this note originally named are
+ALL resolved â€” the key convention shipped (`Id`/`<TypeName>Id`, explicit config wins), pooling
+was evaluated and is API-additive (`AddNormPool` can land post-freeze without breaking
+changes), and `Set<T>` shipped as the `Query<T>` alias. No known API-shape decision blocks the
+freeze; declaring it remains a deliberate product call (alongside the sustained fuzzer dry
+window and real-user evidence RELEASE.md requires).
