@@ -172,6 +172,20 @@ namespace nORM.Query
                 : CommandBehavior.SequentialAccess | CommandBehavior.SingleResult;
 
         /// <summary>
+        /// Resolves the mapping used for owned-collection loading. Owned collections are part
+        /// of the entity's data, not of change tracking, so they must load for UNTRACKED reads
+        /// too (AsNoTracking, NoTracking-default contexts, and every AsOf query, which forces
+        /// no-tracking) — gating the load on the tracking-oriented <paramref name="entityMap"/>
+        /// silently returned owners with empty owned collections on all of those paths.
+        /// </summary>
+        private TableMapping? OwnedRootMapFor(QueryPlan plan, TableMapping? entityMap)
+            => entityMap ?? (plan.ElementType.IsClass
+                && !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal)
+                && _ctx.IsMapped(plan.ElementType)
+                    ? _ctx.GetMapping(plan.ElementType)
+                    : null);
+
+        /// <summary>
         /// Materializes directly into <c>List&lt;object&gt;</c> to avoid covariant copy
         /// when the caller needs <c>List&lt;object&gt;</c> but the plan's ElementType is a concrete type.
         /// </summary>
@@ -229,6 +243,14 @@ namespace nORM.Query
                     IList iList = list;
                     foreach (var m2mPlan in plan.M2MIncludes)
                         await _includeProcessor.LoadManyToManyAsync(m2mPlan, iList, ct, plan.NoTracking).ConfigureAwait(false);
+                }
+
+                // Load owned collections (OwnsMany) — this path serves entity roots too, and an
+                // owner materialized without its owned rows silently reads as empty.
+                var ownedRootMap = OwnedRootMapFor(plan, entityMap);
+                if (ownedRootMap != null && ownedRootMap.OwnedCollections.Count > 0 && list.Count > 0)
+                {
+                    await LoadOwnedCollectionsAsync(list, ownedRootMap, ct, plan.AsOfTimestamp).ConfigureAwait(false);
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
@@ -344,10 +366,12 @@ namespace nORM.Query
                     await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, ct).ConfigureAwait(false);
                 }
 
-                // Load owned collections (OwnsMany) for all materialized entities
-                if (entityMap != null && entityMap.OwnedCollections.Count > 0 && list.Count > 0)
+                // Load owned collections (OwnsMany) for all materialized entities — including
+                // untracked reads, where owned data is still part of the entity.
+                var ownedRootMap = OwnedRootMapFor(plan, entityMap);
+                if (ownedRootMap != null && ownedRootMap.OwnedCollections.Count > 0 && list.Count > 0)
                 {
-                    await LoadOwnedCollectionsAsync(list, entityMap, ct).ConfigureAwait(false);
+                    await LoadOwnedCollectionsAsync(list, ownedRootMap, ct, plan.AsOfTimestamp).ConfigureAwait(false);
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);
@@ -455,9 +479,11 @@ namespace nORM.Query
                 // path, via a truly synchronous loader (no GetAwaiter().GetResult()). Without this a
                 // sync-loaded owner has an EMPTY owned navigation, so a later scalar edit + SaveChanges
                 // DELETE-then-reinserts owned children from that empty nav and permanently loses them.
-                if (entityMap != null && entityMap.OwnedCollections.Count > 0 && list.Count > 0)
+                // Untracked reads load owned data too — it is part of the entity, not of tracking.
+                var ownedRootMapSync = OwnedRootMapFor(plan, entityMap);
+                if (ownedRootMapSync != null && ownedRootMapSync.OwnedCollections.Count > 0 && list.Count > 0)
                 {
-                    LoadOwnedCollections(list, entityMap);
+                    LoadOwnedCollections(list, ownedRootMapSync, plan.AsOfTimestamp);
                 }
 
                 if (plan.PostReverse) ReverseListInPlace(list);

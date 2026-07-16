@@ -169,13 +169,13 @@ namespace nORM.Core
         /// <summary>
         /// Loads owned collection items for all given owner entities using a single IN-query per collection.
         /// </summary>
-        internal async Task LoadOwnedCollectionsAsync(System.Collections.IList owners, TableMapping ownerMap, CancellationToken ct)
+        internal async Task LoadOwnedCollectionsAsync(System.Collections.IList owners, TableMapping ownerMap, CancellationToken ct, DateTime? asOf = null)
         {
             if (ownerMap.KeyColumns.Length == 0 || owners.Count == 0) return;
 
             foreach (var ownedMap in ownerMap.OwnedCollections)
             {
-                var prep = PrepareOwnedCollectionLoad(ownedMap, owners, ownerMap);
+                var prep = PrepareOwnedCollectionLoad(ownedMap, owners, ownerMap, asOf);
                 if (prep == null) continue;
                 var (cmd, ownerByPk, pkCol, fkOrdinal) = prep.Value;
                 try
@@ -215,13 +215,13 @@ namespace nORM.Core
         /// has an empty owned navigation and a later scalar edit + SaveChanges deletes all its owned
         /// children (SaveOwnedCollectionsAsync delete-then-reinserts from that empty nav).
         /// </summary>
-        internal void LoadOwnedCollections(System.Collections.IList owners, TableMapping ownerMap)
+        internal void LoadOwnedCollections(System.Collections.IList owners, TableMapping ownerMap, DateTime? asOf = null)
         {
             if (ownerMap.KeyColumns.Length == 0 || owners.Count == 0) return;
 
             foreach (var ownedMap in ownerMap.OwnedCollections)
             {
-                var prep = PrepareOwnedCollectionLoad(ownedMap, owners, ownerMap);
+                var prep = PrepareOwnedCollectionLoad(ownedMap, owners, ownerMap, asOf);
                 if (prep == null) continue;
                 var (cmd, ownerByPk, pkCol, fkOrdinal) = prep.Value;
                 using (cmd)
@@ -241,7 +241,7 @@ namespace nORM.Core
         /// resolvable key. Shared by the sync and async loaders.
         /// </summary>
         private (DbCommand Cmd, Dictionary<object, object> OwnerByPk, Column PkCol, int FkOrdinal)? PrepareOwnedCollectionLoad(
-            OwnedCollectionMapping ownedMap, System.Collections.IList owners, TableMapping ownerMap)
+            OwnedCollectionMapping ownedMap, System.Collections.IList owners, TableMapping ownerMap, DateTime? asOf = null)
         {
             // Resolve which owner key column this FK references (composite-key aware).
             var pkCol = ResolveOwnerKeyColumnForOwnedFk(ownerMap.KeyColumns, ownedMap.ForeignKeyColumn, ownerMap.Type.Name);
@@ -258,6 +258,36 @@ namespace nORM.Core
             if (ownerByPk.Count == 0) return null;
 
             // SELECT owned cols + fk_col FROM child_table WHERE fk_col IN (@p0, @p1, ...)
+            // Under AsOf the owned rows are part of the reconstructed entity, so they read
+            // through the SAME history window the root query used — the live table would
+            // silently mix eras (or, for rows deleted since, drop history that exists).
+            var fromSource = ownedMap.EscTable;
+            string? asOfParamName = null;
+            if (asOf != null)
+            {
+                asOfParamName = _p.ParamPrefix + "asof";
+                var ownedTypeMap = GetMapping(ownedMap.OwnedType);
+                if (Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
+                {
+                    fromSource = _p.GetProviderNativeTemporalAsOfFromClause(ownedTypeMap, asOfParamName);
+                }
+                else
+                {
+                    var history = _p.Escape(ownedTypeMap.TableName + "_History");
+                    var w = _p.Escape("__ownw");
+                    var windowCols = new StringBuilder();
+                    for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+                    {
+                        if (ci > 0) windowCols.Append(", ");
+                        windowCols.Append(ownedMap.Columns[ci].EscCol);
+                    }
+                    if (ownedMap.Columns.Length > 0) windowCols.Append(", ");
+                    windowCols.Append(ownedMap.EscForeignKeyColumn);
+                    fromSource = $"(SELECT {windowCols} FROM {history} {w} " +
+                        $"WHERE {asOfParamName} >= {w}.{_p.Escape("__ValidFrom")} AND {asOfParamName} < {w}.{_p.Escape("__ValidTo")})";
+                }
+            }
+
             var pks = ownerByPk.Keys.ToArray();
             var sqlBuilder = new StringBuilder();
             sqlBuilder.Append("SELECT ");
@@ -268,7 +298,7 @@ namespace nORM.Core
             }
             if (ownedMap.Columns.Length > 0) sqlBuilder.Append(", ");
             sqlBuilder.Append(ownedMap.EscForeignKeyColumn);
-            sqlBuilder.Append(" FROM ").Append(ownedMap.EscTable)
+            sqlBuilder.Append(" FROM ").Append(fromSource).Append(' ').Append(_p.Escape("__ownt"))
                       .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
             for (int pi = 0; pi < pks.Length; pi++)
             {
@@ -305,6 +335,13 @@ namespace nORM.Core
                 tp.ParameterName = _p.ParamPrefix + "tenantId";
                 tp.Value = GetRequiredTenantId(ownedTenantColLoad, ownedMap.OwnedType, "owned collection load");
                 cmd.Parameters.Add(tp);
+            }
+            if (asOfParamName != null)
+            {
+                var ap = cmd.CreateParameter();
+                ap.ParameterName = asOfParamName;
+                ap.Value = _p.FormatTemporalAsOfParameterValue(asOf!.Value);
+                cmd.Parameters.Add(ap);
             }
 
             // Reset each owner's collection to a fresh empty list before loading so the load is

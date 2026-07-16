@@ -42,7 +42,29 @@ namespace nORM.Configuration
         internal IEntityTypeConfiguration? GetConfiguration(Type type)
         {
             ArgumentNullException.ThrowIfNull(type);
-            return _configurations.TryGetValue(type, out var config) ? config : null;
+            if (_configurations.TryGetValue(type, out var config))
+                return config;
+
+            // A type that appears only as an owned collection has no standalone
+            // Entity<T>() registration. Fall back to the owned navigation's configuration
+            // (which carries the configured child table) so infrastructure resolving a
+            // mapping for the owned type directly — the temporal bootstrap, history-window
+            // reads — targets the configured owned table instead of the CLR-name default.
+            // Ambiguity across owners with DIFFERENT tables keeps the legacy behavior.
+            IEntityTypeConfiguration? found = null;
+            string? foundTable = null;
+            foreach (var ownerConfig in _configurations.Values)
+            {
+                foreach (var nav in ownerConfig.OwnedCollectionNavigations.Values)
+                {
+                    if (nav.OwnedType != type || nav.Configuration == null) continue;
+                    if (foundTable != null && !string.Equals(foundTable, nav.TableName, StringComparison.Ordinal))
+                        return null;
+                    found = nav.Configuration;
+                    foundTable = nav.TableName;
+                }
+            }
+            return found;
         }
 
         /// <summary>

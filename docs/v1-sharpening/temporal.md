@@ -23,6 +23,26 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
 
 ## Open items
 
+- [ ] **Owned-collection temporal history lacks the owner key (follow-up to KILL 45).** The
+      temporal DDL mirrors the property-backed mapping, but the owned child table's FK column
+      exists only physically — so owned history rows cannot be correlated to owners and AsOf
+      cannot reconstruct owned collections. Until the owned history schema (and triggers, all
+      four providers) carries the FK, AsOf over an owner with owned collections FAILS LOUD
+      (deterministic `NormUnsupportedFeatureException`, pinned by
+      `OwnedCollectionUntrackedAndAsOfContractTests`). Implementing the FK-carrying owned
+      history replaces the boundary with true reconstruction.
+- [x] **KILL 45 (found and FIXED 2026-07-16): owned collections were silently EMPTY on every
+      untracked read.** Owned loading was gated on the change-tracking mapping, so
+      AsNoTracking reads, NoTracking-default contexts, and AsOf queries returned owners with
+      empty `OwnsMany` collections while the rows existed; one materialize path
+      (`MaterializeAsObjectListAsync`) never loaded owned rows at all. Fixed by resolving the
+      owned-load mapping from the element type independent of tracking, in all three
+      materialize paths. ALSO fixed en route: the `OwnsMany(tableName:)` override now reaches
+      the owned type's own mapping (via the owned navigation's configuration fallback in
+      `ModelBuilder.GetConfiguration`), so the temporal bootstrap targets the configured child
+      table instead of crashing on the CLR-name default. Pinned by
+      `OwnedCollectionUntrackedAndAsOfContractTests`.
+
 - [x] **KILL 44 (found and FIXED 2026-07-16): `Include` under `AsOf` silently mixed eras.**
       The root query reconstructed history while every eager-loaded relation read the LIVE
       tables (probe: AsOf(t1) truth `[1:10]`, returned `[1:99, 2:20]`). FIX: the query plan

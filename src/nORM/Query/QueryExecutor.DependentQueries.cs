@@ -412,15 +412,16 @@ namespace nORM.Query
 
         /// <summary>
         /// Loads owned collection items for all given owner entities. Delegates to DbContext.
+        /// Under AsOf the owned rows reconstruct through the same history window as the root.
         /// </summary>
-        internal Task LoadOwnedCollectionsAsync(IList owners, TableMapping ownerMap, CancellationToken ct)
-            => _ctx.LoadOwnedCollectionsAsync(owners, ownerMap, ct);
+        internal Task LoadOwnedCollectionsAsync(IList owners, TableMapping ownerMap, CancellationToken ct, DateTime? asOf = null)
+            => _ctx.LoadOwnedCollectionsAsync(owners, ownerMap, ct, asOf);
 
         /// <summary>
         /// Synchronous owned-collection load used by the sync materialize path (which is deliberately
         /// free of GetAwaiter().GetResult()). Delegates to DbContext.
         /// </summary>
-        internal void LoadOwnedCollections(IList owners, TableMapping ownerMap)
-            => _ctx.LoadOwnedCollections(owners, ownerMap);
+        internal void LoadOwnedCollections(IList owners, TableMapping ownerMap, DateTime? asOf = null)
+            => _ctx.LoadOwnedCollections(owners, ownerMap, asOf);
     }
 }

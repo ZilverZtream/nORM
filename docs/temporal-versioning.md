@@ -182,6 +182,11 @@ the runtime model.
   associations onto historical rows. Query the historical entities without the
   many-to-many `Include`, or model the association as a mapped entity if its
   history matters.
+- `AsOf` over an entity that owns collections (`OwnsMany`) also throws
+  `NormUnsupportedFeatureException`: the owned child table's history rows do
+  not carry the owner key, so the owned rows at a past timestamp cannot be
+  correlated to their owners. Model the children as a mapped related entity
+  (with `Include`, which reconstructs correctly) when their history matters.
 
 ## Test Evidence
 

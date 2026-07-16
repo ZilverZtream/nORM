@@ -309,6 +309,13 @@ namespace nORM.Configuration
 
             var childTable = tableName ?? typeof(TOwned).Name;
             var fkCol = foreignKey ?? typeof(TEntity).Name + "Id";
+            // The owned type usually has no standalone Entity<TOwned>() registration, so any
+            // infrastructure that resolves a mapping for it directly (the temporal bootstrap,
+            // history-window reads) would fall back to the CLR-name table and target a table
+            // that does not exist. Record the child table on the owned configuration so the
+            // owned type's own mapping agrees with the owner's navigation.
+            if (ownedBuilder.Configuration.TableName == null)
+                ownedBuilder.ToTable(childTable, schema);
             _config.AddOwnedCollection(prop, new OwnedCollectionNavigation(typeof(TOwned), childTable, fkCol, ownedBuilder.Configuration)
             {
                 SchemaName = schema
