@@ -267,7 +267,15 @@ namespace nORM.Migration
                         continue;
                     }
 
-                    var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
+                    // A NULLABLE added column must carry its declared DEFAULT too - dropping it
+                    // silently diverges the migrated schema from a freshly-created one (the
+                    // CREATE TABLE path and the Down-restore path both emit the default), and new
+                    // inserts would not honour the model's default.
+                    var nullPart = column.IsNullable
+                        ? (!string.IsNullOrEmpty(column.DefaultValue)
+                            ? $"NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
+                            : "NULL")
+                        : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                     up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}");
                 }
                 foreach (var (_, column) in group.Where(g => IsImplicitUniqueColumn(g.Column)))

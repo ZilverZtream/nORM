@@ -258,6 +258,117 @@ public class MigrationBoundaryDataPreservationTests
         }
     }
 
+    [Fact]
+    public void Unique_index_add_enforces_and_drop_removes_with_data_untouched()
+    {
+        using var cn = CreateSeededBaseline(out var before);
+
+        // Up: add a UNIQUE index on U.
+        var target = BuildTable(withExtra: false);
+        target.Columns.Single(c => c.Name == "U").Indexes.Add(
+            new ColumnIndexSchema { Name = "IX_MigBoundary_U", IsUnique = true, Order = 0 });
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false) } },
+            new SchemaSnapshot { Tables = { target } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+
+        AssertSnapshotsEqual(before, Snapshot(cn));   // data untouched by index add
+
+        // The unique constraint is ENFORCED: a duplicate U fails loud.
+        var dup = cn.CreateCommand();
+        dup.CommandText = "INSERT INTO MigBoundary (Dec, Dto, G, S, B, U) VALUES ('1','2020-01-01 00:00:00+00:00','g','s',x'00',9000000000000000000);";
+        Assert.Throws<SqliteException>(() => dup.ExecuteNonQuery());
+
+        // Down: index gone, data untouched.
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+        AssertSnapshotsEqual(before, Snapshot(cn));
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM pragma_index_list('MigBoundary') WHERE name = 'IX_MigBoundary_U';";
+            Assert.Equal(0, Convert.ToInt32(c.ExecuteScalar()));
+        }
+    }
+
+    [Fact]
+    public void Foreign_key_add_enforces_and_drop_relaxes_with_data_untouched()
+    {
+        using var cn = CreateSeededBaseline(out var before);
+        Exec(cn, "PRAGMA foreign_keys = ON;");
+
+        // Child table without an FK, seeded with a row pointing at the existing parent (Id 1).
+        var childNoFk = new TableSchema { Name = "MigBoundaryChild" };
+        childNoFk.Columns.Add(new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true, IsIdentity = true });
+        childNoFk.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName! });
+        var gen = new SqliteMigrationSqlGenerator();
+        Apply(cn, null, gen.GenerateSql(new SchemaDiff { AddedTables = { childNoFk } }).Up, null);
+        Exec(cn, "INSERT INTO MigBoundaryChild (ParentId) VALUES (1);");
+
+        // Up: add the FK (child recreate).
+        var childWithFk = new TableSchema { Name = "MigBoundaryChild" };
+        childWithFk.Columns.Add(new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true, IsIdentity = true });
+        childWithFk.Columns.Add(new ColumnSchema { Name = "ParentId", ClrType = typeof(int).FullName! });
+        childWithFk.ForeignKeys.Add(new ForeignKeySchema
+        {
+            ConstraintName = "FK_MigBoundaryChild_MigBoundary_ParentId",
+            DependentColumns = new[] { "ParentId" },
+            PrincipalTable = "MigBoundary",
+            PrincipalColumns = new[] { "Id" },
+        });
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false), childNoFk } },
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false), childWithFk } });
+        var sql = gen.GenerateSql(diff);
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+
+        AssertSnapshotsEqual(before, Snapshot(cn));   // parent data untouched
+
+        // FK ENFORCED: an orphan insert fails loud.
+        var orphan = cn.CreateCommand();
+        orphan.CommandText = "INSERT INTO MigBoundaryChild (ParentId) VALUES (99999);";
+        Assert.Throws<SqliteException>(() => orphan.ExecuteNonQuery());
+
+        // Down: FK gone - the same orphan insert is allowed; data untouched.
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+        Exec(cn, "INSERT INTO MigBoundaryChild (ParentId) VALUES (99999);");
+        AssertSnapshotsEqual(before, Snapshot(cn));
+    }
+
+    [Fact]
+    public void Default_value_column_add_backfills_and_applies_to_new_inserts()
+    {
+        using var cn = CreateSeededBaseline(out var before);
+
+        // Up: add a nullable column WITH a default.
+        var target = BuildTable(withExtra: false);
+        target.Columns.Add(new ColumnSchema { Name = "Extra", ClrType = typeof(int).FullName!, IsNullable = true, DefaultValue = "42" });
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { BuildTable(withExtra: false) } },
+            new SchemaSnapshot { Tables = { target } });
+        var sql = new SqliteMigrationSqlGenerator().GenerateSql(diff);
+        Apply(cn, sql.PreTransactionUp, sql.Up, sql.PostTransactionUp);
+
+        AssertSnapshotsEqual(before, Snapshot(cn));   // prior columns byte-exact
+
+        // Existing row got the default; a new insert without Extra also honours it.
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM MigBoundary WHERE Extra = 42;";
+            Assert.Equal(1, Convert.ToInt32(c.ExecuteScalar()));
+        }
+        Exec(cn, "INSERT INTO MigBoundary (Dec, Dto, G, S, B, U) VALUES ('2','2021-01-01 00:00:00+00:00','g2','s2',x'01',5);");
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "SELECT COUNT(*) FROM MigBoundary WHERE Extra = 42;";
+            Assert.Equal(2, Convert.ToInt32(c.ExecuteScalar()));
+        }
+
+        // Down: column dropped, original data intact.
+        Exec(cn, "DELETE FROM MigBoundary WHERE Id > 1;");
+        Apply(cn, sql.PreTransactionDown, sql.Down, sql.PostTransactionDown);
+        AssertSnapshotsEqual(before, Snapshot(cn));
+    }
+
     private static string SchemaInfo(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();

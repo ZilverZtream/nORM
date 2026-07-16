@@ -275,7 +275,13 @@ namespace nORM.Migration
                         $"Cannot generate ADD COLUMN '{column.Name}' NOT NULL on table '{table.Name}' without a DefaultValue. " +
                         "Set ColumnSchema.DefaultValue to a SQL literal or make the column nullable.");
 
-                var nullPart = column.IsNullable ? "NULL" : $"NOT NULL DEFAULT {FormatDefaultValue(column)}";
+                // A NULLABLE added column must carry its declared DEFAULT too - dropping it silently
+                // diverges the migrated schema from a freshly-created one and new inserts would not
+                // honour the model's default. (Sister fix in the SQLite/Postgres generators; the
+                // SqlServer generator already applied its inline default clause unconditionally.)
+                var nullPart = column.IsNullable
+                    ? (!string.IsNullOrEmpty(column.DefaultValue) ? $"NULL DEFAULT {FormatDefaultValue(column)}" : "NULL")
+                    : $"NOT NULL DEFAULT {FormatDefaultValue(column)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
             }
