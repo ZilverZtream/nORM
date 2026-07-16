@@ -281,7 +281,7 @@ namespace nORM.Query
                     FastExpressionVisitorPool.Return(visitor);
                     var keyType = Nullable.GetUnderlyingType(keySelector.Body.Type) ?? keySelector.Body.Type;
                     if (keyType == typeof(decimal))
-                        sql = t._provider.NormalizeDecimalForCompare(sql);
+                        sql = t._provider.OrderByDecimalKeySql(sql);
                     result.Add((sql, ascending));
                 }
                 return result;

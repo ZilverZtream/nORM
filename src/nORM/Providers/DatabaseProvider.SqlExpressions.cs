@@ -206,9 +206,22 @@ namespace nORM.Providers
         /// <see cref="NormalizeDecimalForCompare"/> (identity). SQLite stores decimal as TEXT and the
         /// ordinary comparison coercion is CAST AS REAL (IEEE-754, precise only to ~16 significant
         /// digits), so SqliteProvider overrides this to a full-precision decimal collation for ordering.
-        /// Ordering only: arithmetic and aggregation keep <see cref="NormalizeDecimalForCompare"/>.
+        /// Ordering only: arithmetic keeps <see cref="NormalizeDecimalForCompare"/>; aggregation goes
+        /// through <see cref="DecimalAggregateSql"/>.
         /// </summary>
         internal virtual string OrderByDecimalKeySql(string sql) => NormalizeDecimalForCompare(sql);
+
+        /// <summary>
+        /// The complete aggregate-call SQL for a decimal operand (SUM / AVG / MIN / MAX). Server
+        /// providers aggregate the native DECIMAL exactly, so the default emits the plain aggregate
+        /// over <see cref="NormalizeDecimalForCompare"/> (identity there). SQLite stores decimal as
+        /// TEXT and the REAL coercion is IEEE-754 double - a SUM/AVG silently loses precision beyond
+        /// ~16 significant digits and a MIN/MAX can return a value that does not exist in the data -
+        /// so SqliteProvider overrides this with registered full-precision decimal aggregate functions
+        /// and collation-ordered MIN/MAX.
+        /// </summary>
+        internal virtual string DecimalAggregateSql(string sqlFunction, string operandSql, bool distinct = false)
+            => $"{sqlFunction}({(distinct ? "DISTINCT " : string.Empty)}{NormalizeDecimalForCompare(operandSql)})";
 
         /// <summary>
         /// Canonical decimal TEXT for EXACT equality / grouping / dedup on providers

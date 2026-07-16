@@ -690,7 +690,7 @@ namespace nORM.Query
                         // inside ORDER BY expressions.
                         var aliasSql = t._provider.Escape(projectedMember.Member.Name);
                         var aliasType = Nullable.GetUnderlyingType(projectedMember.Type) ?? projectedMember.Type;
-                        if (aliasType == typeof(decimal)) aliasSql = t._provider.NormalizeDecimalForCompare(aliasSql);
+                        if (aliasType == typeof(decimal)) aliasSql = t._provider.OrderByDecimalKeySql(aliasSql);
                         else if (aliasType == typeof(TimeSpan)) aliasSql = t._provider.NormalizeTimeSpanForCompare(aliasSql);
                         else if (aliasType == typeof(DateTimeOffset)) aliasSql = t._provider.NormalizeDateTimeOffsetForCompare(aliasSql);
                         t._orderBy.Add((aliasSql, ascendingAlias));

@@ -924,26 +924,25 @@ namespace nORM.Query
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
 
-            // Mirror the HandleDirectAggregate REAL coercion for decimal
-            // aggregate selectors. SQLite decimal columns are stored as TEXT,
-            // so SUM/AVG/MIN/MAX inherit text storage class and lex-compare
-            // ('10.5' < '2.0'). The same precision tradeoff applies - REAL is
-            // IEEE-754 binary double so aggregate results are approximate;
-            // SqlServer/Postgres/MySQL use native DECIMAL and are unaffected.
+            // Decimal aggregate selectors route through the provider's full-precision hook
+            // (mirrors the top-level paths in QueryTranslator.Aggregates.cs): SQLite uses
+            // registered decimal aggregates / collation-ordered MIN-MAX over the raw TEXT
+            // operand, exact at full precision; providers with native DECIMAL emit the plain
+            // aggregate. AverageAggregateOperand is identity for decimal.
             var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
-            if (selBodyType == typeof(decimal))
-            {
-                columnSql = _provider.NormalizeDecimalForCompare(columnSql);
-            }
+            bool decimalOperand = selBodyType == typeof(decimal);
 
             // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so its
             // provider hook casts integral operands to FLOAT (identity elsewhere). Mirrors the
             // top-level aggregate paths in QueryTranslator.Aggregates.cs.
-            if (sqlAgg == "AVG")
+            if (!decimalOperand && sqlAgg == "AVG")
                 columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
 
             var whereFilter = ExtractAggregateSourceFilter(methodCall);
-            if (whereFilter == null) return $"{sqlAgg}({columnSql})";
+            if (whereFilter == null)
+                return decimalOperand
+                    ? _provider.DecimalAggregateSql(sqlAgg, columnSql)
+                    : $"{sqlAgg}({columnSql})";
 
             // Rebind the filter lambda's parameter onto the selector's parameter so both
             // expressions reference the same group-element alias, then translate the
@@ -952,7 +951,10 @@ namespace nORM.Query
             var reboundBody = new nORM.Internal.ParameterReplacer(whereFilter.Parameters[0], selector.Parameters[0]).Visit(whereFilter.Body)!;
             var reboundFilter = Expression.Lambda(reboundBody, selector.Parameters[0]);
             var predSql = TranslateGroupPredicateBody(reboundFilter, alias);
-            return $"{sqlAgg}(CASE WHEN {predSql} THEN {columnSql} ELSE {unmatchedBranchSql} END)";
+            var caseSql = $"CASE WHEN {predSql} THEN {columnSql} ELSE {unmatchedBranchSql} END";
+            return decimalOperand
+                ? _provider.DecimalAggregateSql(sqlAgg, caseSql)
+                : $"{sqlAgg}({caseSql})";
         }
 
         private LambdaExpression ExpandGroupElementSelector(LambdaExpression selector)

@@ -47,20 +47,23 @@ namespace nORM.Query
             if (!AggregateFunctionMap.TryGetValue(functionName, out var sqlFunction))
                 sqlFunction = functionName.ToUpperInvariant();
 
-            // SQLite stores decimals as TEXT; an uncoerced MIN/MAX lex-compares
-            // mixed-magnitude values. Coerce to REAL like the direct-aggregate path
-            // (identity on providers with native DECIMAL).
+            // Decimal aggregates route through the provider's full-precision hook (registered
+            // decimal aggregates / collation-ordered MIN-MAX on SQLite; the plain native aggregate
+            // on providers with exact DECIMAL). AverageAggregateOperand is identity for decimal.
             var aggBodyType = Nullable.GetUnderlyingType(selectorLambda.Body.Type) ?? selectorLambda.Body.Type;
-            if (aggBodyType == typeof(decimal))
-                columnSql = _provider.NormalizeDecimalForCompare(columnSql);
-
-            // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so its
-            // provider hook casts integral operands to FLOAT (identity elsewhere).
-            if (sqlFunction == "AVG")
-                columnSql = _provider.AverageAggregateOperand(columnSql, selectorLambda.Body.Type);
-
             _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-            _sql.AppendAggregateFunction(sqlFunction, columnSql);
+            if (aggBodyType == typeof(decimal))
+            {
+                _sql.Append(_provider.DecimalAggregateSql(sqlFunction, columnSql));
+            }
+            else
+            {
+                // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so its
+                // provider hook casts integral operands to FLOAT (identity elsewhere).
+                if (sqlFunction == "AVG")
+                    columnSql = _provider.AverageAggregateOperand(columnSql, selectorLambda.Body.Type);
+                _sql.AppendAggregateFunction(sqlFunction, columnSql);
+            }
 
             return node;
         }
@@ -341,16 +344,22 @@ namespace nORM.Query
                     foreach (var kvp in visitor.GetParameters())
                         AddLiteralParameter(kvp.Key, kvp.Value);
                     FastExpressionVisitorPool.Return(visitor);
-                    // See the flat path below: SQLite stores decimals as TEXT, so an
-                    // uncoerced MIN/MAX lex-compares mixed-magnitude values ('-1.5' >
-                    // '-1.0'). Coerce to REAL before aggregating (identity elsewhere).
+                    // See the flat path below: decimal aggregates route through the provider's
+                    // full-precision hook; AverageAggregateOperand is identity for decimal.
                     var selABodyType = Nullable.GetUnderlyingType(selA.Body.Type) ?? selA.Body.Type;
+                    string aggCallA;
                     if (selABodyType == typeof(decimal))
-                        colSql = _provider.NormalizeDecimalForCompare(colSql);
-                    // See HandleAggregate: SQL Server AVG(int) truncates; cast integral operands.
-                    if (aggUpper == "AVG")
-                        colSql = _provider.AverageAggregateOperand(colSql, selA.Body.Type);
-                    _sql.Append("SELECT ").Append(aggUpper).Append('(').Append(colSql).Append(") FROM (")
+                    {
+                        aggCallA = _provider.DecimalAggregateSql(aggUpper, colSql);
+                    }
+                    else
+                    {
+                        // See HandleAggregate: SQL Server AVG(int) truncates; cast integral operands.
+                        if (aggUpper == "AVG")
+                            colSql = _provider.AverageAggregateOperand(colSql, selA.Body.Type);
+                        aggCallA = $"{aggUpper}({colSql})";
+                    }
+                    _sql.Append("SELECT ").Append(aggCallA).Append(" FROM (")
                         .Append(subPlanA.Sql).AppendFragment(") AS ").Append(winAliasA);
                 }
                 return node;
@@ -388,38 +397,29 @@ namespace nORM.Query
                 if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var sqlFunction))
                     sqlFunction = node.Method.Name.ToUpperInvariant();
 
-                // Decimal columns store as TEXT in SQLite; SQL aggregates
-                // inherit storage class so MIN/MAX/SUM/AVG over a decimal
-                // column lex-compares mixed-magnitude values ('10.5' lex >
-                // '2.0'). Coerce to REAL before aggregating so the numeric
-                // semantics apply. CAST(int AS REAL) is identity-with-.0;
-                // non-decimal columns unaffected.
-                //
-                // PRECISION TRADEOFF: REAL is IEEE-754 binary double, so
-                // aggregate results are approximate -- numeric ordering and
-                // comparison are correct for practical magnitudes, but the
-                // returned sum/avg is subject to floating-point rounding
-                // (e.g. 0.01m is not exactly representable in binary, so a
-                // SUM of cents accumulates tiny rounding error). Tests should
-                // assert with tolerance. Exact decimal aggregate semantics on
-                // SQLite require a different storage/aggregate strategy --
-                // the SqlServer/Postgres/MySQL providers use native DECIMAL
-                // and preserve exact semantics without this caveat.
+                // Decimal aggregates route through the provider's full-precision hook: SQLite
+                // (TEXT-stored decimal) uses registered decimal aggregates for SUM/AVG and the
+                // NORM_DECIMAL collation for MIN/MAX, so results are exact at full 28-digit
+                // precision and MIN/MAX always return an actual stored value; providers with
+                // native DECIMAL emit the plain aggregate. AverageAggregateOperand is identity
+                // for decimal.
                 var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
-                if (selBodyType == typeof(decimal))
-                {
-                    columnSql = _provider.NormalizeDecimalForCompare(columnSql);
-                }
-
-                // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so
-                // its provider hook casts integral operands to FLOAT (identity elsewhere).
-                if (sqlFunction == "AVG")
-                    columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
 
                 // Build complete SELECT ... FROM ... so the sql-length guard in Generate()
                 // correctly skips the default SELECT/FROM assembly block.
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
-                _sql.AppendAggregateFunction(sqlFunction, columnSql);
+                if (selBodyType == typeof(decimal))
+                {
+                    _sql.Append(_provider.DecimalAggregateSql(sqlFunction, columnSql));
+                }
+                else
+                {
+                    // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so
+                    // its provider hook casts integral operands to FLOAT (identity elsewhere).
+                    if (sqlFunction == "AVG")
+                        columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
+                    _sql.AppendAggregateFunction(sqlFunction, columnSql);
+                }
                 _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
             }
 

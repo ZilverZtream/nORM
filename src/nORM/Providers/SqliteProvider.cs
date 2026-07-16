@@ -167,9 +167,29 @@ namespace nORM.Providers
         /// (CAST AS REAL, which loses precision beyond ~16 significant digits), this orders by the
         /// registered <see cref="DecimalOrderCollation"/> collation, which parses the canonical decimal
         /// TEXT and compares via <see cref="decimal.Compare"/> at full precision. Ordering only -
-        /// arithmetic and aggregation keep the REAL coercion.
+        /// arithmetic keeps the REAL coercion; aggregation goes through <see cref="DecimalAggregateSql"/>.
         /// </summary>
         internal override string OrderByDecimalKeySql(string sql) => $"({sql}) COLLATE {DecimalOrderCollation}";
+
+        /// <summary>
+        /// Full-precision decimal aggregates. SUM / AVG route to the registered
+        /// <c>norm_decimal_sum</c> / <c>norm_decimal_avg</c> aggregate functions, which accumulate in
+        /// <see cref="decimal"/> and return canonical decimal TEXT (materialized exactly, like a stored
+        /// decimal column). MIN / MAX stay native but compare their TEXT operand through the
+        /// <see cref="DecimalOrderCollation"/> collation, so they pick the true extreme and return an
+        /// actual stored value. Anything else falls back to the base REAL coercion.
+        /// </summary>
+        internal override string DecimalAggregateSql(string sqlFunction, string operandSql, bool distinct = false)
+        {
+            var d = distinct ? "DISTINCT " : string.Empty;
+            return sqlFunction switch
+            {
+                "SUM" => $"norm_decimal_sum({d}{operandSql})",
+                "AVG" => $"norm_decimal_avg({d}{operandSql})",
+                "MIN" or "MAX" => $"{sqlFunction}({d}({operandSql}) COLLATE {DecimalOrderCollation})",
+                _ => base.DecimalAggregateSql(sqlFunction, operandSql, distinct),
+            };
+        }
 
         /// <summary>
         /// Exact decimal key for TEXT-stored decimals: strip trailing fraction zeros
@@ -581,7 +601,40 @@ namespace nORM.Providers
             // significant digits. This collation parses both operands and compares via decimal.Compare
             // at full 28-digit precision. Applied only where OrderByDecimalKeySql emits COLLATE NORM_DECIMAL.
             sqlite.CreateCollation(DecimalOrderCollation, static (x, y) => CompareCanonicalDecimalText(x, y));
+
+            // Full-precision decimal SUM / AVG: the REAL coercion would accumulate in IEEE-754 double,
+            // silently losing precision beyond ~16 significant digits. These aggregates accumulate in
+            // decimal and return canonical decimal TEXT, which materializes exactly like a stored
+            // decimal column. Empty / all-NULL inputs return NULL, matching SQL SUM / AVG semantics
+            // (the query layer's empty-set handling is unchanged). Emitted by DecimalAggregateSql.
+            sqlite.CreateAggregate<string?, (decimal Sum, bool Any), string?>(
+                "norm_decimal_sum",
+                (Sum: 0m, Any: false),
+                static (acc, v) => v is null
+                    ? acc
+                    : (acc.Sum + ParseDecimalAggregateOperand(v), true),
+                static acc => acc.Any ? acc.Sum.ToString(CultureInfo.InvariantCulture) : null,
+                isDeterministic: true);
+            sqlite.CreateAggregate<string?, (decimal Sum, long Count), string?>(
+                "norm_decimal_avg",
+                (Sum: 0m, Count: 0L),
+                static (acc, v) => v is null
+                    ? acc
+                    : (acc.Sum + ParseDecimalAggregateOperand(v), acc.Count + 1),
+                static acc => acc.Count == 0
+                    ? null
+                    : (acc.Sum / acc.Count).ToString(CultureInfo.InvariantCulture),
+                isDeterministic: true);
         }
+
+        /// <summary>
+        /// Parses an aggregate operand for the full-precision decimal aggregates. Stored decimals are
+        /// canonical plain-notation TEXT, but a COMPUTED operand (e.g. <c>Sum(x =&gt; x.Price * x.Qty)</c>)
+        /// arrives as SQLite REAL arithmetic output, whose text form may use exponent notation -
+        /// NumberStyles.Float accepts both.
+        /// </summary>
+        private static decimal ParseDecimalAggregateOperand(string v)
+            => decimal.Parse(v, NumberStyles.Float, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Compares two canonical decimal TEXT values at full precision for the NORM_DECIMAL collation.

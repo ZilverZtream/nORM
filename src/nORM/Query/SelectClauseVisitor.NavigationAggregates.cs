@@ -438,25 +438,26 @@ namespace nORM.Query
                 _ => methodName.ToUpperInvariant()
             };
 
-            // Decimal columns store as TEXT in SQLite; SQL aggregates inherit
-            // storage class so MIN/MAX/SUM/AVG would lex-compare mixed-
-            // magnitude values. Coerce to REAL so the inner aggregate uses
-            // numeric semantics. Sister to HandleDirectAggregate (2002200)
-            // and OrderBy (c8b8c6b) -- same precision-tradeoff caveat
-            // documented at those sites.
+            // Decimal aggregate selectors route through the provider's full-precision hook -
+            // sister to the top-level and grouped aggregate paths. AverageAggregateOperand is
+            // identity for decimal.
             var aggSelType = Nullable.GetUnderlyingType(selectorLambda.Body.Type) ?? selectorLambda.Body.Type;
+            string navAggCall;
             if (aggSelType == typeof(decimal))
             {
-                selectorSql = _provider.NormalizeDecimalForCompare(selectorSql);
+                navAggCall = _provider.DecimalAggregateSql(sqlAgg, selectorSql);
+            }
+            else
+            {
+                // C# Average over ints is a double; SQL Server's AVG(int) truncates (and the truncated
+                // Int32 then fails the double materializer). Same hook as the other aggregate emit
+                // paths: cast integral operands to FLOAT there, identity elsewhere.
+                if (sqlAgg == "AVG")
+                    selectorSql = _provider.AverageAggregateOperand(selectorSql, selectorLambda.Body.Type);
+                navAggCall = $"{sqlAgg}({selectorSql})";
             }
 
-            // C# Average over ints is a double; SQL Server's AVG(int) truncates (and the truncated
-            // Int32 then fails the double materializer). Same hook as the other aggregate emit
-            // paths: cast integral operands to FLOAT there, identity elsewhere.
-            if (sqlAgg == "AVG")
-                selectorSql = _provider.AverageAggregateOperand(selectorSql, selectorLambda.Body.Type);
-
-            sb.Append('(').Append("SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
+            sb.Append('(').Append("SELECT ").Append(navAggCall)
               .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
               .Append(" WHERE ");
             AppendNavigationRelationPredicate(sb, relation, depAlias, _outerAlias);
@@ -638,15 +639,20 @@ namespace nORM.Query
                 _ => "AVG",
             };
             var underlying = Nullable.GetUnderlyingType(operandType) ?? operandType;
+            string scalarAggCall;
             if (underlying == typeof(decimal))
-                head = _provider.NormalizeDecimalForCompare(head);
-            if (aggName == "AVG")
-                head = _provider.AverageAggregateOperand(head, operandType);
+            {
+                // Full-precision decimal hook - sister to the other aggregate emit paths.
+                scalarAggCall = _provider.DecimalAggregateSql(aggName, head, distinct);
+            }
+            else
+            {
+                if (aggName == "AVG")
+                    head = _provider.AverageAggregateOperand(head, operandType);
+                scalarAggCall = $"{aggName}({(distinct ? "DISTINCT " : string.Empty)}{head})";
+            }
 
-            sb.Append("(SELECT ").Append(aggName).Append('(');
-            if (distinct)
-                sb.Append("DISTINCT ");
-            sb.Append(head).Append(')').Append(tail).Append(')');
+            sb.Append("(SELECT ").Append(scalarAggCall).Append(tail).Append(')');
             return true;
         }
 
