@@ -11,7 +11,6 @@ namespace nORM.Core
     /// </summary>
     public static partial class NormValidator
     {
-        private const int MaxEntityDepth = 10;
         private const int MaxCollectionSize = 10000;
         private const int MaxBulkOperationSize = 50000;
         private const int MaxParameterCount = 2000;

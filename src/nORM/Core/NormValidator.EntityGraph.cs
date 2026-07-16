@@ -90,15 +90,21 @@ namespace nORM.Core
 
         private static void ValidateEntityGraph(object rootEntity, HashSet<object> visited, string rootPath)
         {
-            var stack = new Stack<(object Entity, int Depth, string Path)>();
-            stack.Push((rootEntity, 0, rootPath));
+            // Termination is structurally guaranteed WITHOUT a depth limit: every entity is
+            // processed at most once (the reference-equality visited set), and collections are
+            // only reached through their owning entities, so the walk is bounded by the live
+            // object graph. A depth cap here was a false-positive tripwire: nORM's own
+            // relationship fixup deliberately leaves stale collection membership behind when a
+            // child is re-parented (see the cascade-delete work), so a long-running tracked
+            // graph legitimately develops chains of DISTINCT parent/child instances longer
+            // than any fixed cap - and Remove/Add on such a graph would crash despite the
+            // graph being finite and cycle-safe.
+            var stack = new Stack<(object Entity, string Path)>();
+            stack.Push((rootEntity, rootPath));
 
             while (stack.Count > 0)
             {
-                var (entity, depth, path) = stack.Pop();
-
-                if (depth > MaxEntityDepth)
-                    throw new ArgumentException($"Entity graph exceeds maximum depth of {MaxEntityDepth} at {path}");
+                var (entity, path) = stack.Pop();
 
                 // Check if the popped entity itself is IEnumerable to validate nested collections.
                 if (entity is IEnumerable enumerable && entity is not string)
@@ -112,8 +118,7 @@ namespace nORM.Core
                         var itemType = item.GetType();
                         if (itemType.IsClass && itemType != typeof(string))
                         {
-                            // Increment depth for collection items to count them as a deeper level in the graph
-                            stack.Push((item, depth + 1, $"{path}[{itemType.Name}]"));
+                            stack.Push((item, $"{path}[{itemType.Name}]"));
                         }
                     }
                     continue;
@@ -140,7 +145,7 @@ namespace nORM.Core
 
                     // Push all non-null class values to stack for validation
                     // IEnumerable check will happen when item is popped
-                    stack.Push((value, depth + 1, propPath));
+                    stack.Push((value, propPath));
                 }
             }
         }

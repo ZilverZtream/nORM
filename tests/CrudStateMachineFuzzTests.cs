@@ -437,6 +437,7 @@ public class CrudStateMachineFuzzTests
     [InlineData(31337)]
     [InlineData(600023)]
     [InlineData(600332)]
+    [InlineData(602775)]
     public async Task Random_relationship_mutations_match_the_committed_model(int seed)
     {
         var dbName = $"relfuzz_{seed}_{Guid.NewGuid():N}";
