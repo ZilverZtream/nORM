@@ -50,7 +50,7 @@ public class BulkOperationProviderCoverageTests
         public override string GenerateCreateHistoryTableSql(TableMapping mapping,
             IReadOnlyList<DatabaseProvider.LiveColumnInfo>? liveColumns = null)
             => _inner.GenerateCreateHistoryTableSql(mapping, liveColumns);
-        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, System.Collections.Generic.IReadOnlyList<LiveColumnInfo>? liveColumns = null)
             => _inner.GenerateTemporalTriggersSql(mapping);
 
         // Expose ExecuteBulkOperationAsync for testing

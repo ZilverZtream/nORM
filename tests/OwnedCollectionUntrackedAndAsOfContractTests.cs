@@ -100,14 +100,11 @@ public class OwnedCollectionUntrackedAndAsOfContractTests
         var liveNt = (await ((INormQueryable<Post>)ctx.Query<Post>()).AsNoTracking().OrderBy(p => p.Title).ToListAsync()).Single();
         Assert.Equal(new[] { "v2", "extra" }, liveNt.Lines.OrderBy(l => l.Id).Select(l => l.Text).ToArray());
 
-        // AsOf over an owner with owned collections FAILS LOUD: the owned history rows do
-        // not carry the owner FK (the FK exists only in the physical child table, not in
-        // the property-backed mapping the temporal DDL mirrors), so the owned rows at t1
-        // cannot be correlated to owners — silently returning empty or era-mixed
-        // collections would be a wrong result. (Carrying the owner key in owned history
-        // is the tracked follow-up that will replace this boundary with reconstruction.)
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Post>().AsOf(t1).ToListAsync());
-        Assert.Contains("owned", ex.Message, StringComparison.OrdinalIgnoreCase);
+        // AsOf reconstructs the owned rows through the SAME history window as the owner:
+        // the temporal DDL builds history tables and triggers from the INTROSPECTED
+        // physical column set, so the owned history carries the owner FK and the rows at
+        // t1 correlate to their owners — exactly one line with the era's value.
+        var historic = (await ctx.Query<Post>().AsOf(t1).ToListAsync()).Single();
+        Assert.Equal(new[] { "v1" }, historic.Lines.OrderBy(l => l.Id).Select(l => l.Text).ToArray());
     }
 }

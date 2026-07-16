@@ -144,7 +144,7 @@ public sealed class ProviderCapabilitiesTests
         public override string GenerateCreateHistoryTableSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
             => string.Empty;
 
-        public override string GenerateTemporalTriggersSql(TableMapping mapping) => string.Empty;
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, System.Collections.Generic.IReadOnlyList<LiveColumnInfo>? liveColumns = null) => string.Empty;
 
         protected override Task<string?> GetServerVersionStringAsync(DbConnection connection, CancellationToken ct)
             => Task.FromResult<string?>(_versionText);

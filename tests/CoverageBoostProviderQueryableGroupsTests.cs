@@ -146,7 +146,7 @@ file sealed class MinimalTestProvider : DatabaseProvider
     public override string GenerateCreateHistoryTableSql(TableMapping mapping,
         IReadOnlyList<LiveColumnInfo>? liveColumns = null) => "";
 
-    public override string GenerateTemporalTriggersSql(TableMapping mapping) => "";
+    public override string GenerateTemporalTriggersSql(TableMapping mapping, System.Collections.Generic.IReadOnlyList<LiveColumnInfo>? liveColumns = null) => "";
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -577,18 +577,6 @@ namespace nORM.Query
                         "association table is not versioned, so the association membership at the " +
                         "requested timestamp is unknown. Query the historical entities without the " +
                         "many-to-many Include.");
-                // Owned-collection history rows do not carry the owner FK column (the FK exists
-                // only in the physical child table, not in the property-backed mapping the
-                // temporal DDL mirrors), so owned rows cannot be correlated to owners at a past
-                // timestamp — a reconstruction would silently return empty or era-mixed
-                // collections. Fail loud until owned temporal history includes the owner key.
-                if (_t._asOfTimestamp.HasValue && !isScalar && _t._mapping.OwnedCollections.Count > 0)
-                    throw new NormUnsupportedFeatureException(
-                        $"AsOf cannot reconstruct entity '{_t._mapping.Type.Name}': its owned " +
-                        "collections are stored in child tables whose history does not carry the " +
-                        "owner key, so the owned rows at the requested timestamp cannot be " +
-                        "correlated to their owners. Project the owner's scalar columns instead, " +
-                        "or query a type without owned collections.");
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }

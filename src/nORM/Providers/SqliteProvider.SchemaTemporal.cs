@@ -99,20 +99,21 @@ namespace nORM.Providers
         public override string GenerateCreateHistoryTableSql(
             TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
-            var liveMap = liveColumns?
-                .ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase)
-                ?? new Dictionary<string, LiveColumnInfo>(0);
-
-            var columns = string.Join(",\n                ", mapping.Columns.Select(c =>
-            {
-                if (liveMap.TryGetValue(c.Name, out var live))
-                    return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                // History rows copy the main table's converter-encoded values, so the
-                // fallback types by the PROVIDER representation.
-                var sqlType = GetSqliteType(c.Converter?.ProviderType ?? c.Prop.PropertyType);
-                var nullability = IsNullableOrReferenceType(c.Prop.PropertyType) ? "" : " NOT NULL";
-                return $"{Escape(c.Name)} {sqlType}{nullability}";
-            }));
+            // Prefer the INTROSPECTED physical column set: the live table can carry columns
+            // that exist only physically (an owned collection's FK, a raw ADD COLUMN), and a
+            // history table missing them loses data or makes owned rows uncorrelatable to
+            // their owners at a past timestamp. The mapping set is the offline fallback.
+            var columns = liveColumns is { Count: > 0 }
+                ? string.Join(",\n                ", liveColumns.Select(live =>
+                    $"{Escape(live.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}"))
+                : string.Join(",\n                ", mapping.Columns.Select(c =>
+                {
+                    // History rows copy the main table's converter-encoded values, so the
+                    // fallback types by the PROVIDER representation.
+                    var sqlType = GetSqliteType(c.Converter?.ProviderType ?? c.Prop.PropertyType);
+                    var nullability = IsNullableOrReferenceType(c.Prop.PropertyType) ? "" : " NOT NULL";
+                    return $"{Escape(c.Name)} {sqlType}{nullability}";
+                }));
             return @$"CREATE TABLE IF NOT EXISTS {Escape(mapping.TableName + "_History")} (
                 __VersionId INTEGER PRIMARY KEY AUTOINCREMENT,
                 __ValidFrom TEXT NOT NULL,
@@ -135,13 +136,16 @@ namespace nORM.Providers
         /// migration that reshapes a temporal table re-emits IDENTICAL triggers from the new schema.
         /// </summary>
         /// <param name="mapping">The mapping describing the source table.</param>
+        /// <param name="liveColumns">Live physical column info from the main table, or null to use the mapped set.</param>
         /// <returns>DDL statements creating the triggers.</returns>
-        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             var statements = SqliteTemporalDdl.BuildTriggersSql(
                 Escape,
                 mapping.TableName,
-                mapping.Columns.Select(c => c.Name).ToArray(),
+                liveColumns is { Count: > 0 }
+                    ? liveColumns.Select(c => c.Name).ToArray()
+                    : mapping.Columns.Select(c => c.Name).ToArray(),
                 mapping.KeyColumns.Select(c => c.Name).ToArray(),
                 mapping.TenantColumn?.Name);
             return "\n" + string.Join("\n\n", statements);

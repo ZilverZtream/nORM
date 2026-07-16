@@ -112,18 +112,18 @@ ALTER TABLE {table} MODIFY COLUMN {tsCol} DATETIME(6) NOT NULL";
             TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             var historyTable = Escape(mapping.TableName + "_History");
-            var liveMap = liveColumns?
-                .ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase)
-                ?? new Dictionary<string, LiveColumnInfo>(0);
-
-            var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
-            {
-                if (liveMap.TryGetValue(c.Name, out var live))
-                    return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                // History rows copy the main table's converter-encoded values, so the
-                // fallback types by the PROVIDER representation.
-                return $"{Escape(c.Name)} {GetSqlType(c.Converter?.ProviderType ?? c.Prop.PropertyType)}";
-            }));
+            // Prefer the INTROSPECTED physical column set: the live table can carry columns
+            // that exist only physically (an owned collection's FK, a raw ADD COLUMN), and a
+            // history table missing them loses data. The mapping set is the offline fallback.
+            var columns = liveColumns is { Count: > 0 }
+                ? string.Join(",\n    ", liveColumns.Select(live =>
+                    $"{Escape(live.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}"))
+                : string.Join(",\n    ", mapping.Columns.Select(c =>
+                {
+                    // History rows copy the main table's converter-encoded values, so the
+                    // fallback types by the PROVIDER representation.
+                    return $"{Escape(c.Name)} {GetSqlType(c.Converter?.ProviderType ?? c.Prop.PropertyType)}";
+                }));
 
             return $@"
 CREATE TABLE {historyTable} (
@@ -138,14 +138,16 @@ CREATE TABLE {historyTable} (
         /// <summary>
         /// Generates the SQL needed to create triggers that populate the temporal history table.
         /// </summary>
-        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             // DDL text lives in MySqlTemporalDdl, shared with the migration generator so a
             // migration that reshapes a temporal table re-emits identical triggers.
             var statements = MySqlTemporalDdl.BuildTriggerStatements(
                 Escape,
                 mapping.TableName,
-                mapping.Columns.Select(c => c.Name).ToArray(),
+                liveColumns is { Count: > 0 }
+                    ? liveColumns.Select(c => c.Name).ToArray()
+                    : mapping.Columns.Select(c => c.Name).ToArray(),
                 mapping.KeyColumns.Select(c => c.Name).ToArray(),
                 mapping.TenantColumn?.Name);
             return "\n" + string.Join("\n-- DELIMITER\n", statements);

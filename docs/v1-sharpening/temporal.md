@@ -23,14 +23,17 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
 
 ## Open items
 
-- [ ] **Owned-collection temporal history lacks the owner key (follow-up to KILL 45).** The
-      temporal DDL mirrors the property-backed mapping, but the owned child table's FK column
-      exists only physically — so owned history rows cannot be correlated to owners and AsOf
-      cannot reconstruct owned collections. Until the owned history schema (and triggers, all
-      four providers) carries the FK, AsOf over an owner with owned collections FAILS LOUD
-      (deterministic `NormUnsupportedFeatureException`, pinned by
-      `OwnedCollectionUntrackedAndAsOfContractTests`). Implementing the FK-carrying owned
-      history replaces the boundary with true reconstruction.
+- [x] **Owned-collection temporal history carries the physical column set (follow-up to KILL
+      45, CLOSED).** The temporal DDL (history tables AND triggers, all four providers) is now
+      built from the INTROSPECTED live physical column set instead of the property-backed
+      mapping — covering the owned child table's FK column and any other physical-only column,
+      so history is strictly more faithful. AsOf over an owner with owned collections now
+      RECONSTRUCTS the owned rows through the same history window as the owner (the interim
+      fail-loud boundary was removed the same day it was added). Pinned by
+      `OwnedCollectionUntrackedAndAsOfContractTests` (era-consistent `[v1]`). Note: history
+      tables created before this change lack physical-only columns; regenerated triggers
+      referencing them fail loud rather than writing incomplete history (pre-1.0, no
+      compatibility promise).
 - [x] **KILL 45 (found and FIXED 2026-07-16): owned collections were silently EMPTY on every
       untracked read.** Owned loading was gated on the change-tracking mapping, so
       AsNoTracking reads, NoTracking-default contexts, and AsOf queries returned owners with

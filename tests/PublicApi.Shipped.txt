@@ -714,7 +714,7 @@ M:nORM.Providers.DatabaseProvider.GenerateCreateHistoryTableSql(nORM.Mapping.Tab
 M:nORM.Providers.DatabaseProvider.GenerateDropNativeTenantPolicySql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.DatabaseProvider.GenerateNativeTenantPolicySql(nORM.Mapping.TableMapping,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GenerateProviderNativeTemporalBootstrapSql(nORM.Mapping.TableMapping):System.String
-M:nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.DatabaseProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.DatabaseProvider.GetBitwiseXorSql(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.GetCharCodeSql(System.String):System.String
@@ -807,7 +807,7 @@ M:nORM.Providers.MySqlProvider.ForceCaseSensitiveStringComparison(System.String)
 M:nORM.Providers.MySqlProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
 M:nORM.Providers.MySqlProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
-M:nORM.Providers.MySqlProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.MySqlProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.MySqlProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetCreateTagSql(System.String,System.String):System.String
@@ -864,7 +864,7 @@ M:nORM.Providers.PostgresProvider.FormatFixedDecimalSql(System.String,System.Int
 M:nORM.Providers.PostgresProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.PostgresProvider.GenerateDropNativeTenantPolicySql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.PostgresProvider.GenerateNativeTenantPolicySql(nORM.Mapping.TableMapping,System.String):System.String
-M:nORM.Providers.PostgresProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.PostgresProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.PostgresProvider.GetBitwiseXorSql(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.PostgresProvider.GetCharFromCodeSql(System.String):System.String
@@ -927,7 +927,7 @@ M:nORM.Providers.SqlServerProvider.GenerateCreateHistoryTableSql(nORM.Mapping.Ta
 M:nORM.Providers.SqlServerProvider.GenerateDropNativeTenantPolicySql(nORM.Mapping.TableMapping):System.String
 M:nORM.Providers.SqlServerProvider.GenerateNativeTenantPolicySql(nORM.Mapping.TableMapping,System.String):System.String
 M:nORM.Providers.SqlServerProvider.GenerateProviderNativeTemporalBootstrapSql(nORM.Mapping.TableMapping):System.String
-M:nORM.Providers.SqlServerProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.SqlServerProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.SqlServerProvider.GetBoolCastSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetCharCodeSql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.GetCreateTagSql(System.String,System.String):System.String
@@ -989,7 +989,7 @@ M:nORM.Providers.SqliteProvider.FormatDateUsingDotNetPattern(System.String,Syste
 M:nORM.Providers.SqliteProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
 M:nORM.Providers.SqliteProvider.FormatTemporalAsOfParameterValue(System.DateTime):System.Object
 M:nORM.Providers.SqliteProvider.GenerateCreateHistoryTableSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
-M:nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping):System.String
+M:nORM.Providers.SqliteProvider.GenerateTemporalTriggersSql(nORM.Mapping.TableMapping,System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}):System.String
 M:nORM.Providers.SqliteProvider.GetBitwiseXorSql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetConcatSql(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.GetCreateTagSql(System.String,System.String):System.String

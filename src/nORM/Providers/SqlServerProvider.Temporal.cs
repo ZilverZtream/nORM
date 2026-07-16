@@ -132,19 +132,19 @@ ORDER BY c.ORDINAL_POSITION";
             TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             var historyTable = Escape(mapping.TableName + "_History");
-            var liveMap = liveColumns?
-                .ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase)
-                ?? new Dictionary<string, LiveColumnInfo>(0);
-
-            var columns = string.Join(",\n    ", mapping.Columns.Select(c =>
-            {
-                if (liveMap.TryGetValue(c.Name, out var live))
-                    return $"{Escape(c.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}";
-                // History rows copy the main table's converter-encoded values, so the
-                // fallback types by the PROVIDER representation.
-                var sqlType = GetSqlType(c.Converter?.ProviderType ?? c.Prop.PropertyType);
-                return $"{Escape(c.Name)} {sqlType}";
-            }));
+            // Prefer the INTROSPECTED physical column set: the live table can carry columns
+            // that exist only physically (an owned collection's FK, a raw ADD COLUMN), and a
+            // history table missing them loses data. The mapping set is the offline fallback.
+            var columns = liveColumns is { Count: > 0 }
+                ? string.Join(",\n    ", liveColumns.Select(live =>
+                    $"{Escape(live.Name)} {live.SqlType}{(live.IsNullable ? "" : " NOT NULL")}"))
+                : string.Join(",\n    ", mapping.Columns.Select(c =>
+                {
+                    // History rows copy the main table's converter-encoded values, so the
+                    // fallback types by the PROVIDER representation.
+                    var sqlType = GetSqlType(c.Converter?.ProviderType ?? c.Prop.PropertyType);
+                    return $"{Escape(c.Name)} {sqlType}";
+                }));
 
             return $@"CREATE TABLE {historyTable} (
     {Escape("__VersionId")} BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -159,15 +159,18 @@ ORDER BY c.ORDINAL_POSITION";
         /// Generates SQL Server triggers that maintain the temporal history table.
         /// </summary>
         /// <param name="mapping">The mapping describing the target table.</param>
+        /// <param name="liveColumns">Live physical column info from the main table, or null to use the mapped set.</param>
         /// <returns>DDL statements creating the temporal triggers.</returns>
-        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
         {
             // DDL text lives in SqlServerTemporalDdl, shared with the migration generator so a
             // migration that reshapes a temporal table re-emits identical triggers.
             var statements = SqlServerTemporalDdl.BuildTriggerStatements(
                 Escape,
                 mapping.TableName,
-                mapping.Columns.Select(c => c.Name).ToArray(),
+                liveColumns is { Count: > 0 }
+                    ? liveColumns.Select(c => c.Name).ToArray()
+                    : mapping.Columns.Select(c => c.Name).ToArray(),
                 mapping.KeyColumns.Select(c => c.Name).ToArray(),
                 mapping.TenantColumn?.Name);
             // Each statement must run in its own batch (CREATE TRIGGER must lead a batch).

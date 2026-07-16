@@ -198,7 +198,7 @@ public class BulkOperationCancellationTests
         public override string GenerateCreateHistoryTableSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
             => throw new NotSupportedException();
 
-        public override string GenerateTemporalTriggersSql(TableMapping mapping)
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, System.Collections.Generic.IReadOnlyList<LiveColumnInfo>? liveColumns = null)
             => throw new NotSupportedException();
     }
 }

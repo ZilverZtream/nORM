@@ -40,7 +40,7 @@ public class BulkInsertTests
 
         public override string GenerateCreateHistoryTableSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null) => throw new NotImplementedException();
 
-        public override string GenerateTemporalTriggersSql(TableMapping mapping) => throw new NotImplementedException();
+        public override string GenerateTemporalTriggersSql(TableMapping mapping, System.Collections.Generic.IReadOnlyList<LiveColumnInfo>? liveColumns = null) => throw new NotImplementedException();
 
         protected override void ValidateConnection(DbConnection connection)
         {

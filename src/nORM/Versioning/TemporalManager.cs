@@ -49,17 +49,21 @@ namespace nORM.Versioning
                 }
                 else
                 {
+                    // Introspect the LIVE physical column set before generating any temporal DDL:
+                    // it mirrors custom precision/length AND covers columns that exist only
+                    // physically (an owned collection's foreign key, a raw ADD COLUMN) — history
+                    // tables and triggers built from the mapped property set alone would silently
+                    // omit those values, making owned rows uncorrelatable at a past timestamp.
+                    var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
+                        .ConfigureAwait(false);
+
                     if (!await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
                     {
-                        // Introspect live column types before generating history DDL so that
-                        // custom precision/length on main-table columns is mirrored in history table.
-                        var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
-                            .ConfigureAwait(false);
                         var createHistoryTableSql = context.RawProvider.GenerateCreateHistoryTableSql(mapping, liveColumns);
                         await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
                     }
 
-                    var createTriggersSql = context.RawProvider.GenerateTemporalTriggersSql(mapping);
+                    var createTriggersSql = context.RawProvider.GenerateTemporalTriggersSql(mapping, liveColumns);
                     await ExecuteDdlAsync(context, conn, createTriggersSql, ct).ConfigureAwait(false);
                 }
             }

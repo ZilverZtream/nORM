@@ -56,10 +56,15 @@ namespace nORM.Providers
 
         /// <summary>
         /// Generates the SQL required to create triggers for maintaining the temporal history table.
+        /// When <paramref name="liveColumns"/> is supplied, the trigger column list is taken from
+        /// the live physical schema — the table can carry columns that exist only physically (an
+        /// owned collection's foreign key, a raw ADD COLUMN), and triggers built from the mapped
+        /// property set alone would silently omit their values from history.
         /// </summary>
         /// <param name="mapping">The table mapping representing the entity.</param>
+        /// <param name="liveColumns">Live column info from the main table, or null to use the mapped set.</param>
         /// <returns>The SQL script containing the trigger definitions.</returns>
-        public abstract string GenerateTemporalTriggersSql(TableMapping mapping);
+        public abstract string GenerateTemporalTriggersSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null);
 
         /// <summary>
         /// Gets whether this provider can use database-native temporal tables for
