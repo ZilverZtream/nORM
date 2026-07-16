@@ -1,4 +1,4 @@
-# Domain 9 — Resilience & concurrency
+﻿# Domain 9 â€” Resilience & concurrency
 
 **Scope:** transient-failure retry, retry-write invariants, and optimistic concurrency control
 (`[Timestamp]`/rowversion) across batched, direct, and bulk writes.
@@ -21,7 +21,7 @@
 ## Current confidence
 
 Strong. `[Timestamp]` OCC was silently losing updates; nORM now client-manages the token across
-all write shapes on all providers — fully closed. The OCC oracle itself was corrected to treat
+all write shapes on all providers â€” fully closed. The OCC oracle itself was corrected to treat
 value-unchanged mutations as non-writes (a version oracle must not count no-ops as conflicts).
 
 ## Open items
@@ -31,6 +31,10 @@ value-unchanged mutations as non-writes (a version oracle must not count no-ops 
 - [x] Explicit fault-injection tests for the retry-write invariants exist and pass (NH-0901,
       `SaveChangesFaultInjectionAtomicity`).
 - [ ] Verify deadlock-resilient path on live SQL Server.
+- [x] Read-path retry interplay (NH-0902): read retries were DEAD CODE - NormException wrapping
+      defeated the retry strategy filter and the fast path bypassed the strategy entirely; both
+      fixed and the retry-x-cache, idempotence, fail-loud, and timeout-wiring contracts pinned
+      (`ResilienceRetryCacheContractTests`, `ResilienceFailLoudAndTimeoutContractTests`).
 
 ## Verification
 
@@ -41,4 +45,4 @@ value-unchanged mutations as non-writes (a version oracle must not count no-ops 
 ## Risks
 
 A version/OCC oracle must treat value-unchanged mutations as non-writes, or it manufactures false
-conflicts. Retrying past commit-attempted is silent data loss — the invariant is absolute.
+conflicts. Retrying past commit-attempted is silent data loss â€” the invariant is absolute.
