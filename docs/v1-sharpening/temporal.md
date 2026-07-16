@@ -23,15 +23,18 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
 
 ## Open items
 
-- [ ] **KILL 44 (found 2026-07-16 by adversarial probe, fix in progress): `Include` under
-      `AsOf` silently mixes eras.** The root query reconstructs history, but every eager-loaded
-      relation reads the LIVE tables: one-to-many children come back with post-timestamp values
-      and post-timestamp rows (probe: AsOf(t1) truth `[1:10]`, returned `[1:99, 2:20]`), and
-      M2M includes read the live association table (which has no history at all - raw table,
-      no mapping). Fix shape: the plan must carry the AsOf timestamp; the include pipeline
-      substitutes the history-window derived table for temporal mappings (same rewrite the
-      root FROM gets); M2M + AsOf fails loud until association-table versioning is a product
-      decision. Probes held locally until the fix lands (they will become the contract tests).
+- [x] **KILL 44 (found and FIXED 2026-07-16): `Include` under `AsOf` silently mixed eras.**
+      The root query reconstructed history while every eager-loaded relation read the LIVE
+      tables (probe: AsOf(t1) truth `[1:10]`, returned `[1:99, 2:20]`). FIX: the query plan
+      now carries the AsOf timestamp (safe to bake — `AsOf()` embeds the timestamp as an
+      expression constant, so each timestamp gets its own cached plan), and the eager-load
+      pipeline reads every include level through the SAME history window the root FROM uses
+      (emulated derived table or the provider-native clause), including the nested EXISTS
+      levels of multi-hop includes. Many-to-many + AsOf now FAILS LOUD at translation — the
+      association table is raw and unversioned, so era membership is unknowable (versioning
+      association tables is a future product decision). Pinned by
+      `IncludeAsOfConsistencyContractTests` + `ManyToManyTemporalContractTests`;
+      `TemporalAsOfPlanCacheTests` still green.
 
 - [~] Sustain the reconstruction fuzzer dry window. (NH-0601 recorded a 50-test dry run;
       env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` via

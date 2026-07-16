@@ -173,6 +173,15 @@ the runtime model.
 - Temporal history reads, tag creation, restore, and pruning use nORM command
   creation so active explicit transactions and command interceptors are applied
   consistently.
+- `Include` composes with `AsOf`: eager-loaded relations are reconstructed
+  through the same history window as the root, so the whole graph reflects one
+  point in time (era-consistent values and membership). The exception is
+  many-to-many navigations: the association table is a raw, user-owned table
+  with no history, so `AsOf` combined with a many-to-many `Include` throws
+  `NormUnsupportedFeatureException` instead of silently joining live
+  associations onto historical rows. Query the historical entities without the
+  many-to-many `Include`, or model the association as a mapped entity if its
+  history matters.
 
 ## Test Evidence
 
