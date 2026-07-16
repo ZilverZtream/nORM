@@ -111,6 +111,25 @@ public class TemporalHistoryReconstructionFuzzTests
         }
     }
 
+    /// <summary>
+    /// Environment-directed seed sweep for building the release dry window: set
+    /// NORM_TEMPORAL_FUZZ_SWEEP to "start:count" to run that seed range through the
+    /// reconstruction machine. Unset, this fact is a no-op so the fixed seeds stay
+    /// the baseline. Seeds here are wall-clock expensive (deliberate clock-gap
+    /// delays), so sweep ranges should stay small relative to the other fuzzers.
+    /// </summary>
+    [Fact]
+    public async Task Environment_directed_seed_sweep()
+    {
+        var spec = Environment.GetEnvironmentVariable("NORM_TEMPORAL_FUZZ_SWEEP");
+        if (string.IsNullOrEmpty(spec)) return;
+        var parts = spec.Split(':');
+        var start = int.Parse(parts[0], CultureInfo.InvariantCulture);
+        var count = int.Parse(parts[1], CultureInfo.InvariantCulture);
+        for (var s = start; s < start + count; s++)
+            await AsOf_reconstructs_every_checkpoint_state(s);
+    }
+
     [Theory]
     [InlineData(20260714)]
     [InlineData(1337)]
