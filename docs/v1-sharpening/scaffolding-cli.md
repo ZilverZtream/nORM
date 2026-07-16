@@ -29,7 +29,11 @@ recorded in the public-API additions policy.
 - [x] The in-proc compile-check suite is green (NH-1001, 798 tests); the suite keeps it green as
       options evolve.
 - [ ] Confirm CLI command surface (`dotnet norm ...`) is stable and documented before API freeze.
-- [ ] Verify database-drop safety on live providers.
+- [x] Verify database-drop safety on live providers. (Closed 2026-07-16:
+      `LiveProviderDatabaseDropSafetyTests` 10/10 non-vacuous on live SQL Server/PostgreSQL/
+      MySQL + SQLite — protected database names refuse the drop on every server, system-schema
+      rows are correctly identified by the schema reader, and the drop gate requires an explicit
+      yes flag (dry-run passes the gate without dropping; no flag is refused).)
 
 ## Verification
 
