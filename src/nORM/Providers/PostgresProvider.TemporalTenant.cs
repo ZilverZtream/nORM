@@ -149,45 +149,15 @@ CREATE TABLE {historyTable} (
         /// <returns>DDL statements that create the temporal triggers.</returns>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
-            var table = Escape(mapping.TableName);
-            var history = Escape(mapping.TableName + "_History");
-            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
-            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
-            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
-            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
-            // Scope the history close to the same tenant (SEC-MT): the history table is not PK-unique
-            // (its key includes the validity range), so matching on the entity key alone could close a
-            // different tenant's open row. No-op when the tenant column is already part of the key.
-            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
-                keyCondition += $" AND {Escape(tc.Name)} = OLD.{Escape(tc.Name)}";
-            var functionName = Escape(mapping.TableName + "_TemporalFunction");
-
-            return $@"
-CREATE OR REPLACE FUNCTION {functionName}() RETURNS TRIGGER AS $$
-DECLARE v_now TIMESTAMP := (now() at time zone 'utc');
-BEGIN
-    IF (TG_OP = 'INSERT') THEN
-        INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
-        VALUES (v_now, '9999-12-31', 'I', {newColumns});
-    ELSIF (TG_OP = 'UPDATE') THEN
-        UPDATE {history} SET ""__ValidTo"" = v_now
-        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition};
-        INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
-        VALUES (v_now, '9999-12-31', 'U', {newColumns});
-    ELSIF (TG_OP = 'DELETE') THEN
-        UPDATE {history} SET ""__ValidTo"" = v_now
-        WHERE ""__ValidTo"" = '9999-12-31' AND {keyCondition};
-        INSERT INTO {history} (""__ValidFrom"", ""__ValidTo"", ""__Operation"", {columns})
-        VALUES (v_now, v_now, 'D', {oldColumns});
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalTrigger")} ON {table};
-CREATE TRIGGER {Escape(mapping.TableName + "_TemporalTrigger")}
-AFTER INSERT OR UPDATE OR DELETE ON {table}
-FOR EACH ROW EXECUTE FUNCTION {functionName}();";
+            // DDL text lives in PostgresTemporalDdl, shared with the migration generator so a
+            // migration that reshapes a temporal table re-emits identical triggers.
+            var statements = PostgresTemporalDdl.BuildTriggerStatements(
+                Escape,
+                mapping.TableName,
+                mapping.Columns.Select(c => c.Name).ToArray(),
+                mapping.KeyColumns.Select(c => c.Name).ToArray(),
+                mapping.TenantColumn?.Name);
+            return "\n" + string.Join("\n\n", statements);
         }
 
         /// <inheritdoc />

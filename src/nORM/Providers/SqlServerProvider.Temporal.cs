@@ -162,70 +162,16 @@ ORDER BY c.ORDINAL_POSITION";
         /// <returns>DDL statements creating the temporal triggers.</returns>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
-            var table = Escape(mapping.TableName);
-            var history = Escape(mapping.TableName + "_History");
-            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
-            var insertedColumns = string.Join(", ", mapping.Columns.Select(c => "i." + Escape(c.Name)));
-            var deletedColumns = string.Join(", ", mapping.Columns.Select(c => "d." + Escape(c.Name)));
-            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h.{Escape(c.Name)} = d.{Escape(c.Name)}"));
-            var keyConditionH2 = string.Join(" AND ", mapping.KeyColumns.Select(c => $"h2.{Escape(c.Name)} = d.{Escape(c.Name)}"));
-            // Scope the history close to the same tenant (SEC-MT): the history table is not PK-unique
-            // (its key includes the validity range), so matching on the entity key alone could close a
-            // different tenant's open row. No-op when the tenant column is already part of the key.
-            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
-            {
-                keyCondition += $" AND h.{Escape(tc.Name)} = d.{Escape(tc.Name)}";
-                keyConditionH2 += $" AND h2.{Escape(tc.Name)} = d.{Escape(tc.Name)}";
-            }
-
-            return $@"
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalInsert")};
-GO
-CREATE TRIGGER {Escape(mapping.TableName + "_TemporalInsert")} ON {table} AFTER INSERT AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
-    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
-    SELECT @Now, '9999-12-31', 'I', {insertedColumns} FROM inserted i;
-END;
-GO
-
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalUpdate")};
-GO
-CREATE TRIGGER {Escape(mapping.TableName + "_TemporalUpdate")} ON {table} AFTER UPDATE AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
-    UPDATE h SET h.__ValidTo = @Now
-    FROM {history} h
-    JOIN deleted d ON {keyCondition}
-    WHERE h.__ValidTo = '9999-12-31'
-      AND NOT EXISTS (
-        SELECT 1 FROM {history} h2
-        WHERE h2.__ValidFrom = @Now AND {keyConditionH2}
-    );
-    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
-    SELECT @Now, '9999-12-31', 'U', {insertedColumns} FROM inserted i;
-END;
-GO
-
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_TemporalDelete")};
-GO
-CREATE TRIGGER {Escape(mapping.TableName + "_TemporalDelete")} ON {table} AFTER DELETE AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
-    UPDATE h SET h.__ValidTo = @Now
-    FROM {history} h
-    JOIN deleted d ON {keyCondition}
-    WHERE h.__ValidTo = '9999-12-31'
-      AND NOT EXISTS (
-        SELECT 1 FROM {history} h2
-        WHERE h2.__ValidFrom = @Now AND {keyConditionH2}
-    );
-    INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columns})
-    SELECT @Now, @Now, 'D', {deletedColumns} FROM deleted d;
-END;";
+            // DDL text lives in SqlServerTemporalDdl, shared with the migration generator so a
+            // migration that reshapes a temporal table re-emits identical triggers.
+            var statements = SqlServerTemporalDdl.BuildTriggerStatements(
+                Escape,
+                mapping.TableName,
+                mapping.Columns.Select(c => c.Name).ToArray(),
+                mapping.KeyColumns.Select(c => c.Name).ToArray(),
+                mapping.TenantColumn?.Name);
+            // Each statement must run in its own batch (CREATE TRIGGER must lead a batch).
+            return "\n" + string.Join("\nGO\n", statements);
         }
 
         /// <inheritdoc />

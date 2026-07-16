@@ -140,47 +140,15 @@ CREATE TABLE {historyTable} (
         /// </summary>
         public override string GenerateTemporalTriggersSql(TableMapping mapping)
         {
-            var table = Escape(mapping.TableName);
-            var history = Escape(mapping.TableName + "_History");
-            var columns = string.Join(", ", mapping.Columns.Select(c => Escape(c.Name)));
-            var newColumns = string.Join(", ", mapping.Columns.Select(c => "NEW." + Escape(c.Name)));
-            var oldColumns = string.Join(", ", mapping.Columns.Select(c => "OLD." + Escape(c.Name)));
-            var keyCondition = string.Join(" AND ", mapping.KeyColumns.Select(c => $"{Escape(c.Name)} = OLD.{Escape(c.Name)}"));
-            // Scope the history close to the same tenant (SEC-MT): the history table is not PK-unique
-            // (its key includes the validity range), so matching on the entity key alone could close a
-            // different tenant's open row. No-op when the tenant column is already part of the key.
-            if (mapping.TenantColumn is { } tc && !mapping.KeyColumns.Any(k => k.Name == tc.Name))
-                keyCondition += $" AND {Escape(tc.Name)} = OLD.{Escape(tc.Name)}";
-
-            return $@"
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ai")};
--- DELIMITER
-CREATE TRIGGER {Escape(mapping.TableName + "_ai")} AFTER INSERT ON {table}
-FOR EACH ROW
-BEGIN
-    INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
-    VALUES (UTC_TIMESTAMP(6), '9999-12-31', 'I', {newColumns});
-END;
--- DELIMITER
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_au")};
--- DELIMITER
-CREATE TRIGGER {Escape(mapping.TableName + "_au")} AFTER UPDATE ON {table}
-FOR EACH ROW
-BEGIN
-    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP(6) WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
-    INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
-    VALUES (UTC_TIMESTAMP(6), '9999-12-31', 'U', {newColumns});
-END;
--- DELIMITER
-DROP TRIGGER IF EXISTS {Escape(mapping.TableName + "_ad")};
--- DELIMITER
-CREATE TRIGGER {Escape(mapping.TableName + "_ad")} AFTER DELETE ON {table}
-FOR EACH ROW
-BEGIN
-    UPDATE {history} SET `__ValidTo` = UTC_TIMESTAMP(6) WHERE `__ValidTo` = '9999-12-31' AND {keyCondition};
-    INSERT INTO {history} (`__ValidFrom`, `__ValidTo`, `__Operation`, {columns})
-    VALUES (UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 'D', {oldColumns});
-END;";
+            // DDL text lives in MySqlTemporalDdl, shared with the migration generator so a
+            // migration that reshapes a temporal table re-emits identical triggers.
+            var statements = MySqlTemporalDdl.BuildTriggerStatements(
+                Escape,
+                mapping.TableName,
+                mapping.Columns.Select(c => c.Name).ToArray(),
+                mapping.KeyColumns.Select(c => c.Name).ToArray(),
+                mapping.TenantColumn?.Name);
+            return "\n" + string.Join("\n-- DELIMITER\n", statements);
         }
     }
 }

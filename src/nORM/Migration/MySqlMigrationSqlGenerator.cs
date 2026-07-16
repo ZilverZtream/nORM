@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -16,7 +16,7 @@ namespace nORM.Migration
     /// MODIFY COLUMN for alterations, and DROP FOREIGN KEY (not DROP CONSTRAINT) for FK removal.
     /// FK referential actions are validated against an allowlist before being interpolated into DDL.
     /// </remarks>
-    public class MySqlMigrationSqlGenerator : IMigrationSqlGenerator
+    public partial class MySqlMigrationSqlGenerator : IMigrationSqlGenerator
     {
         /// <summary>Default MySQL fallback type for unmapped CLR types.</summary>
         private const string FallbackSqlType = "LONGTEXT";
@@ -158,7 +158,7 @@ namespace nORM.Migration
             var down = new List<string>();
             var primaryKeyChanges = SchemaDiffer.GetPrimaryKeyChanges(diff);
 
-            // ─ UP: correct DDL dependency ordering ──────────────────────────────────
+            // â”€ UP: correct DDL dependency ordering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             // FK constraints must be dropped BEFORE the columns/tables they reference
             // are removed. Symmetric rule for DOWN: FK constraints added in UP must be
             // dropped BEFORE the columns/tables added in UP are removed.
@@ -176,7 +176,7 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
                 up.Add($"DROP TABLE {EscTable(table.Name)}");
 
-            // UP-3: Drop columns (safe — FKs on those columns are removed in UP-1).
+            // UP-3: Drop columns (safe â€” FKs on those columns are removed in UP-1).
             foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
             {
                 var table = group.First().Table;
@@ -188,7 +188,7 @@ namespace nORM.Migration
             foreach (var (table, column) in diff.DroppedColumns)
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
 
-            // UP-3b: Rename columns BEFORE anything that references the new names —
+            // UP-3b: Rename columns BEFORE anything that references the new names â€”
             // altered-column statements and rebuilt indexes for a renamed column
             // reference the post-rename name, which must exist by then.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
@@ -208,7 +208,7 @@ namespace nORM.Migration
                         up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}");
                     continue;
                 }
-                // M1: Include DEFAULT in MODIFY COLUMN — MySQL replaces the full column definition.
+                // M1: Include DEFAULT in MODIFY COLUMN â€” MySQL replaces the full column definition.
                 if (IsImplicitUniqueColumn(oldCol) && !IsImplicitUniqueColumn(newCol))
                     up.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, oldCol))} ON {EscTable(table.Name)}");
                 var newDefault = newCol.DefaultValue != null ? $" DEFAULT {FormatDefaultValue(newCol)}" : "";
@@ -305,7 +305,7 @@ namespace nORM.Migration
             foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
                 up.Add(BuildExpressionIndexSql(table, expressionIndex));
 
-            // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
+            // â”€ DOWN: reverse of UP, with symmetric FK ordering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
             // DOWN-1: Drop FK constraints that were added in UP-7 (before touching their columns).
             foreach (var (table, fk) in diff.AddedForeignKeys)
@@ -334,7 +334,7 @@ namespace nORM.Migration
                 down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
 
             // DOWN-3b: Rename columns back BEFORE anything that references the old
-            // names — alteration reverts and restored indexes use pre-rename names.
+            // names â€” alteration reverts and restored indexes use pre-rename names.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
                 down.Add($"ALTER TABLE {EscTable(table.Name)} RENAME COLUMN {Esc(newCol.Name)} TO {Esc(oldColName)}");
 
@@ -440,6 +440,13 @@ namespace nORM.Migration
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildFkConstraintSql(fk)}");
             foreach (var (table, expressionIndex) in diff.DroppedExpressionIndexes)
                 down.Add(BuildExpressionIndexSql(table, expressionIndex));
+
+            // Temporal companions LAST: history mirrors and trigger re-emission reference the main
+
+            // table's post-change shape in each direction, established by the statements above.
+
+            EmitTemporalDdl(up, down, diff);
+
 
             return new MigrationSqlStatements(up, down);
         }
