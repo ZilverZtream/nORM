@@ -145,7 +145,7 @@ namespace nORM.Migration
                         IsFixedLength = storeFacets.IsFixedLength,
                         Precision = precision,
                         Scale = scale,
-                        IsNullable = !prop.PropertyType.IsValueType || Nullable.GetUnderlyingType(prop.PropertyType) != null,
+                        IsNullable = IsNullableProperty(prop),
                         // Populate PK / index metadata from attributes or convention.
                         // IsUnique is only set for single-column PKs; composite PKs must NOT
                         // emit per-column UNIQUE constraints.
@@ -202,6 +202,23 @@ namespace nORM.Migration
             foreach (var tbl in seen.Values) snapshot.Tables.Add(tbl);
 
             return snapshot;
+        }
+
+        /// <summary>
+        /// Column nullability for the attribute-driven (assembly) snapshot path. Value types
+        /// follow Nullable&lt;T&gt;; reference types follow nullable-reference-type annotations
+        /// and [Required]. Treating EVERY reference type as nullable silently dropped NOT NULL
+        /// from string/byte[] columns - scaffolded models round-tripped to a laxer schema than
+        /// the one they were scaffolded from.
+        /// </summary>
+        private static bool IsNullableProperty(PropertyInfo prop)
+        {
+            if (prop.PropertyType.IsValueType)
+                return Nullable.GetUnderlyingType(prop.PropertyType) != null;
+            if (prop.GetCustomAttribute<System.ComponentModel.DataAnnotations.RequiredAttribute>() != null)
+                return false;
+            var info = new NullabilityInfoContext().Create(prop);
+            return info.WriteState != NullabilityState.NotNull;
         }
 
         /// <summary>
