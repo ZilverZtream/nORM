@@ -32,7 +32,21 @@ enforce the surface continuously.
       (auto-detect `Id` / `<Type>Id`) or keep explicit `[Key]`/fluent only. This changes nORM's
       documented explicit-keys philosophy and can affect legitimately keyless entities that have
       an `Id` column, so it is **not** a safe unilateral change â€” needs an explicit call.
-- [ ] Consider `AddDbContextPool`-style pooling (requires context-reset semantics) â€” evaluate.
+- [~] Consider `AddDbContextPool`-style pooling (requires context-reset semantics) â€” EVALUATED
+      2026-07-16 (measurement harness: `ContextConstructionCostProbeTests`). Findings: a fresh
+      context per query costs ~0.283 ms/op vs ~0.013 ms/op on a warm reused context (2-entity
+      model, trivial query, in-memory SQLite) â€” pooling would save ~0.27 ms/request and the gap
+      GROWS with model size because `TableMapping` reflection, prepared-command and fast-path SQL
+      caches are all per-context by design. Reset inventory for a future pool lease: MUST clear
+      ChangeTracker/identity map, refuse leases holding a live transaction, and re-apply/clear the
+      native tenant session key (`_nativeTenantSessionAppliedKey` is a cross-tenant leak hazard);
+      MUST KEEP the warm per-context caches (that is the point) and the context's own connection â€”
+      pooling connection+context as a unit sidesteps the cross-database cache-identity hazard the
+      caching matrix fixed. DECISION: implementation deferred to a dedicated effort (reset audit +
+      tenant/transaction leak stress tests are enterprise-grade work); crucially the feature is
+      API-ADDITIVE (`AddNormPool<TContext>` + an internal reset â€” no existing member changes), so
+      **pooling does NOT block the API freeze** â€” which resolves this item's part of the freeze
+      risk below.
 - [x] Direct-vs-tracked write-model doc written (NH-1201): `docs/write-model.md`, linked from README.
 - [ ] Freeze the API: declare no-more-breaking-changes and lock the baseline.
 
