@@ -29,7 +29,11 @@ machine is fully green; a 1600-seed sweep post-KILL-42 was clean.
 
 ## Open items
 
-- [ ] Sustain the state-machine fuzzer dry window across all three machines; record seed ranges.
+- [~] Sustain the state-machine fuzzer dry window across all three machines; record seed ranges.
+      (Env-directed sweeps feed `docs/v1-sharpening/fuzzer-dry-log.md` via
+      `NORM_CRUD_FUZZ_SWEEP="start:count"` — every sweep runs all three machines per seed;
+      relationship-machine seeds 600000-601600 clean post-KILL-42, plus 602000+ swept dry
+      2026-07-16. The sustained window accumulates in the log.)
 - [x] Direct-vs-tracked write-model guidance doc written (NH-1201): `docs/write-model.md`.
 - [x] Retry-write invariants (Domain 9) hold under fault injection (NH-0201,
       `SaveChangesFaultInjectionAtomicity`): reset rolled-back db-generated keys on retry; never

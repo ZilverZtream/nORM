@@ -46,7 +46,7 @@ with hand-written ADO.NET on the hot path (see [Performance](#performance)).
 ### 2. Fast where it counts
 
 - **Fastest method on every provider in our matrix is a nORM path** (corrected,
-  threshold-gated RC2 evidence; see [Performance](#performance)).
+  threshold-gated provider-matrix evidence; see [Performance](#performance)).
 - Compiled/prepared query paths, IL-generated materializers, low-allocation
   execution, and database-native bulk operations - benchmarked against EF Core,
   Dapper, and optimized Raw ADO.NET with [explicit baseline rules](docs/benchmark-governance.md).
@@ -67,7 +67,7 @@ with hand-written ADO.NET on the hot path (see [Performance](#performance)).
 
 ## Sample Store App
 
-Run the RC3 product-proof sample locally with SQLite:
+Run the product-proof sample locally with SQLite:
 
 ```bash
 dotnet run --project samples/nORM.Sample.Store -- --provider sqlite
@@ -115,11 +115,11 @@ rows for dialect differences.
 nORM ships BenchmarkDotNet suites that compare nORM against EF Core, Dapper, and
 Raw ADO.NET across all four providers, using the same seeded schema, equivalent
 SQL shape, typed materialization, and matched compiled/prepared modes. The
-numbers below are a pre-RC3 evidence snapshot from the threshold-gated RC2
-provider matrix plus the follow-up SQLite single-insert fairness slice after
-durability settings were equalized. They are representative, not final RC3
-release evidence. Final RC3 claims must come from a fresh provider-matrix run on
-the release commit, using the job settings and claim rules in
+numbers below are an evidence snapshot from an earlier threshold-gated provider
+matrix run plus the follow-up SQLite single-insert fairness slice after
+durability settings were equalized. They are representative, not final release
+evidence. Release claims must come from a fresh provider-matrix run on the
+release commit, using the job settings and claim rules in
 [benchmark governance](docs/benchmark-governance.md).
 
 ### nORM runtime latency, full provider matrix (mean, lower is better)
@@ -201,6 +201,10 @@ public class User
     public virtual ICollection<Order> Orders { get; set; }
 }
 ```
+
+Primary keys follow the EF Core convention: when an entity has no explicit
+`[Key]` attribute or fluent `HasKey`, a property named `Id` or `<TypeName>Id`
+becomes the primary key automatically. Explicit configuration always wins.
 
 ### LINQ Queries
 

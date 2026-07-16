@@ -17,8 +17,12 @@ documented" bar.
       which, a decision table, and the mixing-modes reconciliation.
 - [x] **Key convention decision made**: EF-parity Id convention ADOPTED (user decision 2026-07-16) and implemented in the mapper - a property named "Id" or "<Type>Id" becomes the primary key when no explicit [Key]/HasKey is configured; explicit configuration always wins, and the mapper now agrees with the assembly-driven snapshot builder. Original scope: (see open items) â€” implement per the decision or document
       the explicit-key requirement as deliberate.
-- [ ] Getting-started + per-area docs exist and match the code; the naming story (published as
-      `TheNorm`, namespace `nORM`) is clear.
+- [~] Getting-started + per-area docs exist and match the code; the naming story (published as
+      `TheNorm`, namespace `nORM`) is clear. (Reviewed 2026-07-16: the naming story leads the
+      README; Quick Start, DI (`AddNorm`/`AddNormFactory`), `Set<T>` alias, and the write-model
+      link are current; drift fixed en route — retired RC2/RC3 wording left over from the
+      versioning reset, and documented the shipped `Id`/`<TypeName>Id` key convention in the
+      Quick Start (it had no user-facing doc). Stays [~] until the pre-freeze final docs pass.)
 
 ## Current confidence
 
