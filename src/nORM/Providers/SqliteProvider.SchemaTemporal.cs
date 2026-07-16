@@ -20,6 +20,18 @@ namespace nORM.Providers
 {
     public partial class SqliteProvider
     {        /// <summary>
+        /// A plain ':memory:' (or Mode=Memory) database without shared cache is PRIVATE to its
+        /// connection: two connections with the identical string see different data, so cache
+        /// keys must include the connection instance. Shared-cache in-memory databases are
+        /// addressable by name and stay connection-string-keyed.
+        /// </summary>
+        public override bool IsConnectionScopedDatabase(string connectionString)
+            => (connectionString.Contains(":memory:", StringComparison.OrdinalIgnoreCase)
+                || connectionString.Contains("Mode=Memory", StringComparison.OrdinalIgnoreCase))
+               && !connectionString.Contains("Cache=Shared", StringComparison.OrdinalIgnoreCase)
+               && !connectionString.Contains("cache=shared", StringComparison.Ordinal);
+
+        /// <summary>
         /// Translates JSON value access using SQLite's <c>json_extract</c> function.
         /// </summary>
         /// <param name="columnName">JSON column to access.</param>

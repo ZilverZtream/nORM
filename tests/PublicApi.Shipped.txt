@@ -759,6 +759,7 @@ M:nORM.Providers.DatabaseProvider.InitializeConnection(System.Data.Common.DbConn
 M:nORM.Providers.DatabaseProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.DatabaseProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
+M:nORM.Providers.DatabaseProvider.IsConnectionScopedDatabase(System.String):System.Boolean
 M:nORM.Providers.DatabaseProvider.IsNullOrEmptySql(System.String):System.String
 M:nORM.Providers.DatabaseProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
 M:nORM.Providers.DatabaseProvider.LiveColumnInfo.#ctor(System.String,System.String,System.Boolean)
@@ -1016,6 +1017,7 @@ M:nORM.Providers.SqliteProvider.InitializeConnection(System.Data.Common.DbConnec
 M:nORM.Providers.SqliteProvider.InitializeConnectionAsync(System.Data.Common.DbConnection,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqliteProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.SqliteProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
+M:nORM.Providers.SqliteProvider.IsConnectionScopedDatabase(System.String):System.Boolean
 M:nORM.Providers.SqliteProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
 M:nORM.Providers.SqliteProvider.NormalizeDateTimeForCompare(System.String):System.String
 M:nORM.Providers.SqliteProvider.NormalizeDateTimeOffsetForCompare(System.String):System.String

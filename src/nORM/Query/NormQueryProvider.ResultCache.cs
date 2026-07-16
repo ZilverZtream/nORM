@@ -90,6 +90,8 @@ namespace nORM.Query
         /// the transaction would hide its own writes. Covers both the explicit connection
         /// transaction and an ambient System.Transactions scope.
         /// </summary>
+        private static readonly ConditionalWeakTable<DbConnection, object> s_connectionScopedDatabaseIds = new();
+
         private bool ResultCacheUsable(QueryPlan plan)
             => plan.IsCacheable
                && _ctx.Options.CacheProvider != null
@@ -107,6 +109,17 @@ namespace nORM.Query
             var dbIdentity = NormalizeConnectionStringForCacheKey(_ctx.Connection.ConnectionString);
             AppendUtf8(hasher, "DB".AsSpan());
             AppendLengthPrefixedUtf8(hasher, dbIdentity.AsSpan());
+            // Connection-private databases (SQLite ':memory:' without shared cache) have
+            // IDENTICAL connection strings but DIFFERENT data per connection - a shared cache
+            // provider would serve one database's rows for another. Key them per connection
+            // instance as well.
+            if (_ctx.RawProvider.IsConnectionScopedDatabase(_ctx.Connection.ConnectionString))
+            {
+                var connectionId = (string)s_connectionScopedDatabaseIds.GetValue(
+                    _ctx.Connection, static _ => Guid.NewGuid().ToString("N"));
+                AppendUtf8(hasher, "CONNDB".AsSpan());
+                AppendLengthPrefixedUtf8(hasher, connectionId.AsSpan());
+            }
             if (_ctx.Options.TenantProvider != null)
             {
                 var tenant = _ctx.GetRequiredTenantId("result cache key");

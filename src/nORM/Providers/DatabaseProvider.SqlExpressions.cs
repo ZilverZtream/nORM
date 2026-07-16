@@ -30,6 +30,16 @@ namespace nORM.Providers
     public abstract partial class DatabaseProvider
     {
         /// <summary>
+        /// True when a connection with this connection string reaches a database PRIVATE to that
+        /// connection - two connections with the IDENTICAL string still see DIFFERENT data (e.g.
+        /// SQLite ':memory:' without shared cache). Cache keys derive database identity from the
+        /// connection string, so connection-private databases must additionally be keyed per
+        /// connection instance or a shared cache provider serves one database's rows for another.
+        /// </summary>
+        /// <param name="connectionString">The connection string to classify.</param>
+        public virtual bool IsConnectionScopedDatabase(string connectionString) => false;
+
+        /// <summary>
         /// Character used to escape wildcards in patterns passed to SQL <c>LIKE</c> clauses.
         /// Defaults to a backslash but can be overridden by providers with different
         /// escaping semantics.

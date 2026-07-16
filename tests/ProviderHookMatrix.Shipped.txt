@@ -99,6 +99,7 @@ IntegerCastTypeName
 IntegerDivisionOperator
 IntrospectTableColumnsAsync
 IsAvailableAsync
+IsConnectionScopedDatabase
 IsNullOrEmptySql
 IsObjectNotFoundError
 IsTransactionLogNearCapacityAsync
@@ -203,6 +204,7 @@ InitializeConnection
 InitializeConnectionAsync
 IntrospectTableColumnsAsync
 IsAvailableAsync
+IsConnectionScopedDatabase
 IsObjectNotFoundError
 MaxParameters
 MaxSqlLength
