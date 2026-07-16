@@ -27,7 +27,9 @@ apply the converter (raw-Guid-as-TEXT corruption closed).
 ## Open items
 
 - [~] Sustain the bulk oracle dry window; record seed ranges. (NH-0301 recorded a 126-test dry
-      run; the multi-week window is calendar time.)
+      run; env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` — set
+      `NORM_BULK_FUZZ_SWEEP="start:count"`; seeds 802000+ swept dry 2026-07-16. The sustained
+      window accumulates in the log.)
 - [ ] Re-verify converter fidelity for every provider type after any converter/staging change.
 - [x] Bulk-update/delete cache invalidation is covered (NH-0301: `BulkCacheInvalidation` green;
       correlated/multi-table cache-tag coverage cross-checked in Domain 8 / NH-0801).

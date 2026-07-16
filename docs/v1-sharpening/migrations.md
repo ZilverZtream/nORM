@@ -28,7 +28,9 @@ invariant and rename-fold are in place.
 ## Open items
 
 - [~] Sustain the preservation fuzzer dry window; record schema/seed ranges. (NH-0401 recorded a
-      220-test dry run; the multi-week window is calendar time.)
+      220-test dry run; env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` — set
+      `NORM_MIGRATION_FUZZ_SWEEP="start:count"`; seeds 902000+ swept dry 2026-07-16. The sustained
+      window accumulates in the log.)
 - [ ] Re-verify advisory-lock behaviour on live SQL Server / PostgreSQL / MySQL under concurrent
       deploy.
 - [x] Rename detection vs DROP+ADD boundary is documented and matches `[RenameColumn]` (NH-0401).
