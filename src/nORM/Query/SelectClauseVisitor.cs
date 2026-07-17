@@ -503,7 +503,7 @@ namespace nORM.Query
             if (!TryResolveScvNavigationFkValueSql(navExpr, out var fkValueSql))
                 return false;
 
-            var combined = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
+            var combined = GlobalFilterFragment.CombineWithTenant(_ctx, principalMap.Type);
             if (combined == null)
             {
                 sql = $"({fkValueSql}{(testIsNull ? " IS NULL" : " IS NOT NULL")})";
@@ -557,7 +557,7 @@ namespace nORM.Query
             // the navigation too: a filtered-out parent must read as a MISSING parent
             // (NULL member), or its data leaks into projections. Mirrors the ETSV emit.
             string? globalFilterSql = null;
-            var combinedFilter = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
+            var combinedFilter = GlobalFilterFragment.CombineWithTenant(_ctx, principalMap.Type);
             if (combinedFilter != null)
                 globalFilterSql = RenderNavigationFilter(combinedFilter, alias);
             return $"(SELECT {alias}.{targetCol.EscCol} FROM {QueryTranslator.TemporalTableSource(principalMap)} {alias} " +

@@ -69,6 +69,12 @@ namespace nORM.Query
                 .Append(" FROM ").Append(QueryTranslator.TemporalTableSource(childMapping)).Append(' ').Append(subAlias)
                 .Append(" WHERE ");
             AppendRelationPredicate(_sql, relation, subAlias, parentInfo.Alias);
+            // Row visibility (soft-delete global filters, tenant) restricts which
+            // dependent rows enter the aggregate — same rule as the projection-side
+            // navigation aggregate emits.
+            var visibilitySql = RenderPrincipalGlobalFilterSql(childMapping, subAlias);
+            if (visibilitySql != null)
+                _sql.Append(" AND ").Append(visibilitySql);
             _sql.Append(')');
         }
 

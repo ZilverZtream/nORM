@@ -53,6 +53,35 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// The full row-visibility predicate for a hand-built correlated subquery: the combined
+        /// global filters AND the tenant predicate. Translator-built navigation subqueries must
+        /// use this rather than <see cref="Combine"/> alone — the provider's top-level tenant
+        /// rewrite never reaches tables referenced inside the statement, and a dependent row
+        /// from another tenant that shares a foreign-key value would otherwise fold into the
+        /// subquery's rows. Entities without a tenant column are shared tables and get only
+        /// their global filters.
+        /// </summary>
+        internal static LambdaExpression? CombineWithTenant(DbContext ctx, Type entityType)
+        {
+            var combined = Combine(ctx, entityType);
+            if (ctx.Options.TenantProvider == null)
+                return combined;
+            TableMapping map;
+            try { map = ctx.GetMapping(entityType); }
+            catch { return combined; }
+            if (map.TenantColumn is not { } tenantCol)
+                return combined;
+
+            var param = Expression.Parameter(entityType, "tf");
+            Expression body = Expression.Equal(
+                Expression.Property(param, tenantCol.Prop.Name),
+                Expression.Constant(ctx.GetRequiredTenantId(map, "navigation subquery"), tenantCol.Prop.PropertyType));
+            if (combined != null)
+                body = Expression.AndAlso(new ParameterReplacer(combined.Parameters[0], param).Visit(combined.Body)!, body);
+            return Expression.Lambda(body, param);
+        }
+
+        /// <summary>
         /// Combines every global filter that applies to <paramref name="entityType"/> into one AND-ed
         /// lambda, mirroring NormQueryProvider.CombineGlobalFilterPredicates (including the two-parameter
         /// <c>(ctx, e) =&gt; …</c> filter form, whose context parameter is inlined as a constant). Exposed

@@ -174,7 +174,7 @@ namespace nORM.Query
             // the aggregate. Applied as a plain AND in every branch (including All, where the extra
             // predicate is inverted but visibility is not) so a projected Count/Any/All counts only
             // visible rows instead of leaking filtered-out ones.
-            var globalFilter = _ctx != null ? GlobalFilterFragment.Combine(_ctx, depType) : null;
+            var globalFilter = _ctx != null ? GlobalFilterFragment.CombineWithTenant(_ctx, depType) : null;
             var globalFilterSql = globalFilter != null ? RenderNavigationFilter(globalFilter, depAlias) : null;
             // Use predicate-overload Count(predicate) sugar when the unwrapped filter is the
             // first / only filter and the outer call is Count() — keeps the SQL compact.
@@ -250,6 +250,17 @@ namespace nORM.Query
             var hop2FilterSql = hop2Filter != null
                 ? RenderNavigationFilter(hop2Filter, hop2Alias)
                 : null;
+            // Row visibility (soft-delete global filters, tenant) restricts BOTH hops:
+            // an invisible intermediate row must not bridge to visible leaves, and
+            // invisible leaves must not count.
+            var hop1Visibility = GlobalFilterFragment.CombineWithTenant(_ctx, intermediateMapping.Type) is { } v1
+                ? RenderNavigationFilter(v1, hop1Alias)
+                : null;
+            var hop2Visibility = GlobalFilterFragment.CombineWithTenant(_ctx, hop2Rel.DependentType) is { } v2
+                ? RenderNavigationFilter(v2, hop2Alias)
+                : null;
+            if (hop2Visibility != null)
+                hop2FilterSql = hop2FilterSql == null ? hop2Visibility : $"({hop2Visibility}) AND ({hop2FilterSql})";
 
             if (methodName is nameof(Queryable.Any))
             {
@@ -262,6 +273,8 @@ namespace nORM.Query
                 AppendNavigationRelationPredicate(sb, hop1Rel, hop1Alias, _outerAlias);
                 sb.Append(" AND ");
                 AppendNavigationRelationPredicate(sb, hop2Rel, hop2Alias, hop1Alias);
+                if (hop1Visibility != null)
+                    sb.Append(" AND ").Append(hop1Visibility);
                 sb.Append(")) THEN 1 ELSE 0 END)");
             }
             else // Count / LongCount
@@ -275,6 +288,8 @@ namespace nORM.Query
                 AppendNavigationRelationPredicate(sb, hop1Rel, hop1Alias, _outerAlias);
                 sb.Append(" AND ");
                 AppendNavigationRelationPredicate(sb, hop2Rel, hop2Alias, hop1Alias);
+                if (hop1Visibility != null)
+                    sb.Append(" AND ").Append(hop1Visibility);
                 sb.Append("))");
             }
         }
@@ -472,6 +487,11 @@ namespace nORM.Query
               .Append(" FROM ").Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias)
               .Append(" WHERE ");
             AppendNavigationRelationPredicate(sb, relation, depAlias, _outerAlias);
+            // Row visibility (soft-delete global filters, tenant) restricts which
+            // dependent rows enter the aggregate — same rule as the Count/Any/All emit.
+            var visibility = _ctx != null ? GlobalFilterFragment.CombineWithTenant(_ctx, depType) : null;
+            if (visibility != null)
+                sb.Append(" AND ").Append(RenderNavigationFilter(visibility, depAlias));
             if (extraFilter != null)
             {
                 var filterSql = RenderNavigationFilter(extraFilter, depAlias);
@@ -832,7 +852,7 @@ namespace nORM.Query
             // Same visibility rule as the scalar nav emits: a filtered-out principal
             // reads as missing, so its values never enter the aggregate.
             string? principalFilterSql = null;
-            var combinedFilter = GlobalFilterFragment.Combine(_ctx!, principalMap.Type);
+            var combinedFilter = GlobalFilterFragment.CombineWithTenant(_ctx!, principalMap.Type);
             if (combinedFilter != null)
                 principalFilterSql = RenderNavigationFilter(combinedFilter, principalAlias);
             return $"(SELECT {principalAlias}.{targetColumn.EscCol} FROM {QueryTranslator.TemporalTableSource(principalMap)} {principalAlias} " +

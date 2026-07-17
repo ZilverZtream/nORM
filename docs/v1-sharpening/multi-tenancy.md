@@ -25,6 +25,18 @@ tenant column resolves from `Options.TenantColumnName`. Native RLS paths exist p
       poisoning, fail-closed, and global-filter bypass.
 - [x] Cache keys include the tenant discriminator on every cacheable path (NH-0701):
       `MultiTenantResultCachePoisoning` + `MultiTenantPlanCache` green.
+- [x] **KILL 48 (found and FIXED 2026-07-17): navigation subqueries leaked across tenants —
+      live, not temporal.** The NH-0701 sweep missed the correlated navigation-aggregate
+      emitters: `d.Emps.Count()` in a projection counted a FOREIGN tenant's dependent that
+      shared the foreign-key value; the nav Sum/Min/Max/Avg emitters (projection and
+      predicate side) applied NO visibility filters at all (soft-delete included); the
+      two-hop count applied none; and a forged FK exposed another tenant's principal VALUES
+      through nav-scalar reads. Fixed via `GlobalFilterFragment.CombineWithTenant` applied
+      at every navigation-subquery emitter — count/Any/All, scalar aggregates on both
+      sides, both hops of the two-hop, and all principal-read paths (a cross-tenant
+      principal reads as MISSING, exactly like a soft-deleted one). Pinned by
+      `TenantJoinAsOfConsistencyContractTests` (era-windowed shapes under AsOf, live
+      aggregates, and forged-FK probes on both tenants' sides).
 - [x] Confirm native RLS behaviour on live SQL Server / PostgreSQL / MySQL. (Closed 2026-07-16:
       `LiveProviderNativeTenantSecurityTests` 4/4 non-vacuous on the live servers — SQL Server's
       RLS policy blocks direct cross-tenant access, PostgreSQL's policy blocks when the role is

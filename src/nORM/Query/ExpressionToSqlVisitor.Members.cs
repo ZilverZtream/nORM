@@ -291,7 +291,7 @@ namespace nORM.Query
         {
             if (_ctx == null)
                 return null;
-            var combined = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
+            var combined = GlobalFilterFragment.CombineWithTenant(_ctx, principalMap.Type);
             if (combined == null)
                 return null;
             var vctx = new VisitorContext(_ctx, principalMap, _provider, combined.Parameters[0], alias, _parameterMappings, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _paramIndex);
