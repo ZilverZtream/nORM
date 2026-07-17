@@ -7,9 +7,11 @@ output, compile-checked generated code, provider parity, and safety modes.
 
 - [x] Scaffolded output **compiles** for every supported shape (in-proc Roslyn compile checks),
       with and without relationships (NH-1001: 798 tests green).
-- [ ] Live scaffold parity: SQLite/SQL Server/PostgreSQL/MySQL produce equivalent, correct
-      models from equivalent schemas. (NH-1001: in-proc compile checks green; live-provider schema
-      parity deferred to the live provider gate.)
+- [x] Live scaffold parity: SQLite/SQL Server/PostgreSQL/MySQL produce equivalent, correct
+      models from equivalent schemas. (NH-1001: in-proc compile checks green. Live evidence
+      2026-07-17: full `LiveProviderScaffold*` suite 734/734, 0 skipped, ~13 min wall — schema
+      introspection, model generation, and compile parity proven against real SQL Server,
+      PostgreSQL, and MySQL schemas.)
 - [x] Safety modes are correct and documented: `OverwriteFiles`, `DryRun`, `FailOnWarnings`,
       database-drop confirmation, keyless-entity handling (NH-1001: output-safety + keyless-safety
       tests green).

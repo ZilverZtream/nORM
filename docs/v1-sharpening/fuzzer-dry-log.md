@@ -20,3 +20,4 @@ Every entry is a REAL run on the stated tree; kills are recorded as loudly as dr
 | 2026-07-16 | CacheStalenessFuzzTests (env-directed sweep, 5 shapes/seed) | seeds 1002000-1005899 (3900) | DRY |
 | 2026-07-16 | MixedTokenOccFuzzTests (env-directed sweep, 3-context interleaving/seed) | seeds 1102000-1103949 (1950) | DRY |
 | 2026-07-16 | RetryFaultInjectionFuzzTests (env-directed sweep, fault machine/seed) | seeds 1202000-1203949 (1950) | DRY |
+| 2026-07-17 | LiveProviderScaffold* suites (all 3 servers, schema introspection + model generation + compile parity) | 734 tests, 0 skipped | GREEN |
