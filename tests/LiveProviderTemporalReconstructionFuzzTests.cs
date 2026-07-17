@@ -49,35 +49,38 @@ public class LiveProviderTemporalReconstructionFuzzTests
     }
 
     private static async Task TeardownAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind)
+        => await TeardownTableAsync(connection, provider, kind, Table);
+
+    private static async Task TeardownTableAsync(DbConnection connection, DatabaseProvider provider, ProviderKind kind, string table)
     {
         try
         {
             if (kind == ProviderKind.Postgres)
             {
                 await ExecuteAsync(connection,
-                    $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_TemporalTrigger")} ON {provider.Escape(Table)}");
+                    $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_TemporalTrigger")} ON {provider.Escape(table)}");
                 await ExecuteAsync(connection,
-                    $"DROP FUNCTION IF EXISTS {provider.Escape(Table + "_TemporalFunction")}()");
+                    $"DROP FUNCTION IF EXISTS {provider.Escape(table + "_TemporalFunction")}()");
             }
             else if (kind == ProviderKind.MySql)
             {
-                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_ai")}");
-                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_au")}");
-                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_ad")}");
+                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_ai")}");
+                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_au")}");
+                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_ad")}");
             }
             else if (kind == ProviderKind.SqlServer)
             {
-                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_TemporalInsert")}");
-                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_TemporalUpdate")}");
-                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(Table + "_TemporalDelete")}");
+                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_TemporalInsert")}");
+                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_TemporalUpdate")}");
+                await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS {provider.Escape(table + "_TemporalDelete")}");
             }
 
             var drop = kind == ProviderKind.SqlServer
-                ? $"IF OBJECT_ID(N'{Table}', N'U') IS NOT NULL DROP TABLE {provider.Escape(Table)}"
-                : $"DROP TABLE IF EXISTS {provider.Escape(Table)}";
+                ? $"IF OBJECT_ID(N'{table}', N'U') IS NOT NULL DROP TABLE {provider.Escape(table)}"
+                : $"DROP TABLE IF EXISTS {provider.Escape(table)}";
             var dropHistory = kind == ProviderKind.SqlServer
-                ? $"IF OBJECT_ID(N'{Table}_History', N'U') IS NOT NULL DROP TABLE {provider.Escape(Table + "_History")}"
-                : $"DROP TABLE IF EXISTS {provider.Escape(Table + "_History")}";
+                ? $"IF OBJECT_ID(N'{table}_History', N'U') IS NOT NULL DROP TABLE {provider.Escape(table + "_History")}"
+                : $"DROP TABLE IF EXISTS {provider.Escape(table + "_History")}";
             await ExecuteAsync(connection, drop);
             await ExecuteAsync(connection, dropHistory);
         }
@@ -86,6 +89,85 @@ public class LiveProviderTemporalReconstructionFuzzTests
             // Best-effort cleanup; the fuzz run itself reports real failures.
         }
     }
+
+    /// <summary>
+    /// The RELATIONAL reconstruction machine against real servers: every
+    /// checkpoint replays through navigation projections and predicates,
+    /// SelectMany, correlated aggregates, Include, a set operation, and a
+    /// Contains subquery — proving each dialect executes the history-window
+    /// derived tables correctly in JOIN and subquery positions, not just as
+    /// the root FROM.
+    /// </summary>
+    [Theory]
+    [InlineData(ProviderKind.SqlServer)]
+    [InlineData(ProviderKind.Postgres)]
+    [InlineData(ProviderKind.MySql)]
+    public async Task Relational_graph_reconstruction_holds_on_live_server(ProviderKind kind)
+    {
+        var live = LiveProviderFactory.OpenLive(kind);
+        if (Skip.If(live is null, $"Live provider {kind} not configured")) return;
+
+        var (connection, provider) = live!.Value;
+        await using (connection)
+        {
+            var db = connection.Database?.Trim() ?? "";
+            if (Skip.If(IsProviderOwnedDatabase(kind, db),
+                $"Live temporal fuzz requires an application database; current {kind} database '{db}' is provider-owned."))
+                return;
+
+            var options = new DbContextOptions
+            {
+                OnModelCreating = mb =>
+                {
+                    mb.Entity<TemporalHistoryReconstructionFuzzTests.Dept>().HasKey(d => d.Id);
+                    mb.Entity<TemporalHistoryReconstructionFuzzTests.Emp>().HasKey(e => e.Id);
+                    mb.Entity<TemporalHistoryReconstructionFuzzTests.Dept>()
+                        .HasMany(d => d.Emps).WithOne(e => e.Dept!).HasForeignKey(e => e.DeptId, d => d.Id);
+                }
+            };
+            options.EnableTemporalVersioning();
+
+            using var ctx = new DbContext(connection, provider, options);
+            var text = kind == ProviderKind.SqlServer ? "NVARCHAR(64)" : "VARCHAR(64)";
+            await TeardownTableAsync(connection, provider, kind, "ThrEmp_Test");
+            await TeardownTableAsync(connection, provider, kind, "ThrDept_Test");
+            await ExecuteAsync(connection,
+                $"CREATE TABLE {provider.Escape("ThrDept_Test")} ({provider.Escape("Id")} INT PRIMARY KEY, {provider.Escape("Title")} {text} NOT NULL)");
+            await ExecuteAsync(connection,
+                $"CREATE TABLE {provider.Escape("ThrEmp_Test")} ({provider.Escape("Id")} INT PRIMARY KEY, {provider.Escape("Name")} {text} NOT NULL, {provider.Escape("DeptId")} INT NOT NULL)");
+            try
+            {
+                await TemporalHistoryReconstructionFuzzTests.RunRelationalReconstructionFuzzAsync(
+                    ctx, seed: 20260717, rounds: 5, async () =>
+                    {
+                        await using var cmd = connection.CreateCommand();
+                        cmd.CommandText = ServerNowSql(kind);
+                        var value = await cmd.ExecuteScalarAsync();
+                        return DateTime.SpecifyKind(Convert.ToDateTime(value, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Utc);
+                    });
+            }
+            finally
+            {
+                await TeardownTableAsync(connection, provider, kind, "ThrEmp_Test");
+                await TeardownTableAsync(connection, provider, kind, "ThrDept_Test");
+            }
+        }
+    }
+
+    private static bool IsProviderOwnedDatabase(ProviderKind kind, string db) => kind switch
+    {
+        ProviderKind.SqlServer => db.Equals("master", StringComparison.OrdinalIgnoreCase)
+            || db.Equals("model", StringComparison.OrdinalIgnoreCase)
+            || db.Equals("msdb", StringComparison.OrdinalIgnoreCase)
+            || db.Equals("tempdb", StringComparison.OrdinalIgnoreCase),
+        ProviderKind.Postgres => db.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+            || db.StartsWith("template", StringComparison.OrdinalIgnoreCase),
+        ProviderKind.MySql => db.Equals("mysql", StringComparison.OrdinalIgnoreCase)
+            || db.Equals("sys", StringComparison.OrdinalIgnoreCase)
+            || db.Equals("information_schema", StringComparison.OrdinalIgnoreCase)
+            || db.Equals("performance_schema", StringComparison.OrdinalIgnoreCase),
+        _ => false
+    };
 
     [Theory]
     [InlineData(ProviderKind.SqlServer)]
