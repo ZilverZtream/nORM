@@ -433,6 +433,45 @@ namespace nORM.Core
     public static class NormIncludableQueryableExtensions
     {
         /// <summary>
+        /// Specifies a navigation property to eager-load, matching Entity Framework Core's
+        /// <c>Include</c> surface. This extension lets <c>Include</c> chain directly off the
+        /// <see cref="IQueryable{T}"/> returned by <see cref="NormQueryable.Query{T}"/> /
+        /// <see cref="NormQueryable.Set{T}"/> and off standard operators such as
+        /// <c>Where</c>/<c>OrderBy</c>, whose static result type is <see cref="IQueryable{T}"/>
+        /// even though the underlying object is a nORM queryable — so no cast to
+        /// <see cref="INormQueryable{T}"/> is required. When the static type already is
+        /// <see cref="INormQueryable{T}"/>, the instance <c>Include</c> is preferred by the
+        /// compiler and this extension is not involved.
+        /// </summary>
+        /// <typeparam name="TEntity">The root entity type of the query.</typeparam>
+        /// <typeparam name="TProperty">Type of the navigation property.</typeparam>
+        /// <param name="source">A nORM query started with <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>.</param>
+        /// <param name="navigationPropertyPath">Expression identifying the navigation to include.</param>
+        /// <returns>A query with the navigation included, chainable with <c>ThenInclude</c>.</returns>
+        public static INormIncludableQueryable<TEntity, TProperty> Include<TEntity, TProperty>(
+            this IQueryable<TEntity> source,
+            Expression<Func<TEntity, TProperty>> navigationPropertyPath)
+            where TEntity : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(navigationPropertyPath);
+
+            // Query<T>()/Set<T>() and every standard operator over them return objects that
+            // implement INormQueryable<T> at runtime (see NormQueryProvider.CreateQueryInternal);
+            // only the compile-time type is erased to IQueryable<T>. Delegate to the instance
+            // Include so the constrained/unconstrained impl choice and the Convert-unwrapping the
+            // translator expects are preserved exactly — this is the same path the cast workaround
+            // (INormQueryable<T>)q).Include(...) already exercises.
+            if (source is INormQueryable<TEntity> normQueryable)
+                return normQueryable.Include(navigationPropertyPath);
+
+            throw new NormUsageException(
+                "Include can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>() or context.Set<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.Include().");
+        }
+
+        /// <summary>
         /// Specifies an additional navigation property to include after a previous <c>Include</c> call.
         /// </summary>
         /// <typeparam name="TEntity">Root entity type of the query.</typeparam>

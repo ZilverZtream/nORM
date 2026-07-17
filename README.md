@@ -173,8 +173,15 @@ numbers.
 
 ## Installation
 
+nORM publishes on NuGet as the **`TheNorm`** package (the `nORM` id is held by an
+unrelated 2011 project); the API namespace and `dotnet norm` CLI keep the `nORM` name.
+
 ```bash
-dotnet add package nORM
+dotnet add package TheNorm
+```
+
+```csharp
+using nORM;
 ```
 
 ## Quick Start
