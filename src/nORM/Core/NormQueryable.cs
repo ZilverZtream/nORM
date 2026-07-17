@@ -472,6 +472,51 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Disables change tracking for the query results, matching Entity Framework Core's
+        /// <c>AsNoTracking</c>. Like <see cref="Include{TEntity,TProperty}"/> this extension lets
+        /// <c>AsNoTracking</c> chain off the <see cref="IQueryable{T}"/> returned by
+        /// <see cref="NormQueryable.Query{T}"/>/<see cref="NormQueryable.Set{T}"/> and off standard
+        /// operators without a cast to <see cref="INormQueryable{T}"/>; when the static type already
+        /// is <see cref="INormQueryable{T}"/> the instance method is preferred by the compiler.
+        /// </summary>
+        /// <typeparam name="T">The entity type of the query.</typeparam>
+        /// <param name="source">A nORM query started with <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>.</param>
+        /// <returns>An untracked query.</returns>
+        public static INormQueryable<T> AsNoTracking<T>(this IQueryable<T> source)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source is INormQueryable<T> normQueryable)
+                return normQueryable.AsNoTracking();
+
+            throw new NormUsageException(
+                "AsNoTracking can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>() or context.Set<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking().");
+        }
+
+        /// <summary>
+        /// Accepted for Entity Framework Core compatibility; nORM always eager-loads
+        /// <c>Include</c> paths through coordinated follow-up queries, so this has no additional
+        /// effect. Exposed on <see cref="IQueryable{T}"/> so it composes without a cast, mirroring
+        /// <see cref="AsNoTracking{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">The entity type of the query.</typeparam>
+        /// <param name="source">A nORM query started with <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>.</param>
+        /// <returns>The same query; eager loading is driven by Include alone.</returns>
+        public static INormQueryable<T> AsSplitQuery<T>(this IQueryable<T> source)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source is INormQueryable<T> normQueryable)
+                return normQueryable.AsSplitQuery();
+
+            throw new NormUsageException(
+                "AsSplitQuery can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>() or context.Set<T>().");
+        }
+
+        /// <summary>
         /// Specifies an additional navigation property to include after a previous <c>Include</c> call.
         /// </summary>
         /// <typeparam name="TEntity">Root entity type of the query.</typeparam>

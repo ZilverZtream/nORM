@@ -450,6 +450,8 @@ M:nORM.Core.NormException.#ctor(System.String,System.String,System.Collections.G
 M:nORM.Core.NormExceptionHandler.#ctor(Microsoft.Extensions.Logging.ILogger)
 M:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync``1(System.Func{`0},System.String,System.Collections.Generic.Dictionary{System.String,System.Object}):`0
 M:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling``1(System.Func{System.Threading.Tasks.Task{`0}},System.String,System.Collections.Generic.Dictionary{System.String,System.Object}):System.Threading.Tasks.Task{`0}
+M:nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{`0}):nORM.Core.INormQueryable{`0}
+M:nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery``1(System.Linq.IQueryable{`0}):nORM.Core.INormQueryable{`0}
 M:nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{`0},System.Linq.Expressions.Expression{System.Func{`0,`1}}):nORM.Core.INormIncludableQueryable{`0,`1}
 M:nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{`0,System.Collections.Generic.IEnumerable{`1}},System.Linq.Expressions.Expression{System.Func{`1,`2}}):nORM.Core.INormIncludableQueryable{`0,`2}
 M:nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{`0,`1},System.Linq.Expressions.Expression{System.Func{`1,`2}}):nORM.Core.INormIncludableQueryable{`0,`2}
