@@ -272,18 +272,23 @@ namespace nORM.Query
                 {
                     if (value is DateTime dt)
                     {
-                        t._asOfTimestamp = DateTime.SpecifyKind(dt.Kind == DateTimeKind.Local ? dt.ToUniversalTime() : dt, DateTimeKind.Unspecified);
+                        t._asOfTimestamp = NormalizeAsOfTimestamp(dt);
                     }
                     else if (value is string tagName)
                     {
-                        t._asOfTimestamp = t.GetTimestampForTagAsync(tagName).GetAwaiter().GetResult();
+                        // Reuse the pre-scan's resolution: resolving the tag twice could
+                        // observe a concurrent tag rewrite and produce two timestamps for
+                        // one statement.
+                        t._asOfTimestamp = t._asOfTagResolution is { } cached && cached.Tag == tagName
+                            ? cached.Ts
+                            : t.GetTimestampForTagAsync(tagName).GetAwaiter().GetResult();
                     }
                 }
                 else
                 {
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, ".AsOf() requires a constant DateTime or string tag."));
                 }
-                t.BeginTemporalTableSourceScope();
+                t.BeginTemporalTableSourceScope(t._asOfTimestamp!.Value);
                 return t.Visit(node.Arguments[0]);
             }
         }

@@ -228,11 +228,19 @@ namespace nORM.Query
             {
                 var ownsOrdinalScope = BeginClosureOrdinalScope(e);
                 var ownsTableScope = BeginReferencedTableScope();
-                // The temporal scope opens lazily when an AsOf node is parsed; the
-                // top-level translation (no scope active at entry) always ends it.
-                var ownsTemporalScope = t_temporalScope == null;
+                // Only the OUTERMOST translation owns the temporal window: nested
+                // sub-translations (set-operation arms, subquery sources — whether on
+                // this instance or a pool-fresh one) must all see the same scope,
+                // wherever in the tree the AsOf node sits. The referenced-table scope
+                // already answers "is this the outermost translation on this thread"
+                // for exactly that mix of nesting shapes, so its ownership doubles as
+                // the temporal scope's. The pre-scan opens the window before any arm
+                // translates so translation order never decides which arms get windowed.
+                var ownsTemporalScope = ownsTableScope;
                 try
                 {
+                    if (ownsTemporalScope)
+                        TryOpenTemporalScopeForTranslation(e);
                     return new TranslationBuilder(this, e)
                         .Validate()
                         .Setup()
@@ -245,7 +253,10 @@ namespace nORM.Query
                     if (ownsTableScope)
                         EndReferencedTableScope();
                     if (ownsTemporalScope)
+                    {
                         EndTemporalTableSourceScope();
+                        _asOfTagResolution = null;
+                    }
                 }
             }
         }

@@ -78,6 +78,25 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
       "navigations read the current principal" contract to the era-consistent one (including
       the pre-bootstrap-row-has-no-history nuance).
 
+- [x] **KILL 47 (found and FIXED 2026-07-17): composite shapes under `AsOf` — set-operation
+      arms, `Contains` inner sources, and tracked-entity aliasing.** Follow-up probing of the
+      KILL 46 fix found three residuals: a `Union`/`Concat` arm translated outside the lazy
+      scope's life read LIVE (order-dependent — which arms windowed depended on where the
+      AsOf node sat); `Contains` over another mapped query never windowed the inner source;
+      and even with correct SQL the RESULT still leaked — the arm-level AsOf set no-tracking
+      only on the sub-context, so the outer plan tracked and the materializer aliased
+      historical rows to already-tracked live entities (silently returning current state).
+      FIX: a pre-scan opens the temporal window at the OUTERMOST translation entry so every
+      arm windows regardless of AsOf position; the root-FROM substitution gates on the
+      ambient scope (not the local timestamp); scope ownership rides the referenced-table
+      scope's outermost signal (a pool-fresh nested translator must not end a scope it did
+      not open); and the pre-scan stamps the timestamp + no-tracking onto the outermost
+      plan. Tag resolution is cached per translation so two resolves cannot straddle a
+      concurrent tag rewrite. The contract: `AsOf` anywhere in a statement windows the WHOLE
+      statement (combine eras by materializing separately). Pinned by
+      `SubqueryAsOfConsistencyContractTests` (set operations, GroupBy aggregates, grouped
+      scalar aggregates, Contains subqueries — all differential).
+
 - [~] Sustain the reconstruction fuzzer dry window. (NH-0601 recorded a 50-test dry run;
       env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` via
       `NORM_TEMPORAL_FUZZ_SWEEP="start:count"` — seeds 702000-702079 swept dry 2026-07-16.)

@@ -321,13 +321,19 @@ namespace nORM.Query
                             ? _t._correlatedParams.FirstOrDefault(kvp => kvp.Value.Mapping == _t._mapping).Value.Alias
                               ?? _t._correlatedParams.Values.FirstOrDefault().Alias
                             : null);
-                    if (_t._asOfTimestamp.HasValue)
+                    // Gate on the AMBIENT scope, not the local _asOfTimestamp: a nested
+                    // sub-translation (a set-operation side, a Contains inner source, a
+                    // windowed sub-plan) carries no AsOf node of its own but must still
+                    // read through the top-level translation's history window.
+                    if (HasActiveTemporalScope)
                     {
                         alias ??= _t.EscapeAlias("T0");
                         fromClause = TemporalTableSource(_t._mapping);
-                        if (ReferenceEquals(fromClause, _t._mapping.EscTable))
-                            throw new NormQueryException(
-                                "Internal error: an AsOf timestamp is set but no temporal window scope is active.");
+                    }
+                    else if (_t._asOfTimestamp.HasValue)
+                    {
+                        throw new NormQueryException(
+                            "Internal error: an AsOf timestamp is set but no temporal window scope is active.");
                     }
                     if (_t._isAggregate && _t._groupBy.Count == 0)
                     {
