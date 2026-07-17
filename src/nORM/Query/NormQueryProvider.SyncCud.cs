@@ -149,6 +149,7 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             ThrowIfClientMaterializedCudShape(plan, "ExecuteDeleteAsync");
+            ThrowIfAsOfCudShape(plan, "ExecuteDeleteAsync");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             EnsureWritableMapping(mapping, "ExecuteDeleteAsync");
@@ -208,6 +209,17 @@ namespace nORM.Query
                     "with a default value, streaming GroupBy, or group-join results) has no set-based SQL " +
                     "equivalent. Express the target rows with Where(...) instead.");
             }
+        }
+
+        private static void ThrowIfAsOfCudShape(QueryPlan plan, string operation)
+        {
+            // Set-based writes target the LIVE table; an AsOf source would either write
+            // through a history window (nonsense) or silently select the target rows by
+            // historical state while mutating current rows. Fail loud instead.
+            if (plan.AsOfTimestamp.HasValue)
+                throw new NormUnsupportedFeatureException(
+                    $"{operation} cannot be combined with AsOf: writes target the live table, " +
+                    "not a historical snapshot.");
         }
 
         private static void ValidateJoinedCudShape(BulkCudQueryShape? shape)
@@ -328,6 +340,7 @@ namespace nORM.Query
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
             var plan = GetPlan(expression, out var filtered, out var paramValues);
             ThrowIfClientMaterializedCudShape(plan, "ExecuteUpdateAsync");
+            ThrowIfAsOfCudShape(plan, "ExecuteUpdateAsync");
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             EnsureWritableMapping(mapping, "ExecuteUpdateAsync");

@@ -511,7 +511,7 @@ namespace nORM.Query
             }
             var probeAlias = _provider.Escape("NF");
             var filterSql = RenderNavigationFilter(combined, probeAlias);
-            sql = $"{(testIsNull ? "NOT EXISTS(" : "EXISTS(")}SELECT 1 FROM {principalMap.EscTable} {probeAlias} " +
+            sql = $"{(testIsNull ? "NOT EXISTS(" : "EXISTS(")}SELECT 1 FROM {QueryTranslator.TemporalTableSource(principalMap)} {probeAlias} " +
                   $"WHERE {probeAlias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql} AND {filterSql})";
             return true;
         }
@@ -560,7 +560,7 @@ namespace nORM.Query
             var combinedFilter = GlobalFilterFragment.Combine(_ctx, principalMap.Type);
             if (combinedFilter != null)
                 globalFilterSql = RenderNavigationFilter(combinedFilter, alias);
-            return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
+            return $"(SELECT {alias}.{targetCol.EscCol} FROM {QueryTranslator.TemporalTableSource(principalMap)} {alias} " +
                    $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql}" +
                    (globalFilterSql != null ? $" AND {globalFilterSql}" : string.Empty) + ")";
         }

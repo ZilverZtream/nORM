@@ -183,7 +183,7 @@ namespace nORM.Query
             sb.Append('(').Append("SELECT ");
             if (node.Method.Name is nameof(Queryable.Any))
             {
-                sb.Append("CASE WHEN EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+                sb.Append("CASE WHEN EXISTS(SELECT 1 FROM ").Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
@@ -192,7 +192,7 @@ namespace nORM.Query
             }
             else if (node.Method.Name is nameof(Queryable.All))
             {
-                sb.Append("CASE WHEN NOT EXISTS(SELECT 1 FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+                sb.Append("CASE WHEN NOT EXISTS(SELECT 1 FROM ").Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
@@ -203,7 +203,7 @@ namespace nORM.Query
             }
             else
             {
-                sb.Append("COUNT(*) FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+                sb.Append("COUNT(*) FROM ").Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias)
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
@@ -211,6 +211,17 @@ namespace nORM.Query
             }
             sb.Append(')');
         }
+
+        /// <summary>
+        /// FROM source for a navigation subquery's dependent table. These emit paths
+        /// build identifiers from attributes rather than a TableMapping, so the AsOf
+        /// history-window substitution resolves the mapping only when a temporal
+        /// scope is active — the non-temporal path is byte-identical to before.
+        /// </summary>
+        private string NavigationTableSource(Type dependentType, string tableName)
+            => _ctx != null && QueryTranslator.HasActiveTemporalScope
+                ? QueryTranslator.TemporalTableSource(_ctx.GetMapping(dependentType))
+                : _provider.Escape(tableName);
 
         private void AppendNavigationRelationPredicate(StringBuilder sb, TableMapping.Relation relation, string dependentAlias, string principalAlias)
         {
@@ -232,9 +243,9 @@ namespace nORM.Query
             LambdaExpression? hop2Filter)
         {
             var hop2DepMapping = _ctx!.GetMapping(hop2Rel.DependentType);
-            var hop1EscTable  = intermediateMapping.EscTable;
+            var hop1EscTable  = QueryTranslator.TemporalTableSource(intermediateMapping);
             var hop1Alias     = _provider.Escape("__mhn1");
-            var hop2EscTable  = hop2DepMapping.EscTable;
+            var hop2EscTable  = QueryTranslator.TemporalTableSource(hop2DepMapping);
             var hop2Alias     = _provider.Escape("__mhn2");
             var hop2FilterSql = hop2Filter != null
                 ? RenderNavigationFilter(hop2Filter, hop2Alias)
@@ -458,7 +469,7 @@ namespace nORM.Query
             }
 
             sb.Append('(').Append("SELECT ").Append(navAggCall)
-              .Append(" FROM ").Append(_provider.Escape(depTable)).Append(' ').Append(depAlias)
+              .Append(" FROM ").Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias)
               .Append(" WHERE ");
             AppendNavigationRelationPredicate(sb, relation, depAlias, _outerAlias);
             if (extraFilter != null)
@@ -824,7 +835,7 @@ namespace nORM.Query
             var combinedFilter = GlobalFilterFragment.Combine(_ctx!, principalMap.Type);
             if (combinedFilter != null)
                 principalFilterSql = RenderNavigationFilter(combinedFilter, principalAlias);
-            return $"(SELECT {principalAlias}.{targetColumn.EscCol} FROM {principalMap.EscTable} {principalAlias} " +
+            return $"(SELECT {principalAlias}.{targetColumn.EscCol} FROM {QueryTranslator.TemporalTableSource(principalMap)} {principalAlias} " +
                    $"WHERE {principalAlias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql}" +
                    (principalFilterSql != null ? $" AND {principalFilterSql}" : string.Empty) + ")";
         }

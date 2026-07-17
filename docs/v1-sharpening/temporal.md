@@ -59,6 +59,25 @@ returned the wrong version. `AsOf` cross-plan re-binding is covered.
       `IncludeAsOfConsistencyContractTests` + `ManyToManyTemporalContractTests`;
       `TemporalAsOfPlanCacheTests` still green.
 
+- [x] **KILL 46 (found and FIXED 2026-07-17): every JOIN-based shape leaked live state under
+      `AsOf`.** The sibling class of KILL 44 through the main statement instead of the
+      eager-load pipeline: navigation-scalar projections era-mixed (`e.Dept.Title` read the
+      LIVE principal on a historical root), navigation predicates evaluated against LIVE
+      principals (silent row loss — the era title matched nothing), `SelectMany` ignored
+      `AsOf` entirely (live values AND post-timestamp members returned), and correlated
+      navigation aggregates counted LIVE membership. Root cause: only the root FROM
+      substituted the history window; every other mapped-table reference in the statement
+      emitted the live table. FIX: an ambient temporal table-source scope (thread-static,
+      mirroring the referenced-table ambient) opens when `AsOf` is parsed and every
+      emission site — SelectMany joins, JoinBuilder (explicit Join/GroupJoin/LeftJoin),
+      aggregate and grouped-projection subqueries, ETSV navigation emitters (WHERE side),
+      SCV navigation emitters (projection side, single- and two-hop) — reads through it.
+      Mixing two AsOf timestamps in one statement and `ExecuteUpdate`/`ExecuteDelete` over
+      an AsOf source now FAIL LOUD. Pinned by `JoinAsOfConsistencyContractTests` (7 probes,
+      all differential) and `TemporalAsOfNavigationTests` rewritten from the superseded
+      "navigations read the current principal" contract to the era-consistent one (including
+      the pre-bootstrap-row-has-no-history nuance).
+
 - [~] Sustain the reconstruction fuzzer dry window. (NH-0601 recorded a 50-test dry run;
       env-directed sweeps now feed `docs/v1-sharpening/fuzzer-dry-log.md` via
       `NORM_TEMPORAL_FUZZ_SWEEP="start:count"` — seeds 702000-702079 swept dry 2026-07-16.)

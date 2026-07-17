@@ -66,7 +66,7 @@ namespace nORM.Query
                 selectorSql = _provider.AverageAggregateOperand(selectorSql, selectorLambda.Body.Type);
 
             _sql.Append("(SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
-                .Append(" FROM ").Append(childMapping.EscTable).Append(' ').Append(subAlias)
+                .Append(" FROM ").Append(QueryTranslator.TemporalTableSource(childMapping)).Append(' ').Append(subAlias)
                 .Append(" WHERE ");
             AppendRelationPredicate(_sql, relation, subAlias, parentInfo.Alias);
             _sql.Append(')');

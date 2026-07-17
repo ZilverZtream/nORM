@@ -182,6 +182,17 @@ the runtime model.
   associations onto historical rows. Query the historical entities without the
   many-to-many `Include`, or model the association as a mapped entity if its
   history matters.
+- The same one-point-in-time rule covers every table the statement itself
+  reads: navigation members in projections and predicates (`e.Dept.Title`),
+  `SelectMany` navigation flattening, explicit `Join`, and correlated
+  navigation aggregates (`d.Emps.Count()`) all read through the root's history
+  window — era values and era membership, never live-table leaks. A row
+  written outside temporal tracking (raw SQL before bootstrap) has no history
+  and is therefore missing from `AsOf` reads, through navigations exactly as
+  at the root. Two different `AsOf` timestamps cannot be combined in one
+  statement, and `ExecuteUpdate`/`ExecuteDelete` reject an `AsOf` source
+  (writes target the live table): both fail with
+  `NormUnsupportedFeatureException`.
 - Owned collections (`OwnsMany`) reconstruct under `AsOf` too: temporal history
   tables and triggers are generated from the live table's physical column set,
   so the owned child table's history carries the owner key and the owned rows

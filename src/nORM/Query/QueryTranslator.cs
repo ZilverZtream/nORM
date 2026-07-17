@@ -228,6 +228,9 @@ namespace nORM.Query
             {
                 var ownsOrdinalScope = BeginClosureOrdinalScope(e);
                 var ownsTableScope = BeginReferencedTableScope();
+                // The temporal scope opens lazily when an AsOf node is parsed; the
+                // top-level translation (no scope active at entry) always ends it.
+                var ownsTemporalScope = t_temporalScope == null;
                 try
                 {
                     return new TranslationBuilder(this, e)
@@ -241,6 +244,8 @@ namespace nORM.Query
                         EndClosureOrdinalScope();
                     if (ownsTableScope)
                         EndReferencedTableScope();
+                    if (ownsTemporalScope)
+                        EndTemporalTableSourceScope();
                 }
             }
         }

@@ -278,7 +278,7 @@ namespace nORM.Query
                     if (!string.IsNullOrWhiteSpace(sourceFromSql))
                         _sql.AppendFragment(sourceFromSql);
                     else
-                        _sql.AppendFragment(" FROM ").Append(_mapping.EscTable).Append(' ').Append(alias);
+                        _sql.AppendFragment(" FROM ").Append(TemporalTableSource(_mapping)).Append(' ').Append(alias);
                     // Applied lateral columns (a navigation-member GROUP BY key exposed
                     // as a groupable column on providers that reject subqueries in
                     // GROUP BY) attach directly after the source table.
@@ -504,7 +504,7 @@ namespace nORM.Query
             if (indexExpr != null)
                 offsetSql = TranslateAgainstSubAlias(indexExpr, Expression.Parameter(typeof(int), "__idx"), subAlias);
 
-            return _provider.BuildCorrelatedSingleRowSubquery(selectSql, _mapping.EscTable, subAlias, whereSql, orderByFull, offsetSql);
+            return _provider.BuildCorrelatedSingleRowSubquery(selectSql, TemporalTableSource(_mapping), subAlias, whereSql, orderByFull, offsetSql);
         }
 
         /// <summary>

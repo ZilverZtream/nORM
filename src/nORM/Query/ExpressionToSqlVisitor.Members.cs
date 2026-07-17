@@ -237,7 +237,7 @@ namespace nORM.Query
             // the navigation too: a filtered-out parent must read as a MISSING parent
             // (NULL member), or its data leaks through predicates and projections.
             var globalFilterSql = RenderPrincipalGlobalFilterSql(principalMap, alias);
-            return $"(SELECT {alias}.{targetCol.EscCol} FROM {principalMap.EscTable} {alias} " +
+            return $"(SELECT {alias}.{targetCol.EscCol} FROM {QueryTranslator.TemporalTableSource(principalMap)} {alias} " +
                    $"WHERE {alias}.{principalMap.KeyColumns[0].EscCol} = {fkValueSql}" +
                    (globalFilterSql != null ? $" AND {globalFilterSql}" : string.Empty) + ")";
         }
@@ -275,7 +275,7 @@ namespace nORM.Query
                 return true;
             }
             _sql.Append(testIsNull ? "NOT EXISTS(" : "EXISTS(")
-                .Append("SELECT 1 FROM ").Append(principalMap.EscTable).Append(' ').Append(probeAlias)
+                .Append("SELECT 1 FROM ").Append(QueryTranslator.TemporalTableSource(principalMap)).Append(' ').Append(probeAlias)
                 .Append(" WHERE ").Append(probeAlias).Append('.').Append(principalMap.KeyColumns[0].EscCol)
                 .Append(" = ").Append(fkValueSql)
                 .Append(" AND ").Append(filterSql).Append(')');

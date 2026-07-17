@@ -324,24 +324,10 @@ namespace nORM.Query
                     if (_t._asOfTimestamp.HasValue)
                     {
                         alias ??= _t.EscapeAlias("T0");
-                        var timeParamName = _t._provider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();
-                        _t.AddLiteralParameter(timeParamName, _t._provider.FormatTemporalAsOfParameterValue(_t._asOfTimestamp.Value));
-                        if (_t._ctx.Options.TemporalStorageMode == TemporalStorageMode.ProviderNative)
-                        {
-                            fromClause = _t._provider.GetProviderNativeTemporalAsOfFromClause(_t._mapping, timeParamName);
-                        }
-                        else
-                        {
-                            var historyTable = _t._provider.Escape(_t._mapping.TableName + "_History");
-                            var cols = PooledStringBuilder.Join(_t._mapping.Columns.Select(c => c.EscCol));
-                            var t1 = _t.EscapeAlias("T1");
-                            var temporalQuery = $@"
-(
-    SELECT {cols} FROM {historyTable} {t1}
-    WHERE {timeParamName} >= {t1}.{_t._provider.Escape("__ValidFrom")} AND {timeParamName} < {t1}.{_t._provider.Escape("__ValidTo")}
-)";
-                            fromClause = temporalQuery;
-                        }
+                        fromClause = TemporalTableSource(_t._mapping);
+                        if (ReferenceEquals(fromClause, _t._mapping.EscTable))
+                            throw new NormQueryException(
+                                "Internal error: an AsOf timestamp is set but no temporal window scope is active.");
                     }
                     if (_t._isAggregate && _t._groupBy.Count == 0)
                     {

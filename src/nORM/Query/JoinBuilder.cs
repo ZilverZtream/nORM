@@ -134,8 +134,8 @@ namespace nORM.Query
                 joinSql.Append(' ');
             }
 
-            joinSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
-            joinSql.Append($"{joinType} {innerMapping.EscTable} {innerAlias} ");
+            joinSql.Append($"FROM {QueryTranslator.TemporalTableSource(outerMapping)} {outerAlias} ");
+            joinSql.Append($"{joinType} {QueryTranslator.TemporalTableSource(innerMapping)} {innerAlias} ");
             joinSql.Append($"ON {BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType)}");
             if (orderBy != null)
                 joinSql.Append($" ORDER BY {orderBy}");
@@ -503,9 +503,9 @@ namespace nORM.Query
             }
             else
             {
-                joinSql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+                joinSql.Append(QueryTranslator.TemporalTableSource(outerMapping)).Append(' ').Append(outerAlias).Append(' ');
             }
-            joinSql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
+            joinSql.Append(joinType).Append(' ').Append(QueryTranslator.TemporalTableSource(innerMapping)).Append(' ').Append(innerAlias).Append(' ');
             joinSql.Append("ON ").Append(onSqlOverride ?? BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType));
             if (!string.IsNullOrEmpty(additionalOnConditions))
                 joinSql.Append(" AND ").Append(additionalOnConditions);

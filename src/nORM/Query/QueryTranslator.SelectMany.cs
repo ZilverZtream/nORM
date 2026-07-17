@@ -272,7 +272,7 @@ namespace nORM.Query
             _sql.Append(' ');
             AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
             var joinType = useLeftJoin ? "LEFT JOIN" : "INNER JOIN";
-            _sql.Append(joinType).Append(' ').Append(innerMapping.EscTable).Append(' ').Append(innerAlias).Append(' ');
+            _sql.Append(joinType).Append(' ').Append(TemporalTableSource(innerMapping)).Append(' ').Append(innerAlias).Append(' ');
             _sql.Append("ON ").Append(relationOnSql);
 
             // The child's global filters (soft-delete, tenant) must gate the flattened rows.
@@ -436,7 +436,7 @@ namespace nORM.Query
 
             _sql.Append(' ');
             AppendSelectManyOuterFrom(outerMapping, outerAlias, outerFromOverride);
-            _sql.Append(useLeftJoin ? "LEFT JOIN " : "INNER JOIN ").Append(corrInnerMapping.EscTable).Append(' ').Append(corrInnerAlias).Append(' ');
+            _sql.Append(useLeftJoin ? "LEFT JOIN " : "INNER JOIN ").Append(TemporalTableSource(corrInnerMapping)).Append(' ').Append(corrInnerAlias).Append(' ');
             _sql.Append("ON ").Append(corrPredSql);
             // See TryHandleNavigationSelectMany: a result selector's unmapped projection
             // shape means the provider-level rewrite cannot carry the inner's filter.
@@ -561,7 +561,7 @@ namespace nORM.Query
             if (outerFromOverride != null)
                 crossSql.Append("FROM (").Append(outerFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
             else
-                crossSql.Append($"FROM {outerMapping.EscTable} {outerAlias} ");
+                crossSql.Append($"FROM {TemporalTableSource(outerMapping)} {outerAlias} ");
 
             // See TryHandleNavigationSelectMany: a result selector's unmapped projection
             // shape means the provider-level rewrite cannot carry the inner's filter. A
@@ -571,17 +571,17 @@ namespace nORM.Query
                 : null;
             if (useLeftJoin)
             {
-                crossSql.Append($"LEFT JOIN {crossMapping.EscTable} {crossAlias} ON 1=1");
+                crossSql.Append($"LEFT JOIN {TemporalTableSource(crossMapping)} {crossAlias} ON 1=1");
                 if (crossFilterSql != null)
                     crossSql.Append($" AND ({crossFilterSql})");
             }
             else if (crossFilterSql != null)
             {
-                crossSql.Append($"INNER JOIN {crossMapping.EscTable} {crossAlias} ON ({crossFilterSql})");
+                crossSql.Append($"INNER JOIN {TemporalTableSource(crossMapping)} {crossAlias} ON ({crossFilterSql})");
             }
             else
             {
-                crossSql.Append($"CROSS JOIN {crossMapping.EscTable} {crossAlias}");
+                crossSql.Append($"CROSS JOIN {TemporalTableSource(crossMapping)} {crossAlias}");
             }
 
             _sql.Clear();
@@ -815,7 +815,7 @@ namespace nORM.Query
             if (outerFromOverride != null)
                 _sql.Append('(').Append(outerFromOverride).Append(") AS ").Append(outerAlias).Append(' ');
             else
-                _sql.Append(outerMapping.EscTable).Append(' ').Append(outerAlias).Append(' ');
+                _sql.Append(TemporalTableSource(outerMapping)).Append(' ').Append(outerAlias).Append(' ');
         }
 
         private static void AppendCrossSelectManyAllColumns(

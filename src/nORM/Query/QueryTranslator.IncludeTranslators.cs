@@ -283,6 +283,7 @@ namespace nORM.Query
                 {
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, ".AsOf() requires a constant DateTime or string tag."));
                 }
+                t.BeginTemporalTableSourceScope();
                 return t.Visit(node.Arguments[0]);
             }
         }
