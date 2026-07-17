@@ -63,6 +63,52 @@ public class ProviderCapabilityContractTests
             $"Expected '{major}.{minor}' in Minimum Version cell for {label}, got: {minVersionCell}");
     }
 
+    [Theory]
+    [InlineData(typeof(SqlServerProvider), true, true, true, true, true, true, new[] { "Microsoft.Data.SqlClient" })]
+    [InlineData(typeof(PostgresProvider), true, true, false, true, true, true, new[] { "Npgsql" })]
+    [InlineData(typeof(MySqlProvider), true, true, false, true, true, false, new[] { "MySqlConnector", "MySql.Data" })]
+    [InlineData(typeof(SqliteProvider), true, true, false, false, true, false, new[] { "Microsoft.Data.Sqlite" })]
+    public void Provider_capability_flags_match_documented_matrix(
+        Type providerType, bool json, bool temporal, bool nativeTemporalDdl,
+        bool nativeBulk, bool savepoints, bool nativeTenantSession, string[] drivers)
+    {
+        var provider = (DatabaseProvider)Activator.CreateInstance(providerType, nonPublic: true)!;
+        var capabilities = provider.Capabilities;
+        Assert.Equal(json, capabilities.SupportsJson);
+        Assert.Equal(temporal, capabilities.SupportsTemporalVersioning);
+        Assert.Equal(nativeTemporalDdl, provider.SupportsProviderNativeTemporalTables);
+        Assert.Equal(nativeBulk, capabilities.SupportsNativeBulkInsert);
+        Assert.Equal(savepoints, capabilities.SupportsSavepoints);
+        Assert.Equal(nativeTenantSession, provider.SupportsNativeTenantSessionContext);
+        foreach (var driver in drivers)
+            Assert.Contains(driver, capabilities.Notes, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("SQL Server", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Microsoft.Data.SqlClient")]
+    [InlineData("PostgreSQL", "Yes", "Yes", "No", "Yes", "Yes", "Yes", "Npgsql")]
+    [InlineData("MySQL", "Yes", "Yes", "No", "Yes", "Yes", "No", "MySqlConnector")]
+    [InlineData("SQLite", "JSON1-dependent", "Yes", "No", "No", "Yes", "No", "Microsoft.Data.Sqlite")]
+    public void Documented_capability_cells_match_provider_table(
+        string label, string json, string temporal, string nativeTemporalDdl,
+        string nativeBulk, string savepoints, string nativeTenantSession, string driver)
+    {
+        var row = File.ReadAllLines(DocPath())
+            .FirstOrDefault(l => l.StartsWith($"| {label} |", StringComparison.Ordinal));
+        Assert.False(row is null, $"No provider table row found for '{label}' in docs/provider-capabilities.md");
+        var cells = row!.Trim().Trim('|').Split('|').Select(c => c.Trim()).ToArray();
+        // Provider | Minimum Version | Notes | JSON | Temporal | Native Temporal DDL |
+        // Native Bulk Insert | Savepoints | Native Tenant Session | Driver
+        Assert.Equal(10, cells.Length);
+        Assert.Equal(json, cells[3]);
+        Assert.Equal(temporal, cells[4]);
+        Assert.Equal(nativeTemporalDdl, cells[5]);
+        Assert.Equal(nativeBulk, cells[6]);
+        Assert.Equal(savepoints, cells[7]);
+        Assert.Equal(nativeTenantSession, cells[8]);
+        Assert.Contains(driver, cells[9], StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Provider_floor_feature_evidence_is_documented_for_release_review()
     {

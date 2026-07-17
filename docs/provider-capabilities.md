@@ -23,7 +23,9 @@ MariaDB-specific capability/version decisions and a live gate.
 Versions in the Minimum Version column are floors enforced at runtime: connections to older
 servers fail startup validation with a `NormConfigurationException` that names the actual
 and minimum versions. `ProviderCapabilityContractTests` enforces that this table and the
-runtime `Capabilities.MinimumServerVersion` for each provider stay in sync.
+runtime capability surface stay in sync for every column: `Capabilities.MinimumServerVersion`,
+the JSON/temporal/native-bulk/savepoint flags, provider-native temporal DDL support,
+provider-native tenant session support, and the driver named in `Capabilities.Notes`.
 Temporal "Yes" means nORM-managed history tables/triggers, not provider-native
 temporal tables; `LiveProviderTemporalParityTests` verifies the live execution
 contract across all four providers. MySQL temporal history and tags use
