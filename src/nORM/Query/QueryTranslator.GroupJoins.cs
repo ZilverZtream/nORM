@@ -214,6 +214,16 @@ namespace nORM.Query
                 if (!_correlatedParams.ContainsKey(composedInner))
                     _correlatedParams[composedInner] = (innerMapping, innerAlias);
             }
+            // Inner-source WHERE conditions (an explicit filter, or the injected
+            // soft-delete/tenant predicates on the inner root) go into the JOIN ON
+            // clause — ON, not WHERE, so a filtered-out inner row reads as UNMATCHED
+            // and the outer row survives with an empty group instead of vanishing.
+            // Without this the grouped rows leak filtered inner rows (another
+            // tenant's, or soft-deleted) into the client-side group materializer.
+            var gjInnerOnConditions = ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
+            var gjAdditionalOnSql = gjInnerOnConditions.Count > 0
+                ? string.Join(" AND ", gjInnerOnConditions.Select(c => "(" + c + ")"))
+                : null;
             // Do NOT embed ORDER BY in the SQL string. Instead, insert the outer key as the
             // first ORDER BY entry so that Build() generates exactly one ORDER BY clause.
             // This prevents double ORDER BY when downstream .OrderBy() is chained, and ensures
@@ -232,6 +242,7 @@ namespace nORM.Query
                 orderBy: null,
                 distinct: _isDistinct,
                 outerFromOverride: gjOuterFromOverride,
+                additionalOnConditions: gjAdditionalOnSql,
                 provider: _provider,
                 keyClrType: sqlOuterKeySelector.Body.Type,
                 onSqlOverride: gjCompositeOnSql);

@@ -613,7 +613,10 @@ namespace nORM.Query
         {
             if (_ctx == null)
                 return null;
-            var combined = GlobalFilterFragment.Combine(_ctx, innerMapping.Type);
+            // Full row visibility (global filters AND tenant): the inner source sits
+            // inside the collection-selector lambda, which the provider's top-level
+            // filter/tenant rewrite never reaches.
+            var combined = GlobalFilterFragment.CombineWithTenant(_ctx, innerMapping.Type);
             if (combined == null)
                 return null;
             var vctx = new VisitorContext(_ctx, innerMapping, _provider, combined.Parameters[0], innerAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);

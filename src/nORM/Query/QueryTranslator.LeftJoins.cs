@@ -108,6 +108,16 @@ namespace nORM.Query
 
             JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
+            // Inner-source WHERE conditions (explicit filters, or the injected
+            // soft-delete/tenant predicates on the inner root) belong in the JOIN ON
+            // clause — ON, not WHERE, so a filtered-out inner row reads as UNMATCHED
+            // and the LEFT JOIN keeps the outer row with a NULL inner instead of
+            // leaking the filtered row into the flattened result.
+            var ljInnerOnConditions = ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
+            var ljAdditionalOnSql = ljInnerOnConditions.Count > 0
+                ? string.Join(" AND ", ljInnerOnConditions.Select(c => "(" + c + ")"))
+                : null;
+
             _sql.Clear();
             JoinBuilder.BuildJoinClauseInto(
                 _sql,
@@ -120,6 +130,7 @@ namespace nORM.Query
                 outerKeySql,
                 innerKeySql,
                 distinct: _isDistinct,
+                additionalOnConditions: ljAdditionalOnSql,
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,
                 provider: _provider,

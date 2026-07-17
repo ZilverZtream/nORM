@@ -25,6 +25,18 @@ tenant column resolves from `Options.TenantColumnName`. Native RLS paths exist p
       poisoning, fail-closed, and global-filter bypass.
 - [x] Cache keys include the tenant discriminator on every cacheable path (NH-0701):
       `MultiTenantResultCachePoisoning` + `MultiTenantPlanCache` green.
+- [x] **KILL 49 (found and FIXED 2026-07-17): explicit join shapes leaked across tenants —
+      live.** GroupJoin's grouped inner rows (`(d, es) => es.Count()`) and the
+      GroupJoin+DefaultIfEmpty LEFT-JOIN flatten dropped the inner source's injected tenant
+      Where — the root rewrite wraps Join/GroupJoin inner sources, but only the INNER-Join
+      translator pushed inner WHERE conditions into the JOIN ON clause. Cross-join
+      SelectMany's inner visibility renderer applied global filters without the tenant
+      predicate (the inner source sits inside the collection-selector lambda, which the
+      top-level rewrite never reaches). Fixed: GroupJoin and the left-join flatten push the
+      extracted inner conditions into the LEFT JOIN ON (a filtered-out inner row reads as
+      unmatched, so outer rows keep empty groups instead of leaking), and the SelectMany
+      inner renderer uses the full visibility predicate. Pinned in
+      `TenantJoinAsOfConsistencyContractTests`.
 - [x] **KILL 48 (found and FIXED 2026-07-17): navigation subqueries leaked across tenants —
       live, not temporal.** The NH-0701 sweep missed the correlated navigation-aggregate
       emitters: `d.Emps.Count()` in a projection counted a FOREIGN tenant's dependent that
