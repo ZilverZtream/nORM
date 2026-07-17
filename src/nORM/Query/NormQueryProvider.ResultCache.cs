@@ -154,6 +154,23 @@ namespace nORM.Query
                 {
                     AppendLengthPrefixedBytes(hasher, bytesValue);
                 }
+                // Temporal values MUST serialize at full (tick) precision: the general format the
+                // IFormattable branch below uses drops fractional seconds for DateTime/DateTimeOffset
+                // and drops seconds entirely for TimeOnly, so two Cacheable queries differing only by
+                // a sub-second timestamp would collide on one key and the second would serve the
+                // first's rows. The round-trip "O" format is exact to the tick and keeps Kind/offset.
+                else if (kvp.Value is DateTime dtValue)
+                {
+                    AppendLengthPrefixedUtf8(hasher, dtValue.ToString("O", CultureInfo.InvariantCulture).AsSpan());
+                }
+                else if (kvp.Value is DateTimeOffset dtoValue)
+                {
+                    AppendLengthPrefixedUtf8(hasher, dtoValue.ToString("O", CultureInfo.InvariantCulture).AsSpan());
+                }
+                else if (kvp.Value is TimeOnly timeOnlyValue)
+                {
+                    AppendLengthPrefixedUtf8(hasher, timeOnlyValue.ToString("O", CultureInfo.InvariantCulture).AsSpan());
+                }
                 else if (kvp.Value is IFormattable formattable)
                 {
                     AppendLengthPrefixedUtf8(hasher, formattable.ToString(null, CultureInfo.InvariantCulture)!.AsSpan());
