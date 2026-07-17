@@ -137,6 +137,13 @@ namespace nORM.Query
                     case nameof(Queryable.Take):
                         if (takeCount.HasValue || call.Arguments[1] is not ConstantExpression takeConst || takeConst.Value is not int take || take < 0)
                             return false;
+                        // A Where/OrderBy already collected (visited OUTER to this Take in the
+                        // top-down walk) means the chain is `.Take(n).Where(p)` / `.Take(n).OrderBy(k)`:
+                        // LINQ pages FIRST then filters/orders, which needs a derived-table wrap the
+                        // flat SQL can't express. Surrender to the slow translator instead of emitting
+                        // `WHERE p LIMIT n` (wrong rows).
+                        if (predicates.Count > 0 || orderProperty != null)
+                            return false;
                         takeCount = take;
                         sawPagingOrOrdering = true;
                         sawPaging = true;
@@ -145,6 +152,12 @@ namespace nORM.Query
 
                     case nameof(Queryable.Skip):
                         if (skipCount.HasValue || call.Arguments[1] is not ConstantExpression skipConst || skipConst.Value is not int skip || skip < 0)
+                            return false;
+                        // Same rule as Take: a filter/order outer to this Skip is `.Skip(n).Where(p)`,
+                        // which pages first then filters. Beyond wrong rows, the flat builder would emit
+                        // a bare OFFSET with no LIMIT (invalid SQL on SQLite/MySQL) — the slow path
+                        // handles the skip-only shape correctly, so defer to it.
+                        if (predicates.Count > 0 || orderProperty != null)
                             return false;
                         skipCount = skip;
                         sawPagingOrOrdering = true;
