@@ -51,6 +51,13 @@ namespace nORM.Core
                 }
                 _providerInitLock.Dispose();
                 _temporalInitLock.Dispose();
+                // Dispose the cached query provider: it pools DbCommands (leaked otherwise, plus
+                // SQLite prepared-statement handles) and decrements the static active-provider
+                // count so the background plan-cache / cache-lock timers can stop. Neither happened
+                // while the provider was created-and-cached but never disposed. Before the owned
+                // connection is torn down, since the pooled commands reference it.
+                _cachedQueryProvider?.Dispose();
+                _cachedQueryProvider = null;
                 DisposePreparedInsertCache();
                 DisposeFastPathPreparedCommandCache();
 
@@ -202,6 +209,10 @@ namespace nORM.Core
                 }
                 _providerInitLock.Dispose();
                 _temporalInitLock.Dispose();
+                // See Dispose(bool): release the pooled DbCommands and decrement the active-provider
+                // count. NormQueryProvider is synchronously disposable only.
+                _cachedQueryProvider?.Dispose();
+                _cachedQueryProvider = null;
                 await DisposePreparedInsertCacheAsync().ConfigureAwait(false);
                 await DisposeFastPathPreparedCommandCacheAsync().ConfigureAwait(false);
                 await CleanupDisposablesAsync().ConfigureAwait(false);
