@@ -511,6 +511,38 @@ namespace nORM.Core
                 : null;
 
         /// <summary>
+        /// Builds the identity-map lookup key from explicit key values (as supplied to
+        /// <c>FindAsync</c>), producing the exact shape <see cref="GetPrimaryKeyValue"/> stores
+        /// from a tracked entity: the raw boxed value for a single key, a <see cref="ValueTuple"/>
+        /// for two or three columns, and a <see cref="CompositeKey"/> beyond that. Returns null
+        /// when the arity does not match or any component is null (a null component can never
+        /// identify a tracked row), signalling the caller to skip the identity-map short circuit.
+        /// </summary>
+        internal static object? BuildLookupKey(TableMapping mapping, IReadOnlyList<object?> keyValues)
+        {
+            if (keyValues.Count != mapping.KeyColumns.Length)
+                return null;
+            for (var i = 0; i < keyValues.Count; i++)
+                if (keyValues[i] is null)
+                    return null;
+
+            switch (mapping.KeyColumns.Length)
+            {
+                case 1:
+                    return keyValues[0];
+                case 2:
+                    return (keyValues[0], keyValues[1]);
+                case 3:
+                    return (keyValues[0], keyValues[1], keyValues[2]);
+                default:
+                    var values = new object?[keyValues.Count];
+                    for (var i = 0; i < keyValues.Count; i++)
+                        values[i] = keyValues[i];
+                    return new CompositeKey(values);
+            }
+        }
+
+        /// <summary>
         /// Detects changes only for entities that were explicitly marked dirty via
         /// <see cref="MarkDirty"/>. For snapshot-based detection of all non-INPC entities,
         /// use <see cref="DetectAllChanges"/> (called internally from SaveChanges).
