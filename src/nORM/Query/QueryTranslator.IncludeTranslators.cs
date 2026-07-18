@@ -49,6 +49,54 @@ namespace nORM.Query
             return new TableMapping.Relation(prop, principalType, fk, principalMap.KeyColumns[0], false);
         }
 
+        /// <summary>
+        /// Extracts the navigation member from an Include/ThenInclude body, peeling a filtered-Include
+        /// <c>nav.Where(pred)</c> and returning the captured predicate via <paramref name="filter"/>.
+        /// </summary>
+        private static MemberExpression PeelIncludeMember(Expression body, out LambdaExpression? filter)
+        {
+            filter = null;
+            if (body is UnaryExpression convert)
+                body = convert.Operand;
+            if (body is MethodCallExpression whereCall
+                && whereCall.Method.Name == nameof(Enumerable.Where)
+                && whereCall.Arguments.Count == 2
+                && (whereCall.Method.DeclaringType == typeof(Enumerable) || whereCall.Method.DeclaringType == typeof(Queryable))
+                && StripQuotes(whereCall.Arguments[1]) is LambdaExpression { Parameters.Count: 1 } predicate)
+            {
+                filter = predicate;
+                body = whereCall.Arguments[0];
+                if (body is UnaryExpression innerConvert)
+                    body = innerConvert.Operand;
+            }
+            return (MemberExpression)body;
+        }
+
+        /// <summary>
+        /// Renders a filtered-Include predicate to SQL against the eager-load alias for
+        /// <paramref name="levelIndex"/> (the IncludeProcessor uses <c>__inc{level}</c>), closure-safely
+        /// through the shared compiled-parameter channel so captured variables re-bind per execution.
+        /// Returns null when there is no filter.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private static IncludeFilter? RenderIncludeFilter(QueryTranslator t, TableMapping.Relation relation, LambdaExpression? filter, int levelIndex)
+        {
+            if (filter == null || t._ctx == null)
+                return null;
+
+            var childMapping = t._ctx.GetMapping(relation.DependentType);
+            var scv = new SelectClauseVisitor(childMapping, new List<string>(), t._provider, outerAlias: null, ctx: t._ctx)
+            {
+                SharedParams = t._params,
+                SharedCompiledParams = t._compiledParams,
+                SharedParamConverters = t._paramConverters,
+            };
+            var alias = t._provider.Escape("__inc" + levelIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var rendered = scv.RenderFilterAgainstAlias(filter, alias);
+            return new IncludeFilter(rendered.Sql, rendered.Parameters);
+        }
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class IncludeTranslator : IMethodCallTranslator
@@ -84,13 +132,13 @@ namespace nORM.Query
                     var includeLambda = rawLambda is UnaryExpression qu ? qu.Operand as LambdaExpression : rawLambda as LambdaExpression;
                     if (includeLambda != null)
                     {
-                        var member = includeLambda.Body is UnaryExpression unary ?
-                                     (MemberExpression)unary.Operand :
-                                     (MemberExpression)includeLambda.Body;
+                        var member = PeelIncludeMember(includeLambda.Body, out var includeFilter);
                         var propName = member.Member.Name;
                         if (t._mapping != null && t._mapping.Relations.TryGetValue(propName, out var relation))
                         {
-                            t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { relation }));
+                            var plan = new IncludePlan(new List<TableMapping.Relation> { relation });
+                            plan.Filters.Add(RenderIncludeFilter(t, relation, includeFilter, 0));
+                            t._includes.Add(plan);
                             t.TrackMapping(relation.DependentType);
                         }
                         else if (t._mapping != null)
@@ -99,12 +147,18 @@ namespace nORM.Query
                             var jtm = t._mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == propName);
                             if (jtm != null)
                             {
+                                if (includeFilter != null)
+                                    throw new NormUnsupportedFeatureException(
+                                        $"A filtered Include on the many-to-many navigation '{propName}' is not supported. " +
+                                        "Filter after materialization, or model the relationship as an explicit join entity.");
                                 t._m2mIncludes.Add(new M2MIncludePlan(jtm));
                                 t.TrackMapping(jtm.RightType);
                             }
                             else if (TryBuildReferenceIncludeRelation(t, t._mapping, member.Member) is { } refRelation)
                             {
-                                t._includes.Add(new IncludePlan(new List<TableMapping.Relation> { refRelation }));
+                                var plan = new IncludePlan(new List<TableMapping.Relation> { refRelation });
+                                plan.Filters.Add(RenderIncludeFilter(t, refRelation, includeFilter, 0));
+                                t._includes.Add(plan);
                             }
                         }
                     }
@@ -132,23 +186,24 @@ namespace nORM.Query
                     var thenLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
                     if (thenLambda != null)
                     {
-                        var member = thenLambda.Body is UnaryExpression unary2 ?
-                                     (MemberExpression)unary2.Operand :
-                                     (MemberExpression)thenLambda.Body;
+                        var member = PeelIncludeMember(thenLambda.Body, out var includeFilter);
                         var propName = member.Member.Name;
                         if (t._includes.Count > 0)
                         {
                             var lastInclude = t._includes[^1];
                             var lastRelation = lastInclude.Path.Last();
                             var parentMap = t.TrackMapping(lastRelation.DependentType);
+                            var levelIndex = lastInclude.Path.Count;
                             if (parentMap.Relations.TryGetValue(propName, out var relation))
                             {
                                 lastInclude.Path.Add(relation);
+                                lastInclude.Filters.Add(RenderIncludeFilter(t, relation, includeFilter, levelIndex));
                                 t.TrackMapping(relation.DependentType);
                             }
                             else if (TryBuildReferenceIncludeRelation(t, parentMap, member.Member) is { } refRelation)
                             {
                                 lastInclude.Path.Add(refRelation);
+                                lastInclude.Filters.Add(RenderIncludeFilter(t, refRelation, includeFilter, levelIndex));
                             }
                         }
                     }

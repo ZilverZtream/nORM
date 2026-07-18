@@ -147,7 +147,17 @@ namespace nORM.Query
         bool HasPaging
     );
 
-    internal sealed record IncludePlan(List<TableMapping.Relation> Path);
+    /// <summary>A filtered-Include predicate (from <c>Include(o =&gt; o.Lines.Where(pred))</c>), rendered to
+    /// SQL against the level's alias at plan-build time, with the compiled-parameter names it references
+    /// (closure captures) for per-execution rebinding.</summary>
+    internal sealed record IncludeFilter(string Sql, IReadOnlyList<string> Parameters);
+
+    internal sealed record IncludePlan(List<TableMapping.Relation> Path)
+    {
+        /// <summary>Per-level filter predicates, parallel to <see cref="Path"/> (null where a level has no
+        /// filter). Grows alongside Path as ThenInclude extends the chain.</summary>
+        public List<IncludeFilter?> Filters { get; } = new();
+    }
 
     /// <summary>Eager-load plan for a many-to-many navigation property.</summary>
     internal sealed record M2MIncludePlan(JoinTableMapping JoinTable);

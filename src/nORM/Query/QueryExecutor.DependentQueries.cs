@@ -157,6 +157,37 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Snapshots the compiled-parameter values any filtered Include (<c>Include(o =&gt; o.Lines.Where(pred))</c>)
+        /// references from the main command while it is still alive — the JOIN-based eager load runs on
+        /// separate commands, so the closure captures must be carried across the same way the split-query
+        /// dependent-filter path carries them. Returns null when no include carries a filter parameter, so
+        /// the common bare-include path allocates nothing.
+        /// </summary>
+        private static Dictionary<string, object?>? CaptureIncludeFilterParams(DbCommand command, IReadOnlyList<IncludePlan>? includes)
+        {
+            if (includes == null)
+                return null;
+
+            Dictionary<string, object?>? snapshot = null;
+            foreach (var include in includes)
+            {
+                foreach (var filter in include.Filters)
+                {
+                    if (filter == null)
+                        continue;
+                    foreach (var name in filter.Parameters)
+                    {
+                        if (snapshot != null && snapshot.ContainsKey(name))
+                            continue;
+                        if (command.Parameters.Contains(name))
+                            (snapshot ??= new Dictionary<string, object?>(StringComparer.Ordinal))[name] = command.Parameters[name].Value;
+                    }
+                }
+            }
+            return snapshot;
+        }
+
+        /// <summary>
         /// Appends a shaped-collection filter (<c>o.Lines.Where(pred).ToList()</c>) — rendered to SQL at
         /// plan-build time — onto the child fetch, binding the compiled parameters it references from the
         /// captured main-command values so closure captures re-bind per execution. No-op when the dependent

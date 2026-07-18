@@ -210,6 +210,10 @@ namespace nORM.Query
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
                 bool isReadOnly = IsReadOnlyQuery();
 
+                // Snapshot any filtered-Include closure params while the command is alive (its lifetime
+                // may transfer to the reader), so the eager-load phase can rebind them per execution.
+                var includeFilterParams = CaptureIncludeFilterParams(command, plan.Includes);
+
                 await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
 
@@ -235,7 +239,7 @@ namespace nORM.Query
                     // Convert to IList for EagerLoadAsync compatibility
                     IList iList = list;
                     foreach (var include in plan.Includes)
-                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams).ConfigureAwait(false);
                 }
 
                 // M2M eager loading runs unconditionally (no SplitQuery requirement)
@@ -305,6 +309,7 @@ namespace nORM.Query
                 // Snapshot any shaped-collection filter params while the command is alive (its lifetime
                 // may transfer to the reader), so the split-query phase can rebind them per execution.
                 var dependentFilterParams = CaptureDependentFilterParams(command, plan.DependentQueries);
+                var includeFilterParams = CaptureIncludeFilterParams(command, plan.Includes);
 
                 await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
@@ -355,7 +360,7 @@ namespace nORM.Query
                 {
                     foreach (var include in plan.Includes)
                     {
-                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams).ConfigureAwait(false);
                     }
                 }
 
@@ -424,6 +429,7 @@ namespace nORM.Query
                 // Snapshot any shaped-collection filter params BEFORE the reader takes over the command's
                 // lifetime (it disposes the command on reader dispose), so the split-query phase can rebind them.
                 var dependentFilterParams = CaptureDependentFilterParams(command, plan.DependentQueries);
+                var includeFilterParams = CaptureIncludeFilterParams(command, plan.Includes);
 
                 commandLifetimeTransferred = true;
                 using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, GetEntityReadBehavior(plan.ElementType));
@@ -468,7 +474,7 @@ namespace nORM.Query
                     foreach (var include in plan.Includes)
                     {
                         // Truly synchronous eager load - no GetAwaiter().GetResult().
-                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp);
+                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams);
                     }
                 }
 

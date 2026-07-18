@@ -114,6 +114,28 @@ namespace nORM.Query
             return new RenderedCollectionFilter(sql, parameters);
         }
 
+        /// <summary>
+        /// Renders a filtered-Include predicate to SQL against an explicit alias (the eager-load level's
+        /// alias), closure-safely through the shared compiled-parameter channel — the same rendering the
+        /// shaped-collection filter uses, but qualified by a caller-supplied alias rather than the child
+        /// table. The eager-load child fetch ANDs the returned SQL on and rebinds its @cp parameters.
+        /// </summary>
+        internal RenderedCollectionFilter RenderFilterAgainstAlias(LambdaExpression filter, string alias)
+        {
+            var before = SharedCompiledParams?.Count ?? 0;
+            var sql = RenderNavigationFilter(filter, alias);
+
+            IReadOnlyList<string> parameters = Array.Empty<string>();
+            if (SharedCompiledParams != null && SharedCompiledParams.Count > before)
+            {
+                var minted = new List<string>(SharedCompiledParams.Count - before);
+                for (var i = before; i < SharedCompiledParams.Count; i++)
+                    minted.Add(SharedCompiledParams[i]);
+                parameters = minted;
+            }
+            return new RenderedCollectionFilter(sql, parameters);
+        }
+
         /// <summary>A lambda argument is a bare LambdaExpression (Enumerable overloads) or a Quote-wrapped one (Queryable overloads).</summary>
         private static LambdaExpression? UnwrapLambda(Expression arg)
             => arg as LambdaExpression
