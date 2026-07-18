@@ -437,6 +437,38 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Enlists the context in an externally-created <see cref="DbTransaction"/>, matching Entity Framework
+        /// Core's <c>Database.UseTransaction</c> — so nORM's commands and <c>SaveChanges</c> run inside a
+        /// transaction begun by raw ADO.NET or another library on the same connection (see
+        /// <see cref="GetDbConnection"/>). The context does NOT take ownership: disposing the returned wrapper
+        /// or the context never disposes the caller's transaction, though committing or rolling it back through
+        /// the wrapper is allowed. Passing <c>null</c> clears the current transaction (without disposing it).
+        /// Because it accepts a provider-specific handle it is disallowed under strict provider mobility.
+        /// </summary>
+        /// <param name="transaction">The externally-managed transaction to enlist, or <c>null</c> to clear.</param>
+        /// <returns>A non-owning <see cref="DbContextTransaction"/> wrapper, or <c>null</c> when clearing.</returns>
+        /// <exception cref="NormUsageException">A transaction is already active.</exception>
+        public DbContextTransaction? UseTransaction(DbTransaction? transaction)
+        {
+            _context.ThrowIfStrictProviderMobilityEscapeHatch(nameof(UseTransaction));
+
+            if (transaction == null)
+            {
+                if (_context.CurrentTransaction is { } current)
+                    _context.ClearTransaction(current);
+                return null;
+            }
+
+            if (_context.CurrentTransaction != null)
+                throw new NormUsageException(
+                    "A transaction is already active; commit or roll it back before calling UseTransaction.");
+
+            var wrapper = new DbContextTransaction(transaction, _context, ownsTransaction: false);
+            _context.SetCurrentTransaction(transaction, wrapper);
+            return wrapper;
+        }
+
+        /// <summary>
         /// Returns the underlying provider <see cref="DbConnection"/> the context uses, matching Entity
         /// Framework Core's <c>GetDbConnection</c> — the escape hatch for interop with Dapper or raw ADO.NET
         /// on the same connection (and any active transaction, via <see cref="CurrentTransaction"/>). Because

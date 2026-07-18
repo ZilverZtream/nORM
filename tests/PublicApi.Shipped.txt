@@ -332,6 +332,7 @@ M:nORM.Core.DatabaseFacade.ExecuteSqlRaw(System.String,System.Object[]):System.I
 M:nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DatabaseFacade.GenerateCreateScript():System.String
 M:nORM.Core.DatabaseFacade.GetDbConnection():System.Data.Common.DbConnection
+M:nORM.Core.DatabaseFacade.UseTransaction(System.Data.Common.DbTransaction):nORM.Core.DbContextTransaction
 M:nORM.Core.DatabaseTopology.#ctor()
 M:nORM.Core.DatabaseTopology.DatabaseNode.#ctor()
 M:nORM.Core.DbConcurrencyException.#ctor()

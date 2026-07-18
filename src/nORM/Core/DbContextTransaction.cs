@@ -15,14 +15,18 @@ namespace nORM.Core
     {
         private readonly DbTransaction? _transaction;
         private readonly DbContext _context;
+        // False when the transaction was supplied via Database.UseTransaction: the caller owns its lifetime,
+        // so commit/rollback and clearing the context reference are allowed but the handle is never disposed.
+        private readonly bool _ownsTransaction;
         // int field + Interlocked.CompareExchange so concurrent Commit/Dispose calls
         // never both observe _completed==false and proceed to double-dispose the transaction.
         private int _completed; // 0 = not yet completed, 1 = completed
 
-        internal DbContextTransaction(DbTransaction? transaction, DbContext context)
+        internal DbContextTransaction(DbTransaction? transaction, DbContext context, bool ownsTransaction = true)
         {
             _transaction = transaction;
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _ownsTransaction = ownsTransaction;
         }
 
         /// <summary>
@@ -194,7 +198,10 @@ namespace nORM.Core
 
             try
             {
-                _transaction.Dispose();
+                // A caller-owned transaction (Database.UseTransaction) is never disposed here — only the
+                // context's reference to it is released; the caller disposes their own handle.
+                if (_ownsTransaction)
+                    _transaction.Dispose();
             }
             finally
             {
@@ -209,7 +216,8 @@ namespace nORM.Core
 
             try
             {
-                await _transaction.DisposeAsync().ConfigureAwait(false);
+                if (_ownsTransaction)
+                    await _transaction.DisposeAsync().ConfigureAwait(false);
             }
             finally
             {

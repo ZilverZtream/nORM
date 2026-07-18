@@ -109,9 +109,9 @@ public class TransactionFaultInjectionTests
         var ctor = typeof(DbContextTransaction).GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
             null,
-            new[] { typeof(DbTransaction), typeof(DbContext) },
+            new[] { typeof(DbTransaction), typeof(DbContext), typeof(bool) },
             null)!;
-        return (DbContextTransaction)ctor.Invoke(new object[] { tx, ctx });
+        return (DbContextTransaction)ctor.Invoke(new object[] { tx, ctx, true });
     }
 
     // ── Async CommitAsync fault-injection ────────────────────────────────────
