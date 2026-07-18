@@ -1,0 +1,46 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.PropertyValues
+  commentId: T:nORM.Core.PropertyValues
+  id: PropertyValues
+  parent: nORM.Core
+  children:
+  - nORM.Core.PropertyValues.GetValue``1(System.String)
+  - nORM.Core.PropertyValues.Item(System.String)
+  - nORM.Core.PropertyValues.Properties
+  - nORM.Core.PropertyValues.SetValues(System.Object)
+  - nORM.Core.PropertyValues.ToObject
+  langs:
+  - csharp
+  - vb
+  name: PropertyValues
+  nameWithType: PropertyValues
+  fullName: nORM.Core.PropertyValues
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/PropertyValues.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PropertyValues
+    path: src/nORM/Core/PropertyValues.cs
+    startLine: 19
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    A mutable bag of an entity's property values, exposed by <xref href="nORM.Core.EntityEntry.CurrentValues" data-throw-if-not-resolved="false"></xref>
+    (the live entity) and <xref href="nORM.Core.EntityEntry.OriginalValues" data-throw-if-not-resolved="false"></xref> (the as-loaded baseline).
+
+    Index by property name to read or write a value, copy a whole set with SetValues, or clone into a detached instance with ToObject.
+  syntax:
+    content: public sealed class PropertyValues
+    content.vb: Public NotInheritable Class PropertyValues
+  inheritance:
+  - System.Object
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core

@@ -164,6 +164,117 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Gets the entity's current property values as a mutable bag. Writing a value assigns it to the
+        /// entity and marks the entry dirty, mirroring EF's <c>CurrentValues</c>.
+        /// </summary>
+        public PropertyValues CurrentValues => new PropertyValues(this, original: false);
+
+        /// <summary>
+        /// Gets the entity's original (as-loaded / last-saved) property values as a bag. Writing a value
+        /// overrides the tracked baseline — e.g. resetting a concurrency token to the database value while
+        /// resolving a conflict — mirroring EF's <c>OriginalValues</c>. Original key values are read-only.
+        /// </summary>
+        public PropertyValues OriginalValues => new PropertyValues(this, original: true);
+
+        /// <summary>The CLR type this entry maps.</summary>
+        internal Type MappedType => _mapping.Type;
+
+        /// <summary>All mapped columns (keys, timestamp, and regular) backing the property bags.</summary>
+        internal IReadOnlyList<Column> MappedColumns => _mapping.Columns;
+
+        /// <summary>Resolves a mapped column by its CLR property name, throwing when there is no match.</summary>
+        internal Column RequireColumn(string propertyName)
+        {
+            foreach (var c in _mapping.Columns)
+                if (string.Equals(c.PropName, propertyName, StringComparison.Ordinal))
+                    return c;
+            throw new ArgumentException(
+                $"'{_mapping.Type.Name}' has no mapped property named '{propertyName}'.", nameof(propertyName));
+        }
+
+        /// <summary>
+        /// Reads a column's current entity value, or its original (as-loaded) value when
+        /// <paramref name="original"/> is set — resolving keys from <see cref="OriginalKey"/>, the
+        /// concurrency token from <see cref="OriginalToken"/>, and everything else from the change snapshot.
+        /// </summary>
+        internal object? ReadValue(Column col, bool original)
+        {
+            if (!original)
+                return Entity != null ? col.Getter(Entity) : null;
+
+            UpgradeToFullTracking();
+            if (col.IsKey)
+                return ReadOriginalKeyComponent(col);
+            if (col.IsTimestamp)
+                return OriginalToken;
+            if (_propertyIndex != null && _propertyIndex.TryGetValue(col.Prop.Name, out var idx))
+                return _originalValues![idx];
+            // No snapshot slot (e.g. a computed column not tracked for changes) — fall back to current.
+            return Entity != null ? col.Getter(Entity) : null;
+        }
+
+        /// <summary>
+        /// Writes a column's current entity value (marking the entry dirty), or its original baseline when
+        /// <paramref name="original"/> is set. Original key values cannot be changed.
+        /// </summary>
+        internal void WriteValue(Column col, object? value, bool original)
+        {
+            var coerced = CoerceToColumnType(col, value);
+            if (!original)
+            {
+                var entity = Entity ?? throw new InvalidOperationException("Cannot set values on a detached entry.");
+                col.Setter(entity, coerced);
+                Tracker?.MarkDirty(this);
+                return;
+            }
+
+            UpgradeToFullTracking();
+            if (col.IsTimestamp)
+            {
+                OriginalToken = coerced;
+                return;
+            }
+            if (col.IsKey)
+                throw new InvalidOperationException($"The original key value of '{col.PropName}' cannot be changed.");
+            if (_propertyIndex != null && _propertyIndex.TryGetValue(col.Prop.Name, out var idx))
+                _originalValues![idx] = coerced;
+            else
+                throw new InvalidOperationException($"'{col.PropName}' has no original-value slot to set.");
+        }
+
+        private object? ReadOriginalKeyComponent(Column col)
+        {
+            if (OriginalKey == null)
+                return Entity != null ? col.Getter(Entity) : null;
+            var keys = _mapping.KeyColumns;
+            if (keys.Length == 1)
+                return OriginalKey;
+            var pos = Array.IndexOf(keys, col);
+            return OriginalKey is object?[] arr && pos >= 0 && pos < arr.Length ? arr[pos] : OriginalKey;
+        }
+
+        /// <summary>Coerces a bag value to the column's CLR type; leaves it as-is (letting the setter surface
+        /// a precise error) when no clean conversion applies.</summary>
+        private static object? CoerceToColumnType(Column col, object? value)
+        {
+            if (value == null)
+                return null;
+            var target = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
+            if (target.IsInstanceOfType(value))
+                return value;
+            try
+            {
+                if (target.IsEnum)
+                    return Enum.ToObject(target, value);
+                return Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+            {
+                return value;
+            }
+        }
+
+        /// <summary>
         /// Marks this entry as explicitly modified (e.g. via ctx.Update), preventing
         /// DetectChanges from reverting the state to Unchanged when no scalar changes are found.
         /// </summary>

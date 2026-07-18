@@ -494,6 +494,9 @@ M:nORM.Core.OutputParameter.GetHashCode():System.Int32
 M:nORM.Core.OutputParameter.ToString():System.String
 M:nORM.Core.PreparedOperation{`0}.DisposeAsync():System.Threading.Tasks.ValueTask
 M:nORM.Core.PreparedOperation{`0}.ExecuteAsync(`0,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
+M:nORM.Core.PropertyValues.GetValue``1(System.String):`0
+M:nORM.Core.PropertyValues.SetValues(System.Object):System.Void
+M:nORM.Core.PropertyValues.ToObject():System.Object
 M:nORM.Core.SetPropertyCalls{`0}.#ctor()
 M:nORM.Core.SetPropertyCalls{`0}.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,`0}},System.Linq.Expressions.Expression{System.Func{`0,`0}}):nORM.Core.SetPropertyCalls{`0}
 M:nORM.Core.SetPropertyCalls{`0}.SetProperty``1(System.Linq.Expressions.Expression{System.Func{`0,`0}},`0):nORM.Core.SetPropertyCalls{`0}
@@ -1236,7 +1239,9 @@ P:nORM.Core.DbContext.Database:nORM.Core.DatabaseFacade
 P:nORM.Core.DbContext.Options:nORM.Configuration.DbContextOptions
 P:nORM.Core.DbContext.Provider:nORM.Providers.DatabaseProvider
 P:nORM.Core.DbContextTransaction.Transaction:System.Data.Common.DbTransaction
+P:nORM.Core.EntityEntry.CurrentValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.Entity:System.Object
+P:nORM.Core.EntityEntry.OriginalValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.State:nORM.Core.EntityState
 P:nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow:System.Boolean
 P:nORM.Core.NormException.Parameters:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
@@ -1248,6 +1253,8 @@ P:nORM.Core.OutputParameter.Precision:System.Nullable{System.Byte}
 P:nORM.Core.OutputParameter.Scale:System.Nullable{System.Byte}
 P:nORM.Core.OutputParameter.Size:System.Nullable{System.Int32}
 P:nORM.Core.OutputParameter.Value:System.Object
+P:nORM.Core.PropertyValues.Item:System.Object
+P:nORM.Core.PropertyValues.Properties:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Core.StoredProcedureNonQueryResult.AffectedRows:System.Int32
 P:nORM.Core.StoredProcedureNonQueryResult.OutputParameters:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
 P:nORM.Core.StoredProcedureResult{`0}.OutputParameters:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
@@ -1631,6 +1638,7 @@ T:nORM.Core.NormUsageException
 T:nORM.Core.NormValidator
 T:nORM.Core.OutputParameter
 T:nORM.Core.PreparedOperation{`0}
+T:nORM.Core.PropertyValues
 T:nORM.Core.QueryTrackingBehavior
 T:nORM.Core.SetPropertyCalls{`0}
 T:nORM.Core.StoredProcedureNonQueryResult
