@@ -393,6 +393,9 @@ M:nORM.Core.DbContextTransaction.DisposeAsync():System.Threading.Tasks.ValueTask
 M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
+M:nORM.Core.EntityEntry.Collection(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry.Navigation(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry.Reference(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.Reload():System.Void
 M:nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.IMemoryMonitor.GetAvailableMemory():System.Int64
@@ -412,6 +415,8 @@ M:nORM.Core.INormQueryable{`0}.SingleOrDefaultAsync(System.Threading.Cancellatio
 M:nORM.Core.INormQueryable{`0}.ToArrayAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{`0[]}
 M:nORM.Core.INormQueryable{`0}.ToListAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.Json.Value``1(System.String,System.String):`0
+M:nORM.Core.NavigationEntry.Load():System.Void
+M:nORM.Core.NavigationEntry.LoadAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.Norm.CompileQuery``3(System.Linq.Expressions.Expression{System.Func{`0,`1,System.Linq.IQueryable{`2}}}):System.Func{`0,`1,System.Threading.Tasks.Task{System.Collections.Generic.List{`2}}}
 M:nORM.Core.Norm.CompileTerminalQuery``3(System.Linq.Expressions.Expression{System.Func{`0,`1,`2}}):System.Func{`0,`1,System.Threading.Tasks.Task{`2}}
 M:nORM.Core.NormAsyncExtensions.AllAsync``1(System.Linq.IQueryable{`0},System.Linq.Expressions.Expression{System.Func{`0,System.Boolean}},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
@@ -1245,6 +1250,9 @@ P:nORM.Core.EntityEntry.CurrentValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.Entity:System.Object
 P:nORM.Core.EntityEntry.OriginalValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.State:nORM.Core.EntityState
+P:nORM.Core.NavigationEntry.CurrentValue:System.Object
+P:nORM.Core.NavigationEntry.IsLoaded:System.Boolean
+P:nORM.Core.NavigationEntry.Name:System.String
 P:nORM.Core.NormAsyncPolicy.SuppressExecutionContextFlow:System.Boolean
 P:nORM.Core.NormException.Parameters:System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object}
 P:nORM.Core.NormException.SqlStatement:System.String
@@ -1622,6 +1630,7 @@ T:nORM.Core.INormDbContextFactory{`0}
 T:nORM.Core.INormIncludableQueryable{`0,`1}
 T:nORM.Core.INormQueryable{`0}
 T:nORM.Core.Json
+T:nORM.Core.NavigationEntry
 T:nORM.Core.Norm
 T:nORM.Core.NormAsyncExtensions
 T:nORM.Core.NormAsyncPolicy

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Configuration;
@@ -202,6 +203,55 @@ namespace nORM.Core
             => Tracker?.Context
                ?? throw new InvalidOperationException(
                    "This entry is not associated with a context and cannot be reloaded. Obtain it from context.Entry(entity).");
+
+        /// <summary>The owning context, or null when this entry is not tracker-bound.</summary>
+        internal DbContext? Context => Tracker?.Context;
+
+        /// <summary>
+        /// Gets an entry for a navigation property by name (reference or collection), for inspecting
+        /// its loaded state or explicitly loading it — mirroring EF's <c>Entry(e).Navigation(name)</c>.
+        /// </summary>
+        public NavigationEntry Navigation(string navigationName)
+            => new NavigationEntry(this, ResolveNavigation(navigationName, requireCollection: null));
+
+        /// <summary>
+        /// Gets an entry for a reference (to-one) navigation property by name, e.g.
+        /// <c>Entry(order).Reference("Customer").Load()</c>.
+        /// </summary>
+        public NavigationEntry Reference(string navigationName)
+            => new NavigationEntry(this, ResolveNavigation(navigationName, requireCollection: false));
+
+        /// <summary>
+        /// Gets an entry for a collection (to-many) navigation property by name, e.g.
+        /// <c>Entry(order).Collection("Lines").Load()</c>.
+        /// </summary>
+        public NavigationEntry Collection(string navigationName)
+            => new NavigationEntry(this, ResolveNavigation(navigationName, requireCollection: true));
+
+        private PropertyInfo ResolveNavigation(string navigationName, bool? requireCollection)
+        {
+            if (string.IsNullOrEmpty(navigationName))
+                throw new ArgumentException("Navigation name cannot be null or empty.", nameof(navigationName));
+            var prop = _mapping.Type.GetProperty(navigationName)
+                ?? throw new ArgumentException(
+                    $"'{_mapping.Type.Name}' has no property named '{navigationName}'.", nameof(navigationName));
+            if (_mapping.ColumnsByName.ContainsKey(navigationName))
+                throw new ArgumentException(
+                    $"'{navigationName}' is a mapped scalar property, not a navigation.", nameof(navigationName));
+
+            if (requireCollection.HasValue)
+            {
+                var isCollection = prop.PropertyType != typeof(string)
+                    && typeof(IEnumerable).IsAssignableFrom(prop.PropertyType);
+                if (requireCollection.Value && !isCollection)
+                    throw new ArgumentException(
+                        $"'{navigationName}' is a reference navigation; use Reference(\"{navigationName}\").", nameof(navigationName));
+                if (!requireCollection.Value && isCollection)
+                    throw new ArgumentException(
+                        $"'{navigationName}' is a collection navigation; use Collection(\"{navigationName}\").", nameof(navigationName));
+            }
+            return prop;
+        }
 
         /// <summary>The CLR type this entry maps.</summary>
         internal Type MappedType => _mapping.Type;

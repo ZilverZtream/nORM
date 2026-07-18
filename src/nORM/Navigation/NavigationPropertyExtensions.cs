@@ -138,6 +138,53 @@ namespace nORM.Navigation
             return navContext.IsLoaded(propertyInfo.Name);
         }
 
+        /// <summary>
+        /// Explicitly (re)loads a navigation property for an entity obtained from <c>DbContext.Entry(...)</c>.
+        /// Backs <see cref="nORM.Core.NavigationEntry.LoadAsync"/>. The tracking pipeline may have attached a
+        /// navigation context typed as <see cref="object"/> (which cannot resolve the relation mapping) and may
+        /// have marked an initializer collection as already loaded; both are corrected here so the load runs.
+        /// </summary>
+        internal static Task LoadNavigationForEntryAsync(object entity, PropertyInfo property, Type entityType, DbContext context, CancellationToken ct)
+        {
+            var navContext = EnsureTypedNavigationContext(entity, entityType, context);
+            navContext.MarkAsUnloaded(property.Name);
+            return LoadNavigationPropertyAsync(entity, property, navContext, ct);
+        }
+
+        /// <summary>Synchronous counterpart of <see cref="LoadNavigationForEntryAsync"/>.</summary>
+        internal static void LoadNavigationForEntry(object entity, PropertyInfo property, Type entityType, DbContext context, CancellationToken ct)
+        {
+            var navContext = EnsureTypedNavigationContext(entity, entityType, context);
+            navContext.MarkAsUnloaded(property.Name);
+            LoadNavigationProperty(entity, property, navContext, ct);
+        }
+
+        /// <summary>True when the named navigation has been loaded for the entity.</summary>
+        internal static bool IsNavigationLoaded(object entity, PropertyInfo property)
+            => _navigationContexts.TryGetValue(entity, out var nc) && nc.IsLoaded(property.Name);
+
+        /// <summary>Marks a navigation as loaded or unloaded for the entity (backs <c>NavigationEntry.IsLoaded</c> set).</summary>
+        internal static void SetNavigationLoaded(object entity, PropertyInfo property, bool loaded, Type entityType, DbContext context)
+        {
+            var nc = EnsureTypedNavigationContext(entity, entityType, context);
+            if (loaded) nc.MarkAsLoaded(property.Name);
+            else nc.MarkAsUnloaded(property.Name);
+        }
+
+        /// <summary>
+        /// Returns the entity's navigation context, replacing one whose <see cref="NavigationContext.EntityType"/>
+        /// is not the mapped type (the tracking pipeline attaches a context typed as <see cref="object"/>, which
+        /// cannot resolve relations). The replacement carries the correct mapped type.
+        /// </summary>
+        private static NavigationContext EnsureTypedNavigationContext(object entity, Type entityType, DbContext context)
+        {
+            if (_navigationContexts.TryGetValue(entity, out var existing) && existing.EntityType == entityType)
+                return existing;
+            var corrected = new NavigationContext(context, entityType);
+            _navigationContexts.AddOrUpdate(entity, corrected);
+            return corrected;
+        }
+
         internal static async Task LoadNavigationPropertyAsync(object entity, PropertyInfo property, NavigationContext context, CancellationToken ct)
         {
             if (context.IsLoaded(property.Name))

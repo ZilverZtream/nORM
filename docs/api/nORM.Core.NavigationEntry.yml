@@ -1,0 +1,48 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.NavigationEntry
+  commentId: T:nORM.Core.NavigationEntry
+  id: NavigationEntry
+  parent: nORM.Core
+  children:
+  - nORM.Core.NavigationEntry.CurrentValue
+  - nORM.Core.NavigationEntry.IsLoaded
+  - nORM.Core.NavigationEntry.Load
+  - nORM.Core.NavigationEntry.LoadAsync(System.Threading.CancellationToken)
+  - nORM.Core.NavigationEntry.Name
+  langs:
+  - csharp
+  - vb
+  name: NavigationEntry
+  nameWithType: NavigationEntry
+  fullName: nORM.Core.NavigationEntry
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/NavigationEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NavigationEntry
+    path: src/nORM/Core/NavigationEntry.cs
+    startLine: 20
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Represents a single navigation property of a tracked entity, exposed by
+    <xref href="nORM.Core.EntityEntry.Reference(System.String)" data-throw-if-not-resolved="false"></xref>,
+    <xref href="nORM.Core.EntityEntry.Collection(System.String)" data-throw-if-not-resolved="false"></xref>, and
+    <xref href="nORM.Core.EntityEntry.Navigation(System.String)" data-throw-if-not-resolved="false"></xref>.
+
+    Explicitly load the related data with Load / LoadAsync, inspect IsLoaded, and read or write CurrentValue.
+  syntax:
+    content: public sealed class NavigationEntry
+    content.vb: Public NotInheritable Class NavigationEntry
+  inheritance:
+  - System.Object
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
