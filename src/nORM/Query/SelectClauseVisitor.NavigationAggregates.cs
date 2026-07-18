@@ -362,8 +362,11 @@ namespace nORM.Query
 
                 default:
                     throw new InvalidOperationException(
-                        "Navigation filter inside a projection subquery supports comparisons, `!`, bare boolean flags, " +
-                        "and `&&`/`||` compositions. For more complex shapes, wrap with `ClientEvaluationPolicy.Allow`.");
+                        "Navigation filter inside a projection subquery supports comparisons (==, !=, <, >, <=, >=), " +
+                        "`IS [NOT] NULL` (`== null` / `!= null`), `StartsWith`/`EndsWith`/`Contains` with a constant " +
+                        "pattern, bare boolean flags, `!`, and `&&`/`||` compositions. Shapes like `list.Contains(col)` " +
+                        "(IN) and enum comparisons aren't supported here yet — filter after materialization, or wrap " +
+                        "with `ClientEvaluationPolicy.Allow`.");
             }
         }
 
