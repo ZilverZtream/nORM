@@ -37,6 +37,11 @@ namespace nORM.Query
                     return node;
                 }
 
+                // The same aggregate shapes over an OWNED or MANY-TO-MANY collection — separate mapping
+                // structures the relation rewrite above can't reach. Emit the correlated subquery directly.
+                if (TryEmitNonRelationCollectionPredicateAggregate(node))
+                    return node;
+
                 // `parent.Children.Select(c => c.Value).Sum/Min/Max/Average()` - the Select
                 // projection sits between the navigation and the aggregate. Emit as a
                 // correlated scalar subquery directly:

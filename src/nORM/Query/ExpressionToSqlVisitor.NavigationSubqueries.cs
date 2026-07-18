@@ -17,6 +17,94 @@ namespace nORM.Query
     internal sealed partial class ExpressionToSqlVisitor
     {
         /// <summary>
+        /// Emits a predicate-context aggregate over an OWNED (OwnsMany) or MANY-TO-MANY collection —
+        /// <c>Where(p =&gt; p.Tags.Any())</c>, <c>Where(o =&gt; o.Lines.Count() &gt; 1)</c>. These collections
+        /// live in separate mapping structures from ordinary relations, so the relation-based rewrite above
+        /// can't reach them; the rewrite also needs a CLR FK property (owned FKs are often shadow columns)
+        /// and an IQueryable source (m2m has none), so this emits the correlated subquery SQL directly.
+        /// Only the unfiltered Count/LongCount/Any shapes over a single-key link are emitted; predicates,
+        /// <c>All</c>, composite keys, and collections whose element type has a global/tenant filter fail
+        /// loud (rendering that filter here is a follow-up) — never silent-wrong. Returns false when the
+        /// receiver isn't such a collection, letting the caller continue.
+        /// </summary>
+        private bool TryEmitNonRelationCollectionPredicateAggregate(MethodCallExpression node)
+        {
+            var method = node.Method.Name;
+            if (method is not (nameof(Queryable.Any) or nameof(Queryable.Count)
+                               or nameof(Queryable.LongCount) or nameof(Queryable.All)))
+                return false;
+            if (_ctx == null
+                || node.Arguments.Count < 1
+                || node.Arguments[0] is not MemberExpression navMember
+                || navMember.Expression is not ParameterExpression navParent
+                || !_parameterMappings.TryGetValue(navParent, out var info))
+                return false;
+
+            var mapping = info.Mapping;
+            var owned = mapping.OwnedCollections.FirstOrDefault(o => o.NavigationProperty.Name == navMember.Member.Name);
+            var jtm = owned == null
+                ? mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == navMember.Member.Name)
+                : null;
+            if (owned == null && jtm == null)
+                return false;
+
+            var kind = owned != null ? "owned" : "many-to-many";
+            // From here it IS such a collection: emit or fail loud, never fall through to a silent-wrong path.
+            if (method is nameof(Queryable.All))
+                throw new NormUnsupportedFeatureException(
+                    $"All(...) over the {kind} collection '{navMember.Member.Name}' in a predicate isn't supported yet. " +
+                    "Evaluate it after materialising, or filter with a separate query.");
+            if (node.Arguments.Count > 1)
+                throw new NormUnsupportedFeatureException(
+                    $"A filtered {method}(...) over the {kind} collection '{navMember.Member.Name}' in a predicate isn't supported yet. " +
+                    "Filter after materialising, or use a separate query.");
+
+            var parentAlias = info.Alias;
+            var depAlias = _provider.Escape("__nav");
+
+            if (owned != null)
+            {
+                if (mapping.KeyColumns.Length != 1)
+                    throw new NormUnsupportedFeatureException(
+                        $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet.");
+                if (GlobalFilterFragment.CombineWithTenant(_ctx, owned.OwnedType) != null)
+                    throw new NormUnsupportedFeatureException(
+                        $"Aggregating the owned collection '{navMember.Member.Name}' whose item type has a global or tenant filter isn't supported in a predicate yet. " +
+                        "Use a separate query.");
+                QueryTranslator.RecordReferencedTable(owned.TableName);
+                var where = $"{depAlias}.{owned.EscForeignKeyColumn} = {parentAlias}.{mapping.KeyColumns[0].EscCol}";
+                if (method is nameof(Queryable.Any))
+                    _sql.Append("EXISTS(SELECT 1 FROM ").Append(owned.EscTable).Append(' ').Append(depAlias).Append(" WHERE ").Append(where).Append(')');
+                else
+                    _sql.Append("(SELECT COUNT(*) FROM ").Append(owned.EscTable).Append(' ').Append(depAlias).Append(" WHERE ").Append(where).Append(')');
+                return true;
+            }
+
+            if (jtm!.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet.");
+            if (GlobalFilterFragment.CombineWithTenant(_ctx, jtm.RightType) != null)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the many-to-many collection '{navMember.Member.Name}' whose related type has a global or tenant filter isn't supported in a predicate yet. " +
+                    "Use a separate query.");
+            var rightMap = _ctx.GetMapping(jtm.RightType);
+            var jAlias = _provider.Escape("__m2mj");
+            var rAlias = _provider.Escape("__m2mr");
+            QueryTranslator.RecordReferencedTable(jtm.TableName);
+            QueryTranslator.RecordReferencedTable(rightMap.TableName);
+            // Join the bridge table to the related table (so orphaned bridge rows don't over-count, matching
+            // the loaded collection). With no related-side filter this is a straight existence/row count.
+            var fromJoin = $"{jtm.EscTableName} {jAlias} JOIN {QueryTranslator.TemporalTableSource(rightMap)} {rAlias} " +
+                           $"ON {rAlias}.{jtm.RightKeyColumns[0].EscCol} = {jAlias}.{jtm.EscRightFkColumn}";
+            var m2mWhere = $"{jAlias}.{jtm.EscLeftFkColumn} = {parentAlias}.{jtm.LeftKeyColumns[0].EscCol}";
+            if (method is nameof(Queryable.Any))
+                _sql.Append("EXISTS(SELECT 1 FROM ").Append(fromJoin).Append(" WHERE ").Append(m2mWhere).Append(')');
+            else
+                _sql.Append("(SELECT COUNT(*) FROM ").Append(fromJoin).Append(" WHERE ").Append(m2mWhere).Append(')');
+            return true;
+        }
+
+        /// <summary>
         /// Emits a correlated scalar subquery for the
         /// `parent.Children.Select(c =&gt; c.Value).Sum/Min/Max/Average()` shape:
         /// <code>(SELECT AGG(selector_sql) FROM ChildTable T_n WHERE T_n.FK = T_outer.PK)</code>
