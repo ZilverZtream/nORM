@@ -70,12 +70,19 @@ namespace nORM.Query
                 _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
                 var dependentElementType = elementProjection?.ReturnType ?? elementType;
 
+                // The projection's DTO property may be named differently from the navigation; the stitch
+                // assigns to THAT member (falling back to the nav when the binding member wasn't captured,
+                // e.g. a field-backed binding).
+                var targetMember = _detectedCollectionTargetMembers.TryGetValue(collectionProperty, out var boundMember)
+                    ? boundMember
+                    : collectionProperty;
+
                 // Create the dependent query definition
                 var dependentQuery = new DependentQueryDefinition(
                     TargetMapping: targetMapping,
                     ForeignKeyColumns: relation.ForeignKeys,
                     ParentKeyProperties: relation.PrincipalKeys.Select(c => c.Prop).ToArray(),
-                    TargetCollectionProperty: collectionProperty,
+                    TargetCollectionProperty: targetMember,
                     CollectionElementType: dependentElementType,
                     FilterSql: filter.Sql,
                     FilterParameters: filter.Parameters,

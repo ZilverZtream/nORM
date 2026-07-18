@@ -179,6 +179,9 @@ namespace nORM.Query
         // Element projections for shaped collection projections (Lines = o.Lines.Select(l => new Dto{...}).ToList()),
         // keyed by nav property; consumed by BuildDependentQueryDefinitions to shape the child fetch.
         private Dictionary<PropertyInfo, System.Linq.Expressions.LambdaExpression> _detectedCollectionProjections = new();
+        // DTO binding member each detected collection is assigned to (keyed by nav property) — the stitch
+        // target when the projection property is named differently from the navigation.
+        private Dictionary<PropertyInfo, PropertyInfo> _detectedCollectionTargetMembers = new();
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;

@@ -45,6 +45,11 @@ namespace nORM.Query
         // stale in the cached materializer, so those fall through to fail-loud). Applied client-side by the
         // split-query child materializer to shape each child entity into the projected element type.
         private Dictionary<PropertyInfo, LambdaExpression> _detectedCollectionProjections = new();
+        // The DTO binding member each detected collection is assigned to, keyed by nav property. The
+        // projection's property may be named DIFFERENTLY from the navigation (new Dto { LineItems = o.Lines...
+        // }), so the split-query stitch must target THIS member, not the nav. Only populated when the binding
+        // member is a settable property; otherwise the stitch falls back to the nav property.
+        private Dictionary<PropertyInfo, PropertyInfo> _detectedCollectionTargetMembers = new();
 
         /// <summary>A shaped collection filter rendered to SQL against the child table, with the names
         /// of the compiled parameters it references (closure captures) for per-execution rebinding.</summary>
@@ -116,6 +121,12 @@ namespace nORM.Query
         public IReadOnlyDictionary<PropertyInfo, LambdaExpression> DetectedCollectionProjections => _detectedCollectionProjections;
 
         /// <summary>
+        /// The DTO binding member (projection property) each detected collection is assigned to, keyed by nav
+        /// property — the split-query stitch target when it is named differently from the navigation.
+        /// </summary>
+        public IReadOnlyDictionary<PropertyInfo, PropertyInfo> DetectedCollectionTargetMembers => _detectedCollectionTargetMembers;
+
+        /// <summary>
         /// Translates a projection expression into a SQL <c>SELECT</c> column list.
         /// Each call resets detected collections, so the result reflects only the
         /// most recent translation.
@@ -130,6 +141,7 @@ namespace nORM.Query
             _detectedCollections = new List<PropertyInfo>();
             _detectedCollectionFilters = new Dictionary<PropertyInfo, RenderedCollectionFilter>();
             _detectedCollectionProjections = new Dictionary<PropertyInfo, LambdaExpression>();
+            _detectedCollectionTargetMembers = new Dictionary<PropertyInfo, PropertyInfo>();
 
             var sb = _stringBuilderPool.Get();
             _sb = sb;
@@ -214,6 +226,9 @@ namespace nORM.Query
                         _detectedCollectionFilters[navProperty] = rendered;
                     if (navProjection != null)
                         _detectedCollectionProjections[navProperty] = navProjection;
+                    // The anonymous/DTO member may be named differently from the nav; stitch to THIS member.
+                    if (node.Members?[i] is PropertyInfo bindingProp)
+                        _detectedCollectionTargetMembers[navProperty] = bindingProp;
                     // Skip adding to SQL SELECT - it will be fetched separately
                     continue;
                 }

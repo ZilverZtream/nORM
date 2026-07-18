@@ -649,6 +649,9 @@ namespace nORM.Query
                             _detectedCollectionFilters[navProperty] = rendered;
                         if (navProjection != null)
                             _detectedCollectionProjections[navProperty] = navProjection;
+                        // The DTO property may be named differently from the nav; stitch to THIS member.
+                        if (assignment.Member is PropertyInfo bindingProp)
+                            _detectedCollectionTargetMembers[navProperty] = bindingProp;
                         // Skip adding to SQL SELECT - it will be fetched separately
                         continue;
                     }
