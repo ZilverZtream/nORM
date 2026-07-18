@@ -472,34 +472,32 @@ namespace nORM.Query
                 : expression;
         }
         /// <summary>
-        /// True when the query tree contains an <c>IgnoreQueryFilters()</c> marker anywhere, so the
-        /// whole query bypasses user global filters (EF semantics). Matched by declaring type and
-        /// name so an unrelated method named IgnoreQueryFilters cannot trigger it.
+        /// True when the outer query operator chain contains an <c>IgnoreQueryFilters()</c> marker,
+        /// so the query bypasses user global filters (EF semantics). Walks only the source spine —
+        /// the instance-method receiver or the first argument, unwrapping the interface Convert the
+        /// instance operators emit — rather than a full expression visit, which can recurse into the
+        /// self-referential Constant(queryable) roots nORM builds and overflow the stack. Matched by
+        /// declaring type and name so an unrelated method named IgnoreQueryFilters cannot trigger it.
         /// </summary>
-        private static bool ExpressionContainsIgnoreQueryFilters(Expression expression)
+        private static bool ExpressionContainsIgnoreQueryFilters(Expression? expression)
         {
-            var finder = new IgnoreQueryFiltersFinder();
-            finder.Visit(expression);
-            return finder.Found;
-        }
-
-        private sealed class IgnoreQueryFiltersFinder : ExpressionVisitor
-        {
-            public bool Found;
-
-            public override Expression? Visit(Expression? node)
-                => Found ? node : base.Visit(node);
-
-            protected override Expression VisitMethodCall(MethodCallExpression node)
+            var current = expression;
+            while (current != null)
             {
-                if (node.Method.DeclaringType == typeof(nORM.Core.NormIncludableQueryableExtensions)
-                    && node.Method.Name == nameof(nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters))
+                if (current is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
                 {
-                    Found = true;
-                    return node;
+                    current = convert.Operand;
+                    continue;
                 }
-                return base.VisitMethodCall(node);
+                if (current is not MethodCallExpression call)
+                    return false;
+                if (call.Method.DeclaringType == typeof(nORM.Core.NormIncludableQueryableExtensions)
+                    && call.Method.Name == nameof(nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters))
+                    return true;
+                // Descend the source spine: instance receiver (Object) else the first argument.
+                current = call.Object ?? (call.Arguments.Count > 0 ? call.Arguments[0] : null);
             }
+            return false;
         }
 
         private Expression ApplyGlobalFilters(Expression expression, bool ignoreUserFilters)
