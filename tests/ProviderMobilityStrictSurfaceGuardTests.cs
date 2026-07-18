@@ -66,6 +66,7 @@ public sealed class ProviderMobilityStrictSurfaceGuardTests
                 "Method:ExecuteSqlInterpolatedAsync",
                 "Method:ExecuteSqlRaw",
                 "Method:ExecuteSqlRawAsync",
+                "Method:GetDbConnection",
                 "Property:CurrentTransaction"
             },
             ProviderBoundMembers(typeof(DatabaseFacade)));

@@ -317,6 +317,7 @@ M:nORM.Core.ConnectionManager.#ctor(nORM.Core.DatabaseTopology,nORM.Providers.Da
 M:nORM.Core.ConnectionManager.Dispose():System.Void
 M:nORM.Core.ConnectionManager.GetReadConnectionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Data.Common.DbConnection}
 M:nORM.Core.ConnectionManager.GetWriteConnectionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Data.Common.DbConnection}
+M:nORM.Core.DatabaseFacade.BeginTransaction():nORM.Core.DbContextTransaction
 M:nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{nORM.Core.DbContextTransaction}
 M:nORM.Core.DatabaseFacade.CanConnect():System.Boolean
 M:nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
@@ -326,6 +327,7 @@ M:nORM.Core.DatabaseFacade.ExecuteSqlInterpolated(System.FormattableString):Syst
 M:nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DatabaseFacade.ExecuteSqlRaw(System.String,System.Object[]):System.Int32
 M:nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Int32}
+M:nORM.Core.DatabaseFacade.GetDbConnection():System.Data.Common.DbConnection
 M:nORM.Core.DatabaseTopology.#ctor()
 M:nORM.Core.DatabaseTopology.DatabaseNode.#ctor()
 M:nORM.Core.DbConcurrencyException.#ctor()

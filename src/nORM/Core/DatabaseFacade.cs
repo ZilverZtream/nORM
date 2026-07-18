@@ -297,5 +297,36 @@ namespace nORM.Core
             _context.SetCurrentTransaction(transaction, contextTransaction);
             return contextTransaction;
         }
+
+        /// <summary>
+        /// Synchronous <see cref="BeginTransactionAsync"/>, matching Entity Framework Core's
+        /// <c>BeginTransaction</c>. Begins a new database transaction for the current context and returns a
+        /// nORM-managed wrapper — commit or roll it back through the returned <see cref="DbContextTransaction"/>.
+        /// </summary>
+        /// <returns>A <see cref="DbContextTransaction"/> representing the started transaction.</returns>
+        /// <exception cref="NormUsageException">Thrown when a transaction is already active.</exception>
+        public DbContextTransaction BeginTransaction()
+        {
+            if (_context.CurrentTransaction != null)
+                throw new NormUsageException("A transaction is already active.");
+            _context.EnsureConnection();
+            var transaction = _context.RawConnection.BeginTransaction();
+            var contextTransaction = new DbContextTransaction(transaction, _context);
+            _context.SetCurrentTransaction(transaction, contextTransaction);
+            return contextTransaction;
+        }
+
+        /// <summary>
+        /// Returns the underlying provider <see cref="DbConnection"/> the context uses, matching Entity
+        /// Framework Core's <c>GetDbConnection</c> — the escape hatch for interop with Dapper or raw ADO.NET
+        /// on the same connection (and any active transaction, via <see cref="CurrentTransaction"/>). Because
+        /// it exposes a provider-specific handle it is disallowed under strict provider mobility.
+        /// </summary>
+        /// <returns>The context's <see cref="DbConnection"/> (not opened by this call).</returns>
+        public DbConnection GetDbConnection()
+        {
+            _context.ThrowIfStrictProviderMobilityEscapeHatch(nameof(GetDbConnection));
+            return _context.RawConnection;
+        }
     }
 }
