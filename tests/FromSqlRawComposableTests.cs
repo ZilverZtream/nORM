@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Configuration;
+using nORM.Enterprise;
 using nORM.Providers;
 using Xunit;
 
@@ -265,5 +266,59 @@ public class FromSqlRawComposableTests
         // Row 2 is soft-deleted; the global filter is applied to the outer query over the raw derived table.
         var ids = ctx.FromSqlRaw<Soft>("SELECT * FROM FsrSoft").OrderBy(s => s.Id).Select(s => s.Id).ToList();
         Assert.Equal(new[] { 1, 3 }, ids);
+    }
+
+    [Table("FsrTenantWidget")]
+    public class TenantWidget
+    {
+        [Key] public int Id { get; set; }
+        public int TenantId { get; set; }
+        public int Score { get; set; }
+    }
+
+    private sealed class FixedTenantProvider(int tenantId) : ITenantProvider
+    {
+        public object GetCurrentTenantId() => tenantId;
+    }
+
+    // Security contract: the tenant predicate is applied to the OUTER query over the raw derived table, so a
+    // composable FromSqlRaw can never read (or aggregate) another tenant's rows — even when the raw SQL itself
+    // explicitly names them. This is the security-critical companion to the soft-delete global-filter test.
+    [Fact]
+    public void raw_enforces_tenant_isolation_including_a_cross_tenant_attack()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE FsrTenantWidget (Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, Score INTEGER NOT NULL);
+                INSERT INTO FsrTenantWidget VALUES (1,1,10),(2,1,20),(3,2,300),(4,2,400);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        DbContext CtxFor(int tenant) => new(cn, new SqliteProvider(), new DbContextOptions
+        {
+            TenantColumnName = "TenantId",
+            TenantProvider = new FixedTenantProvider(tenant),
+            OnModelCreating = mb => mb.Entity<TenantWidget>().HasKey(w => w.Id)
+        });
+
+        // Each tenant sees only its own rows through a raw SELECT *.
+        var t1 = CtxFor(1);
+        Assert.Equal(new[] { 1, 2 },
+            t1.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget").OrderBy(w => w.Id).Select(w => w.Id).ToList());
+        var t2 = CtxFor(2);
+        Assert.Equal(new[] { 3, 4 },
+            t2.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget").OrderBy(w => w.Id).Select(w => w.Id).ToList());
+
+        // Cross-tenant attack: tenant 1's query whose raw SQL explicitly asks for tenant 2's rows returns
+        // nothing — the outer tenant predicate filters the derived table regardless of what the SQL selected.
+        Assert.Empty(
+            t1.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget WHERE TenantId = 2").ToList());
+
+        // Aggregates and Count are tenant-scoped too (would be 730 / 4 without the outer tenant filter).
+        Assert.Equal(30, t1.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget").Sum(w => w.Score));
+        Assert.Equal(2, t1.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget").Count());
     }
 }
