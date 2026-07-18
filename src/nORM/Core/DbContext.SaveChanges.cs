@@ -695,7 +695,7 @@ namespace nORM.Core
                             continue;
                         }
 
-                        dependentEntry.State = EntityState.Deleted;
+                        dependentEntry.SetStateInternal(EntityState.Deleted);
                         if (dependentEntry.Mapping.Relations.Count > 0)
                             queue.Enqueue(dependentEntry);
                     }

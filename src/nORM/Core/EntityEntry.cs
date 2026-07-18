@@ -49,7 +49,6 @@ namespace nORM.Core
         private Func<object, object?>[]? _getValues;
         private Dictionary<string, int>? _propertyIndex;
         private readonly DbContextOptions _options;
-        private readonly Action<EntityEntry>? _markDirty;
         private bool _hasNotifiedChange;
         private bool _isInitialized;
 
@@ -59,11 +58,110 @@ namespace nORM.Core
         /// </summary>
         public object? Entity { get; private set; }
 
+        private EntityState _state;
+
         /// <summary>
-        /// Gets or sets the current <see cref="EntityState"/> of the tracked entity
-        /// within the context.
+        /// Gets or sets the current <see cref="EntityState"/> of the tracked entity within the context.
+        /// Assigning a new state performs the corresponding tracker transition — setting
+        /// <see cref="EntityState.Modified"/> flags the entity for a full UPDATE, <see cref="EntityState.Deleted"/>
+        /// for a DELETE (or detaches a never-inserted <see cref="EntityState.Added"/> entity),
+        /// <see cref="EntityState.Unchanged"/> accepts the current values as the clean baseline, and
+        /// <see cref="EntityState.Detached"/> stops tracking the entity — mirroring
+        /// <c>DbContext.Update</c>/<c>Remove</c>/<c>Attach</c>. Internal bookkeeping uses
+        /// <see cref="SetStateInternal"/>, which assigns the field without any transition side effects.
         /// </summary>
-        public EntityState State { get; internal set; }
+        public EntityState State
+        {
+            get => _state;
+            set => SetEntityState(value);
+        }
+
+        /// <summary>
+        /// Assigns the raw state field with no transition side effects. Used by the change tracker and
+        /// the save pipeline, which manage identity-map membership and dirty registration themselves.
+        /// </summary>
+        internal void SetStateInternal(EntityState state) => _state = state;
+
+        /// <summary>
+        /// The change tracker that owns this entry, used by the public <see cref="State"/> setter to
+        /// detach the entity (Detached, or Deleting a never-inserted Added entity). Null only for the
+        /// rare entry constructed without a tracker.
+        /// </summary>
+        internal ChangeTracker? Tracker { get; }
+
+        /// <summary>
+        /// Applies the EF-style state transition for a user assignment to <see cref="State"/>.
+        /// </summary>
+        private void SetEntityState(EntityState newState)
+        {
+            // Added/Deleted/Detached are terminal enough that re-applying the same one is a no-op.
+            // Modified and Unchanged always run: change detection is deferred, so a nominally-Unchanged
+            // entry may hold pending edits that "= Unchanged" must accept, and "= Modified" force-marks.
+            if (newState == _state && newState is EntityState.Added or EntityState.Deleted or EntityState.Detached)
+                return;
+
+            var entity = Entity;
+            if (entity == null)
+            {
+                // A detached entry has released its entity; only re-detaching is meaningful.
+                if (newState == EntityState.Detached)
+                    return;
+                throw new InvalidOperationException(
+                    "Cannot change the state of an entry whose entity has already been detached.");
+            }
+
+            switch (newState)
+            {
+                case EntityState.Detached:
+                    if (Tracker != null)
+                        Tracker.Remove(entity);
+                    else
+                        DetachEntity();
+                    return;
+
+                case EntityState.Deleted:
+                    // A never-inserted Added entity has no row to delete — deleting it just stops
+                    // tracking it, matching EF. A persisted entity is marked for a DELETE by key.
+                    if (_state == EntityState.Added)
+                    {
+                        if (Tracker != null)
+                            Tracker.Remove(entity);
+                        else
+                            DetachEntity();
+                        return;
+                    }
+                    _state = EntityState.Deleted;
+                    return;
+
+                case EntityState.Added:
+                    _state = EntityState.Added;
+                    return;
+
+                case EntityState.Modified:
+                    UpgradeToFullTracking();
+                    _state = EntityState.Modified;
+                    // Keep DetectChanges from reverting to Unchanged when no scalar diff is found,
+                    // and flag every column so the entry reports a full modification.
+                    _hasNotifiedChange = true;
+                    MarkAllPropertiesModified();
+                    Tracker?.MarkDirty(this);
+                    return;
+
+                case EntityState.Unchanged:
+                    // Accept the current values (and collection/owned/token/key snapshots) as the new
+                    // clean baseline so a subsequent SaveChanges does not re-detect and persist them.
+                    AcceptChanges();
+                    return;
+            }
+        }
+
+        /// <summary>Flags every tracked column as modified. Requires <see cref="UpgradeToFullTracking"/> first.</summary>
+        private void MarkAllPropertiesModified()
+        {
+            if (_changedProperties == null) return;
+            for (int i = 0; i < _changedProperties.Length; i++)
+                _changedProperties[i] = true;
+        }
 
         /// <summary>
         /// Marks this entry as explicitly modified (e.g. via ctx.Update), preventing
@@ -312,13 +410,13 @@ namespace nORM.Core
             return false;
         }
 
-        internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, Action<EntityEntry>? markDirty = null, bool lazy = false)
+        internal EntityEntry(object entity, EntityState state, TableMapping mapping, DbContextOptions options, ChangeTracker? tracker = null, bool lazy = false)
         {
             Entity = entity ?? throw new ArgumentNullException(nameof(entity));
-            State = state;
+            _state = state;
             _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
             _options = options ?? throw new ArgumentNullException(nameof(options));
-            _markDirty = markDirty;
+            Tracker = tracker;
             _isInitialized = false;
 
             // Capture original PK at attach time so mutations can be detected.
@@ -497,8 +595,8 @@ namespace nORM.Core
             _hasNotifiedChange = true;
             // State transition is not under a lock — this is by design because DbContext
             // is single-threaded. Callers must not raise PropertyChanged from other threads.
-            State = hasAnyChanges ? EntityState.Modified : EntityState.Unchanged;
-            _markDirty?.Invoke(this);
+            _state = hasAnyChanges ? EntityState.Modified : EntityState.Unchanged;
+            Tracker?.MarkDirty(this);
         }
 
         /// <summary>
@@ -615,9 +713,9 @@ namespace nORM.Core
             hasChanges |= HasOwnedCollectionChanges();
 
             if (hasChanges)
-                State = EntityState.Modified;
-            else if (State == EntityState.Modified)
-                State = EntityState.Unchanged;
+                _state = EntityState.Modified;
+            else if (_state == EntityState.Modified)
+                _state = EntityState.Unchanged;
         }
 
         /// <summary>
@@ -637,7 +735,7 @@ namespace nORM.Core
             // Refresh loaded collection-nav baselines so a severed/removed child is not
             // re-severed on the next save, and a newly added child becomes the baseline.
             RecaptureLoadedCollectionNavSnapshots();
-            State = EntityState.Unchanged;
+            _state = EntityState.Unchanged;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.
             var tsCol = _mapping.TimestampColumn;
@@ -660,7 +758,7 @@ namespace nORM.Core
             Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no dynamic code paths are exercised.")]
         internal void DetachEntity()
         {
-            State = EntityState.Detached;
+            _state = EntityState.Detached;
             var entity = Entity;
             if (entity is INotifyPropertyChanged notify)
                 notify.PropertyChanged -= PropertyChangedHandler;

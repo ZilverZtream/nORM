@@ -80,7 +80,7 @@ namespace nORM.Core
                     if (!(existingEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
                           && state == EntityState.Unchanged))
                     {
-                        existingEntry.State = state;
+                        existingEntry.SetStateInternal(state);
                         // When explicitly marking as Modified (ctx.Update), prevent DetectChanges
                         // from reverting the state to Unchanged when no scalar properties changed.
                         if (state == EntityState.Modified)
@@ -120,7 +120,7 @@ namespace nORM.Core
                     {
                         var newEntry = state == EntityState.Unchanged && !_options.EagerChangeTracking
                             ? CreateLazyEntry(entity, mapping)
-                            : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+                            : new EntityEntry(entity, state, mapping, _options, this);
 
                         // When explicitly tracking as Modified (ctx.Update on a new-to-context entity),
                         // prevent DetectChanges from reverting the state to Unchanged when no scalar
@@ -157,7 +157,7 @@ namespace nORM.Core
                                 // The new entry takes over the identity-map slot so PK lookups
                                 // resolve to the live instance; the deleted entry remains
                                 // reference-tracked and therefore still executes.
-                                var replacementEntry = new EntityEntry(entity, EntityState.Added, mapping, _options, MarkDirty);
+                                var replacementEntry = new EntityEntry(entity, EntityState.Added, mapping, _options, this);
                                 typeEntries[pk] = replacementEntry;
                                 _entriesByReference.TryAdd(entity, replacementEntry);
                                 if (entity is not INotifyPropertyChanged)
@@ -187,7 +187,7 @@ namespace nORM.Core
                         if (!(pkEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
                               && state == EntityState.Unchanged))
                         {
-                            pkEntry.State = state;
+                            pkEntry.SetStateInternal(state);
                         }
                         // Note: the new `entity` reference is NOT added to _entriesByReference here;
                         // the winner's reference remains the canonical tracked instance for this PK.
@@ -200,7 +200,7 @@ namespace nORM.Core
                 // No PK - only track by reference
                 var entry = state == EntityState.Unchanged && !_options.EagerChangeTracking
                     ? CreateLazyEntry(entity, mapping)
-                    : new EntityEntry(entity, state, mapping, _options, MarkDirty);
+                    : new EntityEntry(entity, state, mapping, _options, this);
 
                 if (_entriesByReference.TryAdd(entity, entry))
                 {
@@ -219,7 +219,7 @@ namespace nORM.Core
                     if (!(raceEntry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
                           && state == EntityState.Unchanged))
                     {
-                        raceEntry.State = state;
+                        raceEntry.SetStateInternal(state);
                     }
                     return raceEntry;
                 }
@@ -245,7 +245,7 @@ namespace nORM.Core
         private EntityEntry CreateLazyEntry(object entity, TableMapping mapping)
         {
             // Minimal entry that defers property change setup
-            return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, MarkDirty, lazy: true);
+            return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, this, lazy: true);
         }
 
         /// <summary>
@@ -483,10 +483,9 @@ namespace nORM.Core
         /// tracked by the context.
         /// </summary>
         /// <remarks>
-        /// Returns a snapshot of the underlying collection. The <see cref="EntityEntry"/>
-        /// objects themselves are mutable; callers should not modify entry state (such as
-        /// <see cref="EntityEntry.State"/>) directly, as this bypasses change-tracker
-        /// invariants. Use <see cref="DbContext"/> APIs to transition entity state.
+        /// Returns a snapshot of the underlying collection. Assigning <see cref="EntityEntry.State"/>
+        /// on a returned entry performs the corresponding tracker transition (the same as the
+        /// <see cref="DbContext"/> Add/Update/Remove/Attach APIs), so it is safe to drive state from here.
         /// </remarks>
         // Ordered by attach sequence so SaveChanges batches (and autoincrement key assignment)
         // are deterministic in Add/Attach order — ConcurrentDictionary enumeration order is

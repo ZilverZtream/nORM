@@ -188,19 +188,19 @@ namespace nORM.Core
                 {
                     for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
                         relation.ForeignKeys[i].Setter(removed, relation.PrincipalKeys[i].Getter(newPrincipal));
-                    removedEntry.State = EntityState.Modified;
+                    removedEntry.SetStateInternal(EntityState.Modified);
                     removedEntry.MarkExplicitlyModified();
                 }
                 else if (isOptional)
                 {
                     for (int i = 0; i < relation.ForeignKeys.Count; i++)
                         relation.ForeignKeys[i].Setter(removed, null);
-                    removedEntry.State = EntityState.Modified;
+                    removedEntry.SetStateInternal(EntityState.Modified);
                     removedEntry.MarkExplicitlyModified();
                 }
                 else
                 {
-                    removedEntry.State = EntityState.Deleted;
+                    removedEntry.SetStateInternal(EntityState.Deleted);
                 }
                 (done ??= new List<object>()).Add(removed);
             }
@@ -275,7 +275,7 @@ namespace nORM.Core
                         fk.Setter(dependent, null);
                         if (entry.State is EntityState.Unchanged or EntityState.Modified)
                         {
-                            entry.State = EntityState.Modified;
+                            entry.SetStateInternal(EntityState.Modified);
                             entry.MarkExplicitlyModified();
                         }
                     }
@@ -305,7 +305,7 @@ namespace nORM.Core
                         // The FK write lands during SaveChanges itself (after the principal's
                         // insert), which is after change detection — mark the row now or its
                         // UPDATE is skipped and the link is silently lost.
-                        entry.State = EntityState.Modified;
+                        entry.SetStateInternal(EntityState.Modified);
                         entry.MarkExplicitlyModified();
                     }
                     continue;
@@ -335,7 +335,7 @@ namespace nORM.Core
                         catch { /* read-only navigation — leave the stale reference */ }
                         continue;
                     }
-                    entry.State = EntityState.Modified;
+                    entry.SetStateInternal(EntityState.Modified);
                     entry.MarkExplicitlyModified();
                 }
                 fk.Setter(dependent, pkValue);
