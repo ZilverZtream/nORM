@@ -128,6 +128,10 @@ namespace nORM.Query
             }
             if (current is not ConstantExpression constant)
                 return false;
+            // A FromSqlRaw/FromSqlInterpolated root supplies its own FROM; this fast path selects from the mapped
+            // table and would ignore the raw SQL (and its filter). Defer to the full plan path.
+            if (constant.Value is INormRawSqlSource)
+                return false;
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
             var whereKey = whereLambda == null ? "" : BuildSimpleWhereCacheKey(whereLambda);

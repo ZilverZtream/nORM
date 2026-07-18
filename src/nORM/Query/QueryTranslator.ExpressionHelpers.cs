@@ -161,6 +161,12 @@ namespace nORM.Query
             {
                 switch (expr)
                 {
+                    // Static extension operators (Queryable.Where/OrderBy/Count…) carry the source as Arguments[0];
+                    // nORM's instance operators (AsNoTracking/AsSplitQuery/Include, built as Convert(src).Op(...))
+                    // carry it as the receiver Object with the predicate/path in Arguments. Follow whichever holds.
+                    case MethodCallExpression { Object: { } receiver }:
+                        expr = receiver;
+                        break;
                     case MethodCallExpression mc when mc.Arguments.Count > 0:
                         expr = mc.Arguments[0];
                         break;
@@ -200,14 +206,15 @@ namespace nORM.Query
             {
                 switch (expr)
                 {
-                    case MethodCallExpression mc when mc.Arguments.Count > 0:
+                    case MethodCallExpression mc when mc.Object != null || mc.Arguments.Count > 0:
                         if (!RawSqlComposableOperators.Contains(mc.Method.Name))
                             throw new nORM.Core.NormUnsupportedFeatureException(
                                 $"'{mc.Method.Name}' can't be composed onto a FromSqlRaw query yet. Supported: Where, " +
                                 "Select, OrderBy/ThenBy, Skip/Take, Distinct, and the scalar terminals (Count, Any, " +
                                 "First, Sum, …). For joins, GroupBy, Include, or set operators, materialise the raw " +
                                 "query first (ToList) and continue with LINQ-to-Objects, or express them in the SQL.");
-                        expr = mc.Arguments[0];
+                        // Instance operators keep the source as the receiver; static extensions keep it at Arguments[0].
+                        expr = mc.Object ?? mc.Arguments[0];
                         break;
                     case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.Quote } u:
                         expr = u.Operand;

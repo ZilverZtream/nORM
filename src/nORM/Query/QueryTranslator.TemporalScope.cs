@@ -161,6 +161,15 @@ namespace nORM.Query
         internal static string TemporalTableSource(TableMapping map)
             => t_temporalScope?.TableSourceFor(map) ?? map.EscTable;
 
+        /// <summary>
+        /// The root FROM for a scalar terminal that emits its own SELECT/FROM (direct aggregates, ALL): the
+        /// <c>FromSqlRaw</c>/<c>FromSqlInterpolated</c> derived table when the query started from raw SQL,
+        /// otherwise <see cref="TemporalTableSource"/> for the mapped table. Raw and temporal are mutually
+        /// exclusive — AsOf is not a composable raw operator, so it fails loud before reaching here.
+        /// </summary>
+        private string RootTableSource()
+            => _rawSqlSource != null ? "(" + _rawSqlSource + ")" : TemporalTableSource(_mapping);
+
         /// <summary>Whether an AsOf window is active for the current translation.</summary>
         internal static bool HasActiveTemporalScope => t_temporalScope != null;
     }

@@ -25,6 +25,23 @@ namespace nORM.Core
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Func<DbContext, object>> _queryFactoryCache = new();
 
         /// <summary>
+        /// Rejects <c>Include</c>/<c>ThenInclude</c> composed over a <c>FromSqlRaw</c>/<c>FromSqlInterpolated</c>
+        /// root. Eager loading rebuilds the root query from the mapped table's <c>FROM</c> clause, which would
+        /// silently discard the raw SQL (and any filter it carries) and read the whole table — so this fails
+        /// loud at composition time rather than returning wrong rows. Callers should materialise the raw query
+        /// first (<c>ToList</c>) and load related data with a follow-up query, or express the join in the SQL.
+        /// </summary>
+        internal static void ThrowIfRawSqlRoot(Expression source, string op)
+        {
+            if (QueryTranslator.FindRootRawSource(source) is not null)
+                throw new NormUnsupportedFeatureException(
+                    $"'{op}' can't be composed onto a FromSqlRaw/FromSqlInterpolated query: eager loading rebuilds " +
+                    "the root query from the mapped table and would silently ignore the raw SQL and its filter. " +
+                    "Materialise the raw query first (ToList) and load related data with a follow-up query, or " +
+                    "express the join in the raw SQL itself.");
+        }
+
+        /// <summary>
         /// Creates a queryable source for the specified entity type backed by the provided context.
         /// </summary>
         /// <typeparam name="T">The entity type to query.</typeparam>
@@ -154,6 +171,7 @@ namespace nORM.Core
 
         public INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> path)
         {
+            NormQueryable.ThrowIfRawSqlRoot(Expression, nameof(Include));
             var method = typeof(INormQueryable<>).MakeGenericType(typeof(T))
                 .GetMethods()
                 .Single(m => m.Name == nameof(Include) && m.IsGenericMethod);
@@ -238,6 +256,7 @@ namespace nORM.Core
 
         public INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> path)
         {
+            NormQueryable.ThrowIfRawSqlRoot(Expression, nameof(Include));
             var method = typeof(INormQueryable<>).MakeGenericType(typeof(T))
                 .GetMethods()
                 .Single(m => m.Name == nameof(Include) && m.IsGenericMethod);
@@ -294,6 +313,7 @@ namespace nORM.Core
 
         public INormIncludableQueryable<T, TProperty2> Include<TProperty2>(Expression<Func<T, TProperty2>> path)
         {
+            NormQueryable.ThrowIfRawSqlRoot(Expression, nameof(Include));
             var method = typeof(INormQueryable<>).MakeGenericType(typeof(T))
                 .GetMethods()
                 .Single(m => m.Name == nameof(INormQueryable<T>.Include) && m.IsGenericMethod);
@@ -357,6 +377,7 @@ namespace nORM.Core
 
         public INormIncludableQueryable<T, TProperty2> Include<TProperty2>(Expression<Func<T, TProperty2>> path)
         {
+            NormQueryable.ThrowIfRawSqlRoot(Expression, nameof(Include));
             var method = typeof(INormQueryable<>).MakeGenericType(typeof(T))
                 .GetMethods()
                 .Single(m => m.Name == nameof(INormQueryable<T>.Include) && m.IsGenericMethod);
@@ -629,6 +650,7 @@ namespace nORM.Core
             Expression<Func<TPreviousProperty, TProperty>> path)
             where TEntity : class
         {
+            NormQueryable.ThrowIfRawSqlRoot(((IQueryable<TEntity>)source).Expression, nameof(ThenInclude));
             var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
                 .GetGenericMethodDefinition()
                 .MakeGenericMethod(typeof(TEntity), typeof(TPreviousProperty), typeof(TProperty));
@@ -651,6 +673,7 @@ namespace nORM.Core
             Expression<Func<TPreviousProperty, TProperty>> path)
             where TEntity : class
         {
+            NormQueryable.ThrowIfRawSqlRoot(((IQueryable<TEntity>)source).Expression, nameof(ThenInclude));
             var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
                 .GetGenericMethodDefinition()
                 .MakeGenericMethod(typeof(TEntity), typeof(TPreviousProperty), typeof(TProperty));

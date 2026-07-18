@@ -420,7 +420,7 @@ namespace nORM.Query
                         columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
                     _sql.AppendAggregateFunction(sqlFunction, columnSql);
                 }
-                _sql.AppendFragment(" FROM ").Append(TemporalTableSource(_mapping)).Append(' ').Append(alias);
+                _sql.AppendFragment(" FROM ").Append(RootTableSource()).Append(' ').Append(alias);
             }
 
             return node;
@@ -477,7 +477,7 @@ namespace nORM.Query
                 ? $"NOT ({predicateSql})"
                 : $"NOT ({predicateSql}) AND ({outerWhereSql})";
             _sql.Insert(0,
-                $"SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM {TemporalTableSource(_mapping)} {alias} WHERE {subqueryWhere}) THEN 1 ELSE 0 END");
+                $"SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM {RootTableSource()} {alias} WHERE {subqueryWhere}) THEN 1 ELSE 0 END");
 
             // Signal to Build() that this is a scalar query so it uses the scalar materializer
             // path (reads position 0, converts via Convert.ChangeType to bool).

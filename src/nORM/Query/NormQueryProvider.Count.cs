@@ -60,6 +60,12 @@ namespace nORM.Query
             if (source is not ConstantExpression constant)
                 return false;
 
+            // A FromSqlRaw/FromSqlInterpolated root supplies its own FROM (the raw SQL wrapped as a derived
+            // table). This fast path counts the mapped table directly, which would ignore the raw SQL and its
+            // filter — defer to the full plan path, which substitutes the raw derived table.
+            if (constant.Value is INormRawSqlSource)
+                return false;
+
             var elementType = GetElementType(constant);
 
             if (!TryBuildCountCacheKey(elementType, predicate, allowComplex: false, out var cacheKey))
@@ -127,6 +133,11 @@ namespace nORM.Query
             }
 
             if (source is not ConstantExpression constant)
+                return false;
+
+            // A FromSqlRaw/FromSqlInterpolated root supplies its own FROM; counting the mapped table here would
+            // ignore the raw SQL and its filter. Defer to the full plan path, which uses the raw derived table.
+            if (constant.Value is INormRawSqlSource)
                 return false;
 
             var elementType = GetElementType(constant);

@@ -114,6 +114,10 @@ namespace nORM.Query
             // pipeline, which wraps execution in the strategy.
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
                 return false;
+            // A FromSqlRaw/FromSqlInterpolated root supplies its own FROM; every fast path below selects from the
+            // mapped table and would silently ignore the raw SQL (and its filter). Defer to the full pipeline.
+            if (QueryTranslator.FindRootRawSource(expr) is not null)
+                return false;
             // TagWith injects a SQL comment the fast path does not emit; defer to the full pipeline.
             if (ContainsTagWith(expr))
                 return false;
@@ -157,6 +161,10 @@ namespace nORM.Query
             // silently dead for exactly the most common queries. Fall back to the full
             // pipeline, which wraps execution in the strategy.
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
+                return false;
+            // A FromSqlRaw/FromSqlInterpolated root supplies its own FROM; every fast path below selects from the
+            // mapped table and would silently ignore the raw SQL (and its filter). Defer to the full pipeline.
+            if (QueryTranslator.FindRootRawSource(expr) is not null)
                 return false;
             // TagWith injects a SQL comment the fast path does not emit; defer to the full pipeline.
             if (ContainsTagWith(expr))
