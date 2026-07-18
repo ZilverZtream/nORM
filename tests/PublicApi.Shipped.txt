@@ -322,9 +322,11 @@ M:nORM.Core.DbConcurrencyException.#ctor(System.String)
 M:nORM.Core.DbConcurrencyException.#ctor(System.String,System.Exception)
 M:nORM.Core.DbContext.#ctor(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)
 M:nORM.Core.DbContext.#ctor(System.String,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)
+M:nORM.Core.DbContext.AddRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DbContext.Add``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.ApplyNativeTenantPolicyAsync``1(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContext.ApplyProviderNativeTemporalBootstrapAsync``1(System.Threading.CancellationToken):System.Threading.Tasks.Task
+M:nORM.Core.DbContext.AttachRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DbContext.Attach``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.BulkDeleteAsync``1(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.BulkInsertAsync``1(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -367,6 +369,7 @@ M:nORM.Core.DbContext.Query(System.String):System.Linq.IQueryable
 M:nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.RegisterForDisposal(System.IDisposable):System.Void
+M:nORM.Core.DbContext.RemoveRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DbContext.Remove``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.DateTime,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -378,6 +381,7 @@ M:nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken):Syste
 M:nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object):System.Void
 M:nORM.Core.DbContext.UpdateAsync``1(`0,System.Data.Common.DbTransaction,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.UpdateAsync``1(`0,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
+M:nORM.Core.DbContext.UpdateRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DbContext.Update``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.UseDeadlockResilientSaveChanges():nORM.Configuration.DbContextOptions
 M:nORM.Core.DbContextTransaction.Commit():System.Void
