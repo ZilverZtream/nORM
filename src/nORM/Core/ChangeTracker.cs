@@ -584,6 +584,33 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Accepts all changes: after running change detection, every Added or Modified entry becomes
+        /// <see cref="EntityState.Unchanged"/> with its current values as the new baseline, and every Deleted
+        /// entry is detached — matching EF Core's <c>ChangeTracker.AcceptAllChanges</c>. Use it to tell the
+        /// tracker that the tracked entities now mirror the database after persisting them out of band (for
+        /// example via raw SQL). Each entry is processed by its own state, without cascading.
+        /// </summary>
+        public void AcceptAllChanges()
+        {
+            DetectChangesCore(allNonNotifying: true);
+            // Snapshot the entries: detaching a Deleted entry mutates the underlying tracked collection.
+            foreach (var entry in Entries.ToList())
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Deleted:
+                        if (entry.Entity is { } deleted)
+                            Remove(deleted, cascade: false);
+                        break;
+                    case EntityState.Added:
+                    case EntityState.Modified:
+                        entry.AcceptChanges();
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
         /// Detects changes in all tracked non-INotifyPropertyChanged entities by
         /// comparing current property values against original snapshots, plus any
         /// INPC entities that were explicitly marked dirty. Called automatically by
