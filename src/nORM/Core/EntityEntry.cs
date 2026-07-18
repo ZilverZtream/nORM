@@ -2,7 +2,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using nORM.Configuration;
 using nORM.Mapping;
 using nORM.Navigation;
@@ -175,6 +178,30 @@ namespace nORM.Core
         /// resolving a conflict — mirroring EF's <c>OriginalValues</c>. Original key values are read-only.
         /// </summary>
         public PropertyValues OriginalValues => new PropertyValues(this, original: true);
+
+        /// <summary>
+        /// Overwrites the entity's column values from a fresh read of its database row and resets the
+        /// entry to <see cref="EntityState.Unchanged"/>, discarding any pending edits — mirroring EF's
+        /// <c>Reload</c>. If the row no longer exists the entity is detached. Navigation properties are
+        /// not reloaded. Throws when the entry is detached or not associated with a context.
+        /// </summary>
+        [RequiresDynamicCode("Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public void Reload() => RequireContext().ReloadEntry(this);
+
+        /// <summary>
+        /// Asynchronous <see cref="Reload"/>: overwrites the entity's column values from a fresh read of
+        /// its database row and resets the entry to <see cref="EntityState.Unchanged"/> (or detaches it
+        /// when the row is gone). Navigation properties are not reloaded.
+        /// </summary>
+        [RequiresDynamicCode("Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public Task ReloadAsync(CancellationToken ct = default) => RequireContext().ReloadEntryAsync(this, ct);
+
+        private DbContext RequireContext()
+            => Tracker?.Context
+               ?? throw new InvalidOperationException(
+                   "This entry is not associated with a context and cannot be reloaded. Obtain it from context.Entry(entity).");
 
         /// <summary>The CLR type this entry maps.</summary>
         internal Type MappedType => _mapping.Type;

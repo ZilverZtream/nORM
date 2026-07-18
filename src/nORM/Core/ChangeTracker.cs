@@ -53,6 +53,16 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// The <see cref="DbContext"/> that owns this tracker, bound once during context construction so
+        /// entries can reach it (e.g. <see cref="EntityEntry.Reload"/> re-queries through it). Null only
+        /// before the owning context finishes constructing.
+        /// </summary>
+        internal DbContext? Context { get; private set; }
+
+        /// <summary>Associates this tracker with its owning context. Called once by the DbContext constructor.</summary>
+        internal void BindContext(DbContext context) => Context = context;
+
+        /// <summary>
         /// Begins tracking the specified entity instance and associates it with the
         /// provided <paramref name="mapping"/>. If the entity is already being tracked
         /// either by reference or by its primary key, the existing <see cref="EntityEntry"/>

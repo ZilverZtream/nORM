@@ -393,6 +393,8 @@ M:nORM.Core.DbContextTransaction.DisposeAsync():System.Threading.Tasks.ValueTask
 M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
+M:nORM.Core.EntityEntry.Reload():System.Void
+M:nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.IMemoryMonitor.GetAvailableMemory():System.Int64
 M:nORM.Core.INormDbContextFactory{`0}.CreateDbContext():`0
 M:nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}

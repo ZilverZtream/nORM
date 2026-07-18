@@ -190,6 +190,7 @@ namespace nORM.Core
                     throw new ArgumentException("SaveChangesInterceptors cannot contain null entries.");
             }
             ChangeTracker = new ChangeTracker(Options);
+            ChangeTracker.BindContext(this);
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
             Database = new DatabaseFacade(this);

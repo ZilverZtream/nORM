@@ -85,6 +85,7 @@ v1.0 contract:
 | `nORM.Core.NormQueryable.Set<T>(this DbContext)` | Stable - EF Core-style query entry-point alias for `Query<T>` | `NormQueryableSetTests` | `README.md` Quick Start (LINQ Queries) |
 | `nORM.Core.PropertyValues` (`this[string]` / `Properties` / `GetValue<T>` / `SetValues` / `ToObject`) | Stable - EF Core-style entity property bag | `EntityEntryPropertyValuesContractTests` | `docs/api/nORM.Core.PropertyValues.yml` |
 | `nORM.Core.EntityEntry.CurrentValues` / `nORM.Core.EntityEntry.OriginalValues` | Stable - EF Core-style current/original value bags | `EntityEntryPropertyValuesContractTests` | `docs/api/nORM.Core.EntityEntry.yml` |
+| `nORM.Core.EntityEntry.Reload()` / `nORM.Core.EntityEntry.ReloadAsync(CancellationToken)` | Stable - EF Core-style refresh from the database | `EntityEntryReloadContractTests` | `docs/api/nORM.Core.EntityEntry.yml` |
 
 `PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
 any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.
