@@ -31,7 +31,7 @@ must independently verify tenant identity.
 
 | Boundary | Protected by nORM | Bypass-capable APIs | Required control |
 | --- | --- | --- | --- |
-| ORM-generated reads | `Query<T>()`, compiled queries, eager-loaded includes, result cache keys | `FromSqlRawAsync<T>`, `QueryUnchangedAsync<T>`, direct `DbCommand` | Add tenant predicates manually or use database row-level security for caller-authored SQL. |
+| ORM-generated reads | `Query<T>()`, compiled queries, eager-loaded includes, **composable `FromSqlRaw<T>` / `FromSqlInterpolated<T>`** (the tenant filter is applied to the outer query over the raw SQL wrapped as a derived table), result cache keys | terminal `FromSqlRawAsync<T>`, `QueryUnchangedAsync<T>`, direct `DbCommand` | Add tenant predicates manually (or use database row-level security) for caller-authored SQL executed through the terminal raw APIs; the composable `FromSqlRaw` path enforces tenant automatically. |
 | ORM-generated writes | `SaveChangesAsync`, direct writes, bulk update/delete, owned/many-to-many maintenance | direct `DbCommand`, migrations, admin CLI commands | Restrict privileged write paths and review tenant predicates in hand-authored SQL. |
 | Relationship loading | mapped `Include`, `ThenInclude` eager loading | raw SQL joins, stored procedures | Verify related tables carry tenant columns or enforce tenancy in database code. |
 | Cache isolation | query/result cache keys include tenant state where nORM owns the key | external cache providers, application-level cache keys | Prefix external keys/tags with tenant identity. |
