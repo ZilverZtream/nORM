@@ -106,7 +106,11 @@ namespace nORM.Query
         /// </summary>
         internal QueryPlan GetPlan(Expression expression, out Expression filtered, out IReadOnlyList<object?>? parameterValues)
         {
-            filtered = ApplyGlobalFilters(expression);
+            // IgnoreQueryFilters() bypasses the user's AddGlobalFilter predicates (soft-delete etc.)
+            // for the whole query, but NEVER the tenant boundary — that is a security invariant, not
+            // an opt-out filter. A single tree scan decides it for this plan.
+            var ignoreUserFilters = ExpressionContainsIgnoreQueryFilters(expression);
+            filtered = ApplyGlobalFilters(expression, ignoreUserFilters);
             var elementType = GetElementType(UnwrapQueryExpression(filtered));
             var tenantHash = _ctx.Options.TenantProvider != null
                 ? _ctx.GetRequiredTenantId("query plan cache key").GetHashCode()
@@ -467,11 +471,43 @@ namespace nORM.Query
                 ? mc.Arguments[0]
                 : expression;
         }
-        private Expression ApplyGlobalFilters(Expression expression)
+        /// <summary>
+        /// True when the query tree contains an <c>IgnoreQueryFilters()</c> marker anywhere, so the
+        /// whole query bypasses user global filters (EF semantics). Matched by declaring type and
+        /// name so an unrelated method named IgnoreQueryFilters cannot trigger it.
+        /// </summary>
+        private static bool ExpressionContainsIgnoreQueryFilters(Expression expression)
+        {
+            var finder = new IgnoreQueryFiltersFinder();
+            finder.Visit(expression);
+            return finder.Found;
+        }
+
+        private sealed class IgnoreQueryFiltersFinder : ExpressionVisitor
+        {
+            public bool Found;
+
+            public override Expression? Visit(Expression? node)
+                => Found ? node : base.Visit(node);
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                if (node.Method.DeclaringType == typeof(nORM.Core.NormIncludableQueryableExtensions)
+                    && node.Method.Name == nameof(nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters))
+                {
+                    Found = true;
+                    return node;
+                }
+                return base.VisitMethodCall(node);
+            }
+        }
+
+        private Expression ApplyGlobalFilters(Expression expression, bool ignoreUserFilters)
         {
             // Skip the entire recursive walk when no global filters or tenant provider exist.
             // The recursion allocates new expression nodes (ToArray + Update) on every node even
-            // when there are no filters to apply.
+            // when there are no filters to apply. (The IgnoreQueryFilters marker is left in the
+            // tree here and stripped by its pass-through translator.)
             if (_ctx.Options.GlobalFilters.Count == 0 && _ctx.Options.TenantProvider == null)
                 return expression;
 
@@ -479,7 +515,7 @@ namespace nORM.Query
                 !typeof(IQueryable).IsAssignableFrom(expression.Type) &&
                 mc.Arguments.Count > 0)
             {
-                var filteredSource = ApplyGlobalFilters(mc.Arguments[0]);
+                var filteredSource = ApplyGlobalFilters(mc.Arguments[0], ignoreUserFilters);
                 var args = mc.Arguments.ToArray();
                 args[0] = filteredSource;
                 return mc.Update(mc.Object, args);
@@ -510,7 +546,7 @@ namespace nORM.Query
                         : typeof(IQueryable).IsAssignableFrom(arg.Type);
                     if (!recurse)
                         continue;
-                    var filtered = ApplyGlobalFilters(arg);
+                    var filtered = ApplyGlobalFilters(arg, ignoreUserFilters);
                     if (!ReferenceEquals(filtered, arg))
                     {
                         rewritten ??= queryCall.Arguments.ToArray();
@@ -535,7 +571,9 @@ namespace nORM.Query
             }
 
             var entityType = GetElementType(expression);
-            if (_ctx.Options.GlobalFilters.Count > 0)
+            // User global filters (soft-delete etc.) are skipped when IgnoreQueryFilters() is in the
+            // query. The tenant predicate below is NEVER skipped.
+            if (!ignoreUserFilters && _ctx.Options.GlobalFilters.Count > 0)
             {
                 var combined = CombineGlobalFilterPredicates(entityType);
                 if (combined != null)

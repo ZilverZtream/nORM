@@ -175,6 +175,20 @@ namespace nORM.Query
             }
         }
 
+        private sealed class IgnoreQueryFiltersTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Strips the <c>IgnoreQueryFilters</c> marker. Whether user global filters are
+            /// suppressed was already decided pre-translation in
+            /// <c>NormQueryProvider.ApplyGlobalFilters</c>, so nothing to do here but pass through.
+            /// </summary>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
+            }
+        }
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class CastOrOfTypeTranslator : IMethodCallTranslator

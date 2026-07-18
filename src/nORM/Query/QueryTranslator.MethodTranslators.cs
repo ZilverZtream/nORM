@@ -82,6 +82,7 @@ namespace nORM.Query
             { "ThenInclude", new ThenIncludeTranslator() },
             { "AsNoTracking", new AsNoTrackingTranslator() },
             { "AsSplitQuery", new AsSplitQueryTranslator() },
+            { "IgnoreQueryFilters", new IgnoreQueryFiltersTranslator() },
             { "AsOf", new AsOfTranslator() },
             { "Cast", new CastOrOfTypeTranslator() },
             { "OfType", new CastOrOfTypeTranslator() }

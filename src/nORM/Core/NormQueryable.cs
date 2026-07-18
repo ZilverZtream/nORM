@@ -517,6 +517,41 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Bypasses the user-defined global query filters (registered via
+        /// <c>DbContextOptions.AddGlobalFilter</c>, e.g. soft-delete) for this query — the escape
+        /// hatch for admin "show deleted", restore, and audit views, matching Entity Framework
+        /// Core's <c>IgnoreQueryFilters</c>. It applies to the root query's filters.
+        /// <para>
+        /// IMPORTANT: it does NOT bypass tenant isolation. In nORM the tenant predicate is a
+        /// security boundary applied independently of global filters, so it always remains in
+        /// force; a query can never read another tenant's rows via IgnoreQueryFilters.
+        /// </para>
+        /// </summary>
+        /// <typeparam name="T">The entity type of the query.</typeparam>
+        /// <param name="source">A nORM query started with <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>.</param>
+        /// <returns>A query whose user global filters are suppressed.</returns>
+        [RequiresDynamicCode("nORM IgnoreQueryFilters emits a MakeGenericMethod marker call; not NativeAOT-compatible.")]
+        [RequiresUnreferencedCode("nORM IgnoreQueryFilters uses reflection to resolve the open generic marker method; trimming may remove it.")]
+        public static IQueryable<T> IgnoreQueryFilters<T>(this IQueryable<T> source)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is not nORM.Query.NormQueryProvider)
+                throw new NormUsageException(
+                    "IgnoreQueryFilters can only be used with nORM queries. " +
+                    "Make sure you started with context.Query<T>() or context.Set<T>().");
+
+            // Marker operator in the expression tree: the provider detects it before translation to
+            // skip user global filters, and a pass-through translator strips it. Self-referential
+            // like ThenInclude so no separate marker method is needed.
+            var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
+                .GetGenericMethodDefinition()
+                .MakeGenericMethod(typeof(T));
+            var call = Expression.Call(method, source.Expression);
+            return source.Provider.CreateQuery<T>(call);
+        }
+
+        /// <summary>
         /// Specifies an additional navigation property to include after a previous <c>Include</c> call.
         /// </summary>
         /// <typeparam name="TEntity">Root entity type of the query.</typeparam>
