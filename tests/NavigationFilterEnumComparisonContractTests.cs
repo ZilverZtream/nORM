@@ -87,6 +87,19 @@ public class NavigationFilterEnumComparisonContractTests
     }
 
     [Fact]
+    public void Enum_comparison_with_a_captured_value_binds_and_rebinds()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Bootstrap(cn);
+
+        int[] RunFor(Kind k) => Load(ctx, q => q.Include(o => o.Lines.Where(l => l.Kind == k)));
+
+        // A captured enum binds through the compiled-parameter path; the same query shape with a different
+        // captured value must re-bind (not replay the first run's) across the plan-cache hit.
+        Assert.Equal(new[] { 2 }, RunFor(Kind.B));
+        Assert.Equal(new[] { 3 }, RunFor(Kind.C));
+    }
+
+    [Fact]
     public void Converter_backed_enum_column_stays_fail_loud()
     {
         using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Bootstrap(cn, kindConverter: true);

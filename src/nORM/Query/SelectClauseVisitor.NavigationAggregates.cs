@@ -431,18 +431,25 @@ namespace nORM.Query
 
         private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias)
         {
-            // Peel the enum→underlying Convert the compiler inserts for `l.EnumCol == EnumValue` so the plain
-            // column is rendered (the enum constant on the other side folds to its underlying integer). Only
-            // when the column has NO value converter — a converter stores a different provider value, so
-            // comparing the column to the raw underlying number would be silently wrong; those stay
-            // unsupported (fall through to the error).
+            // Peel the enum→underlying Convert the compiler inserts around either operand of an enum
+            // comparison (`l.EnumCol == EnumValue`, or `== capturedEnum`) so the plain column / captured
+            // value is rendered. For the ELEMENT member, peel only when the column has NO value converter —
+            // a converter stores a different provider value, so comparing it to the raw underlying number
+            // would be silently wrong, so those stay fail-loud. For a captured value (closure) the column is
+            // the OTHER operand, whose converter check already gates the whole comparison, so peeling here is
+            // safe and routes the value through the compiled-parameter (@cp) path.
             if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } enumConv
-                && enumConv.Operand is MemberExpression enumMember
-                && enumMember.Expression == elementParam
-                && (Nullable.GetUnderlyingType(enumMember.Type) ?? enumMember.Type).IsEnum
-                && !MemberColumnHasConverter(enumMember))
+                && (Nullable.GetUnderlyingType(enumConv.Operand.Type) ?? enumConv.Operand.Type).IsEnum)
             {
-                expr = enumMember;
+                if (enumConv.Operand is MemberExpression enumMember && enumMember.Expression == elementParam)
+                {
+                    if (!MemberColumnHasConverter(enumMember))
+                        expr = enumMember;
+                }
+                else
+                {
+                    expr = enumConv.Operand;
+                }
             }
 
             // Member access on the element parameter → column on the dependent.
