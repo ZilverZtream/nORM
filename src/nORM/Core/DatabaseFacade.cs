@@ -112,6 +112,42 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns the DDL that would create the tables for the context's mapped entities, as a single
+        /// script — matching Entity Framework Core's <c>Database.GenerateCreateScript</c>. This GENERATES the
+        /// SQL only: it opens no connection and executes nothing, so it is the tool for inspecting, diffing,
+        /// or exporting the schema the fluent model (<c>DbContextOptions.OnModelCreating</c>) implies. Tables
+        /// are ordered so a principal precedes its dependents (inline foreign keys). Returns an empty string
+        /// when the model configures no tables.
+        /// </summary>
+        /// <returns>The create-table DDL for every mapped entity, one statement per line.</returns>
+        [RequiresDynamicCode("GenerateCreateScript builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("GenerateCreateScript reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public string GenerateCreateScript()
+        {
+            var target = SchemaSnapshotBuilder.Build(_context);
+            if (target.Tables.Count == 0)
+                return string.Empty;
+
+            var ordered = OrderByForeignKeyDependencies(new List<TableSchema>(target.Tables));
+            var diff = new SchemaDiff();
+            diff.AddedTables.AddRange(ordered);
+
+            var statements = CreateMigrationSqlGenerator().GenerateSql(diff);
+            var sb = new System.Text.StringBuilder();
+            foreach (var sql in EnumerateUpStatements(statements))
+            {
+                var trimmed = sql.TrimEnd();
+                if (trimmed.Length == 0)
+                    continue;
+                sb.Append(trimmed);
+                if (!trimmed.EndsWith(";", StringComparison.Ordinal))
+                    sb.Append(';');
+                sb.Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
         /// Tests whether the database is reachable by opening the connection and running a trivial probe —
         /// matching EF Core's <c>Database.CanConnectAsync</c>. Returns <c>false</c> (rather than throwing)
         /// when the connection cannot be opened or the probe fails.
