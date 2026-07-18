@@ -153,6 +153,35 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Executes a raw non-query SQL command (INSERT/UPDATE/DELETE/DDL) against the database and
+        /// returns the number of rows affected — matching EF Core's <c>Database.ExecuteSqlRawAsync</c>.
+        /// Pass values as <paramref name="parameters"/> (referenced positionally in the SQL) rather than
+        /// string-concatenating them, to avoid SQL injection. Participates in the active transaction.
+        /// </summary>
+        /// <param name="sql">The non-query SQL to execute.</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        /// <param name="parameters">Parameter values referenced by the SQL.</param>
+        public Task<int> ExecuteSqlRawAsync(string sql, CancellationToken ct = default, params object[] parameters)
+            => _context.ExecuteSqlRawCoreAsync(sql, parameters ?? Array.Empty<object>(), ct);
+
+        /// <summary>Synchronous <see cref="ExecuteSqlRawAsync(string, CancellationToken, object[])"/>.</summary>
+        public int ExecuteSqlRaw(string sql, params object[] parameters)
+            => _context.ExecuteSqlRawCore(sql, parameters ?? Array.Empty<object>());
+
+        /// <summary>
+        /// Executes interpolated non-query SQL, turning each interpolation hole into a database parameter
+        /// before execution — matching EF Core's <c>Database.ExecuteSqlInterpolatedAsync</c>.
+        /// </summary>
+        /// <param name="sql">The interpolated non-query SQL; interpolation holes become parameters.</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        public Task<int> ExecuteSqlInterpolatedAsync(FormattableString sql, CancellationToken ct = default)
+            => _context.ExecuteSqlInterpolatedCoreAsync(sql, ct);
+
+        /// <summary>Synchronous <see cref="ExecuteSqlInterpolatedAsync"/>.</summary>
+        public int ExecuteSqlInterpolated(FormattableString sql)
+            => _context.ExecuteSqlInterpolatedCore(sql);
+
+        /// <summary>
         /// Gets the active <see cref="DbTransaction"/> for the context, if one exists.
         /// </summary>
         public DbTransaction? CurrentTransaction

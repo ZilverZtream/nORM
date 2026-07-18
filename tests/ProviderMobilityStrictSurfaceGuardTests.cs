@@ -58,7 +58,14 @@ public sealed class ProviderMobilityStrictSurfaceGuardTests
     public void Provider_bound_public_transaction_facades_are_explicitly_classified()
     {
         Assert.Equal(
-            new[] { "Property:CurrentTransaction" },
+            new[]
+            {
+                "Method:ExecuteSqlInterpolated",
+                "Method:ExecuteSqlInterpolatedAsync",
+                "Method:ExecuteSqlRaw",
+                "Method:ExecuteSqlRawAsync",
+                "Property:CurrentTransaction"
+            },
             ProviderBoundMembers(typeof(DatabaseFacade)));
 
         Assert.Equal(

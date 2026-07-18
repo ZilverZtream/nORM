@@ -237,6 +237,98 @@ namespace nORM.Core
             return FromSqlRawAsync<T>(prepared.Sql, ct, prepared.Parameters);
         }
 
+        /// <summary>
+        /// Executes a raw non-query command (INSERT/UPDATE/DELETE/DDL) and returns the affected row
+        /// count. Backs <see cref="DatabaseFacade.ExecuteSqlRawAsync(string, System.Threading.CancellationToken, object[])"/>.
+        /// </summary>
+        internal Task<int> ExecuteSqlRawCoreAsync(string sql, object[] parameters, CancellationToken ct)
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteSqlRawCoreAsync));
+            ArgumentNullException.ThrowIfNull(sql);
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.RawConnection, sql);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
+                var paramDict = ctx.AddParametersFast(cmd, parameters);
+                NormValidator.ValidateRawNonQuerySql(sql, ctx.RawProvider, paramDict);
+                var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, token).ConfigureAwait(false);
+                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, affected);
+                cmd.Parameters.Clear();
+                ctx.InvalidateResultCacheForRawSql(sql);
+                return affected;
+            }, ct);
+        }
+
+        /// <summary>Synchronous counterpart of <see cref="ExecuteSqlRawCoreAsync"/>.</summary>
+        internal int ExecuteSqlRawCore(string sql, object[] parameters)
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ExecuteSqlRawCore));
+            ArgumentNullException.ThrowIfNull(sql);
+            EnsureConnection();
+            var sw = Stopwatch.StartNew();
+            using var cmd = CommandPool.Get(RawConnection, sql);
+            if (CurrentTransaction != null)
+                cmd.Transaction = CurrentTransaction;
+            cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
+            var paramDict = AddParametersFast(cmd, parameters);
+            NormValidator.ValidateRawNonQuerySql(sql, RawProvider, paramDict);
+            var affected = cmd.ExecuteNonQueryWithInterception(this);
+            Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, affected);
+            cmd.Parameters.Clear();
+            InvalidateResultCacheForRawSql(sql);
+            return affected;
+        }
+
+        /// <summary>Executes interpolated non-query SQL, parameterizing each hole first.</summary>
+        internal Task<int> ExecuteSqlInterpolatedCoreAsync(FormattableString sql, CancellationToken ct)
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var prepared = BuildInterpolatedSql(sql);
+            return ExecuteSqlRawCoreAsync(prepared.Sql, prepared.Parameters, ct);
+        }
+
+        /// <summary>Synchronous counterpart of <see cref="ExecuteSqlInterpolatedCoreAsync"/>.</summary>
+        internal int ExecuteSqlInterpolatedCore(FormattableString sql)
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var prepared = BuildInterpolatedSql(sql);
+            return ExecuteSqlRawCore(prepared.Sql, prepared.Parameters);
+        }
+
+        // Matches the target table after a DML/DDL verb so a raw write can invalidate the result cache
+        // for that table (EF does no cache invalidation for raw SQL; this is a best-effort improvement).
+        private static readonly System.Text.RegularExpressions.Regex s_rawSqlTargetTableRegex = new(
+            @"(?:UPDATE|INSERT\s+INTO|DELETE\s+FROM|MERGE\s+INTO|TRUNCATE\s+TABLE)\s+(?<t>[`""\[]?[A-Za-z_][A-Za-z0-9_]*[`""\]]?(?:\s*\.\s*[`""\[]?[A-Za-z_][A-Za-z0-9_]*[`""\]]?)?)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// Best-effort result-cache invalidation for a raw non-query: parses the target table of each
+        /// UPDATE/INSERT/DELETE/MERGE/TRUNCATE and invalidates its cache tag. Complex or unparseable SQL
+        /// invalidates nothing (matching EF, which never invalidates for raw SQL).
+        /// </summary>
+        private void InvalidateResultCacheForRawSql(string sql)
+        {
+            var cache = Options.CacheProvider;
+            if (cache == null)
+                return;
+            foreach (System.Text.RegularExpressions.Match match in s_rawSqlTargetTableRegex.Matches(sql))
+            {
+                var token = match.Groups["t"].Value;
+                var lastDot = token.LastIndexOf('.');
+                if (lastDot >= 0)
+                    token = token.Substring(lastDot + 1);
+                token = token.Trim().Trim('`', '"', '[', ']', ' ');
+                if (token.Length > 0)
+                    cache.InvalidateTag(token);
+            }
+        }
+
         private (string Sql, object[] Parameters) BuildInterpolatedSql(FormattableString sql)
         {
             var arguments = sql.GetArguments();
