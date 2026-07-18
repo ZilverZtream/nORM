@@ -42,12 +42,11 @@ public class NavigationFilterEnumComparisonContractTests
     {
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = """
-                CREATE TABLE NfeOrder (Id INTEGER PRIMARY KEY);
-                CREATE TABLE NfeLine (Id INTEGER PRIMARY KEY, OrderId INTEGER NOT NULL, Kind INTEGER NOT NULL);
-                INSERT INTO NfeOrder VALUES (1);
-                INSERT INTO NfeLine VALUES (1,1,1),(2,1,2),(3,1,3);
-                """;
+            // With the converter, Kind is stored as its NAME (A/B/C); without it, as the underlying int.
+            var lineTable = kindConverter
+                ? "CREATE TABLE NfeLine (Id INTEGER PRIMARY KEY, OrderId INTEGER NOT NULL, Kind TEXT NOT NULL); INSERT INTO NfeLine VALUES (1,1,'A'),(2,1,'B'),(3,1,'C');"
+                : "CREATE TABLE NfeLine (Id INTEGER PRIMARY KEY, OrderId INTEGER NOT NULL, Kind INTEGER NOT NULL); INSERT INTO NfeLine VALUES (1,1,1),(2,1,2),(3,1,3);";
+            cmd.CommandText = "CREATE TABLE NfeOrder (Id INTEGER PRIMARY KEY); INSERT INTO NfeOrder VALUES (1); " + lineTable;
             cmd.ExecuteNonQuery();
         }
         var opts = new DbContextOptions { OnModelCreating = mb =>
@@ -100,11 +99,19 @@ public class NavigationFilterEnumComparisonContractTests
     }
 
     [Fact]
-    public void Converter_backed_enum_column_stays_fail_loud()
+    public void Converter_backed_enum_column_matches_the_converted_value()
     {
         using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Bootstrap(cn, kindConverter: true);
-        // The Kind column stores its NAME (string) via a converter; comparing the column to the raw integer
-        // would be silently wrong, so this must throw rather than mis-filter.
-        Assert.ThrowsAny<Exception>(() => Load(ctx, q => q.Include(o => o.Lines.Where(l => l.Kind == Kind.B))));
+        // Kind is stored as its NAME via the converter; the constant Kind.B is converted to "B" so the
+        // comparison matches the stored value (previously this was fail-loud).
+        Assert.Equal(new[] { 2 }, Load(ctx, q => q.Include(o => o.Lines.Where(l => l.Kind == Kind.B))));
+    }
+
+    [Fact]
+    public void Converter_backed_enum_column_binds_a_captured_value()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Bootstrap(cn, kindConverter: true);
+        var k = Kind.C;
+        Assert.Equal(new[] { 3 }, Load(ctx, q => q.Include(o => o.Lines.Where(l => l.Kind == k))));
     }
 }

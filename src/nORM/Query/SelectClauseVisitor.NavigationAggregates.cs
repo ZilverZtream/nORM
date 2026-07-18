@@ -382,27 +382,6 @@ namespace nORM.Query
         /// pattern, non-element receiver) so the caller falls through to the unsupported-shape error.
         /// </summary>
         /// <summary>
-        /// True when the given filter-element member maps to a column with a value converter — or when that
-        /// can't be verified (no context, unresolvable mapping). Used to keep enum comparisons on
-        /// converter-backed columns fail-loud rather than render a comparison against the raw underlying
-        /// value, which would be silently wrong.
-        /// </summary>
-        private bool MemberColumnHasConverter(MemberExpression member)
-        {
-            if (_ctx == null || member.Member.DeclaringType == null)
-                return true;
-            try
-            {
-                var map = _ctx.GetMapping(member.Member.DeclaringType);
-                return !map.ColumnsByName.TryGetValue(member.Member.Name, out var col) || col.Converter != null;
-            }
-            catch
-            {
-                return true;
-            }
-        }
-
-        /// <summary>
         /// The value converter of the filter-element column the expression accesses, or null when the
         /// expression isn't such a column, has no converter, or can't be resolved. Used to convert the
         /// opposing operand of a comparison to the provider representation.
@@ -461,23 +440,13 @@ namespace nORM.Query
         {
             // Peel the enum→underlying Convert the compiler inserts around either operand of an enum
             // comparison (`l.EnumCol == EnumValue`, or `== capturedEnum`) so the plain column / captured
-            // value is rendered. For the ELEMENT member, peel only when the column has NO value converter —
-            // a converter stores a different provider value, so comparing it to the raw underlying number
-            // would be silently wrong, so those stay fail-loud. For a captured value (closure) the column is
-            // the OTHER operand, whose converter check already gates the whole comparison, so peeling here is
-            // safe and routes the value through the compiled-parameter (@cp) path.
+            // value is rendered. A value-converter enum column is fine now: the BinaryExpression case applies
+            // the column's converter to the opposing operand, so the comparison uses the stored provider
+            // representation rather than the raw underlying number.
             if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } enumConv
                 && (Nullable.GetUnderlyingType(enumConv.Operand.Type) ?? enumConv.Operand.Type).IsEnum)
             {
-                if (enumConv.Operand is MemberExpression enumMember && enumMember.Expression == elementParam)
-                {
-                    if (!MemberColumnHasConverter(enumMember))
-                        expr = enumMember;
-                }
-                else
-                {
-                    expr = enumConv.Operand;
-                }
+                expr = enumConv.Operand;
             }
 
             // Member access on the element parameter → column on the dependent.
