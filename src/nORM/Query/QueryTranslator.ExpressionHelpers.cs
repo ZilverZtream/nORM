@@ -191,6 +191,10 @@ namespace nORM.Query
                 "First", "FirstOrDefault", "Single", "SingleOrDefault", "Last", "LastOrDefault",
                 "ElementAt", "ElementAtOrDefault", "Sum", "Min", "Max", "Average",
                 "AsNoTracking", "AsTracking", "AsSplitQuery", "IgnoreQueryFilters", "TagWith", "Cast",
+                // Cacheable wraps the result set; it doesn't rewrite the FROM. The result-cache key includes the
+                // rendered SQL (so distinct raw SQL never collides) and the entity's mapped table drives
+                // invalidation — sound whenever the raw SQL reads that table, the standard caller-owns-SQL caveat.
+                "Cacheable",
             };
 
         /// <summary>

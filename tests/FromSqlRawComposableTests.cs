@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -320,5 +321,53 @@ public class FromSqlRawComposableTests
         // Aggregates and Count are tenant-scoped too (would be 730 / 4 without the outer tenant filter).
         Assert.Equal(30, t1.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget").Sum(w => w.Score));
         Assert.Equal(2, t1.FromSqlRaw<TenantWidget>("SELECT * FROM FsrTenantWidget").Count());
+    }
+
+    [Table("FsrCache")]
+    public class CacheWidget
+    {
+        [Key] public int Id { get; set; }
+        public int Score { get; set; }
+    }
+
+    // Cacheable composes over a raw root: the result-cache key includes the rendered SQL (distinct raw SQL
+    // never collides) and the entity's mapped table drives invalidation on a nORM write.
+    [Fact]
+    public async Task raw_composes_with_cacheable_keyed_on_sql_and_invalidated_by_writes()
+    {
+        using var cache = new NormMemoryCacheProvider();
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE FsrCache (Id INTEGER PRIMARY KEY, Score INTEGER NOT NULL);
+                INSERT INTO FsrCache VALUES (1,10),(2,20),(3,30),(4,40);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions
+        {
+            CacheProvider = cache,
+            OnModelCreating = mb => mb.Entity<CacheWidget>().HasKey(w => w.Id)
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
+        var expiry = TimeSpan.FromMinutes(5);
+
+        // Distinct raw SQL must not share a cached entry — the key includes the rendered SQL.
+        var lo = ctx.FromSqlRaw<CacheWidget>("SELECT * FROM FsrCache WHERE Score < 25").Cacheable(expiry).ToList();
+        var hi = ctx.FromSqlRaw<CacheWidget>("SELECT * FROM FsrCache WHERE Score > 25").Cacheable(expiry).ToList();
+        Assert.Equal(new[] { 1, 2 }, lo.Select(w => w.Id).OrderBy(i => i).ToArray());
+        Assert.Equal(new[] { 3, 4 }, hi.Select(w => w.Id).OrderBy(i => i).ToArray());
+
+        // The result really is cached: an out-of-band raw INSERT (bypassing nORM's invalidation) is not seen.
+        int Count() => ctx.FromSqlRaw<CacheWidget>("SELECT * FROM FsrCache").Cacheable(expiry).ToList().Count;
+        Assert.Equal(4, Count());   // caches 4
+        using (var ins = cn.CreateCommand()) { ins.CommandText = "INSERT INTO FsrCache VALUES (5,50)"; ins.ExecuteNonQuery(); }
+        Assert.Equal(4, Count());   // still 4 — served from cache, the out-of-band row is invisible
+
+        // A nORM write to the mapped table invalidates the cached raw result.
+        ctx.Add(new CacheWidget { Score = 60 });
+        await ctx.SaveChangesAsync();
+        Assert.Equal(6, Count());   // 4 original + out-of-band 5 + nORM-added 6, re-read after invalidation
     }
 }
