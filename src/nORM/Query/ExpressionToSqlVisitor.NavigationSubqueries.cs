@@ -30,12 +30,38 @@ namespace nORM.Query
         private bool TryEmitNonRelationCollectionPredicateAggregate(MethodCallExpression node)
         {
             var method = node.Method.Name;
-            if (method is not (nameof(Queryable.Any) or nameof(Queryable.Count)
-                               or nameof(Queryable.LongCount) or nameof(Queryable.All)))
+            if (method is not (nameof(Queryable.Any) or nameof(Queryable.Count) or nameof(Queryable.LongCount)
+                               or nameof(Queryable.All) or nameof(Queryable.Sum) or nameof(Queryable.Min)
+                               or nameof(Queryable.Max) or nameof(Queryable.Average)))
                 return false;
-            if (_ctx == null
-                || node.Arguments.Count < 1
-                || node.Arguments[0] is not MemberExpression navMember
+            if (_ctx == null || node.Arguments.Count < 1)
+                return false;
+
+            // Peel an optional `Select(selector)` and `Where(pred)` between the collection and the aggregate,
+            // and a direct selector/predicate argument, to find the nav member and the selector/filter.
+            var src = node.Arguments[0];
+            LambdaExpression? selector = null;
+            LambdaExpression? filter = null;
+            if (src is MethodCallExpression selCall && selCall.Method.Name == nameof(Queryable.Select)
+                && selCall.Arguments.Count == 2 && StripQuotes(selCall.Arguments[1]) is LambdaExpression selLambda)
+            {
+                selector = selLambda;
+                src = selCall.Arguments[0];
+            }
+            if (src is MethodCallExpression whereCall && whereCall.Method.Name == nameof(Queryable.Where)
+                && whereCall.Arguments.Count == 2 && StripQuotes(whereCall.Arguments[1]) is LambdaExpression whereLambda)
+            {
+                filter = whereLambda;
+                src = whereCall.Arguments[0];
+            }
+            if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression argLambda)
+            {
+                if (method is nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max) or nameof(Queryable.Average))
+                    selector ??= argLambda;
+                else
+                    filter ??= argLambda;
+            }
+            if (src is not MemberExpression navMember
                 || navMember.Expression is not ParameterExpression navParent
                 || !_parameterMappings.TryGetValue(navParent, out var info))
                 return false;
@@ -95,15 +121,47 @@ namespace nORM.Query
             var visibility = RenderPrincipalGlobalFilterSql(elementMapping, subAlias);
             if (visibility != null)
                 conditions.Add($"({visibility})");
-            // A predicate (`Any(t => p)` / `Count(t => p)`) restricts which rows the aggregate ranges over.
-            if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression predicate)
-                conditions.Add($"({TranslateCollectionSubqueryPredicate(predicate, elementMapping, subAlias)})");
+            // A predicate (`Any(t => p)` / `Count(t => p)` / `Where(p).Agg()`) restricts which rows count.
+            if (filter != null)
+                conditions.Add($"({TranslateCollectionSubqueryPredicate(filter, elementMapping, subAlias)})");
             var whereSql = string.Join(" AND ", conditions);
 
             if (method is nameof(Queryable.Any))
+            {
                 _sql.Append("EXISTS(SELECT 1 FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');
-            else
+                return true;
+            }
+            if (method is nameof(Queryable.Count) or nameof(Queryable.LongCount))
+            {
                 _sql.Append("(SELECT COUNT(*) FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');
+                return true;
+            }
+
+            // Sum / Min / Max / Average with a selector over the element (Where(...).Sum(s => s.X) too).
+            if (selector == null)
+                throw new NormUnsupportedFeatureException(
+                    $"{method}(...) over the {kind} collection '{navMember.Member.Name}' requires a selector (e.g. x => x.Value).");
+            var selectorSql = TranslateCollectionSubqueryPredicate(selector, elementMapping, subAlias);
+            var sqlAgg = method switch
+            {
+                nameof(Queryable.Sum) => "SUM",
+                nameof(Queryable.Min) => "MIN",
+                nameof(Queryable.Max) => "MAX",
+                _ => "AVG",
+            };
+            var aggType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
+            string aggCall;
+            if (aggType == typeof(decimal))
+            {
+                aggCall = _provider.DecimalAggregateSql(sqlAgg, selectorSql);
+            }
+            else
+            {
+                if (sqlAgg == "AVG")
+                    selectorSql = _provider.AverageAggregateOperand(selectorSql, selector.Body.Type);
+                aggCall = $"{sqlAgg}({selectorSql})";
+            }
+            _sql.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');
             return true;
         }
 
