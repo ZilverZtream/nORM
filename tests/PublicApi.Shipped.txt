@@ -408,6 +408,8 @@ M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.EntityEntry.Collection(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry.GetDatabaseValues():nORM.Core.PropertyValues
+M:nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{nORM.Core.PropertyValues}
 M:nORM.Core.EntityEntry.Navigation(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.Reference(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.Reload():System.Void

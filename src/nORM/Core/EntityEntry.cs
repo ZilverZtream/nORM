@@ -199,10 +199,33 @@ namespace nORM.Core
         [RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
         public Task ReloadAsync(CancellationToken ct = default) => RequireContext().ReloadEntryAsync(this, ct);
 
+        /// <summary>
+        /// Reads the entity's current values straight from its database row as a detached
+        /// <see cref="PropertyValues"/> snapshot, without disturbing the tracked entity or its state —
+        /// mirroring EF's <c>GetDatabaseValues</c>. Returns <c>null</c> when the row no longer exists. The
+        /// canonical use is resolving a <see cref="DbConcurrencyException"/>: compare the returned store
+        /// values against <see cref="CurrentValues"/>/<see cref="OriginalValues"/>, then
+        /// <see cref="PropertyValues.SetValues(object)"/> the chosen winner back before retrying the save.
+        /// Throws when the entry is detached or not associated with a context.
+        /// </summary>
+        [RequiresDynamicCode("GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public PropertyValues? GetDatabaseValues() => RequireContext().GetDatabaseValuesForEntry(this);
+
+        /// <summary>
+        /// Asynchronous <see cref="GetDatabaseValues"/>: reads the entity's current database row as a
+        /// detached <see cref="PropertyValues"/> snapshot (or <c>null</c> when the row is gone) without
+        /// affecting the tracked entity.
+        /// </summary>
+        [RequiresDynamicCode("GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public Task<PropertyValues?> GetDatabaseValuesAsync(CancellationToken ct = default)
+            => RequireContext().GetDatabaseValuesForEntryAsync(this, ct);
+
         private DbContext RequireContext()
             => Tracker?.Context
                ?? throw new InvalidOperationException(
-                   "This entry is not associated with a context and cannot be reloaded. Obtain it from context.Entry(entity).");
+                   "This entry is not associated with a context. Obtain it from context.Entry(entity).");
 
         /// <summary>The owning context, or null when this entry is not tracker-bound.</summary>
         internal DbContext? Context => Tracker?.Context;
