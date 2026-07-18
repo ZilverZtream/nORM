@@ -212,41 +212,7 @@ namespace nORM.Query
                     ignoreCase = true;
                 }
                 var receiverSql = TranslateProjectionArg(node.Object);
-                if (!ignoreCase)
-                {
-                    // Ordinal (case-sensitive) match, mirroring the Where path. SQLite's LIKE
-                    // folds ASCII case regardless of collation, so bypass LIKE to the provider's
-                    // byte-exact instr/substr forms — the raw pattern is emitted as a literal
-                    // with no wildcard wrapping or escaping (instr/substr match literally).
-                    // Other providers force the binary collation the equality path already uses
-                    // (identity on PostgreSQL, whose LIKE is case-sensitive).
-                    if (_provider.UsesOrdinalStringMatchBypass)
-                    {
-                        var kind = node.Method.Name switch
-                        {
-                            nameof(string.StartsWith) => nORM.Providers.OrdinalStringMatch.StartsWith,
-                            nameof(string.EndsWith) => nORM.Providers.OrdinalStringMatch.EndsWith,
-                            _ => nORM.Providers.OrdinalStringMatch.Contains,
-                        };
-                        var patternLiteral = $"'{patternStr.Replace("'", "''")}'";
-                        sb.Append(_provider.GetOrdinalStringMatchSql(receiverSql, patternLiteral, kind));
-                        return node;
-                    }
-                    receiverSql = _provider.ForceCaseSensitiveStringComparison(receiverSql);
-                }
-                var escapeChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
-                var effectivePattern = ignoreCase ? patternStr.ToLowerInvariant() : patternStr;
-                var escaped = _provider.EscapeLikePattern(effectivePattern);
-                var wrapped = node.Method.Name switch
-                {
-                    nameof(string.StartsWith) => $"{escaped}%",
-                    nameof(string.EndsWith) => $"%{escaped}",
-                    _ => $"%{escaped}%",
-                };
-                var lhs = ignoreCase ? $"LOWER({receiverSql})" : receiverSql;
-                sb.Append('(').Append(lhs).Append(" LIKE '")
-                  .Append(wrapped.Replace("'", "''"))
-                  .Append("' ESCAPE '").Append(escapeChar).Append("')");
+                sb.Append(EmitStringMatch(receiverSql, patternStr, node.Method.Name, ignoreCase));
                 return node;
             }
 

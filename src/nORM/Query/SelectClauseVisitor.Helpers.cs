@@ -282,5 +282,43 @@ namespace nORM.Query
         }
 
         private static Expression StripQuotes(Expression e) => e is UnaryExpression u && u.NodeType == ExpressionType.Quote ? u.Operand : e;
+
+        /// <summary>
+        /// Emits the SQL for a string <c>StartsWith</c>/<c>EndsWith</c>/<c>Contains</c> match against a
+        /// pre-rendered receiver with a CONSTANT pattern, applying the provider's case-sensitivity handling
+        /// (the ordinal byte-exact bypass, or LIKE with wildcard escaping). Shared by projection rendering
+        /// (<see cref="VisitMethodCall"/>) and the navigation-filter grammar so both produce identical
+        /// string-match SQL — the case-sensitivity rules here are the ones the Where/projection paths were
+        /// fixed to (Ordinal by default; SQLite bypasses LIKE which folds ASCII case).
+        /// </summary>
+        internal string EmitStringMatch(string receiverSql, string patternStr, string methodName, bool ignoreCase)
+        {
+            if (!ignoreCase)
+            {
+                if (_provider.UsesOrdinalStringMatchBypass)
+                {
+                    var kind = methodName switch
+                    {
+                        nameof(string.StartsWith) => nORM.Providers.OrdinalStringMatch.StartsWith,
+                        nameof(string.EndsWith) => nORM.Providers.OrdinalStringMatch.EndsWith,
+                        _ => nORM.Providers.OrdinalStringMatch.Contains,
+                    };
+                    var patternLiteral = $"'{patternStr.Replace("'", "''")}'";
+                    return _provider.GetOrdinalStringMatchSql(receiverSql, patternLiteral, kind);
+                }
+                receiverSql = _provider.ForceCaseSensitiveStringComparison(receiverSql);
+            }
+            var escapeChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
+            var effectivePattern = ignoreCase ? patternStr.ToLowerInvariant() : patternStr;
+            var escaped = _provider.EscapeLikePattern(effectivePattern);
+            var wrapped = methodName switch
+            {
+                nameof(string.StartsWith) => $"{escaped}%",
+                nameof(string.EndsWith) => $"%{escaped}",
+                _ => $"%{escaped}%",
+            };
+            var lhs = ignoreCase ? $"LOWER({receiverSql})" : receiverSql;
+            return $"({lhs} LIKE '{wrapped.Replace("'", "''")}' ESCAPE '{escapeChar}')";
+        }
     }
 }

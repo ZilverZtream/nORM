@@ -324,6 +324,12 @@ namespace nORM.Query
                 case MemberExpression boolMember when boolMember.Type == typeof(bool) && boolMember.Expression == elementParam:
                     return $"{RenderFilterSide(boolMember, elementParam, depAlias)} = {_provider.BooleanTrueLiteral}";
 
+                // String match on a column (`c.Sku.StartsWith("A")`, `.EndsWith(...)`, `.Contains(...)`) with
+                // a constant pattern — shares the provider case-sensitivity/LIKE-escaping logic with the
+                // projection path so the subquery filter matches the same rows the outer query would.
+                case MethodCallExpression stringMatch when TryRenderNavStringMatch(stringMatch, elementParam, depAlias, out var matchSql):
+                    return matchSql;
+
                 case BinaryExpression { NodeType: ExpressionType.AndAlso or ExpressionType.OrElse } logical:
                     var logicalOp = logical.NodeType == ExpressionType.AndAlso ? "AND" : "OR";
                     return $"({RenderNavigationFilterBody(logical.Left, elementParam, depAlias)} {logicalOp} {RenderNavigationFilterBody(logical.Right, elementParam, depAlias)})";
@@ -350,6 +356,36 @@ namespace nORM.Query
                         "Navigation filter inside a projection subquery supports comparisons, `!`, bare boolean flags, " +
                         "and `&&`/`||` compositions. For more complex shapes, wrap with `ClientEvaluationPolicy.Allow`.");
             }
+        }
+
+        /// <summary>
+        /// Renders a string <c>StartsWith</c>/<c>EndsWith</c>/<c>Contains</c> call on a column of the filter
+        /// element with a CONSTANT pattern (optionally with a StringComparison) into a navigation-filter
+        /// predicate, reusing <see cref="EmitStringMatch"/>. Returns false for any other shape (variable
+        /// pattern, non-element receiver) so the caller falls through to the unsupported-shape error.
+        /// </summary>
+        private bool TryRenderNavStringMatch(MethodCallExpression mc, ParameterExpression elementParam, string depAlias, out string sql)
+        {
+            sql = string.Empty;
+            if (mc.Object is not MemberExpression receiver || receiver.Expression != elementParam)
+                return false;
+            if (mc.Method.DeclaringType != typeof(string)
+                || mc.Method.Name is not (nameof(string.StartsWith) or nameof(string.EndsWith) or nameof(string.Contains)))
+                return false;
+            if (!(mc.Arguments.Count == 1 || (mc.Arguments.Count == 2 && mc.Arguments[1].Type == typeof(StringComparison))))
+                return false;
+            if (!QueryTranslator.TryGetConstantValue(mc.Arguments[0], out var rawPattern) || !(rawPattern is string || rawPattern is char))
+                return false;
+
+            var patternStr = rawPattern as string ?? ((char)rawPattern!).ToString();
+            var ignoreCase = mc.Arguments.Count == 2
+                && QueryTranslator.TryGetConstantValue(mc.Arguments[1], out var cmpVal)
+                && cmpVal is StringComparison.OrdinalIgnoreCase
+                    or StringComparison.CurrentCultureIgnoreCase
+                    or StringComparison.InvariantCultureIgnoreCase;
+
+            sql = EmitStringMatch(RenderFilterSide(receiver, elementParam, depAlias), patternStr, mc.Method.Name, ignoreCase);
+            return true;
         }
 
         private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias)
