@@ -145,7 +145,7 @@ namespace nORM.Query
                     // Support boolean member: u => u.IsActive
                     if (lambda.Body is MemberExpression boolMember && boolMember.Type == typeof(bool))
                     {
-                        if (!map.TryGetColumnForMemberAccess(boolMember, out var boolCol))
+                        if (!map.TryGetColumnForMemberAccess(boolMember, out var boolCol) || boolCol.Converter != null)
                             return false;
                         whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                     }
@@ -154,7 +154,7 @@ namespace nORM.Query
                              && notExpr.Operand is MemberExpression negBoolMember
                              && negBoolMember.Type == typeof(bool))
                     {
-                        if (!map.TryGetColumnForMemberAccess(negBoolMember, out var boolCol))
+                        if (!map.TryGetColumnForMemberAccess(negBoolMember, out var boolCol) || boolCol.Converter != null)
                             return false;
                         whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(boolCol.EscCol, expectedValue: false)}";
                     }
@@ -165,6 +165,11 @@ namespace nORM.Query
                         if (be.Left is not MemberExpression me)
                             return false;
                         if (!map.TryGetColumnForMemberAccess(me, out var column))
+                            return false;
+                        // A value converter changes the stored representation, but this fast path binds the
+                        // RAW model value (col = @p with the unconverted value), so it would silently match
+                        // nothing. Defer converter columns to the full translator, which applies the converter.
+                        if (column.Converter != null)
                             return false;
                         // Use ExpressionValueExtractor instead of Compile().DynamicInvoke();
                         // DynamicInvoke is significantly slower and poses RCE risks.
