@@ -76,6 +76,11 @@ namespace nORM.Query
 
             var kind = owned != null ? "owned" : "many-to-many";
             // From here it IS such a collection: emit or fail loud, never fall through to a silent-wrong path.
+            if (QueryTranslator.HasActiveTemporalScope)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the {kind} collection '{navMember.Member.Name}' under AsOf isn't supported yet: the aggregate " +
+                    "reads the live table, so it would reflect the current era, not the historical one. Load the collection " +
+                    "under AsOf and aggregate the result client-side.");
             if (method is nameof(Queryable.All))
                 throw new NormUnsupportedFeatureException(
                     $"All(...) over the {kind} collection '{navMember.Member.Name}' in a predicate isn't supported yet. " +

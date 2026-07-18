@@ -154,6 +154,11 @@ namespace nORM.Query
 
             // It IS a many-to-many aggregate: emit a correct correlated subquery or fail loud — never fall
             // through to the outer-aggregate handler (which silently collapses to one wrong row).
+            if (QueryTranslator.HasActiveTemporalScope)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the many-to-many collection '{navMember.Member.Name}' under AsOf isn't supported yet: the " +
+                    "bridge table is read live, so the association set would reflect the current era, not the historical one. " +
+                    "Load the collection under AsOf and aggregate the result client-side.");
             if (jtm.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet. " +
@@ -256,6 +261,11 @@ namespace nORM.Query
 
             // From here it IS an owned-collection aggregate: emit a correct correlated subquery or fail loud —
             // never fall through to the outer-aggregate handler (which silently collapses to one wrong row).
+            if (QueryTranslator.HasActiveTemporalScope)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the owned collection '{navMember.Member.Name}' under AsOf isn't supported yet: the aggregate " +
+                    "reads the live table, so it would count the current rows instead of the historical era. Load the owned " +
+                    "collection under AsOf and aggregate the result client-side.");
             if (_mapping.KeyColumns.Length != 1)
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet. " +
