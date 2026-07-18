@@ -67,7 +67,12 @@ namespace nORM.Benchmarks
                 }).ToList();
             _connection = new SqliteConnection(_connectionString);
             await _connection.OpenAsync();
-            var options = new nORM.Configuration.DbContextOptions();
+            // No-tracking by default so query sites don't need AsNoTracking(), whose IQueryable<T> extension
+            // is ambiguous with EF Core's identically-signed one when both are referenced.
+            var options = new nORM.Configuration.DbContextOptions
+            {
+                DefaultTrackingBehavior = nORM.Core.QueryTrackingBehavior.NoTracking
+            };
             _context = new nORM.Core.DbContext(_connection, new SqliteProvider(), options);
             var createUserTableSql = @"
                 CREATE TABLE BenchmarkUser (
@@ -95,15 +100,15 @@ namespace nORM.Benchmarks
             await _connection.ExecuteAsync(createUserTableSql);
             await _connection.ExecuteAsync(createOrderTableSql);
             _normSimpleCompiled = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkUser>(
-                (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).AsNoTracking().Take(take));
+                (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).Take(take));
             _normComplexCompiled = Norm.CompileQuery<nORM.Core.DbContext, (int, string), BenchmarkUser>(
                 (c, p) => c.Query<BenchmarkUser>()
                     .Where(u => u.IsActive == true && u.Age > p.Item1 && u.City == p.Item2)
-                    .AsNoTracking().OrderBy(u => u.Name).Skip(5).Take(20));
+                    .OrderBy(u => u.Name).Skip(5).Take(20));
             _normJoinCompiled = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkJoinRow>(
                 (c, amount) => c.Query<BenchmarkUser>()
                     .Join(c.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
-                    .AsNoTracking()
+                    
                     .Where(x => x.Amount > amount)
                     .Take(50));
             await _context.BulkInsertAsync(_testUsers);
@@ -134,14 +139,14 @@ namespace nORM.Benchmarks
         public Task<List<BenchmarkUser>> Query_Simple()
             => NormAsyncExtensions.ToListAsync(GetContext().Query<BenchmarkUser>()
                 .Where(u => u.IsActive == true)
-                .AsNoTracking()
+                
                 .Take(10));
 
         [Benchmark]
         public Task<List<BenchmarkUser>> Query_Complex()
             => NormAsyncExtensions.ToListAsync(GetContext().Query<BenchmarkUser>()
                 .Where(u => u.IsActive == true && u.Age > 25 && u.City == "New York")
-                .AsNoTracking()
+                
                 .OrderBy(u => u.Name)
                 .Skip(5)
                 .Take(20));
@@ -150,7 +155,7 @@ namespace nORM.Benchmarks
         public Task<List<BenchmarkJoinRow>> Query_Join()
             => NormAsyncExtensions.ToListAsync(GetContext().Query<BenchmarkUser>()
                 .Join(GetContext().Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
-                .AsNoTracking()
+                
                 .Where(x => x.Amount > 100)
                 .Take(50));
 

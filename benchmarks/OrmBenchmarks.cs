@@ -90,11 +90,11 @@ namespace nORM.Benchmarks
         // EF Core compiled queries
         private static readonly Func<EfCoreContext, int, IAsyncEnumerable<BenchmarkUser>> _efSimpleCompiled
             = CompileAsyncQuery((EfCoreContext ctx, int take)
-                => ctx.Users.AsNoTracking().Where(u => u.IsActive).Take(take));
+                => EfQueryableExtensions.AsNoTracking(ctx.Users).Where(u => u.IsActive).Take(take));
 
         private static readonly Func<EfCoreContext, int, string, IAsyncEnumerable<BenchmarkUser>> _efComplexCompiled
             = CompileAsyncQuery((EfCoreContext ctx, int age, string city)
-                => ctx.Users.AsNoTracking()
+                => EfQueryableExtensions.AsNoTracking(ctx.Users)
                     .Where(u => u.IsActive && u.Age > age && u.City == city)
                     .OrderBy(u => u.Name)
                     .Skip(5)
@@ -103,13 +103,12 @@ namespace nORM.Benchmarks
         // nORM compiled queries (via Norm.CompileQuery)
         private static readonly Func<nORM.Core.DbContext, int, Task<List<BenchmarkUser>>> _normSimpleCompiled
             = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkUser>(
-                (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).AsNoTracking().Take(take));
+                (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).Take(take));
 
         private static readonly Func<nORM.Core.DbContext, (int, string), Task<List<BenchmarkUser>>> _normComplexCompiled
             = Norm.CompileQuery<nORM.Core.DbContext, (int, string), BenchmarkUser>(
                 (c, p) => c.Query<BenchmarkUser>()
                     .Where(u => u.IsActive == true && u.Age > p.Item1 && u.City == p.Item2)
-                    .AsNoTracking()
                     .OrderBy(u => u.Name)
                     .Skip(5)
                     .Take(20));
@@ -118,7 +117,6 @@ namespace nORM.Benchmarks
             = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkJoinRow>((ctx, amount) =>
                 ctx.Query<BenchmarkUser>()
                     .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId, (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
-                    .AsNoTracking()
                     .Where(x => x.Amount > amount)
                     .Take(50));
 
@@ -220,6 +218,10 @@ namespace nORM.Benchmarks
             var options = new nORM.Configuration.DbContextOptions
             {
                 BulkBatchSize = 50,
+                // Read benchmarks are no-tracking (matching the EF AsNoTracking baselines). Set it as the
+                // context default so nORM query sites don't need .AsNoTracking(), whose IQueryable<T>
+                // extension is ambiguous with EF Core's identically-signed one when both are referenced.
+                DefaultTrackingBehavior = nORM.Core.QueryTrackingBehavior.NoTracking,
                 TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
             };
             _nOrmConnection = new SqliteConnection(_nOrmConnectionString);
@@ -350,8 +352,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Simple_EfCore()
         {
-            return await EfQueryableExtensions.ToListAsync(_efContext!.Users
-                .AsNoTracking()
+            return await EfQueryableExtensions.ToListAsync(EfQueryableExtensions.AsNoTracking(_efContext!.Users)
                 .Where(u => u.IsActive)
                 .Take(10));
         }
@@ -361,8 +362,16 @@ namespace nORM.Benchmarks
         {
             return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive == true)
-                .AsNoTracking()
                 .Take(10));
+        }
+
+        [Benchmark(Description = "Query Simple nORM FromSqlRaw (composable)")]
+        public async Task<List<BenchmarkUser>> Query_Simple_nORM_FromSqlRaw()
+        {
+            // Raw SQL composed with LINQ Take — the direct comparison to Dapper's raw-SQL read path.
+            return await NormAsyncExtensions.ToListAsync(
+                _nOrmContext!.FromSqlRaw<BenchmarkUser>("SELECT * FROM BenchmarkUser WHERE IsActive = 1")
+                    .Take(10));
         }
 
         [Benchmark]
@@ -438,8 +447,7 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task<List<BenchmarkUser>> Query_Complex_EfCore()
         {
-            return await EfQueryableExtensions.ToListAsync(_efContext!.Users
-                .AsNoTracking()
+            return await EfQueryableExtensions.ToListAsync(EfQueryableExtensions.AsNoTracking(_efContext!.Users)
                 .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
                 .OrderBy(u => u.Name)
                 .Skip(5)
@@ -451,7 +459,6 @@ namespace nORM.Benchmarks
         {
             return await NormAsyncExtensions.ToListAsync(_nOrmContext!.Query<BenchmarkUser>()
                 .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
-                .AsNoTracking()
                 .OrderBy(u => u.Name)
                 .Skip(5)
                 .Take(20));
@@ -581,8 +588,7 @@ namespace nORM.Benchmarks
 
         [Benchmark]
         public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()
-            => EfQueryableExtensions.ToListAsync(_efContext!.Users
-                .AsNoTracking()
+            => EfQueryableExtensions.ToListAsync(EfQueryableExtensions.AsNoTracking(_efContext!.Users)
                 .Join(_efContext.Orders, u => u.Id, o => o.UserId, (u, o) => new { u.Name, o.Amount, o.ProductName })
                 .Where(x => x.Amount > 100)
                 .Select(x => new BenchmarkJoinRow(x.Name, x.Amount, x.ProductName))
@@ -597,7 +603,6 @@ namespace nORM.Benchmarks
                     o => o.UserId,
                     (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName)
                 )
-                .AsNoTracking()
                 .Where(x => x.Amount > 100)
                 .Take(50));
 

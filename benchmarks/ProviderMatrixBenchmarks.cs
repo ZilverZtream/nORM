@@ -117,11 +117,11 @@ public class ProviderMatrixBenchmarks
 
     private static readonly Func<ProviderMatrixEfContext, int, IAsyncEnumerable<BenchmarkUser>> s_efSimpleCompiled
         = CompileAsyncQuery((ProviderMatrixEfContext ctx, int take)
-            => ctx.Users.AsNoTracking().Where(u => u.IsActive).Take(take));
+            => EfQueryableExtensions.AsNoTracking(ctx.Users).Where(u => u.IsActive).Take(take));
 
     private static readonly Func<ProviderMatrixEfContext, int, string, IAsyncEnumerable<BenchmarkUser>> s_efComplexCompiled
         = CompileAsyncQuery((ProviderMatrixEfContext ctx, int age, string city)
-            => ctx.Users.AsNoTracking()
+            => EfQueryableExtensions.AsNoTracking(ctx.Users)
                 .Where(u => u.IsActive && u.Age > age && u.City == city)
                 .OrderBy(u => u.Name)
                 .Skip(5)
@@ -129,13 +129,13 @@ public class ProviderMatrixBenchmarks
 
     private static readonly Func<nORM.Core.DbContext, int, Task<List<BenchmarkUser>>> s_normSimpleCompiled
         = Norm.CompileQuery<nORM.Core.DbContext, int, BenchmarkUser>(
-            (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).AsNoTracking().Take(take));
+            (c, take) => c.Query<BenchmarkUser>().Where(u => u.IsActive == true).Take(take));
 
     private static readonly Func<nORM.Core.DbContext, (int, string), Task<List<BenchmarkUser>>> s_normComplexCompiled
         = Norm.CompileQuery<nORM.Core.DbContext, (int, string), BenchmarkUser>(
             (c, p) => c.Query<BenchmarkUser>()
                 .Where(u => u.IsActive == true && u.Age > p.Item1 && u.City == p.Item2)
-                .AsNoTracking()
+                
                 .OrderBy(u => u.Name)
                 .Skip(5)
                 .Take(20));
@@ -145,7 +145,7 @@ public class ProviderMatrixBenchmarks
             ctx.Query<BenchmarkUser>()
                 .Join(ctx.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId,
                     (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
-                .AsNoTracking()
+                
                 .Where(x => x.Amount > amount)
                 .Take(50));
 
@@ -168,6 +168,7 @@ public class ProviderMatrixBenchmarks
         _normContext = new nORM.Core.DbContext(_normConnection, CreateNormProvider(Provider), new nORM.Configuration.DbContextOptions
         {
             BulkBatchSize = 50,
+            DefaultTrackingBehavior = nORM.Core.QueryTrackingBehavior.NoTracking,
             TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
         });
 
@@ -330,13 +331,13 @@ public class ProviderMatrixBenchmarks
 
     [Benchmark]
     public Task<List<BenchmarkUser>> Query_Simple_EfCore()
-        => EfQueryableExtensions.ToListAsync(_efContext!.Users.AsNoTracking().Where(u => u.IsActive).Take(10));
+        => EfQueryableExtensions.ToListAsync(EfQueryableExtensions.AsNoTracking(_efContext!.Users).Where(u => u.IsActive).Take(10));
 
     [Benchmark]
     public Task<List<BenchmarkUser>> Query_Simple_nORM()
         => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
             .Where(u => u.IsActive == true)
-            .AsNoTracking()
+            
             .Take(10));
 
     [Benchmark]
@@ -385,8 +386,7 @@ public class ProviderMatrixBenchmarks
 
     [Benchmark]
     public Task<List<BenchmarkUser>> Query_Complex_EfCore()
-        => EfQueryableExtensions.ToListAsync(_efContext!.Users
-            .AsNoTracking()
+        => EfQueryableExtensions.ToListAsync(EfQueryableExtensions.AsNoTracking(_efContext!.Users)
             .Where(u => u.IsActive && u.Age > 25 && u.City == "New York")
             .OrderBy(u => u.Name)
             .Skip(5)
@@ -396,7 +396,7 @@ public class ProviderMatrixBenchmarks
     public Task<List<BenchmarkUser>> Query_Complex_nORM()
         => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
             .Where(u => u.IsActive == true && u.Age > 25 && u.City == "New York")
-            .AsNoTracking()
+            
             .OrderBy(u => u.Name)
             .Skip(5)
             .Take(20));
@@ -449,8 +449,7 @@ public class ProviderMatrixBenchmarks
 
     [Benchmark]
     public Task<List<BenchmarkJoinRow>> Query_Join_EfCore()
-        => EfQueryableExtensions.ToListAsync(_efContext!.Users
-            .AsNoTracking()
+        => EfQueryableExtensions.ToListAsync(EfQueryableExtensions.AsNoTracking(_efContext!.Users)
             .Join(_efContext.Orders, u => u.Id, o => o.UserId,
                 (u, o) => new { u.Name, o.Amount, o.ProductName })
             .Where(x => x.Amount > 100)
@@ -462,7 +461,7 @@ public class ProviderMatrixBenchmarks
         => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
             .Join(_normContext!.Query<BenchmarkOrder>(), u => u.Id, o => o.UserId,
                 (u, o) => new BenchmarkJoinRow(u.Name, o.Amount, o.ProductName))
-            .AsNoTracking()
+            
             .Where(x => x.Amount > 100)
             .Take(50));
 
@@ -515,7 +514,7 @@ public class ProviderMatrixBenchmarks
     [Benchmark(Description = "Query Scale 1K - nORM")]
     public Task<List<BenchmarkUser>> Query_Scale1k_nORM()
         => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
-            .AsNoTracking()
+            
             .OrderBy(u => u.Id)
             .Take(1_000));
 
@@ -530,7 +529,7 @@ public class ProviderMatrixBenchmarks
     [Benchmark(Description = "Query Scale 10K - nORM")]
     public Task<List<BenchmarkUser>> Query_Scale10k_nORM()
         => NormAsyncExtensions.ToListAsync(_normContext!.Query<BenchmarkUser>()
-            .AsNoTracking()
+            
             .OrderBy(u => u.Id)
             .Take(10_000));
 
@@ -551,10 +550,11 @@ public class ProviderMatrixBenchmarks
             using var context = new nORM.Core.DbContext(connection, CreateNormProvider(Provider), new nORM.Configuration.DbContextOptions
             {
                 BulkBatchSize = 50,
+            DefaultTrackingBehavior = nORM.Core.QueryTrackingBehavior.NoTracking,
                 TimeoutConfiguration = { BaseTimeout = TimeSpan.FromSeconds(30) }
             });
             var rows = await NormAsyncExtensions.ToListAsync(context.Query<BenchmarkUser>()
-                .AsNoTracking()
+                
                 .Where(u => u.IsActive == true)
                 .OrderBy(u => u.Id)
                 .Take(100));
