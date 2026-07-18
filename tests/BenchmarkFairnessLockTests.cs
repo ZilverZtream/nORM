@@ -140,12 +140,18 @@ public sealed class BenchmarkFairnessLockTests
     {
         var code = ReadRepoFile(relativePath);
 
-        AssertMethodContains(code, "Query_Simple_EfCore", ".AsNoTracking()");
-        AssertMethodContains(code, "Query_Simple_nORM", ".AsNoTracking()");
-        AssertMethodContains(code, "Query_Complex_EfCore", ".AsNoTracking()");
-        AssertMethodContains(code, "Query_Complex_nORM", ".AsNoTracking()");
-        AssertMethodContains(code, "Query_Join_EfCore", ".AsNoTracking()");
-        AssertMethodContains(code, "Query_Join_nORM", ".AsNoTracking()");
+        // Fairness: the runtime query benchmarks must read no-tracking on BOTH sides, so neither pays
+        // change-tracking overhead. nORM and EF each define an AsNoTracking(IQueryable<T>) extension, which
+        // makes a fluent q.AsNoTracking() ambiguous in a file that references both. Each side therefore
+        // applies no-tracking unambiguously: EF via EfQueryableExtensions.AsNoTracking(...) on every runtime
+        // query, and nORM via the context's NoTracking default (so its query methods don't repeat it per call).
+        AssertMethodContains(code, "Query_Simple_EfCore", "EfQueryableExtensions.AsNoTracking(");
+        AssertMethodContains(code, "Query_Complex_EfCore", "EfQueryableExtensions.AsNoTracking(");
+        AssertMethodContains(code, "Query_Join_EfCore", "EfQueryableExtensions.AsNoTracking(");
+
+        // nORM reads are no-tracking by context default, and nothing re-enables tracking per query.
+        Assert.Contains("DefaultTrackingBehavior = nORM.Core.QueryTrackingBehavior.NoTracking", code);
+        Assert.DoesNotContain(".AsTracking(", code);
     }
 
     [Fact]
