@@ -85,6 +85,22 @@ namespace nORM.Query
                 return false;
             }
 
+            // Optional single Select(source, elementProjection) — admitted only when the projection reads
+            // solely its own element (SelectClauseVisitor.IsSafeChildProjection), matching the split-query
+            // detection. A closure- or outer-referencing projection is left unpeeled so it falls through to
+            // client-eval.
+            if (current is MethodCallExpression selectCall
+                && selectCall.Arguments.Count == 2
+                && (selectCall.Method.DeclaringType == typeof(Enumerable) || selectCall.Method.DeclaringType == typeof(Queryable))
+                && selectCall.Method.Name == nameof(Enumerable.Select))
+            {
+                var selArg = selectCall.Arguments[1];
+                var selLambda = selArg as LambdaExpression
+                    ?? (selArg is UnaryExpression { NodeType: ExpressionType.Quote, Operand: LambdaExpression q } ? q : null);
+                if (selLambda is { Parameters.Count: 1 } && SelectClauseVisitor.IsSafeChildProjection(selLambda))
+                    current = selectCall.Arguments[0];
+            }
+
             // Optional single Where(source, predicate).
             if (current is MethodCallExpression whereCall
                 && whereCall.Arguments.Count == 2

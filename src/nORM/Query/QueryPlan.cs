@@ -290,6 +290,10 @@ namespace nORM.Query
     /// <param name="FilterParameters">Names of the compiled parameters the shaped filter references,
     /// bound onto the child command from the main command's live values so closure captures re-bind
     /// correctly across plan-cache hits. Empty/null when the filter is constant-only or absent.</param>
+    /// <param name="ElementProjection">Optional element projection from a shaped projection binding
+    /// (Select(o =&gt; new Dto { Lines = o.Lines.Select(l =&gt; new LineDto{...}).ToList() })); when present
+    /// CollectionElementType is the projected type and the child materializer applies this lambda
+    /// client-side. Null for a bare/filtered (non-projected) collection.</param>
     internal sealed record DependentQueryDefinition(
         TableMapping TargetMapping,
         IReadOnlyList<Column> ForeignKeyColumns,
@@ -302,7 +306,13 @@ namespace nORM.Query
         // keeping values fresh across cached-plan reuse. The child fetch ANDs FilterSql onto its WHERE
         // and binds FilterParameters from the main command. Null for a bare collection include.
         string? FilterSql = null,
-        IReadOnlyList<string>? FilterParameters = null
+        IReadOnlyList<string>? FilterParameters = null,
+        // Optional element projection from a shaped projection binding
+        // (Select(o => new Dto { Lines = o.Lines.Select(l => new LineDto{...}).ToList() })). When present,
+        // CollectionElementType is the PROJECTED type and the child materializer applies this lambda
+        // client-side to shape each fetched child entity into it. Only closure-free, element-only
+        // projections reach here (captured/outer references fall through to fail-loud at translation).
+        System.Linq.Expressions.LambdaExpression? ElementProjection = null
     )
     {
         internal Column ForeignKeyColumn => ForeignKeyColumns[0];

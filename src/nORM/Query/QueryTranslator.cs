@@ -176,6 +176,9 @@ namespace nORM.Query
         // Rendered filter fragments for shaped collection projections (Lines = o.Lines.Where(pred).ToList()),
         // keyed by nav property; consumed by BuildDependentQueryDefinitions.
         private Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter> _detectedCollectionFilters = new();
+        // Element projections for shaped collection projections (Lines = o.Lines.Select(l => new Dto{...}).ToList()),
+        // keyed by nav property; consumed by BuildDependentQueryDefinitions to shape the child fetch.
+        private Dictionary<PropertyInfo, System.Linq.Expressions.LambdaExpression> _detectedCollectionProjections = new();
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;

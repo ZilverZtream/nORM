@@ -247,10 +247,11 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// True when <paramref name="expr"/> is a navigation-collection projection binding in either
-        /// bare (<c>o.Lines</c>) or shaped (<c>o.Lines.ToList()</c>, <c>o.Lines.Where(pred).ToList()</c>)
-        /// form. The split-query / dependent-query pipeline fills these, so they must be excluded from
-        /// the row-column set. Mirrors the peel order in SelectClauseVisitor.TryMatchDetectedCollection.
+        /// True when <paramref name="expr"/> is a navigation-collection projection binding in bare
+        /// (<c>o.Lines</c>), shaped (<c>o.Lines.ToList()</c>, <c>o.Lines.Where(pred).ToList()</c>), or
+        /// element-projected (<c>o.Lines.Select(l =&gt; new Dto{...}).ToList()</c>) form. The split-query /
+        /// dependent-query pipeline fills these, so they must be excluded from the row-column set. Mirrors
+        /// the peel order in SelectClauseVisitor.TryMatchDetectedCollection (ToList → Select → Where → nav).
         /// </summary>
         private static bool IsShapedOrBareNavigationCollection(Expression expr, TableMapping mapping)
         {
@@ -263,6 +264,15 @@ namespace nORM.Query
                 && term.Method.Name is nameof(Enumerable.ToList) or nameof(Enumerable.ToArray) or nameof(Enumerable.AsEnumerable))
             {
                 current = term.Arguments[0];
+
+                // Peel an optional single Select(source, elementProjection).
+                if (current is MethodCallExpression selectCall
+                    && selectCall.Arguments.Count == 2
+                    && (selectCall.Method.DeclaringType == typeof(Enumerable) || selectCall.Method.DeclaringType == typeof(Queryable))
+                    && selectCall.Method.Name == nameof(Enumerable.Select))
+                {
+                    current = selectCall.Arguments[0];
+                }
 
                 // Peel an optional single Where(source, predicate).
                 if (current is MethodCallExpression whereCall

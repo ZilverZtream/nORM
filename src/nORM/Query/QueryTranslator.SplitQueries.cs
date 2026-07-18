@@ -63,15 +63,23 @@ namespace nORM.Query
                 // the shared compiled-parameter channel; the child fetch ANDs it on and binds its params.
                 _detectedCollectionFilters.TryGetValue(collectionProperty, out var filter);
 
+                // A shaped projection binding that also projects each element
+                // (Lines = o.Lines.Select(l => new LineDto{...}).ToList()) captured an element projection.
+                // The collection then holds the PROJECTED type, and the child materializer applies the
+                // projection client-side over each fetched child entity.
+                _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
+                var dependentElementType = elementProjection?.ReturnType ?? elementType;
+
                 // Create the dependent query definition
                 var dependentQuery = new DependentQueryDefinition(
                     TargetMapping: targetMapping,
                     ForeignKeyColumns: relation.ForeignKeys,
                     ParentKeyProperties: relation.PrincipalKeys.Select(c => c.Prop).ToArray(),
                     TargetCollectionProperty: collectionProperty,
-                    CollectionElementType: elementType,
+                    CollectionElementType: dependentElementType,
                     FilterSql: filter.Sql,
-                    FilterParameters: filter.Parameters
+                    FilterParameters: filter.Parameters,
+                    ElementProjection: elementProjection
                 );
 
                 dependentQueries.Add(dependentQuery);

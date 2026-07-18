@@ -57,10 +57,11 @@ namespace nORM.Query
         /// (<c>Select</c>) into a different element type is deliberately NOT matched here — that
         /// falls through to the general translatability path (a later stage handles it).
         /// </summary>
-        private bool TryMatchDetectedCollection(Expression expr, out PropertyInfo navProperty, out LambdaExpression? filter)
+        private bool TryMatchDetectedCollection(Expression expr, out PropertyInfo navProperty, out LambdaExpression? filter, out LambdaExpression? projection)
         {
             navProperty = null!;
             filter = null;
+            projection = null;
             var current = expr;
 
             // Peel a terminal ToList()/ToArray()/AsEnumerable().
@@ -70,6 +71,24 @@ namespace nORM.Query
                 && term.Method.Name is "ToList" or "ToArray" or "AsEnumerable")
             {
                 current = term.Arguments[0];
+            }
+
+            // A single Select(source, elementProjection) → capture the element projection so the child
+            // materializer shapes each child into the projected element type. Peeled BEFORE Where because
+            // the LINQ order is `o.Lines.Where(pred).Select(proj)`. Only a projection that reads solely its
+            // own element (no closure captures, no outer-row references) is admitted — the child materializer
+            // has only the child entity, and a closure would bake stale into the cached materializer; anything
+            // else falls through to the existing fail-loud (client-eval) path.
+            if (current is MethodCallExpression selectCall
+                && selectCall.Arguments.Count == 2
+                && (selectCall.Method.DeclaringType == typeof(Enumerable) || selectCall.Method.DeclaringType == typeof(Queryable))
+                && selectCall.Method.Name == nameof(Enumerable.Select)
+                && UnwrapLambda(selectCall.Arguments[1]) is { Parameters.Count: 1 } projLambda)
+            {
+                if (!IsSafeChildProjection(projLambda))
+                    return false;
+                projection = projLambda;
+                current = selectCall.Arguments[0];
             }
 
             // A single Where(source, predicate) → capture the predicate.
@@ -84,6 +103,46 @@ namespace nORM.Query
             }
 
             return IsNavigationCollection(current, out navProperty);
+        }
+
+        /// <summary>
+        /// True when a shaped-collection element projection reads ONLY its own element parameter — no
+        /// closure captures (which would freeze stale into the cached materializer) and no references to
+        /// the outer projection row or any other parameter (which the child materializer cannot supply).
+        /// Such a projection is safe to apply client-side over each fetched child entity.
+        /// </summary>
+        internal static bool IsSafeChildProjection(LambdaExpression projection)
+        {
+            var checker = new ChildProjectionSafetyChecker(projection.Parameters[0]);
+            checker.Visit(projection.Body);
+            return checker.IsSafe;
+        }
+
+        private sealed class ChildProjectionSafetyChecker : ExpressionVisitor
+        {
+            private readonly ParameterExpression _elementParam;
+            public bool IsSafe { get; private set; } = true;
+            public ChildProjectionSafetyChecker(ParameterExpression elementParam) => _elementParam = elementParam;
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                // A member whose root folds to a constant is a closure capture — unsafe (stale in cache).
+                if (QueryTranslator.TryGetConstantValue(node, out _))
+                {
+                    IsSafe = false;
+                    return node; // do not descend into the captured constant
+                }
+                return base.VisitMember(node);
+            }
+
+            protected override Expression VisitParameter(ParameterExpression node)
+            {
+                // Any parameter other than the element (the outer row, or a nested lambda's parameter)
+                // is not available to the child materializer.
+                if (node != _elementParam)
+                    IsSafe = false;
+                return node;
+            }
         }
 
         /// <summary>

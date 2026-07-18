@@ -128,6 +128,7 @@ namespace nORM.Query
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
                 _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();
+                _detectedCollectionProjections = new Dictionary<PropertyInfo, System.Linq.Expressions.LambdaExpression>();
                 _complexityMetrics = default;
                 _postMaterializeTransform = null;
                 _postMaterializeOrderPrefixTransform = null;
@@ -189,6 +190,7 @@ namespace nORM.Query
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
                 _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();
+                _detectedCollectionProjections = new Dictionary<PropertyInfo, System.Linq.Expressions.LambdaExpression>();
                 _complexityMetrics = default;
                 _postMaterializeTransform = null;
                 _postMaterializeOrderPrefixTransform = null;

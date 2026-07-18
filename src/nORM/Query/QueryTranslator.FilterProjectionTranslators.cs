@@ -393,6 +393,8 @@ namespace nORM.Query
                             t._detectedCollections.AddRange(selectVisitor.DetectedCollections);
                             foreach (var kvp in selectVisitor.DetectedCollectionFilters)
                                 t._detectedCollectionFilters[kvp.Key] = kvp.Value;
+                            foreach (var kvp in selectVisitor.DetectedCollectionProjections)
+                                t._detectedCollectionProjections[kvp.Key] = kvp.Value;
                             t._sql.Clear();
                             t._sql.Append("SELECT ").Append(projSelect).Append(wrappedSql.Substring("SELECT *".Length));
                         }

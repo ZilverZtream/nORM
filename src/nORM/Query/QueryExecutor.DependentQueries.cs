@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -261,15 +262,20 @@ namespace nORM.Query
             using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(
                 _ctx, GetEntityReadBehavior(depQuery.TargetMapping));
 
+            // A projected collection (o.Lines.Select(l => new Dto{...}).ToList()) materializes the child
+            // ENTITY (kept transient — never tracked, since the result is a projected DTO) so the FK stays
+            // available for stitching; the projection is applied per child when the parent's collection is
+            // built in StitchChildrenToParents.
+            var projecting = depQuery.ElementProjection != null;
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(
                 depQuery.TargetMapping,
-                depQuery.CollectionElementType);
+                projecting ? depQuery.TargetMapping.Type : depQuery.CollectionElementType);
 
             while (reader.Read())
             {
                 var child = syncMaterializer(reader);
 
-                if (!noTracking)
+                if (!noTracking && !projecting)
                 {
                     var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, depQuery.TargetMapping);
                     child = entry.Entity!;
@@ -334,16 +340,19 @@ namespace nORM.Query
                 _ctx, GetEntityReadBehavior(depQuery.TargetMapping), ct).ConfigureAwait(false);
 
             // Use sync materializer to avoid per-row Task allocation, consistent with MaterializeAsync.
+            // A projected collection materializes the child ENTITY (transient, untracked — the result is a
+            // projected DTO) so the FK survives for stitching; the projection is applied at stitch time.
+            var projecting = depQuery.ElementProjection != null;
             var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(
                 depQuery.TargetMapping,
-                depQuery.CollectionElementType);
+                projecting ? depQuery.TargetMapping.Type : depQuery.CollectionElementType);
 
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
                 ct.ThrowIfCancellationRequested();
                 var child = syncMaterializer(reader);
 
-                if (!noTracking)
+                if (!noTracking && !projecting)
                 {
                     var entry = _ctx.ChangeTracker.Track(child, EntityState.Unchanged, depQuery.TargetMapping);
                     child = entry.Entity!;
@@ -405,6 +414,11 @@ namespace nORM.Query
             List<object> children,
             DependentQueryDefinition depQuery)
         {
+            // For a projected collection the fetched children are transient ENTITIES (kept so the FK can
+            // group them); this compiled delegate shapes each into the projected element type as the
+            // parent's collection is built. Null for bare/filtered (non-projected) collections.
+            var projector = depQuery.ElementProjection is { } proj ? CompileElementProjection(proj) : null;
+
             // Create lookup: ParentId -> List<Child>
             var childrenByParentKey = new Dictionary<object, List<object>>();
 
@@ -434,7 +448,7 @@ namespace nORM.Query
                     childCollection = CreateList(depQuery.CollectionElementType, childList.Count);
                     foreach (var child in childList)
                     {
-                        childCollection.Add(child);
+                        childCollection.Add(projector != null ? projector(child) : child);
                     }
                 }
                 else
@@ -445,6 +459,21 @@ namespace nORM.Query
 
                 ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery).SetValue(parent, childCollection);
             }
+        }
+
+        /// <summary>
+        /// Compiles a closure-free element projection (verified at translation) into a boxed
+        /// <c>object → object</c> delegate applied per child entity when a shaped-projected collection is
+        /// stitched. Closure-free, so the compiled delegate is stable across executions.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Compiling an element projection emits IL at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Compiling an element projection reflects over the projected type; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private static Func<object, object> CompileElementProjection(LambdaExpression projection)
+        {
+            var param = Expression.Parameter(typeof(object), "e");
+            var typed = Expression.Convert(param, projection.Parameters[0].Type);
+            var body = Expression.Convert(Expression.Invoke(projection, typed), typeof(object));
+            return Expression.Lambda<Func<object, object>>(body, param).Compile();
         }
 
         private static object? GetParentKeyValue(DependentQueryDefinition depQuery, object parent)
