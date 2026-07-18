@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Threading;
@@ -32,9 +31,6 @@ namespace nORM.Core
         /// <summary>The navigation property's CLR name.</summary>
         public string Name => _property.Name;
 
-        private bool IsCollection
-            => _property.PropertyType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(_property.PropertyType);
-
         /// <summary>
         /// Whether the navigation has been loaded. Setting it records the loaded state without touching
         /// the data — e.g. mark a manually populated navigation as loaded so it is not reloaded.
@@ -66,20 +62,11 @@ namespace nORM.Core
         /// </summary>
         [RequiresDynamicCode("Loading a navigation builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [RequiresUnreferencedCode("Loading a navigation reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
-        public async Task LoadAsync(CancellationToken ct = default)
+        public Task LoadAsync(CancellationToken ct = default)
         {
             var entity = _entry.Entity
                 ?? throw new InvalidOperationException("Cannot load a navigation on a detached entry.");
-            var context = RequireContext();
-            if (IsCollection)
-            {
-                await NavigationPropertyExtensions.LoadNavigationForEntryAsync(entity, _property, _entry.MappedType, context, ct).ConfigureAwait(false);
-            }
-            else
-            {
-                await context.LoadReferenceNavigationForEntryAsync(entity, _entry.MappedType, _property, ct).ConfigureAwait(false);
-                NavigationPropertyExtensions.SetNavigationLoaded(entity, _property, true, _entry.MappedType, context);
-            }
+            return NavigationPropertyExtensions.LoadNavigationForEntryAsync(entity, _property, _entry.MappedType, RequireContext(), ct);
         }
 
         /// <summary>Synchronous <see cref="LoadAsync"/>.</summary>
@@ -89,16 +76,7 @@ namespace nORM.Core
         {
             var entity = _entry.Entity
                 ?? throw new InvalidOperationException("Cannot load a navigation on a detached entry.");
-            var context = RequireContext();
-            if (IsCollection)
-            {
-                NavigationPropertyExtensions.LoadNavigationForEntry(entity, _property, _entry.MappedType, context, CancellationToken.None);
-            }
-            else
-            {
-                context.LoadReferenceNavigationForEntry(entity, _entry.MappedType, _property);
-                NavigationPropertyExtensions.SetNavigationLoaded(entity, _property, true, _entry.MappedType, context);
-            }
+            NavigationPropertyExtensions.LoadNavigationForEntry(entity, _property, _entry.MappedType, RequireContext(), CancellationToken.None);
         }
 
         private DbContext RequireContext()

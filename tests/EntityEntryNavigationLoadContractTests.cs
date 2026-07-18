@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Navigation;
 using nORM.Providers;
 using Xunit;
 
@@ -100,6 +101,33 @@ public class EntityEntryNavigationLoadContractTests
         Assert.NotNull(line.Order);
         Assert.Equal(1, line.Order!.Id);
         Assert.True(ctx.Entry(line).Reference("Order").IsLoaded);
+    }
+
+    [Fact]
+    public async Task Entity_LoadAsync_extension_loads_a_collection_on_a_queried_entity()
+    {
+        // The entity.LoadAsync(lambda) extension previously no-oped on a queried entity because the
+        // tracking pipeline attached an object-typed navigation context; this proves it now works.
+        using var cn = await SeedAsync();
+        await using var ctx = NewCtx(cn);
+
+        var order = (await ctx.Query<Order>().FirstOrDefaultAsync(o => o.Id == 1))!;
+        await order.LoadAsync(o => o.Lines);
+
+        Assert.Equal(new[] { "a", "b" }, order.Lines.OrderBy(l => l.Id).Select(l => l.Sku).ToArray());
+    }
+
+    [Fact]
+    public async Task Entity_LoadAsync_extension_loads_a_reference_on_a_queried_entity()
+    {
+        using var cn = await SeedAsync();
+        await using var ctx = NewCtx(cn);
+
+        var line = (await ctx.Query<Line>().FirstOrDefaultAsync(l => l.Id == 1))!;
+        await line.LoadAsync(l => l.Order);
+
+        Assert.NotNull(line.Order);
+        Assert.Equal(1, line.Order!.Id);
     }
 
     [Fact]

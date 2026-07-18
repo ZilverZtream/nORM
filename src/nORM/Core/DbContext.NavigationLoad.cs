@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,61 +17,65 @@ namespace nORM.Core
             typeof(DbContext).GetMethod(nameof(LoadReferenceCoreAsync), BindingFlags.Instance | BindingFlags.NonPublic)!;
 
         /// <summary>
-        /// Loads a reference (dependent → principal) navigation for an entry, resolving the foreign key from
-        /// the mapping and fetching the principal by key (identity-map aware). nORM's lazy-loading path is
-        /// principal → dependent only, so this backs <see cref="NavigationEntry.LoadAsync"/> for the to-one
-        /// direction directly.
+        /// Handles a dependent → principal reference navigation (this entity holds the foreign key, e.g.
+        /// <c>Line.Order</c>) by loading the principal directly by that key — nORM's relationship loader
+        /// reads the principal key from the wrong side for this direction and never populates it. Returns
+        /// false (leaving <paramref name="task"/> unset) for collection navs, principal → dependent
+        /// references, and composite-key principals, which the relationship loader handles.
         /// </summary>
         [RequiresDynamicCode("Reference loading builds a key predicate and lifts it onto the principal query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [RequiresUnreferencedCode("Reference loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
-        internal Task LoadReferenceNavigationForEntryAsync(object entity, Type entityType, PropertyInfo property, CancellationToken ct)
+        internal bool TryLoadDependentToPrincipalReference(object entity, Type entityType, PropertyInfo property, CancellationToken ct, out Task task)
         {
-            ThrowIfDisposed();
+            task = Task.CompletedTask;
+
+            // Collections are handled by the batched relationship loader, not here.
+            if (property.PropertyType == typeof(string) || typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
+                return false;
+
             var ownerMap = GetMapping(entityType);
             var principalType = property.PropertyType;
             TableMapping principalMap;
-            try
-            {
-                principalMap = GetMapping(principalType);
-            }
-            catch (Exception ex)
-            {
-                throw new NormUsageException(
-                    $"Reference navigation '{property.Name}' targets '{principalType.Name}', which is not a mapped entity.", ex);
-            }
+            try { principalMap = GetMapping(principalType); }
+            catch { return false; }
 
+            // A non-null result means THIS entity carries the foreign key (dependent → principal). A null
+            // result means the principal → dependent case (the other side holds the FK), which
+            // LoadRelationshipAsync loads correctly, including composite keys.
             var fkColumn = nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(ownerMap, property.Name, principalType, principalMap);
-            if (fkColumn == null)
-                throw new NormUsageException(
-                    $"Cannot resolve the foreign key for reference navigation '{property.Name}' on '{entityType.Name}'. " +
-                    "Configure the relationship with HasOne/WithMany or a conventional '{Principal}Id' foreign key.");
+            if (fkColumn == null || principalMap.KeyColumns.Length != 1)
+                return false;
 
-            var fkValue = fkColumn.Getter(entity);
-            if (fkValue == null)
-            {
-                // A null foreign key means no principal — clear the navigation to reflect that.
-                property.SetValue(entity, null);
-                return Task.CompletedTask;
-            }
-
-            return (Task)s_loadReferenceCoreMethod.MakeGenericMethod(principalType)
-                .Invoke(this, new object[] { entity, property, fkValue, ct })!;
+            task = LoadDependentToPrincipalReferenceAsync(entity, entityType, principalType, principalMap, property, fkColumn, ct);
+            return true;
         }
-
-        /// <summary>Synchronous <see cref="LoadReferenceNavigationForEntryAsync"/>.</summary>
-        [RequiresDynamicCode("Reference loading builds a key predicate and lifts it onto the principal query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
-        [RequiresUnreferencedCode("Reference loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
-        internal void LoadReferenceNavigationForEntry(object entity, Type entityType, PropertyInfo property)
-            => LoadReferenceNavigationForEntryAsync(entity, entityType, property, CancellationToken.None).GetAwaiter().GetResult();
 
         [RequiresDynamicCode("Reference loading builds a key predicate; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [RequiresUnreferencedCode("Reference loading reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
-        private async Task LoadReferenceCoreAsync<TPrincipal>(object entity, PropertyInfo property, object fkValue, CancellationToken ct)
+        private async Task LoadDependentToPrincipalReferenceAsync(
+            object entity, Type entityType, Type principalType, TableMapping principalMap, PropertyInfo property, Column fkColumn, CancellationToken ct)
+        {
+            var fkValue = fkColumn.Getter(entity);
+            if (fkValue == null)
+            {
+                property.SetValue(entity, null);
+            }
+            else
+            {
+                await (Task)s_loadReferenceCoreMethod.MakeGenericMethod(principalType)
+                    .Invoke(this, new object[] { entity, property, principalMap, fkValue, ct })!;
+            }
+            nORM.Navigation.NavigationPropertyExtensions.SetNavigationLoaded(entity, property, true, entityType, this);
+        }
+
+        [RequiresDynamicCode("Reference loading builds a key predicate; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Reference loading reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private async Task LoadReferenceCoreAsync<TPrincipal>(object entity, PropertyInfo property, TableMapping principalMap, object fkValue, CancellationToken ct)
             where TPrincipal : class
         {
-            // FindAsync resolves the identity map first (returning an already-tracked principal), then
-            // queries by key — exactly the semantics EF's reference Load uses.
-            var principal = await FindAsync<TPrincipal>(new object?[] { fkValue }, ct).ConfigureAwait(false);
+            // Tracking query so identity resolution returns an already-tracked principal, matching EF.
+            var predicate = BuildFindPredicate<TPrincipal>(principalMap, new object?[] { fkValue });
+            var principal = await this.Query<TPrincipal>().Where(predicate).FirstOrDefaultAsync(ct).ConfigureAwait(false);
             property.SetValue(entity, principal);
         }
     }

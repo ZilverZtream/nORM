@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -87,6 +88,8 @@ namespace nORM.Navigation
         /// <summary>
         /// Explicitly loads a reference navigation property from the database.
         /// </summary>
+        [RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
         public static async Task LoadAsync<T, TProperty>(this T entity,
             System.Linq.Expressions.Expression<Func<T, TProperty?>> navigationProperty,
             CancellationToken ct = default)
@@ -100,12 +103,17 @@ namespace nORM.Navigation
                 throw new NormUsageException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
 
             var propertyInfo = GetPropertyInfo(navigationProperty);
-            await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
+            // Pass the compile-time type so a mapped-type navigation context is used — the tracking
+            // pipeline attaches an object-typed context that would otherwise leave GetMapping unable to
+            // resolve the relation (a silent no-op load).
+            await LoadNavigationForEntryAsync(entity, propertyInfo, typeof(T), navContext.DbContext, ct).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Explicitly loads a collection navigation property from the database.
         /// </summary>
+        [RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
         public static async Task LoadAsync<T, TProperty>(this T entity,
             System.Linq.Expressions.Expression<Func<T, ICollection<TProperty>?>> navigationProperty,
             CancellationToken ct = default)
@@ -114,12 +122,12 @@ namespace nORM.Navigation
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             if (navigationProperty == null) throw new ArgumentNullException(nameof(navigationProperty));
-            
+
             if (!_navigationContexts.TryGetValue(entity, out var navContext))
                 throw new NormUsageException("Entity must be loaded from a DbContext or have lazy loading enabled to use LoadAsync");
-            
+
             var propertyInfo = GetPropertyInfo(navigationProperty);
-            await LoadNavigationPropertyAsync(entity, propertyInfo, navContext, ct).ConfigureAwait(false);
+            await LoadNavigationForEntryAsync(entity, propertyInfo, typeof(T), navContext.DbContext, ct).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -144,18 +152,29 @@ namespace nORM.Navigation
         /// navigation context typed as <see cref="object"/> (which cannot resolve the relation mapping) and may
         /// have marked an initializer collection as already loaded; both are corrected here so the load runs.
         /// </summary>
+        [RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
         internal static Task LoadNavigationForEntryAsync(object entity, PropertyInfo property, Type entityType, DbContext context, CancellationToken ct)
         {
             var navContext = EnsureTypedNavigationContext(entity, entityType, context);
-            navContext.MarkAsUnloaded(property.Name);
+            // A dependent → principal reference (this entity holds the FK) is loaded directly; everything
+            // else (collections, principal → dependent references) goes through the relationship loader.
+            if (context.TryLoadDependentToPrincipalReference(entity, entityType, property, ct, out var referenceTask))
+                return referenceTask;
             return LoadNavigationPropertyAsync(entity, property, navContext, ct);
         }
 
         /// <summary>Synchronous counterpart of <see cref="LoadNavigationForEntryAsync"/>.</summary>
+        [RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
         internal static void LoadNavigationForEntry(object entity, PropertyInfo property, Type entityType, DbContext context, CancellationToken ct)
         {
             var navContext = EnsureTypedNavigationContext(entity, entityType, context);
-            navContext.MarkAsUnloaded(property.Name);
+            if (context.TryLoadDependentToPrincipalReference(entity, entityType, property, ct, out var referenceTask))
+            {
+                referenceTask.ConfigureAwait(false).GetAwaiter().GetResult();
+                return;
+            }
             LoadNavigationProperty(entity, property, navContext, ct);
         }
 
@@ -251,9 +270,35 @@ namespace nORM.Navigation
                 }
                 else
                 {
-                    // Property already has a value; mark it as loaded so it won't be reloaded
-                    context.MarkAsLoaded(navProp.Property.Name);
+                    // A populated navigation came from the query (e.g. Include) — mark it loaded so it is
+                    // not reloaded. An EMPTY collection, though, is almost always just a constructor
+                    // initializer (`= new()`), NOT loaded data; marking it loaded would make an explicit
+                    // Load() a silent no-op. Leave empty collections unloaded so they can be loaded on demand.
+                    if (navProp.IsCollection && IsEmptyEnumerable(navProp.Property.GetValue(entity)))
+                        context.MarkAsUnloaded(navProp.Property.Name);
+                    else
+                        context.MarkAsLoaded(navProp.Property.Name);
                 }
+            }
+        }
+
+        /// <summary>True when <paramref name="value"/> is null or an empty (non-string) sequence.</summary>
+        private static bool IsEmptyEnumerable(object? value)
+        {
+            switch (value)
+            {
+                case null:
+                    return true;
+                case string:
+                    return false;
+                case System.Collections.ICollection collection:
+                    return collection.Count == 0;
+                case System.Collections.IEnumerable enumerable:
+                    var enumerator = enumerable.GetEnumerator();
+                    try { return !enumerator.MoveNext(); }
+                    finally { (enumerator as IDisposable)?.Dispose(); }
+                default:
+                    return false;
             }
         }
 

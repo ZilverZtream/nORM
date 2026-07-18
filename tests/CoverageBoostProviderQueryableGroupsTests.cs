@@ -395,10 +395,13 @@ public class NavigationPropertyExtensionsProxyTests
             .ExecuteNonQuery();
         using var ctx = new DbContext(cn, new SqliteProvider());
 
+        // A POPULATED collection is treated as loaded data (e.g. from Include). An empty initializer
+        // collection is deliberately NOT marked loaded, so an explicit Load() can still fetch it.
         var author = new CovAuthor { Id = 1, Name = "Author" };
+        author.Books = new System.Collections.Generic.List<CovBook> { new CovBook { Id = 1, AuthorId = 1, Title = "Preloaded" } };
         author.EnableLazyLoading(ctx); // registers nav context
 
-        // Books was non-null → MarkAsLoaded("Books") was called in else branch
+        // Books was non-null and non-empty → MarkAsLoaded("Books") was called in the else branch.
         var loaded = author.IsLoaded(a => a.Books);
         Assert.True(loaded); // was marked loaded by the else branch
     }
