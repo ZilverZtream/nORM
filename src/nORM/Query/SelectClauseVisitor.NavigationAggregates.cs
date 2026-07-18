@@ -334,6 +334,15 @@ namespace nORM.Query
                     var logicalOp = logical.NodeType == ExpressionType.AndAlso ? "AND" : "OR";
                     return $"({RenderNavigationFilterBody(logical.Left, elementParam, depAlias)} {logicalOp} {RenderNavigationFilterBody(logical.Right, elementParam, depAlias)})";
 
+                // Null comparison (`c.DeletedAt == null` / `!= null`) must lower to IS [NOT] NULL — the
+                // general `col = NULL` form below is always unknown, so the whole subquery filter would match
+                // nothing (silently dropping every child, e.g. for a `DeletedAt == null` soft-delete filter).
+                case BinaryExpression { NodeType: ExpressionType.Equal or ExpressionType.NotEqual } nullCmp
+                    when IsNullConstant(nullCmp.Left) || IsNullConstant(nullCmp.Right):
+                    var nullOperand = IsNullConstant(nullCmp.Left) ? nullCmp.Right : nullCmp.Left;
+                    var nullTest = nullCmp.NodeType == ExpressionType.Equal ? "IS NULL" : "IS NOT NULL";
+                    return $"{RenderFilterSide(nullOperand, elementParam, depAlias)} {nullTest}";
+
                 case BinaryExpression be:
                     var lhs = RenderFilterSide(be.Left, elementParam, depAlias);
                     var rhs = RenderFilterSide(be.Right, elementParam, depAlias);
@@ -364,6 +373,14 @@ namespace nORM.Query
         /// predicate, reusing <see cref="EmitStringMatch"/>. Returns false for any other shape (variable
         /// pattern, non-element receiver) so the caller falls through to the unsupported-shape error.
         /// </summary>
+        /// <summary>True when the expression is a null literal (possibly wrapped in a nullable Convert).</summary>
+        private static bool IsNullConstant(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            return e is ConstantExpression { Value: null };
+        }
+
         private bool TryRenderNavStringMatch(MethodCallExpression mc, ParameterExpression elementParam, string depAlias, out string sql)
         {
             sql = string.Empty;
