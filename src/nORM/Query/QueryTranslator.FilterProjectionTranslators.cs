@@ -630,7 +630,18 @@ namespace nORM.Query
                     && keyMember.Expression is ParameterExpression)
                 {
                     var ascendingSet = !node.Method.Name.Contains("Descending");
-                    t._orderBy.Add((t._provider.Escape(keyMember.Member.Name), ascendingSet));
+                    // A full-entity set op names each result column by its MAPPED column (the union arm
+                    // selects `t.Col`), so order by the mapped column — honouring a fluent HasColumnName
+                    // rename, which the CLR property name misses. A projection set op
+                    // (`.Select(x => new { V }).Union(...)`) aliases its output by the member name, so that
+                    // shape keeps the member name; the two are distinguished by whether the key member is a
+                    // column on the entity mapping (its declaring type is the mapped entity or a base).
+                    var setOpOrderCol =
+                        keyMember.Member.DeclaringType?.IsAssignableFrom(t._mapping.Type) == true
+                        && t._mapping.ColumnsByName.TryGetValue(keyMember.Member.Name, out var setOpKeyColumn)
+                            ? setOpKeyColumn.EscCol
+                            : t._provider.Escape(keyMember.Member.Name);
+                    t._orderBy.Add((setOpOrderCol, ascendingSet));
                     return source;
                 }
                 // Detect OrderBy applied AFTER a Take/Skip — LINQ semantics
