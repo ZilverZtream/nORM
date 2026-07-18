@@ -95,6 +95,7 @@ v1.0 contract:
 | `nORM.Core.NormIncludableQueryableExtensions.TagWith<T>(IQueryable<T>, string)` | Stable - EF Core-style SQL query tagging (comment) | `QueryTagWithContractTests` | `docs/api/nORM.Core.NormIncludableQueryableExtensions.yml` |
 | `nORM.Core.DbContext.SqlQueryRawAsync<T>` / `SqlQueryInterpolatedAsync<T>` | Stable - EF Core-style raw-SQL scalar/DTO query | `DatabaseSqlQueryContractTests` | `docs/api/nORM.Core.DbContext.yml` |
 | `nORM.Core.DbContext.AddAsync<T>` / `AddRangeAsync<T>` | Stable - EF Core-style async add (synchronous under the hood) | `AddAsyncContractTests` | `docs/api/nORM.Core.DbContext.yml` |
+| `nORM.Core.DbContext.Find<T>(object[])` | Stable - EF Core-style synchronous primary-key lookup (identity-map first) | `FindSyncContractTests` | `docs/api/nORM.Core.DbContext.yml` |
 
 `PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
 any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.

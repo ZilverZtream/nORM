@@ -361,6 +361,7 @@ M:nORM.Core.DbContext.ExecuteStoredProcedureNonQueryWithOutputAsync(System.Strin
 M:nORM.Core.DbContext.ExecuteStoredProcedureWithOutputAsync``1(System.String,System.Threading.CancellationToken,System.Object,nORM.Core.OutputParameter[]):System.Threading.Tasks.Task{nORM.Core.StoredProcedureResult{`0}}
 M:nORM.Core.DbContext.FindAsync``1(System.Object[]):System.Threading.Tasks.ValueTask{`0}
 M:nORM.Core.DbContext.FindAsync``1(System.Object[],System.Threading.CancellationToken):System.Threading.Tasks.ValueTask{`0}
+M:nORM.Core.DbContext.Find``1(System.Object[]):`0
 M:nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.GenerateNativeTenantPolicySql``1():System.String

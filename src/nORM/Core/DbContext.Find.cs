@@ -37,18 +37,51 @@ namespace nORM.Core
         [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
         public async ValueTask<T?> FindAsync<T>(object?[] keyValues, CancellationToken ct) where T : class
         {
+            if (TryFindTracked<T>(keyValues, out var tracked, out var predicate))
+                return tracked;
+            return await this.Query<T>().Where(predicate).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Synchronous <see cref="FindAsync{T}(object?[])"/>, matching Entity Framework Core's
+        /// <c>Find</c>. A tracked entity with the given key is returned with no database round trip;
+        /// otherwise the entity is queried by key. Returns <c>null</c> when no such row exists. Key
+        /// values are supplied in mapped key order and coerced to the key CLR types.
+        /// </summary>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
+        /// <param name="keyValues">The primary-key values in mapped key order.</param>
+        /// <returns>The tracked or freshly loaded entity, or <c>null</c> if none exists.</returns>
+        [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public T? Find<T>(params object?[] keyValues) where T : class
+        {
+            if (TryFindTracked<T>(keyValues, out var tracked, out var predicate))
+                return tracked;
+            return this.Query<T>().Where(predicate).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Validates and coerces the supplied key values, then attempts an identity-map lookup shared by the
+        /// sync and async <c>Find</c> paths. Returns <c>true</c> when the entity resolves from the tracker
+        /// (no round trip needed); otherwise returns <c>false</c> with <paramref name="predicate"/> set to
+        /// the key query. Validation failures (no key, wrong arity, null component) throw synchronously.
+        /// </summary>
+        [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private bool TryFindTracked<T>(object?[] keyValues, out T? tracked, out Expression<Func<T, bool>> predicate) where T : class
+        {
             ArgumentNullException.ThrowIfNull(keyValues);
             var mapping = GetMapping(typeof(T));
             if (mapping.KeyColumns.Length == 0)
                 throw new NormUsageException(
-                    $"FindAsync requires a primary key, but entity type '{typeof(T).Name}' has none. " +
+                    $"Find requires a primary key, but entity type '{typeof(T).Name}' has none. " +
                     "Configure a key with [Key] or a fluent HasKey(...).");
             if (keyValues.Length != mapping.KeyColumns.Length)
                 throw new NormUsageException(
-                    $"FindAsync for '{typeof(T).Name}' expects {mapping.KeyColumns.Length} key value(s) " +
+                    $"Find for '{typeof(T).Name}' expects {mapping.KeyColumns.Length} key value(s) " +
                     $"in mapped key order but received {keyValues.Length}.");
 
-            // Coerce each supplied value to its key column's CLR type so FindAsync<T>(5) matches a
+            // Coerce each supplied value to its key column's CLR type so Find<T>(5) matches a
             // long key, a string matches a Guid key, and so on — the same coercion the temporal
             // history key path uses.
             var coerced = new object?[keyValues.Length];
@@ -56,23 +89,28 @@ namespace nORM.Core
             {
                 if (keyValues[i] is null)
                     throw new NormUsageException(
-                        $"FindAsync for '{typeof(T).Name}' received a null value for key component " +
+                        $"Find for '{typeof(T).Name}' received a null value for key component " +
                         $"'{mapping.KeyColumns[i].Prop.Name}'. Primary-key values cannot be null.");
                 coerced[i] = ConvertTemporalKeyValue(keyValues[i], mapping.KeyColumns[i].Prop.PropertyType);
             }
 
             // Identity-map first: a tracked entity with this key is returned without a round trip.
-            // This is the whole point of Find over FirstOrDefault — and the ValueTask makes the hit
-            // path allocation-free.
+            // This is the whole point of Find over FirstOrDefault — and on the async path the ValueTask
+            // makes the hit path allocation-free.
             var lookupKey = ChangeTracker.BuildLookupKey(mapping, coerced);
-            if (lookupKey is not null && ChangeTracker.GetEntryByKey(typeof(T), lookupKey)?.Entity is T tracked)
-                return tracked;
+            if (lookupKey is not null && ChangeTracker.GetEntryByKey(typeof(T), lookupKey)?.Entity is T hit)
+            {
+                tracked = hit;
+                predicate = null!;
+                return true;
+            }
 
             // Not tracked: query by key. The predicate captures the key values through a holder so
             // the translator parameterizes them (@p) — Find(1) and Find(2) then share one cached
             // plan instead of baking the id as a literal and thrashing the plan cache.
-            var predicate = BuildFindPredicate<T>(mapping, coerced);
-            return await this.Query<T>().Where(predicate).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            tracked = null;
+            predicate = BuildFindPredicate<T>(mapping, coerced);
+            return false;
         }
 
         [RequiresDynamicCode("nORM Find builds a key predicate expression tree; not NativeAOT-compatible.")]
