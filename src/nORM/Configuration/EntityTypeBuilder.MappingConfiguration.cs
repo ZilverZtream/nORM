@@ -17,6 +17,7 @@ namespace nORM.Configuration
             public string? TableName { get; private set; }
             public string? SchemaName { get; private set; }
             public bool IsReadOnly { get; private set; }
+            public bool IsKeyless { get; private set; }
             public List<PropertyInfo> KeyProperties { get; } = new();
             public string? PrimaryKeyConstraintName { get; private set; }
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
@@ -41,6 +42,7 @@ namespace nORM.Configuration
             IReadOnlyList<PropertyInfo> IEntityTypeConfiguration.KeyProperties => KeyProperties;
             string? IEntityTypeConfiguration.PrimaryKeyConstraintName => PrimaryKeyConstraintName;
             bool IEntityTypeConfiguration.IsReadOnly => IsReadOnly;
+            bool IEntityTypeConfiguration.IsKeyless => IsKeyless;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueConstraintNames => DefaultValueConstraintNameValues;
@@ -109,6 +111,15 @@ namespace nORM.Configuration
             public void SetReadOnly()
             {
                 IsReadOnly = true;
+            }
+
+            /// <summary>
+            /// Marks the entity as keyless (a query type): it is never tracked and cannot be saved,
+            /// suitable for database views and read models.
+            /// </summary>
+            public void SetKeyless()
+            {
+                IsKeyless = true;
             }
 
             /// <summary>

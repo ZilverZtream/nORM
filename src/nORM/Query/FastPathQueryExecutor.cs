@@ -278,6 +278,7 @@ namespace nORM.Query
         private static bool ShouldTrackResults<T>(Expression expr, DbContext ctx) where T : class
             => ctx.Options.DefaultTrackingBehavior != QueryTrackingBehavior.NoTracking
                && ctx.IsMapped(typeof(T))
+               && !ctx.GetMapping(typeof(T)).IsKeyless   // keyless = query-only, never tracked
                && !HasAsNoTrackingCall(expr);
 
         private static bool HasAsNoTrackingCall(Expression e)

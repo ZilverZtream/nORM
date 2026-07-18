@@ -43,6 +43,9 @@ namespace nORM.Mapping
         /// <summary>Gets whether this mapping is query-only and rejects writes.</summary>
         public bool IsReadOnly { get; }
 
+        /// <summary>Gets whether this mapping is keyless (a query type): never tracked and not savable.</summary>
+        public bool IsKeyless { get; }
+
         /// <summary>Gets the timestamp column used for concurrency, if any.</summary>
         public Column? TimestampColumn { get; }
 
@@ -300,6 +303,8 @@ namespace nORM.Mapping
             IsReadOnly = (fluentConfig?.IsReadOnly ?? false)
                 || t.GetCustomAttribute<ReadOnlyEntityAttribute>(inherit: true) != null;
 
+            IsKeyless = fluentConfig?.IsKeyless ?? false;
+
             Columns = cols.ToArray();
             ColumnsByName = BuildColumnsByName(Columns, t);
 
@@ -307,8 +312,9 @@ namespace nORM.Mapping
             // property named "Id" - then "<Type>Id" - becomes the primary key, matching the
             // assembly-driven snapshot builder's convention so the mapper and design-time model
             // agree. Explicit configuration always wins; prefixed owned/shadow columns never
-            // match (their PropName carries the prefix).
-            if (!Columns.Any(c => c.IsKey))
+            // match (their PropName carries the prefix). A keyless entity (HasNoKey) opts out of the
+            // convention entirely so it stays keyless even when an "Id" property is present.
+            if (!IsKeyless && !Columns.Any(c => c.IsKey))
             {
                 var conventionKey = Columns.FirstOrDefault(c => string.Equals(c.PropName, "Id", StringComparison.Ordinal))
                     ?? Columns.FirstOrDefault(c => string.Equals(c.PropName, t.Name + "Id", StringComparison.Ordinal));

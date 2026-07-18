@@ -189,6 +189,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.HasExpressionIndex(System.String,Syst
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}}):nORM.Configuration.EntityTypeBuilder{`0}.CollectionNavigationBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.HasNoKey():nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.HasOne``1(System.Linq.Expressions.Expression{System.Func{`0,`0}}):nORM.Configuration.EntityTypeBuilder{`0}.ReferenceNavigationBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.IsReadOnly():nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{`0}}},System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{`0}}):nORM.Configuration.EntityTypeBuilder{`0}
@@ -1158,6 +1159,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql:System.Collections
 P:nORM.Configuration.IEntityTypeConfiguration.ExpressionIndexes:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ExpressionIndexConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.FixedLengthSettings:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
 P:nORM.Configuration.IEntityTypeConfiguration.IdentityOptions:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.IdentityOptionsConfiguration}
+P:nORM.Configuration.IEntityTypeConfiguration.IsKeyless:System.Boolean
 P:nORM.Configuration.IEntityTypeConfiguration.IsReadOnly:System.Boolean
 P:nORM.Configuration.IEntityTypeConfiguration.KeyProperties:System.Collections.Generic.IReadOnlyList{System.Reflection.PropertyInfo}
 P:nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ManyToManyConfiguration}
@@ -1384,6 +1386,7 @@ P:nORM.Mapping.TableMapping.DiscriminatorColumn:nORM.Mapping.Column
 P:nORM.Mapping.TableMapping.DiscriminatorValue:System.Object
 P:nORM.Mapping.TableMapping.EscTable:System.String
 P:nORM.Mapping.TableMapping.InsertColumns:nORM.Mapping.Column[]
+P:nORM.Mapping.TableMapping.IsKeyless:System.Boolean
 P:nORM.Mapping.TableMapping.IsReadOnly:System.Boolean
 P:nORM.Mapping.TableMapping.KeyColumns:nORM.Mapping.Column[]
 P:nORM.Mapping.TableMapping.ManyToManyJoins:System.Collections.Generic.List{nORM.Mapping.JoinTableMapping}

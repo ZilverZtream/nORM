@@ -204,7 +204,8 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                                 _ctx.IsMapped(plan.ElementType);
+                                 _ctx.IsMapped(plan.ElementType) &&
+                                 !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
                 bool isReadOnly = IsReadOnlyQuery();
@@ -293,7 +294,8 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                                 _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
+                                 _ctx.IsMapped(plan.ElementType) &&
+                                 !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
@@ -411,7 +413,8 @@ namespace nORM.Query
                 var trackable = !plan.NoTracking &&
                                  plan.ElementType.IsClass &&
                                  !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                                 _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
+                                 _ctx.IsMapped(plan.ElementType) &&
+                                 !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
@@ -517,7 +520,8 @@ namespace nORM.Query
             var trackable = !plan.NoTracking &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
-                             _ctx.IsMapped(plan.ElementType);
+                             _ctx.IsMapped(plan.ElementType) &&
+                             !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
 
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
             bool isReadOnly = IsReadOnlyQuery();

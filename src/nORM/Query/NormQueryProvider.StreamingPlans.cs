@@ -74,7 +74,8 @@ namespace nORM.Query
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>", StringComparison.Ordinal) &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&
-                             _ctx.IsMapped(plan.ElementType);   // only mapped entity roots
+                             _ctx.IsMapped(plan.ElementType) &&
+                             !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
             if (trackable)
                 _ctx.GetMapping(plan.ElementType);
             var count = 0;

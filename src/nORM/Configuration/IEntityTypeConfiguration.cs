@@ -41,6 +41,12 @@ namespace nORM.Configuration
         bool IsReadOnly { get; }
 
         /// <summary>
+        /// Gets a value indicating whether the mapped type is keyless (a query type):
+        /// never tracked and not savable, used for views and read models.
+        /// </summary>
+        bool IsKeyless { get; }
+
+        /// <summary>
         /// Gets a mapping of property infos to explicit column names.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, string> ColumnNames { get; }

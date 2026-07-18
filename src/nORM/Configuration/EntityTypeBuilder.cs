@@ -123,6 +123,17 @@ namespace nORM.Configuration
         }
 
         /// <summary>
+        /// Configures this entity as keyless — a query type with no primary key, matching EF Core's
+        /// <c>HasNoKey()</c>. Keyless entities are materialized from queries (including database views and
+        /// read models) but are never change-tracked and cannot be saved.
+        /// </summary>
+        public EntityTypeBuilder<TEntity> HasNoKey()
+        {
+            _config.SetKeyless();
+            return this;
+        }
+
+        /// <summary>
         /// Configures a table-level CHECK constraint for migration snapshot generation.
         /// The SQL predicate is provider SQL and should not include the outer CHECK keyword.
         /// </summary>
