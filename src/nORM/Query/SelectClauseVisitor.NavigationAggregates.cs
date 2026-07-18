@@ -235,8 +235,12 @@ namespace nORM.Query
             {
                 if (i > 0)
                     sb.Append(" AND ");
-                sb.Append(dependentAlias).Append('.').Append(_provider.Escape(relation.ForeignKeys[i].Prop.Name))
-                  .Append(" = ").Append(principalAlias).Append('.').Append(_provider.Escape(relation.PrincipalKeys[i].Prop.Name));
+                // Use the mapped column identifiers (EscCol), NOT the CLR property names: a key column
+                // renamed via [Column("...")] or fluent HasColumnName otherwise emits `alias.<PropName>`
+                // for a column that does not exist. EscCol equals the escaped property name in the common
+                // (un-renamed) case, so this is byte-identical there and correct under renaming.
+                sb.Append(dependentAlias).Append('.').Append(relation.ForeignKeys[i].EscCol)
+                  .Append(" = ").Append(principalAlias).Append('.').Append(relation.PrincipalKeys[i].EscCol);
             }
         }
 
@@ -455,9 +459,23 @@ namespace nORM.Query
                 expr = enumConv.Operand;
             }
 
-            // Member access on the element parameter → column on the dependent.
+            // Member access on the element parameter → column on the dependent. Resolve the mapped
+            // column through the TableMapping (like the selector path RenderElementColumnSql) so a fluent
+            // HasColumnName override is honoured — not only a [Column] attribute, which is all the member's
+            // own metadata carries. Otherwise a fluently renamed filter column emits `alias.<PropName>` for
+            // a column that does not exist. The attribute/property-name path remains the fallback when the
+            // mapping isn't reachable, and is byte-identical to the mapping's EscCol in the un-renamed case.
             if (expr is MemberExpression me && me.Expression == elementParam)
             {
+                if (_ctx != null && me.Member.DeclaringType != null)
+                {
+                    try
+                    {
+                        if (_ctx.GetMapping(me.Member.DeclaringType).ColumnsByName.TryGetValue(me.Member.Name, out var mappedCol))
+                            return $"{depAlias}.{mappedCol.EscCol}";
+                    }
+                    catch { /* fall through to attribute/property-name resolution */ }
+                }
                 var colAttr = me.Member.GetCustomAttributes(typeof(System.ComponentModel.DataAnnotations.Schema.ColumnAttribute), inherit: false)
                     .Cast<System.ComponentModel.DataAnnotations.Schema.ColumnAttribute>().FirstOrDefault();
                 var colName = colAttr?.Name ?? me.Member.Name;
