@@ -370,4 +370,38 @@ public class FromSqlRawComposableTests
         await ctx.SaveChangesAsync();
         Assert.Equal(6, Count());   // 4 original + out-of-band 5 + nORM-added 6, re-read after invalidation
     }
+
+    // Security: a cacheable raw query under one tenant must never serve its rows to another tenant sharing the
+    // same cache provider — the result-cache key carries the tenant, so identical raw SQL keys per tenant.
+    [Fact]
+    public void raw_cacheable_does_not_leak_across_tenants_sharing_a_cache()
+    {
+        using var cache = new NormMemoryCacheProvider();
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE FsrTenantWidget (Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, Score INTEGER NOT NULL);
+                INSERT INTO FsrTenantWidget VALUES (1,1,10),(2,1,20),(3,2,300),(4,2,400);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        DbContext CtxFor(int tenant) => new(cn, new SqliteProvider(), new DbContextOptions
+        {
+            CacheProvider = cache,
+            TenantColumnName = "TenantId",
+            TenantProvider = new FixedTenantProvider(tenant),
+            OnModelCreating = mb => mb.Entity<TenantWidget>().HasKey(w => w.Id)
+        });
+        const string sql = "SELECT * FROM FsrTenantWidget";
+        var expiry = TimeSpan.FromMinutes(5);
+
+        // Tenant 1 warms the cache with the SAME raw SQL text tenant 2 will use.
+        var t1 = CtxFor(1).FromSqlRaw<TenantWidget>(sql).Cacheable(expiry).ToList();
+        Assert.Equal(new[] { 1, 2 }, t1.Select(w => w.Id).OrderBy(i => i).ToArray());
+
+        // Tenant 2's identical raw SQL must NOT hit tenant 1's cached entry — it sees only its own rows.
+        var t2 = CtxFor(2).FromSqlRaw<TenantWidget>(sql).Cacheable(expiry).ToList();
+        Assert.Equal(new[] { 3, 4 }, t2.Select(w => w.Id).OrderBy(i => i).ToArray());
+    }
 }
