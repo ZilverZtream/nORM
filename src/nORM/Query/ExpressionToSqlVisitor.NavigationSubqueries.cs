@@ -54,54 +54,80 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"All(...) over the {kind} collection '{navMember.Member.Name}' in a predicate isn't supported yet. " +
                     "Evaluate it after materialising, or filter with a separate query.");
-            if (node.Arguments.Count > 1)
-                throw new NormUnsupportedFeatureException(
-                    $"A filtered {method}(...) over the {kind} collection '{navMember.Member.Name}' in a predicate isn't supported yet. " +
-                    "Filter after materialising, or use a separate query.");
 
             var parentAlias = info.Alias;
-            var depAlias = _provider.Escape("__nav");
-
+            // Resolve the element mapping, the subquery FROM source + alias, and the FK correlation to the owner.
+            TableMapping elementMapping;
+            string subAlias;
+            string fromClause;
+            string fkCorrelation;
             if (owned != null)
             {
                 if (mapping.KeyColumns.Length != 1)
                     throw new NormUnsupportedFeatureException(
                         $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet.");
-                if (GlobalFilterFragment.CombineWithTenant(_ctx, owned.OwnedType) != null)
-                    throw new NormUnsupportedFeatureException(
-                        $"Aggregating the owned collection '{navMember.Member.Name}' whose item type has a global or tenant filter isn't supported in a predicate yet. " +
-                        "Use a separate query.");
+                elementMapping = _ctx.GetMapping(owned.OwnedType);
+                subAlias = _provider.Escape("__nav");
+                fromClause = $"{owned.EscTable} {subAlias}";
+                fkCorrelation = $"{subAlias}.{owned.EscForeignKeyColumn} = {parentAlias}.{mapping.KeyColumns[0].EscCol}";
                 QueryTranslator.RecordReferencedTable(owned.TableName);
-                var where = $"{depAlias}.{owned.EscForeignKeyColumn} = {parentAlias}.{mapping.KeyColumns[0].EscCol}";
-                if (method is nameof(Queryable.Any))
-                    _sql.Append("EXISTS(SELECT 1 FROM ").Append(owned.EscTable).Append(' ').Append(depAlias).Append(" WHERE ").Append(where).Append(')');
-                else
-                    _sql.Append("(SELECT COUNT(*) FROM ").Append(owned.EscTable).Append(' ').Append(depAlias).Append(" WHERE ").Append(where).Append(')');
-                return true;
+            }
+            else
+            {
+                if (jtm!.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
+                    throw new NormUnsupportedFeatureException(
+                        $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet.");
+                elementMapping = _ctx.GetMapping(jtm.RightType);
+                var jAlias = _provider.Escape("__m2mj");
+                subAlias = _provider.Escape("__m2mr");
+                // Join the bridge table to the related table so the related entity's filters apply and a
+                // predicate can reach its columns; orphaned bridge rows don't over-count.
+                fromClause = $"{jtm.EscTableName} {jAlias} JOIN {QueryTranslator.TemporalTableSource(elementMapping)} {subAlias} " +
+                             $"ON {subAlias}.{jtm.RightKeyColumns[0].EscCol} = {jAlias}.{jtm.EscRightFkColumn}";
+                fkCorrelation = $"{jAlias}.{jtm.EscLeftFkColumn} = {parentAlias}.{jtm.LeftKeyColumns[0].EscCol}";
+                QueryTranslator.RecordReferencedTable(jtm.TableName);
+                QueryTranslator.RecordReferencedTable(elementMapping.TableName);
             }
 
-            if (jtm!.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
-                throw new NormUnsupportedFeatureException(
-                    $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet.");
-            if (GlobalFilterFragment.CombineWithTenant(_ctx, jtm.RightType) != null)
-                throw new NormUnsupportedFeatureException(
-                    $"Aggregating the many-to-many collection '{navMember.Member.Name}' whose related type has a global or tenant filter isn't supported in a predicate yet. " +
-                    "Use a separate query.");
-            var rightMap = _ctx.GetMapping(jtm.RightType);
-            var jAlias = _provider.Escape("__m2mj");
-            var rAlias = _provider.Escape("__m2mr");
-            QueryTranslator.RecordReferencedTable(jtm.TableName);
-            QueryTranslator.RecordReferencedTable(rightMap.TableName);
-            // Join the bridge table to the related table (so orphaned bridge rows don't over-count, matching
-            // the loaded collection). With no related-side filter this is a straight existence/row count.
-            var fromJoin = $"{jtm.EscTableName} {jAlias} JOIN {QueryTranslator.TemporalTableSource(rightMap)} {rAlias} " +
-                           $"ON {rAlias}.{jtm.RightKeyColumns[0].EscCol} = {jAlias}.{jtm.EscRightFkColumn}";
-            var m2mWhere = $"{jAlias}.{jtm.EscLeftFkColumn} = {parentAlias}.{jtm.LeftKeyColumns[0].EscCol}";
+            var conditions = new List<string> { fkCorrelation };
+            // The element type's global/tenant filters restrict visibility, matching the loaded collection
+            // (rendered against the sub-alias in a sub-visitor, so soft-deleted/other-tenant rows drop out).
+            var visibility = RenderPrincipalGlobalFilterSql(elementMapping, subAlias);
+            if (visibility != null)
+                conditions.Add($"({visibility})");
+            // A predicate (`Any(t => p)` / `Count(t => p)`) restricts which rows the aggregate ranges over.
+            if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression predicate)
+                conditions.Add($"({TranslateCollectionSubqueryPredicate(predicate, elementMapping, subAlias)})");
+            var whereSql = string.Join(" AND ", conditions);
+
             if (method is nameof(Queryable.Any))
-                _sql.Append("EXISTS(SELECT 1 FROM ").Append(fromJoin).Append(" WHERE ").Append(m2mWhere).Append(')');
+                _sql.Append("EXISTS(SELECT 1 FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');
             else
-                _sql.Append("(SELECT COUNT(*) FROM ").Append(fromJoin).Append(" WHERE ").Append(m2mWhere).Append(')');
+                _sql.Append("(SELECT COUNT(*) FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');
             return true;
+        }
+
+        /// <summary>
+        /// Translates a collection-aggregate predicate (<c>t =&gt; t.Col op v</c>) against the subquery's
+        /// element mapping and alias in a sub-visitor, merging its parameters into the outer command. Mirrors
+        /// <see cref="RenderPrincipalGlobalFilterSql"/> but for an arbitrary caller-supplied predicate.
+        /// </summary>
+        private string TranslateCollectionSubqueryPredicate(LambdaExpression predicate, TableMapping mapping, string alias)
+        {
+            var vctx = new VisitorContext(_ctx!, mapping, _provider, predicate.Parameters[0], alias, _parameterMappings, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _paramIndex);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            try
+            {
+                var sql = visitor.Translate(predicate.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    _params[kvp.Key] = kvp.Value;
+                _paramIndex = visitor.ParamIndex;
+                return sql;
+            }
+            finally
+            {
+                FastExpressionVisitorPool.Return(visitor);
+            }
         }
 
         /// <summary>

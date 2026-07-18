@@ -113,26 +113,55 @@ public class NavigationAggregateWhereSideTests
     }
 
     [Fact]
-    public void Filtered_predicate_aggregate_fails_loud()
+    public void Where_m2m_Any_with_predicate_filters_related_rows()
     {
         using var ctx = Ctx(out var cn);
         using var _cn = cn;
-        Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Post>().Where(p => p.Tags.Any(t => t.Label == "x")).ToList());
+        // Posts with a tag labelled "y": only post 1 (tags x, y); post 2 has only "x".
+        var ids = ctx.Query<Post>().Where(p => p.Tags.Any(t => t.Label == "y"))
+            .ToList().Select(p => p.Id).OrderBy(i => i).ToArray();
+        Assert.Equal(new[] { 1 }, ids);
     }
 
     [Fact]
-    public void M2m_with_related_global_filter_fails_loud_not_silently_wrong()
+    public void Where_owned_Count_with_predicate()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        // Orders with more than one line whose Amount >= 10: order 1 has lines 10 and 20 → 2 (>1); order 2 has 5.
+        var ids = ctx.Query<Order>().Where(o => o.Lines.Count(l => l.Amount >= 10) > 1)
+            .ToList().Select(o => o.Id).OrderBy(i => i).ToArray();
+        Assert.Equal(new[] { 1 }, ids);
+    }
+
+    [Fact]
+    public void Where_m2m_Any_excludes_globally_filtered_related_rows()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
-        CreateSchema(cn);
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE WaPost (Id INTEGER PRIMARY KEY);
+                CREATE TABLE WaTag (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL, Hidden INTEGER NOT NULL);
+                CREATE TABLE WaPostTag (PostId INTEGER NOT NULL, TagId INTEGER NOT NULL);
+                CREATE TABLE WaOrder (Id INTEGER PRIMARY KEY);
+                CREATE TABLE WaLine (Id INTEGER PRIMARY KEY, OrderId INTEGER NOT NULL, Amount INTEGER NOT NULL);
+                INSERT INTO WaPost VALUES (10),(11);
+                INSERT INTO WaTag VALUES (100,'ok',0),(101,'secret',1);
+                -- Post 10 → a visible tag; post 11 → only a hidden tag.
+                INSERT INTO WaPostTag VALUES (10,100),(11,101);
+                """;
+            cmd.ExecuteNonQuery();
+        }
         var opts = new DbContextOptions();
         opts.AddGlobalFilter<Tag>(t => !t.Hidden);
         opts.OnModelCreating = Configure;
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
-        // A soft-delete filter on the related type would make a plain bridge-row count wrong, so it fails loud.
-        Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Post>().Where(p => p.Tags.Any()).ToList());
+        // The related global filter is applied inside the subquery: post 11's only tag is hidden, so it
+        // has no visible tags and is excluded — not a plain bridge-row existence check.
+        var ids = ctx.Query<Post>().Where(p => p.Tags.Any())
+            .ToList().Select(p => p.Id).OrderBy(i => i).ToArray();
+        Assert.Equal(new[] { 10 }, ids);
     }
 }
