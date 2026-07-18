@@ -38,7 +38,7 @@ namespace nORM.Tests
             var entry = ctx.ChangeTracker.Entries.Single();
             var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             markDirty!.Invoke(ctx.ChangeTracker, new object[] { entry });
-            var detect = typeof(ChangeTracker).GetMethod("DetectChanges", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var detect = typeof(ChangeTracker).GetMethod("DetectChangesDirtyOnly", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             detect!.Invoke(ctx.ChangeTracker, null);
             var state = ctx.ChangeTracker.Entries.Single().State;
             Assert.Equal(EntityState.Modified, state);
@@ -56,7 +56,7 @@ namespace nORM.Tests
             var entry = ctx.ChangeTracker.Entries.Single();
             var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             markDirty!.Invoke(ctx.ChangeTracker, new object[] { entry });
-            var detect = typeof(ChangeTracker).GetMethod("DetectChanges", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var detect = typeof(ChangeTracker).GetMethod("DetectChangesDirtyOnly", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             detect!.Invoke(ctx.ChangeTracker, null);
             var state = ctx.ChangeTracker.Entries.Single().State;
             Assert.Equal(EntityState.Modified, state);
@@ -71,7 +71,7 @@ namespace nORM.Tests
             var entity = new CollisionEntity { Id = 1, Data = new CollidingValue("A") };
             ctx.Attach(entity);
             entity.Data = new CollidingValue("B");
-            var detect = typeof(ChangeTracker).GetMethod("DetectChanges", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var detect = typeof(ChangeTracker).GetMethod("DetectChangesDirtyOnly", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             detect!.Invoke(ctx.ChangeTracker, null);
             var state = ctx.ChangeTracker.Entries.Single().State;
             Assert.Equal(EntityState.Unchanged, state);

@@ -74,7 +74,7 @@ public class ChangeTrackerAggregateExceptionTests
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         markDirty.Invoke(ctx.ChangeTracker, new object[] { entry });
 
-        var detectChanges = typeof(ChangeTracker).GetMethod("DetectChanges",
+        var detectChanges = typeof(ChangeTracker).GetMethod("DetectChangesDirtyOnly",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
 
         var ex = Assert.Throws<TargetInvocationException>(() =>

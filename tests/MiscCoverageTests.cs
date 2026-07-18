@@ -647,7 +647,7 @@ CREATE TABLE IF NOT EXISTS MiscPost (Id INTEGER PRIMARY KEY AUTOINCREMENT, BlogI
             markDirty.Invoke(ctx.ChangeTracker, new object[] { entry });
 
             var detect = typeof(ChangeTracker)
-                .GetMethod("DetectChanges", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                .GetMethod("DetectChangesDirtyOnly", BindingFlags.Instance | BindingFlags.NonPublic)!;
             detect.Invoke(ctx.ChangeTracker, null);
 
             Assert.Equal(EntityState.Modified, entry.State);

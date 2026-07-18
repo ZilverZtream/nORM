@@ -552,12 +552,36 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Detects changes only for entities that were explicitly marked dirty via
-        /// <see cref="MarkDirty"/>. For snapshot-based detection of all non-INPC entities,
-        /// use <see cref="DetectAllChanges"/> (called internally from SaveChanges).
+        /// Forces detection of changes made to tracked entities since they were loaded or last saved,
+        /// updating each entry's <see cref="EntityEntry.State"/> — matching EF Core's
+        /// <c>ChangeTracker.DetectChanges()</c>. SaveChanges runs this automatically; call it explicitly
+        /// only when you need up-to-date states before then (e.g. before <see cref="HasChanges"/> or
+        /// enumerating <see cref="Entries"/>).
         /// </summary>
-        internal void DetectChanges()
+        public void DetectChanges()
+            => DetectChangesCore(allNonNotifying: true);
+
+        /// <summary>
+        /// Targeted detection that scans only entities explicitly marked dirty via <see cref="MarkDirty"/>
+        /// (plus INPC entities), rather than every tracked entity. Not part of the public EF-style surface;
+        /// exercised directly by change-tracking tests.
+        /// </summary>
+        internal void DetectChangesDirtyOnly()
             => DetectChangesCore(allNonNotifying: false);
+
+        /// <summary>
+        /// Runs change detection and returns whether any tracked entity is pending insert, update, or
+        /// delete — matching EF Core's <c>ChangeTracker.HasChanges()</c>. Use it to skip a no-op
+        /// <c>SaveChanges</c>.
+        /// </summary>
+        public bool HasChanges()
+        {
+            DetectChangesCore(allNonNotifying: true);
+            foreach (var entry in _entriesByReference.Values)
+                if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                    return true;
+            return false;
+        }
 
         /// <summary>
         /// Detects changes in all tracked non-INotifyPropertyChanged entities by

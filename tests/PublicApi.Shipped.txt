@@ -310,6 +310,8 @@ M:nORM.Core.AdvancedLinqExtensions.SumAsync``2(nORM.Core.INormQueryable{`0},Syst
 M:nORM.Core.CacheableExtensions.Cacheable``1(System.Linq.IQueryable{`0},System.TimeSpan):System.Linq.IQueryable{`0}
 M:nORM.Core.ChangeTracker.#ctor(nORM.Configuration.DbContextOptions)
 M:nORM.Core.ChangeTracker.Clear():System.Void
+M:nORM.Core.ChangeTracker.DetectChanges():System.Void
+M:nORM.Core.ChangeTracker.HasChanges():System.Boolean
 M:nORM.Core.ConnectionManager.#ctor(nORM.Core.DatabaseTopology,nORM.Providers.DatabaseProvider,Microsoft.Extensions.Logging.ILogger,System.Nullable{System.TimeSpan})
 M:nORM.Core.ConnectionManager.Dispose():System.Void
 M:nORM.Core.ConnectionManager.GetReadConnectionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Data.Common.DbConnection}

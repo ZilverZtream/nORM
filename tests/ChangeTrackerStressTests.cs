@@ -201,7 +201,7 @@ public class ChangeTrackerStressTests
         }
 
         // Force DetectChanges via reflection
-        var detectMethod = typeof(ChangeTracker).GetMethod("DetectChanges", BindingFlags.Instance | BindingFlags.NonPublic);
+        var detectMethod = typeof(ChangeTracker).GetMethod("DetectChangesDirtyOnly", BindingFlags.Instance | BindingFlags.NonPublic);
         detectMethod?.Invoke(ctx.ChangeTracker, null);
 
         var entries = ctx.ChangeTracker.Entries.ToList();

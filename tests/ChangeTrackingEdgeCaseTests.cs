@@ -385,7 +385,7 @@ public class ChangeTrackingEdgeCaseTests
         var markDirty = typeof(ChangeTracker).GetMethod("MarkDirty",
             BindingFlags.Instance | BindingFlags.NonPublic);
         markDirty?.Invoke(ctx.ChangeTracker, new object[] { entry });
-        var detect = typeof(ChangeTracker).GetMethod("DetectChanges",
+        var detect = typeof(ChangeTracker).GetMethod("DetectChangesDirtyOnly",
             BindingFlags.Instance | BindingFlags.NonPublic);
         detect?.Invoke(ctx.ChangeTracker, null);
     }
