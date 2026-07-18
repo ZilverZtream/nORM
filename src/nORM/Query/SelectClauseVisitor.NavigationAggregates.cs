@@ -141,10 +141,6 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet. " +
                     "Materialise the owned items and aggregate them client-side.");
-            if (filter != null)
-                throw new NormUnsupportedFeatureException(
-                    $"A filtered aggregate over the owned collection '{navMember.Member.Name}' isn't supported yet. " +
-                    "Materialise the owned items and aggregate them client-side.");
             if (method is nameof(Queryable.All))
                 throw new NormUnsupportedFeatureException(
                     $"All(...) over the owned collection '{navMember.Member.Name}' isn't supported yet. " +
@@ -154,17 +150,23 @@ namespace nORM.Query
             var depAlias = _provider.Escape("__nav");
             QueryTranslator.RecordReferencedTable(owned.TableName);
             var fkPredicate = $"{depAlias}.{owned.EscForeignKeyColumn} = {_outerAlias}.{ownerKey.EscCol}";
+            // A predicate (`Count(l => p)`, `Where(l => p).Sum(...)`) restricts which owned rows the aggregate
+            // ranges over. RenderNavigationFilter resolves the owned columns through GetMapping(ownedType) —
+            // the same hardened nav-filter grammar the relation path uses, so closures mint @cp params and
+            // renamed/converter owned columns bind correctly. A shape the grammar can't render throws there.
+            var filterSql = filter != null ? RenderNavigationFilter(filter, depAlias) : null;
+            var whereSql = filterSql != null ? $"{fkPredicate} AND ({filterSql})" : fkPredicate;
 
             if (method is nameof(Queryable.Count) or nameof(Queryable.LongCount))
             {
                 sb.Append("(SELECT COUNT(*) FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(fkPredicate).Append(')');
+                  .Append(" WHERE ").Append(whereSql).Append(')');
                 return true;
             }
             if (method is nameof(Queryable.Any))
             {
                 sb.Append("(SELECT CASE WHEN EXISTS(SELECT 1 FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
-                  .Append(" WHERE ").Append(fkPredicate).Append(") THEN 1 ELSE 0 END)");
+                  .Append(" WHERE ").Append(whereSql).Append(") THEN 1 ELSE 0 END)");
                 return true;
             }
 
@@ -202,7 +204,7 @@ namespace nORM.Query
                 aggCall = $"{sqlAgg}({operandSql})";
             }
             sb.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
-              .Append(" WHERE ").Append(fkPredicate).Append(')');
+              .Append(" WHERE ").Append(whereSql).Append(')');
             return true;
         }
 

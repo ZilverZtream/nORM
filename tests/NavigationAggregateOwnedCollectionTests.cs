@@ -97,11 +97,90 @@ public class NavigationAggregateOwnedCollectionTests
     }
 
     [Fact]
-    public void Filtered_owned_aggregate_fails_loud_not_silently_wrong()
+    public void Filtered_owned_Count_restricts_the_subquery()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        var rows = ctx.Query<Order>()
+            .Select(o => new { o.Id, N = o.Lines.Count(l => l.Amount > 60) })
+            .ToList().OrderBy(r => r.Id).ToList();
+        // > 60: order 1 has both (100, 75) → 2; order 2 has 50 → 0; order 3 none → 0.
+        Assert.Equal(new[] { 2, 0, 0 }, rows.Select(r => r.N).ToArray());
+    }
+
+    [Fact]
+    public void Filtered_owned_Sum_with_a_closure_threshold_binds_and_rebinds()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        var threshold = 60;
+        var rows = ctx.Query<Order>()
+            .Select(o => new { o.Id, Total = o.Lines.Where(l => l.Amount > threshold).Sum(l => l.Amount) })
+            .ToList().OrderBy(r => r.Id).ToList();
+        Assert.Equal(175, rows[0].Total);   // 100 + 75 (both > 60)
+        Assert.Equal(0, rows[1].Total);     // 50 excluded
+    }
+
+    [Fact]
+    public void All_over_owned_still_fails_loud_not_silently_wrong()
     {
         using var ctx = Ctx(out var cn);
         using var _cn = cn;
         Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Order>().Select(o => new { o.Id, N = o.Lines.Count(l => l.Amount > 60) }).ToList());
+            ctx.Query<Order>().Select(o => new { o.Id, B = o.Lines.All(l => l.Amount > 0) }).ToList());
+    }
+
+    // ── A fluently-renamed owned column must resolve to its mapped name in BOTH the selector and the
+    //    filter, or a filtered aggregate silently targets a non-existent column. ──────────────────────
+    private static DbContext CtxRenamed(out SqliteConnection cn)
+    {
+        cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE RocOrder (Id INTEGER PRIMARY KEY, Customer TEXT NOT NULL);
+                CREATE TABLE RocLine (Id INTEGER PRIMARY KEY, OrderId INTEGER NOT NULL, amt INTEGER NOT NULL);
+                INSERT INTO RocOrder VALUES (1,'a'),(2,'b');
+                INSERT INTO RocLine VALUES (1,1,100),(2,1,75),(3,2,50);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        return new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<RocOrder>().HasKey(o => o.Id);
+                mb.Entity<RocOrder>().OwnsMany<RocLine>(o => o.Lines, tableName: "RocLine", foreignKey: "OrderId",
+                    buildAction: b => b.Property(x => x.Amount).HasColumnName("amt"));
+            }
+        });
+    }
+
+    [Fact]
+    public void Filtered_aggregate_honours_a_renamed_owned_column()
+    {
+        using var ctx = CtxRenamed(out var cn);
+        using var _cn = cn;
+        var rows = ctx.Query<RocOrder>()
+            .Select(o => new { o.Id, N = o.Lines.Count(l => l.Amount > 60), Total = o.Lines.Sum(l => l.Amount) })
+            .ToList().OrderBy(r => r.Id).ToList();
+        // Column is physically "amt": order 1 has 100,75 (both > 60) → N=2, Total=175; order 2 → N=0, Total=50.
+        Assert.Equal(new[] { 2, 0 }, rows.Select(r => r.N).ToArray());
+        Assert.Equal(new[] { 175, 50 }, rows.Select(r => r.Total).ToArray());
+    }
+
+    [Table("RocOrder")]
+    private class RocOrder
+    {
+        [Key] public int Id { get; set; }
+        public string Customer { get; set; } = "";
+        public List<RocLine> Lines { get; set; } = new();
+    }
+
+    private class RocLine
+    {
+        public int Id { get; set; }
+        public int Amount { get; set; }
     }
 }
