@@ -364,9 +364,9 @@ namespace nORM.Query
                     throw new InvalidOperationException(
                         "Navigation filter inside a projection subquery supports comparisons (==, !=, <, >, <=, >=), " +
                         "`IS [NOT] NULL` (`== null` / `!= null`), `StartsWith`/`EndsWith`/`Contains` with a constant " +
-                        "pattern, bare boolean flags, `!`, and `&&`/`||` compositions. Shapes like `list.Contains(col)` " +
-                        "(IN) and enum comparisons aren't supported here yet — filter after materialization, or wrap " +
-                        "with `ClientEvaluationPolicy.Allow`.");
+                        "pattern, enum comparisons, bare boolean flags, `!`, and `&&`/`||` compositions. Shapes like " +
+                        "`list.Contains(col)` (IN) and comparisons on value-converter columns aren't supported here " +
+                        "yet — filter after materialization, or wrap with `ClientEvaluationPolicy.Allow`.");
             }
         }
 
@@ -376,6 +376,27 @@ namespace nORM.Query
         /// predicate, reusing <see cref="EmitStringMatch"/>. Returns false for any other shape (variable
         /// pattern, non-element receiver) so the caller falls through to the unsupported-shape error.
         /// </summary>
+        /// <summary>
+        /// True when the given filter-element member maps to a column with a value converter — or when that
+        /// can't be verified (no context, unresolvable mapping). Used to keep enum comparisons on
+        /// converter-backed columns fail-loud rather than render a comparison against the raw underlying
+        /// value, which would be silently wrong.
+        /// </summary>
+        private bool MemberColumnHasConverter(MemberExpression member)
+        {
+            if (_ctx == null || member.Member.DeclaringType == null)
+                return true;
+            try
+            {
+                var map = _ctx.GetMapping(member.Member.DeclaringType);
+                return !map.ColumnsByName.TryGetValue(member.Member.Name, out var col) || col.Converter != null;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
         /// <summary>True when the expression is a null literal (possibly wrapped in a nullable Convert).</summary>
         private static bool IsNullConstant(Expression e)
         {
@@ -410,6 +431,20 @@ namespace nORM.Query
 
         private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias)
         {
+            // Peel the enum→underlying Convert the compiler inserts for `l.EnumCol == EnumValue` so the plain
+            // column is rendered (the enum constant on the other side folds to its underlying integer). Only
+            // when the column has NO value converter — a converter stores a different provider value, so
+            // comparing the column to the raw underlying number would be silently wrong; those stay
+            // unsupported (fall through to the error).
+            if (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } enumConv
+                && enumConv.Operand is MemberExpression enumMember
+                && enumMember.Expression == elementParam
+                && (Nullable.GetUnderlyingType(enumMember.Type) ?? enumMember.Type).IsEnum
+                && !MemberColumnHasConverter(enumMember))
+            {
+                expr = enumMember;
+            }
+
             // Member access on the element parameter → column on the dependent.
             if (expr is MemberExpression me && me.Expression == elementParam)
             {
