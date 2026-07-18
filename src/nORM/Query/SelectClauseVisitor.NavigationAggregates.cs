@@ -76,7 +76,134 @@ namespace nORM.Query
             if (TryVisitSelectedNavigationScalarAggregate(node, sb))
                 return true;
 
-            return TryVisitDirectNavigationScalarAggregate(node, sb);
+            if (TryVisitDirectNavigationScalarAggregate(node, sb))
+                return true;
+
+            return TryVisitOwnedCollectionAggregate(node, sb);
+        }
+
+        /// <summary>
+        /// Handles a projected aggregate over an OWNED collection (OwnsMany) — <c>o.Lines.Count()</c>,
+        /// <c>o.Lines.Any()</c>, <c>o.Lines.Sum(l =&gt; l.Amount)</c> (and Min/Max/Average). Owned collections
+        /// live in <see cref="TableMapping.OwnedCollections"/>, NOT <see cref="TableMapping.Relations"/>, so
+        /// they never matched the relation-based paths above and fell through to the outer-aggregate handler,
+        /// which silently collapsed the whole result to a single wrong row. This emits the correct correlated
+        /// subquery against the owned child table, and FAILS LOUD (never silent-wrong) for the sub-shapes not
+        /// yet supported here (filtered aggregates, composite owner keys, All, non-member selectors).
+        /// </summary>
+        private bool TryVisitOwnedCollectionAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            var method = node.Method.Name;
+            if (method is not (nameof(Queryable.Count) or nameof(Queryable.LongCount) or nameof(Queryable.Any)
+                               or nameof(Queryable.All) or nameof(Queryable.Sum) or nameof(Queryable.Min)
+                               or nameof(Queryable.Max) or nameof(Queryable.Average)))
+                return false;
+            if (node.Arguments.Count < 1)
+                return false;
+
+            var src = node.Arguments[0];
+            LambdaExpression? selector = null;
+            LambdaExpression? filter = null;
+
+            // `o.Lines.Select(l => l.X).Agg()`
+            if (src is MethodCallExpression selCall && selCall.Method.Name == nameof(Queryable.Select)
+                && selCall.Arguments.Count == 2 && StripQuotes(selCall.Arguments[1]) is LambdaExpression selLambda)
+            {
+                selector = selLambda;
+                src = selCall.Arguments[0];
+            }
+            // `o.Lines.Where(l => pred).Agg()`
+            if (src is MethodCallExpression whereCall && whereCall.Method.Name == nameof(Queryable.Where)
+                && whereCall.Arguments.Count == 2 && StripQuotes(whereCall.Arguments[1]) is LambdaExpression whereLambda)
+            {
+                filter = whereLambda;
+                src = whereCall.Arguments[0];
+            }
+            // Direct selector/predicate argument: `o.Lines.Sum(l => l.X)`, `o.Lines.Count(l => pred)`.
+            if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression argLambda)
+            {
+                if (method is nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max) or nameof(Queryable.Average))
+                    selector ??= argLambda;
+                else
+                    filter ??= argLambda;
+            }
+
+            if (src is not MemberExpression navMember || navMember.Expression is not ParameterExpression)
+                return false;
+
+            var owned = _mapping.OwnedCollections.FirstOrDefault(o => o.NavigationProperty.Name == navMember.Member.Name);
+            if (owned == null)
+                return false;
+
+            // From here it IS an owned-collection aggregate: emit a correct correlated subquery or fail loud —
+            // never fall through to the outer-aggregate handler (which silently collapses to one wrong row).
+            if (_mapping.KeyColumns.Length != 1)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet. " +
+                    "Materialise the owned items and aggregate them client-side.");
+            if (filter != null)
+                throw new NormUnsupportedFeatureException(
+                    $"A filtered aggregate over the owned collection '{navMember.Member.Name}' isn't supported yet. " +
+                    "Materialise the owned items and aggregate them client-side.");
+            if (method is nameof(Queryable.All))
+                throw new NormUnsupportedFeatureException(
+                    $"All(...) over the owned collection '{navMember.Member.Name}' isn't supported yet. " +
+                    "Materialise the owned items and evaluate it client-side.");
+
+            var ownerKey = _mapping.KeyColumns[0];
+            var depAlias = _provider.Escape("__nav");
+            QueryTranslator.RecordReferencedTable(owned.TableName);
+            var fkPredicate = $"{depAlias}.{owned.EscForeignKeyColumn} = {_outerAlias}.{ownerKey.EscCol}";
+
+            if (method is nameof(Queryable.Count) or nameof(Queryable.LongCount))
+            {
+                sb.Append("(SELECT COUNT(*) FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
+                  .Append(" WHERE ").Append(fkPredicate).Append(')');
+                return true;
+            }
+            if (method is nameof(Queryable.Any))
+            {
+                sb.Append("(SELECT CASE WHEN EXISTS(SELECT 1 FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
+                  .Append(" WHERE ").Append(fkPredicate).Append(") THEN 1 ELSE 0 END)");
+                return true;
+            }
+
+            // Sum / Min / Max / Average with a simple member selector on the owned element.
+            var selBody = selector?.Body;
+            while (selBody is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } conv)
+                selBody = conv.Operand;
+            if (selBody is not MemberExpression selMember || selMember.Expression != selector!.Parameters[0])
+                throw new NormUnsupportedFeatureException(
+                    $"{method}(...) over the owned collection '{navMember.Member.Name}' requires a simple member selector " +
+                    "(e.g. l => l.Amount). Materialise the owned items and aggregate them client-side for anything richer.");
+            var col = owned.Columns.FirstOrDefault(c => c.Prop.Name == selMember.Member.Name);
+            if (col == null)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the owned collection '{navMember.Member.Name}'.");
+
+            var sqlAgg = method switch
+            {
+                nameof(Queryable.Sum) => "SUM",
+                nameof(Queryable.Min) => "MIN",
+                nameof(Queryable.Max) => "MAX",
+                _ => "AVG",
+            };
+            var operandSql = $"{depAlias}.{col.EscCol}";
+            var aggType = Nullable.GetUnderlyingType(selector!.Body.Type) ?? selector.Body.Type;
+            string aggCall;
+            if (aggType == typeof(decimal))
+            {
+                aggCall = _provider.DecimalAggregateSql(sqlAgg, operandSql);
+            }
+            else
+            {
+                if (sqlAgg == "AVG")
+                    operandSql = _provider.AverageAggregateOperand(operandSql, selector.Body.Type);
+                aggCall = $"{sqlAgg}({operandSql})";
+            }
+            sb.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
+              .Append(" WHERE ").Append(fkPredicate).Append(')');
+            return true;
         }
 
         private bool TryVisitSelectedNavigationScalarAggregate(MethodCallExpression node, StringBuilder sb)
