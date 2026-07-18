@@ -79,7 +79,156 @@ namespace nORM.Query
             if (TryVisitDirectNavigationScalarAggregate(node, sb))
                 return true;
 
-            return TryVisitOwnedCollectionAggregate(node, sb);
+            if (TryVisitOwnedCollectionAggregate(node, sb))
+                return true;
+
+            return TryVisitManyToManyAggregate(node, sb);
+        }
+
+        /// <summary>
+        /// Parses an aggregate method call whose source is a navigation collection into its parts —
+        /// the navigation member, an optional element selector (<c>Select(x =&gt; x.Col)</c>), and an optional
+        /// filter (a leading <c>Where(...)</c> or a direct predicate argument). Returns false when the source
+        /// isn't a simple <c>param.Nav</c> access. Shared by the owned-collection and many-to-many emit paths.
+        /// </summary>
+        private static bool TryParseCollectionAggregate(MethodCallExpression node, out MemberExpression navMember,
+            out LambdaExpression? selector, out LambdaExpression? filter)
+        {
+            navMember = null!;
+            selector = null;
+            filter = null;
+            var method = node.Method.Name;
+            if (node.Arguments.Count < 1)
+                return false;
+
+            var src = node.Arguments[0];
+            if (src is MethodCallExpression selCall && selCall.Method.Name == nameof(Queryable.Select)
+                && selCall.Arguments.Count == 2 && StripQuotes(selCall.Arguments[1]) is LambdaExpression selLambda)
+            {
+                selector = selLambda;
+                src = selCall.Arguments[0];
+            }
+            if (src is MethodCallExpression whereCall && whereCall.Method.Name == nameof(Queryable.Where)
+                && whereCall.Arguments.Count == 2 && StripQuotes(whereCall.Arguments[1]) is LambdaExpression whereLambda)
+            {
+                filter = whereLambda;
+                src = whereCall.Arguments[0];
+            }
+            if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression argLambda)
+            {
+                if (method is nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max) or nameof(Queryable.Average))
+                    selector ??= argLambda;
+                else
+                    filter ??= argLambda;
+            }
+
+            if (src is not MemberExpression member || member.Expression is not ParameterExpression)
+                return false;
+            navMember = member;
+            return true;
+        }
+
+        /// <summary>
+        /// Handles a projected aggregate over a MANY-TO-MANY collection — <c>p.Tags.Count()</c>,
+        /// <c>p.Tags.Any()</c>, <c>p.Tags.Sum(t =&gt; t.Weight)</c>. M2M links live in
+        /// <see cref="TableMapping.ManyToManyJoins"/>, not <see cref="TableMapping.Relations"/>, so like owned
+        /// collections they matched none of the relation-based paths and fell through to the outer-aggregate
+        /// handler, silently collapsing the result to a single wrong row. This emits a correlated subquery
+        /// that joins the bridge table to the related table (so the right entity's global/tenant filters
+        /// restrict visibility, matching the loaded collection) and FAILS LOUD for the sub-shapes not yet
+        /// supported (composite keys, All, non-member selectors) — never silent-wrong.
+        /// </summary>
+        private bool TryVisitManyToManyAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            var method = node.Method.Name;
+            if (method is not (nameof(Queryable.Count) or nameof(Queryable.LongCount) or nameof(Queryable.Any)
+                               or nameof(Queryable.All) or nameof(Queryable.Sum) or nameof(Queryable.Min)
+                               or nameof(Queryable.Max) or nameof(Queryable.Average)))
+                return false;
+            if (_ctx == null || !TryParseCollectionAggregate(node, out var navMember, out var selector, out var filter))
+                return false;
+
+            var jtm = _mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == navMember.Member.Name);
+            if (jtm == null)
+                return false;
+
+            // It IS a many-to-many aggregate: emit a correct correlated subquery or fail loud — never fall
+            // through to the outer-aggregate handler (which silently collapses to one wrong row).
+            if (jtm.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet. " +
+                    "Materialise the related items and aggregate them client-side.");
+            if (method is nameof(Queryable.All))
+                throw new NormUnsupportedFeatureException(
+                    $"All(...) over the many-to-many collection '{navMember.Member.Name}' isn't supported yet. " +
+                    "Materialise the related items and evaluate it client-side.");
+
+            var rightMap = _ctx.GetMapping(jtm.RightType);
+            var jtAlias = _provider.Escape("__m2mj");
+            var rightAlias = _provider.Escape("__m2mr");
+            QueryTranslator.RecordReferencedTable(jtm.TableName);
+            QueryTranslator.RecordReferencedTable(rightMap.TableName);
+
+            var ownerKey = jtm.LeftKeyColumns[0];
+            var rightKey = jtm.RightKeyColumns[0];
+            // Join the bridge table to the related table so the right entity's visibility filters apply and
+            // scalar selectors can reach its columns — mirrors how the loaded m2m collection is built.
+            var fromJoin = $"{jtm.EscTableName} {jtAlias} JOIN {QueryTranslator.TemporalTableSource(rightMap)} {rightAlias} " +
+                           $"ON {rightAlias}.{rightKey.EscCol} = {jtAlias}.{jtm.EscRightFkColumn}";
+
+            var conds = new List<string> { $"{jtAlias}.{jtm.EscLeftFkColumn} = {_outerAlias}.{ownerKey.EscCol}" };
+            var rightVisibility = GlobalFilterFragment.CombineWithTenant(_ctx, jtm.RightType);
+            if (rightVisibility != null)
+                conds.Add($"({RenderNavigationFilter(rightVisibility, rightAlias)})");
+            if (filter != null)
+                conds.Add($"({RenderNavigationFilter(filter, rightAlias)})");
+            var whereSql = string.Join(" AND ", conds);
+
+            if (method is nameof(Queryable.Count) or nameof(Queryable.LongCount))
+            {
+                sb.Append("(SELECT COUNT(*) FROM ").Append(fromJoin).Append(" WHERE ").Append(whereSql).Append(')');
+                return true;
+            }
+            if (method is nameof(Queryable.Any))
+            {
+                sb.Append("(SELECT CASE WHEN EXISTS(SELECT 1 FROM ").Append(fromJoin)
+                  .Append(" WHERE ").Append(whereSql).Append(") THEN 1 ELSE 0 END)");
+                return true;
+            }
+
+            var selBody = selector?.Body;
+            while (selBody is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } conv)
+                selBody = conv.Operand;
+            if (selBody is not MemberExpression selMember || selMember.Expression != selector!.Parameters[0])
+                throw new NormUnsupportedFeatureException(
+                    $"{method}(...) over the many-to-many collection '{navMember.Member.Name}' requires a simple member selector " +
+                    "(e.g. t => t.Weight). Materialise the related items and aggregate them client-side for anything richer.");
+            if (!rightMap.ColumnsByName.TryGetValue(selMember.Member.Name, out var col))
+                throw new NormUnsupportedFeatureException(
+                    $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the related entity '{jtm.RightType.Name}'.");
+
+            var sqlAgg = method switch
+            {
+                nameof(Queryable.Sum) => "SUM",
+                nameof(Queryable.Min) => "MIN",
+                nameof(Queryable.Max) => "MAX",
+                _ => "AVG",
+            };
+            var operandSql = $"{rightAlias}.{col.EscCol}";
+            var aggType = Nullable.GetUnderlyingType(selector!.Body.Type) ?? selector.Body.Type;
+            string aggCall;
+            if (aggType == typeof(decimal))
+            {
+                aggCall = _provider.DecimalAggregateSql(sqlAgg, operandSql);
+            }
+            else
+            {
+                if (sqlAgg == "AVG")
+                    operandSql = _provider.AverageAggregateOperand(operandSql, selector.Body.Type);
+                aggCall = $"{sqlAgg}({operandSql})";
+            }
+            sb.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(fromJoin).Append(" WHERE ").Append(whereSql).Append(')');
+            return true;
         }
 
         /// <summary>
@@ -98,37 +247,7 @@ namespace nORM.Query
                                or nameof(Queryable.All) or nameof(Queryable.Sum) or nameof(Queryable.Min)
                                or nameof(Queryable.Max) or nameof(Queryable.Average)))
                 return false;
-            if (node.Arguments.Count < 1)
-                return false;
-
-            var src = node.Arguments[0];
-            LambdaExpression? selector = null;
-            LambdaExpression? filter = null;
-
-            // `o.Lines.Select(l => l.X).Agg()`
-            if (src is MethodCallExpression selCall && selCall.Method.Name == nameof(Queryable.Select)
-                && selCall.Arguments.Count == 2 && StripQuotes(selCall.Arguments[1]) is LambdaExpression selLambda)
-            {
-                selector = selLambda;
-                src = selCall.Arguments[0];
-            }
-            // `o.Lines.Where(l => pred).Agg()`
-            if (src is MethodCallExpression whereCall && whereCall.Method.Name == nameof(Queryable.Where)
-                && whereCall.Arguments.Count == 2 && StripQuotes(whereCall.Arguments[1]) is LambdaExpression whereLambda)
-            {
-                filter = whereLambda;
-                src = whereCall.Arguments[0];
-            }
-            // Direct selector/predicate argument: `o.Lines.Sum(l => l.X)`, `o.Lines.Count(l => pred)`.
-            if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression argLambda)
-            {
-                if (method is nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max) or nameof(Queryable.Average))
-                    selector ??= argLambda;
-                else
-                    filter ??= argLambda;
-            }
-
-            if (src is not MemberExpression navMember || navMember.Expression is not ParameterExpression)
+            if (!TryParseCollectionAggregate(node, out var navMember, out var selector, out var filter))
                 return false;
 
             var owned = _mapping.OwnedCollections.FirstOrDefault(o => o.NavigationProperty.Name == navMember.Member.Name);
