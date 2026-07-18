@@ -344,8 +344,13 @@ namespace nORM.Query
                     return $"{RenderFilterSide(nullOperand, elementParam, depAlias)} {nullTest}";
 
                 case BinaryExpression be:
-                    var lhs = RenderFilterSide(be.Left, elementParam, depAlias);
-                    var rhs = RenderFilterSide(be.Right, elementParam, depAlias);
+                    // If one side is a value-converter column, the OTHER side's value must be converted to the
+                    // provider representation, or `col = <rawModelValue>` compares against the wrong stored
+                    // value and matches nothing (silent-wrong). Non-converter columns pass null → unchanged.
+                    var leftColConv = ColumnConverterFor(be.Left, elementParam);
+                    var rightColConv = ColumnConverterFor(be.Right, elementParam);
+                    var lhs = RenderFilterSide(be.Left, elementParam, depAlias, valueConverter: rightColConv);
+                    var rhs = RenderFilterSide(be.Right, elementParam, depAlias, valueConverter: leftColConv);
                     var op = be.NodeType switch
                     {
                         ExpressionType.Equal => "=",
@@ -397,6 +402,29 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// The value converter of the filter-element column the expression accesses, or null when the
+        /// expression isn't such a column, has no converter, or can't be resolved. Used to convert the
+        /// opposing operand of a comparison to the provider representation.
+        /// </summary>
+        private IValueConverter? ColumnConverterFor(Expression expr, ParameterExpression elementParam)
+        {
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (_ctx == null || expr is not MemberExpression me || me.Expression != elementParam
+                || me.Member.DeclaringType == null)
+                return null;
+            try
+            {
+                var map = _ctx.GetMapping(me.Member.DeclaringType);
+                return map.ColumnsByName.TryGetValue(me.Member.Name, out var col) ? col.Converter : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         /// <summary>True when the expression is a null literal (possibly wrapped in a nullable Convert).</summary>
         private static bool IsNullConstant(Expression e)
         {
@@ -429,7 +457,7 @@ namespace nORM.Query
             return true;
         }
 
-        private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias)
+        private string RenderFilterSide(Expression expr, ParameterExpression elementParam, string depAlias, IValueConverter? valueConverter = null)
         {
             // Peel the enum→underlying Convert the compiler inserts around either operand of an enum
             // comparison (`l.EnumCol == EnumValue`, or `== capturedEnum`) so the plain column / captured
@@ -461,11 +489,12 @@ namespace nORM.Query
                 return $"{depAlias}.{_provider.Escape(colName)}";
             }
             // Inline constants are plan-cache-safe literals (the constant's identity is part of
-            // the expression fingerprint).
+            // the expression fingerprint). When compared against a value-converter column, the constant is
+            // converted to the provider representation so `col = <converted>` matches the stored value.
             if (expr is ConstantExpression ce)
-                return FormatLiteral(ce.Value);
+                return FormatLiteral(valueConverter != null ? valueConverter.ConvertToProvider(ce.Value) : ce.Value);
             if (expr is UnaryExpression { NodeType: ExpressionType.Convert } u && u.Operand is ConstantExpression ce2)
-                return FormatLiteral(ce2.Value);
+                return FormatLiteral(valueConverter != null ? valueConverter.ConvertToProvider(ce2.Value) : ce2.Value);
             // CLOSURE captures must NOT literal-ize: plans are cached by fingerprint, so a baked
             // value would freeze the first run's filter into every later run. Emit a compiled
             // parameter through the shared channel when available (same contract as the main
@@ -481,6 +510,10 @@ namespace nORM.Query
                     SharedParams[paramName] = DBNull.Value;
                     SharedCompiledParams.Add(paramName);
                     QueryTranslator.RecordClosureSlot(closureMe, paramName);
+                    // Compared against a value-converter column: record the converter so the extractor binds
+                    // the provider representation of the captured value, not the raw model value.
+                    if (valueConverter != null && SharedParamConverters != null)
+                        SharedParamConverters[paramName] = valueConverter;
                     return paramName;
                 }
                 return FormatLiteral(closureVal);
