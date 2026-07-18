@@ -33,6 +33,17 @@ namespace nORM.Query
                 // Try to find the relation for this navigation property
                 if (!_mapping.Relations.TryGetValue(collectionProperty.Name, out var relation))
                 {
+                    // Owned (OwnsMany) and many-to-many collections use separate mapping structures the
+                    // split-query stitch doesn't cover. They are admitted as shaped-collection bindings
+                    // upstream, so silently skipping here left the materializer expecting a stitched column
+                    // that never arrived — an opaque ordinal error at read time. Fail loud with an actionable
+                    // message instead of crashing (full shaped-projection support for these is a follow-up).
+                    var isOwned = _mapping.OwnedCollections.Any(o => o.NavigationProperty.Name == collectionProperty.Name);
+                    var isManyToMany = _mapping.ManyToManyJoins.Any(j => j.LeftNavPropertyName == collectionProperty.Name);
+                    if (isOwned || isManyToMany)
+                        throw new NormUnsupportedFeatureException(
+                            $"Projecting the {(isOwned ? "owned" : "many-to-many")} collection '{collectionProperty.Name}' " +
+                            "into a shaped result isn't supported yet. Load it with Include(...), or fetch it in a separate query.");
                     continue; // Skip if relation not found
                 }
 
