@@ -213,13 +213,19 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// FROM source for a navigation subquery's dependent table. These emit paths
-        /// build identifiers from attributes rather than a TableMapping, so the AsOf
-        /// history-window substitution resolves the mapping only when a temporal
-        /// scope is active — the non-temporal path is byte-identical to before.
+        /// FROM source for a navigation subquery's dependent table. When a DbContext is
+        /// available this resolves through the authoritative <see cref="TableMapping"/>
+        /// (via <see cref="QueryTranslator.TemporalTableSource"/>, which yields the live
+        /// <see cref="TableMapping.EscTable"/> normally and the AsOf history window while a
+        /// temporal scope is active) — so a fluent <c>ToTable()</c> override, schema, and the
+        /// provider's identifier escaping are all honoured. The attribute-derived
+        /// <paramref name="tableName"/> is only the fallback when no context is present; it
+        /// misses fluent table names and multi-segment schemas, so it must not be used when
+        /// the mapping is reachable. This mirrors the two-hop emit, which already routes its
+        /// hop tables through <see cref="QueryTranslator.TemporalTableSource"/> unconditionally.
         /// </summary>
         private string NavigationTableSource(Type dependentType, string tableName)
-            => _ctx != null && QueryTranslator.HasActiveTemporalScope
+            => _ctx != null
                 ? QueryTranslator.TemporalTableSource(_ctx.GetMapping(dependentType))
                 : _provider.Escape(tableName);
 
