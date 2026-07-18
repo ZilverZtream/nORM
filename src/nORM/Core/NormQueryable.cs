@@ -552,6 +552,38 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Adds a comment tag to the generated SQL for this query, matching EF Core's <c>TagWith</c>. The
+        /// tag is emitted as a leading SQL line comment (injection-safe: each line is prefixed with
+        /// <c>-- </c>), which is invaluable for correlating a query in database logs, an APM trace, or a
+        /// slow-query report back to the source. Multiple <c>TagWith</c> calls accumulate. Has no effect on
+        /// results.
+        /// </summary>
+        /// <typeparam name="T">The query element type.</typeparam>
+        /// <param name="source">The source query.</param>
+        /// <param name="tag">The comment to embed in the generated SQL.</param>
+        /// <returns>A query that emits the tag comment in its SQL.</returns>
+        [RequiresDynamicCode("nORM TagWith emits a MakeGenericMethod marker call; not NativeAOT-compatible.")]
+        [RequiresUnreferencedCode("nORM TagWith uses reflection to resolve the open generic marker method; trimming may remove it.")]
+        public static IQueryable<T> TagWith<T>(this IQueryable<T> source, string tag)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(tag);
+            if (source.Provider is not nORM.Query.NormQueryProvider)
+                throw new NormUsageException(
+                    "TagWith can only be used with nORM queries. " +
+                    "Make sure you started with context.Query<T>() or context.Set<T>().");
+
+            // Self-referential marker call (like IgnoreQueryFilters): a pass-through translator captures
+            // the tag and prepends it to the SQL as a line comment, then strips the marker.
+            var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
+                .GetGenericMethodDefinition()
+                .MakeGenericMethod(typeof(T));
+            var call = Expression.Call(method, source.Expression, Expression.Constant(tag));
+            return source.Provider.CreateQuery<T>(call);
+        }
+
+        /// <summary>
         /// Specifies an additional navigation property to include after a previous <c>Include</c> call.
         /// </summary>
         /// <typeparam name="TEntity">Root entity type of the query.</typeparam>

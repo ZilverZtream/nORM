@@ -175,6 +175,41 @@ namespace nORM.Query
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private sealed class TagWithTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Captures the tag from <c>TagWith(source, tag)</c> and prepends it to the generated SQL as a
+            /// line comment (see <see cref="ApplyQueryTags"/>). Pass-through otherwise.
+            /// </summary>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                if (node.Arguments.Count >= 2 && TryGetConstantValue(node.Arguments[1], out var tagValue) && tagValue is string tag && tag.Length > 0)
+                    (t._queryTags ??= new List<string>()).Add(tag);
+                return t.Visit(node.Arguments[0]);
+            }
+        }
+
+        /// <summary>
+        /// Prepends any TagWith(...) comments to <paramref name="sql"/> as SQL line comments. Line comments
+        /// consume to end of line, so each line of every tag is prefixed with <c>-- </c> (and embedded
+        /// carriage returns/newlines are normalized) — a tag can never break out of the comment into SQL.
+        /// </summary>
+        private string ApplyQueryTags(string sql)
+        {
+            if (_queryTags == null || _queryTags.Count == 0)
+                return sql;
+            var sb = new System.Text.StringBuilder();
+            foreach (var tag in _queryTags)
+            {
+                foreach (var line in tag.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+                    sb.Append("-- ").Append(line).Append('\n');
+            }
+            sb.Append('\n').Append(sql);
+            return sb.ToString();
+        }
+
         private sealed class IgnoreQueryFiltersTranslator : IMethodCallTranslator
         {
             /// <summary>

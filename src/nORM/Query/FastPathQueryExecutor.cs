@@ -114,6 +114,9 @@ namespace nORM.Query
             // pipeline, which wraps execution in the strategy.
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
                 return false;
+            // TagWith injects a SQL comment the fast path does not emit; defer to the full pipeline.
+            if (ContainsTagWith(expr))
+                return false;
             if (IsSimpleCountPattern(expr, out var hasPredicate))
             {
                 if (hasPredicate)
@@ -150,6 +153,9 @@ namespace nORM.Query
             // silently dead for exactly the most common queries. Fall back to the full
             // pipeline, which wraps execution in the strategy.
             if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
+                return false;
+            // TagWith injects a SQL comment the fast path does not emit; defer to the full pipeline.
+            if (ContainsTagWith(expr))
                 return false;
 
             var cacheUnsupportedMiss = ShouldCacheUnsupportedListMiss(expr);
@@ -239,6 +245,18 @@ namespace nORM.Query
                 break;
             }
             return e;
+        }
+
+        /// <summary>True when the query chain contains a TagWith marker anywhere along its source spine.</summary>
+        private static bool ContainsTagWith(Expression e)
+        {
+            while (e is MethodCallExpression m && m.Arguments.Count > 0)
+            {
+                if (m.Method.Name == "TagWith")
+                    return true;
+                e = m.Object ?? m.Arguments[0];
+            }
+            return false;
         }
         /// <summary>
         /// Returns a cached sync materializer delegate for the given entity type.

@@ -522,7 +522,7 @@ namespace nORM.Query
                 }
 
                 var plan = new QueryPlan(
-                    _t._sql.ToString(),
+                    _t.ApplyQueryTags(_t._sql.ToString()),
                     (IReadOnlyDictionary<string, object>)_t._params,
                     _t._compiledParams,
                     materializer,

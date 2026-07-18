@@ -116,6 +116,7 @@ namespace nORM.Query
                 _singleResult = false;
                 _noTracking = false;
                 _splitQuery = false;
+                _queryTags = null;
                 _tables = new HashSet<string>();
                 _clauses = new SqlBuilder();
                 _contextStack.Clear();
@@ -177,6 +178,7 @@ namespace nORM.Query
                 _singleResult = false;
                 _noTracking = false;
                 _splitQuery = false;
+                _queryTags = null;
                 _estimatedTimeout = default;
                 _isCacheable = false;
                 _cacheExpiration = null;

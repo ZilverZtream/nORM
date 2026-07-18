@@ -139,6 +139,8 @@ namespace nORM.Query
         private bool _singleResult;
         private bool _noTracking;
         private bool _splitQuery;
+        // Comments captured from TagWith(...) and prepended to the generated SQL as line comments.
+        private List<string>? _queryTags;
         // Set by TakeLast/SkipLast translators after flipping ORDER BY direction +
         // applying Take/Skip. The materializer reverses the final list so the caller
         // sees rows in the original ORDER BY direction.
