@@ -125,18 +125,39 @@ public class ShapedCollectionProjectionStage2ContractTests
     }
 
     [Fact]
-    public async Task Closure_capturing_element_projection_is_not_admitted()
+    public async Task Closure_capturing_element_projection_works_and_rebinds_across_executions()
     {
         using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); await using var ctx = Bootstrap(cn);
 
-        var factor = 10;
-        // The element projection captures `factor` — a cached materializer would freeze it, so this stays
-        // fail-loud rather than silently returning stale rows.
+        async Task<int[]> RunFor(int factor)
+        {
+            var dtos = await ctx.Query<Order>()
+                .Select(o => new OrderDto { Id = o.Id, Lines = o.Lines.Select(l => new LineDto { Sku = l.Sku, Qty = l.Qty * factor }).ToList() })
+                .ToListAsync();
+            return dtos.Single(d => d.Id == 1).Lines.OrderBy(l => l.Sku).Select(l => l.Qty).ToArray();
+        }
+
+        // The element projection captures `factor`. The plan is marked non-cacheable so a second execution
+        // with a different factor re-binds it — a frozen cached delegate would replay the first run's values.
+        Assert.Equal(new[] { 30, 80, 50 }, await RunFor(10));   // 3,8,5 * 10
+        Assert.Equal(new[] { 6, 16, 10 }, await RunFor(2));     // 3,8,5 * 2
+    }
+
+    [Fact]
+    public async Task Outer_row_referencing_element_projection_is_not_admitted()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); await using var ctx = Bootstrap(cn);
+
+        // The element projection reads the OUTER row (o.Id), which the child materializer cannot supply —
+        // this stays fail-loud rather than being mis-shaped.
         await Assert.ThrowsAnyAsync<Exception>(async () =>
             await ctx.Query<Order>()
-                .Select(o => new OrderDto { Id = o.Id, Lines = o.Lines.Select(l => new LineDto { Sku = l.Sku, Qty = l.Qty * factor }).ToList() })
+                .Select(o => new OrderOuterRefDto { Id = o.Id, Lines = o.Lines.Select(l => new LineWithOrderDto { Sku = l.Sku, OrderId = o.Id }).ToList() })
                 .ToListAsync());
     }
+
+    public class LineWithOrderDto { public string Sku { get; set; } = ""; public int OrderId { get; set; } }
+    public class OrderOuterRefDto { public int Id { get; set; } public List<LineWithOrderDto> Lines { get; set; } = new(); }
 
     [Fact]
     public async Task Bare_collection_projection_still_returns_entities()

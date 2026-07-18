@@ -70,6 +70,12 @@ namespace nORM.Query
                 _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
                 var dependentElementType = elementProjection?.ReturnType ?? elementType;
 
+                // A closure-capturing element projection is applied client-side; baking it into a cached
+                // delegate would replay the first execution's captured value. Mark the plan non-cacheable so
+                // it re-translates (a fresh projection with the current capture) on every execution.
+                if (elementProjection != null && SelectClauseVisitor.ProjectionCapturesClosures(elementProjection))
+                    _closureFoldedIntoSql = true;
+
                 // The projection's DTO property may be named differently from the navigation; the stitch
                 // assigns to THAT member (falling back to the nav when the binding member wasn't captured,
                 // e.g. a field-backed binding).

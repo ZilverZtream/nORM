@@ -107,29 +107,43 @@ namespace nORM.Query
 
         /// <summary>
         /// True when a shaped-collection element projection reads ONLY its own element parameter — no
-        /// closure captures (which would freeze stale into the cached materializer) and no references to
-        /// the outer projection row or any other parameter (which the child materializer cannot supply).
-        /// Such a projection is safe to apply client-side over each fetched child entity.
+        /// references to the outer projection row or any other parameter, which the child materializer
+        /// cannot supply. Closure captures ARE admitted: when present the owning plan is marked
+        /// non-cacheable (see <see cref="ProjectionCapturesClosures"/>) so the projection re-translates with
+        /// the current captured value each execution instead of freezing the first run's into a cached
+        /// delegate. The projection is applied client-side over each fetched child entity.
         /// </summary>
         internal static bool IsSafeChildProjection(LambdaExpression projection)
+            => AnalyzeChildProjection(projection).ReferencesOnlyElement;
+
+        /// <summary>
+        /// True when a shaped-collection element projection captures a closure variable. The owning plan
+        /// must then be non-cacheable so the captured value is re-read per execution rather than frozen
+        /// into the cached client-side projection delegate.
+        /// </summary>
+        internal static bool ProjectionCapturesClosures(LambdaExpression projection)
+            => AnalyzeChildProjection(projection).CapturesClosures;
+
+        private static ChildProjectionAnalysis AnalyzeChildProjection(LambdaExpression projection)
         {
-            var checker = new ChildProjectionSafetyChecker(projection.Parameters[0]);
-            checker.Visit(projection.Body);
-            return checker.IsSafe;
+            var analysis = new ChildProjectionAnalysis(projection.Parameters[0]);
+            analysis.Visit(projection.Body);
+            return analysis;
         }
 
-        private sealed class ChildProjectionSafetyChecker : ExpressionVisitor
+        private sealed class ChildProjectionAnalysis : ExpressionVisitor
         {
             private readonly ParameterExpression _elementParam;
-            public bool IsSafe { get; private set; } = true;
-            public ChildProjectionSafetyChecker(ParameterExpression elementParam) => _elementParam = elementParam;
+            public bool ReferencesOnlyElement { get; private set; } = true;
+            public bool CapturesClosures { get; private set; }
+            public ChildProjectionAnalysis(ParameterExpression elementParam) => _elementParam = elementParam;
 
             protected override Expression VisitMember(MemberExpression node)
             {
-                // A member whose root folds to a constant is a closure capture — unsafe (stale in cache).
+                // A member whose root folds to a constant is a closure capture.
                 if (QueryTranslator.TryGetConstantValue(node, out _))
                 {
-                    IsSafe = false;
+                    CapturesClosures = true;
                     return node; // do not descend into the captured constant
                 }
                 return base.VisitMember(node);
@@ -140,7 +154,7 @@ namespace nORM.Query
                 // Any parameter other than the element (the outer row, or a nested lambda's parameter)
                 // is not available to the child materializer.
                 if (node != _elementParam)
-                    IsSafe = false;
+                    ReferencesOnlyElement = false;
                 return node;
             }
         }
