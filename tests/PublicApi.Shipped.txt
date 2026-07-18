@@ -315,6 +315,7 @@ M:nORM.Core.ConnectionManager.Dispose():System.Void
 M:nORM.Core.ConnectionManager.GetReadConnectionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Data.Common.DbConnection}
 M:nORM.Core.ConnectionManager.GetWriteConnectionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Data.Common.DbConnection}
 M:nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{nORM.Core.DbContextTransaction}
+M:nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Core.DatabaseTopology.#ctor()
 M:nORM.Core.DatabaseTopology.DatabaseNode.#ctor()
 M:nORM.Core.DbConcurrencyException.#ctor()
