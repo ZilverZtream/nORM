@@ -238,6 +238,117 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Executes raw SQL and materializes each row into <typeparamref name="T"/>, which — unlike
+        /// <see cref="FromSqlRawAsync{T}(string, CancellationToken, object[])"/> — may be a scalar
+        /// (<c>int</c>, <c>string</c>, <c>Guid</c>, …) read from the first column, or any type with a
+        /// parameterless constructor whose settable properties are bound by column name. Matches EF Core's
+        /// <c>Database.SqlQueryRaw&lt;T&gt;</c> and is the raw-SQL path for counts, aggregates, and DTOs.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("SqlQuery materializes an arbitrary result type by reflection; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("SqlQuery reflects over the result type's constructor and properties; trimming may remove them. See docs/aot-trimming.md.")]
+        public Task<List<T>> SqlQueryRawAsync<T>(string sql, CancellationToken ct = default, params object[] parameters)
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(SqlQueryRawAsync));
+            ArgumentNullException.ThrowIfNull(sql);
+            return _executionStrategy.ExecuteAsync(async (ctx, token) =>
+            {
+                await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
+                var sw = Stopwatch.StartNew();
+                await using var cmd = CommandPool.Get(ctx.RawConnection, sql);
+                if (ctx.CurrentTransaction != null)
+                    cmd.Transaction = ctx.CurrentTransaction;
+                cmd.CommandTimeout = ToSecondsClamped(ctx.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText));
+                var paramDict = ctx.AddParametersFast(cmd, parameters);
+                NormValidator.ValidateRawQuerySql(sql, ctx.RawProvider, paramDict);
+
+                var list = new List<T>();
+                await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, CommandBehavior.Default, token).ConfigureAwait(false);
+                var materialize = BuildRawResultMaterializer<T>(reader);
+                while (await reader.ReadAsync(token).ConfigureAwait(false))
+                    list.Add(materialize(reader));
+
+                ctx.Options.Logger?.LogQuery(sql, paramDict, sw.Elapsed, list.Count);
+                cmd.Parameters.Clear();
+                return list;
+            }, ct);
+        }
+
+        /// <summary>Interpolated counterpart of <see cref="SqlQueryRawAsync{T}(string, CancellationToken, object[])"/>.</summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("SqlQuery materializes an arbitrary result type by reflection; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("SqlQuery reflects over the result type's constructor and properties; trimming may remove them. See docs/aot-trimming.md.")]
+        public Task<List<T>> SqlQueryInterpolatedAsync<T>(FormattableString sql, CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(sql);
+            var prepared = BuildInterpolatedSql(sql);
+            return SqlQueryRawAsync<T>(prepared.Sql, ct, prepared.Parameters);
+        }
+
+        private static bool IsScalarResultType(Type t)
+            => t.IsPrimitive || t.IsEnum
+               || t == typeof(string) || t == typeof(decimal) || t == typeof(Guid)
+               || t == typeof(DateTime) || t == typeof(DateTimeOffset) || t == typeof(DateOnly)
+               || t == typeof(TimeOnly) || t == typeof(TimeSpan) || t == typeof(byte[]);
+
+        /// <summary>
+        /// Builds a per-row materializer for <typeparamref name="T"/>: a scalar reads and coerces the first
+        /// column; a complex type is constructed via its parameterless constructor and its settable
+        /// properties are bound from same-named columns (case-insensitive).
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("SqlQuery constructs an arbitrary result type by reflection; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("SqlQuery reflects over the result type's constructor and properties; trimming may remove them. See docs/aot-trimming.md.")]
+        private static Func<DbDataReader, T> BuildRawResultMaterializer<T>(DbDataReader reader)
+        {
+            var type = typeof(T);
+            var underlying = Nullable.GetUnderlyingType(type) ?? type;
+
+            if (IsScalarResultType(underlying))
+            {
+                return r =>
+                {
+                    if (r.IsDBNull(0))
+                        return default!;
+                    var raw = r.GetValue(0);
+                    if (raw.GetType() != underlying)
+                        raw = CoerceRawValue(raw, underlying);
+                    return (T)raw;
+                };
+            }
+
+            var ctor = type.GetConstructor(Type.EmptyTypes)
+                ?? throw new NormUsageException(
+                    $"SqlQuery cannot materialize '{type.Name}': it must be a scalar type or have a public parameterless constructor.");
+
+            var nameToOrdinal = new Dictionary<string, int>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < reader.FieldCount; i++)
+                nameToOrdinal[reader.GetName(i)] = i;
+
+            var binders = new List<(int Ordinal, System.Reflection.PropertyInfo Prop, Type Target)>();
+            foreach (var prop in type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (!prop.CanWrite || prop.GetIndexParameters().Length > 0)
+                    continue;
+                if (nameToOrdinal.TryGetValue(prop.Name, out var ordinal))
+                    binders.Add((ordinal, prop, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType));
+            }
+
+            return r =>
+            {
+                var obj = (T)ctor.Invoke(null)!;
+                foreach (var (ordinal, prop, target) in binders)
+                {
+                    if (r.IsDBNull(ordinal))
+                        continue;
+                    var raw = r.GetValue(ordinal);
+                    if (raw.GetType() != target)
+                        raw = CoerceRawValue(raw, target);
+                    prop.SetValue(obj, raw);
+                }
+                return obj;
+            };
+        }
+
+        /// <summary>
         /// Executes a raw non-query command (INSERT/UPDATE/DELETE/DDL) and returns the affected row
         /// count. Backs <see cref="DatabaseFacade.ExecuteSqlRawAsync(string, System.Threading.CancellationToken, object[])"/>.
         /// </summary>

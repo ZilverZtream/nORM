@@ -92,6 +92,7 @@ v1.0 contract:
 | `nORM.Core.DatabaseFacade.EnsureDeletedAsync()` / `CanConnect()` / `CanConnectAsync()` | Stable - EF Core-style database lifecycle API | `DatabaseLifecycleContractTests` | `docs/api/nORM.Core.DatabaseFacade.yml` |
 | `nORM.Configuration.EntityTypeBuilder<TEntity>.HasNoKey()` and `nORM.Configuration.IEntityTypeConfiguration.IsKeyless` / `nORM.Mapping.TableMapping.IsKeyless` | Stable - EF Core-style keyless (query-type) entities | `KeylessEntityContractTests` | `docs/api/nORM.Configuration.EntityTypeBuilder-1.yml` |
 | `nORM.Core.NormIncludableQueryableExtensions.TagWith<T>(IQueryable<T>, string)` | Stable - EF Core-style SQL query tagging (comment) | `QueryTagWithContractTests` | `docs/api/nORM.Core.NormIncludableQueryableExtensions.yml` |
+| `nORM.Core.DbContext.SqlQueryRawAsync<T>` / `SqlQueryInterpolatedAsync<T>` | Stable - EF Core-style raw-SQL scalar/DTO query | `DatabaseSqlQueryContractTests` | `docs/api/nORM.Core.DbContext.yml` |
 
 `PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
 any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.

@@ -390,6 +390,8 @@ M:nORM.Core.DbContext.RollbackToSavepointAsync(System.Data.Common.DbTransaction,
 M:nORM.Core.DbContext.SaveChangesAsync(System.Boolean,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.SaveChangesAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.SetShadowProperty(System.Object,System.String,System.Object):System.Void
+M:nORM.Core.DbContext.SqlQueryInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
+M:nORM.Core.DbContext.SqlQueryRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.UpdateAsync``1(`0,System.Data.Common.DbTransaction,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.UpdateAsync``1(`0,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.DbContext.UpdateRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
