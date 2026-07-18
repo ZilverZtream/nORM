@@ -269,12 +269,25 @@ namespace nORM.Query
     /// <param name="ParentKeyProperties">The ordered key properties on the parent object to extract IDs from.</param>
     /// <param name="TargetCollectionProperty">The collection property on the parent object to populate with children.</param>
     /// <param name="CollectionElementType">The type of elements in the collection.</param>
+    /// <param name="FilterSql">Optional per-element predicate SQL from a shaped projection binding
+    /// (Select(o =&gt; new Dto { Lines = o.Lines.Where(pred).ToList() })), rendered at plan-build time
+    /// against the child table and ANDed onto the split-query child fetch; null for a bare include.</param>
+    /// <param name="FilterParameters">Names of the compiled parameters the shaped filter references,
+    /// bound onto the child command from the main command's live values so closure captures re-bind
+    /// correctly across plan-cache hits. Empty/null when the filter is constant-only or absent.</param>
     internal sealed record DependentQueryDefinition(
         TableMapping TargetMapping,
         IReadOnlyList<Column> ForeignKeyColumns,
         IReadOnlyList<PropertyInfo> ParentKeyProperties,
         PropertyInfo TargetCollectionProperty,
-        Type CollectionElementType
+        Type CollectionElementType,
+        // Optional per-element filter from a shaped projection binding
+        // (Select(o => new Dto { Lines = o.Lines.Where(pred).ToList() })). Rendered to SQL at plan-build
+        // time so its closures flow through the shared compiled-parameter channel (RecordClosureSlot),
+        // keeping values fresh across cached-plan reuse. The child fetch ANDs FilterSql onto its WHERE
+        // and binds FilterParameters from the main command. Null for a bare collection include.
+        string? FilterSql = null,
+        IReadOnlyList<string>? FilterParameters = null
     )
     {
         internal Column ForeignKeyColumn => ForeignKeyColumns[0];

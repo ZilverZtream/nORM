@@ -33,6 +33,16 @@ namespace nORM.Query
             new DefaultObjectPool<StringBuilder>(new StringBuilderPooledObjectPolicy());
         private StringBuilder? _sb;
         private List<PropertyInfo> _detectedCollections = new();
+        // Per-detected-collection filter from a shaped projection binding
+        // (`Lines = o.Lines.Where(pred).ToList()`). Keyed by the nav property; only populated for
+        // filtered bindings. Rendered to SQL at detection time so closure captures flow through the
+        // shared compiled-parameter channel (staying fresh across cached-plan reuse); the split-query
+        // loader ANDs FilterSql onto the child fetch and binds FilterParameters from the main command.
+        private Dictionary<PropertyInfo, RenderedCollectionFilter> _detectedCollectionFilters = new();
+
+        /// <summary>A shaped collection filter rendered to SQL against the child table, with the names
+        /// of the compiled parameters it references (closure captures) for per-execution rebinding.</summary>
+        internal readonly record struct RenderedCollectionFilter(string Sql, IReadOnlyList<string> Parameters);
 
         /// <summary>SQL aggregate function name for COUNT operations.</summary>
         private const string CountFunctionName = "COUNT";
@@ -87,6 +97,12 @@ namespace nORM.Query
         public IReadOnlyList<PropertyInfo> DetectedCollections => _detectedCollections;
 
         /// <summary>
+        /// Per-detected-collection filter captured from a shaped projection binding
+        /// (`Lines = o.Lines.Where(pred).ToList()`), rendered to SQL. Only filtered collections appear here.
+        /// </summary>
+        public IReadOnlyDictionary<PropertyInfo, RenderedCollectionFilter> DetectedCollectionFilters => _detectedCollectionFilters;
+
+        /// <summary>
         /// Translates a projection expression into a SQL <c>SELECT</c> column list.
         /// Each call resets detected collections, so the result reflects only the
         /// most recent translation.
@@ -99,6 +115,7 @@ namespace nORM.Query
 
             // Reset per-translation state so consecutive calls don't accumulate stale entries.
             _detectedCollections = new List<PropertyInfo>();
+            _detectedCollectionFilters = new Dictionary<PropertyInfo, RenderedCollectionFilter>();
 
             var sb = _stringBuilderPool.Get();
             _sb = sb;
@@ -174,11 +191,13 @@ namespace nORM.Query
                 // fall back to positional Item name (Item1, Item2, ...).
                 var memberName = node.Members?[i]?.Name ?? $"Item{i + 1}";
 
-                // Check if this is a navigation property (collection)
-                if (IsNavigationCollection(arg, out var navProperty))
+                // Check if this is a navigation collection (bare, or shaped as .Where(pred).ToList()).
+                if (TryMatchDetectedCollection(arg, out var navProperty, out var navFilter))
                 {
                     // Track it for later split query processing
                     _detectedCollections.Add(navProperty);
+                    if (navFilter != null && RenderShapedCollectionFilter(navProperty, navFilter) is { } rendered)
+                        _detectedCollectionFilters[navProperty] = rendered;
                     // Skip adding to SQL SELECT - it will be fetched separately
                     continue;
                 }

@@ -166,6 +166,9 @@ namespace nORM.Query
         private HashSet<string> _tables = new();
         private readonly Stack<TranslationContextSnapshot> _contextStack = new();
         private List<PropertyInfo> _detectedCollections = new();
+        // Rendered filter fragments for shaped collection projections (Lines = o.Lines.Where(pred).ToList()),
+        // keyed by nav property; consumed by BuildDependentQueryDefinitions.
+        private Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter> _detectedCollectionFilters = new();
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;

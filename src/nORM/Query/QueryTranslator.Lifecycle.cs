@@ -124,6 +124,7 @@ namespace nORM.Query
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
+                _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();
                 _complexityMetrics = default;
                 _postMaterializeTransform = null;
                 _postMaterializeOrderPrefixTransform = null;
@@ -181,6 +182,7 @@ namespace nORM.Query
                 _cacheExpiration = null;
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
+                _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();
                 _complexityMetrics = default;
                 _postMaterializeTransform = null;
                 _postMaterializeOrderPrefixTransform = null;

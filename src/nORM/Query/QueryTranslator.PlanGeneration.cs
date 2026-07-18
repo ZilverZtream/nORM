@@ -386,6 +386,8 @@ namespace nORM.Query
 
                             // Capture detected collections for split query processing
                             _t._detectedCollections.AddRange(selectVisitor.DetectedCollections);
+                            foreach (var kvp in selectVisitor.DetectedCollectionFilters)
+                                _t._detectedCollectionFilters[kvp.Key] = kvp.Value;
 
                             // If we detected collections, ensure primary key is included in SELECT
                             if (_t._detectedCollections.Count > 0 && _t._mapping.KeyColumns.Length > 0)

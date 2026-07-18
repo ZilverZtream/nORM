@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using nORM.Core;
@@ -25,6 +26,7 @@ namespace nORM.Query
             List<DependentQueryDefinition> dependentQueries,
             IList parents,
             bool noTracking,
+            Dictionary<string, object?>? filterParams,
             CancellationToken ct)
         {
             if (parents.Count == 0)
@@ -69,7 +71,7 @@ namespace nORM.Query
 
                     var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
                     var batchIds = parentIdList.GetRange(i, batchCount);
-                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, ct).ConfigureAwait(false);
+                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, filterParams, ct).ConfigureAwait(false);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -85,7 +87,8 @@ namespace nORM.Query
         private void ExecuteDependentQueries(
             List<DependentQueryDefinition> dependentQueries,
             IList parents,
-            bool noTracking)
+            bool noTracking,
+            Dictionary<string, object?>? filterParams)
         {
             if (parents.Count == 0)
                 return;
@@ -116,7 +119,7 @@ namespace nORM.Query
                 {
                     var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
                     var batchIds = parentIdList.GetRange(i, batchCount);
-                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking);
+                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking, filterParams);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -125,12 +128,67 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Truly synchronous variant of <see cref="FetchChildrenBatchAsync"/>.
+        /// Snapshots the values of every compiled parameter any shaped-collection filter references,
+        /// read from the main command while it is still alive (the sync path transfers the command's
+        /// lifetime to its reader, so the values must be captured before the dependent-query phase runs).
+        /// Returns null when no dependent query carries a filter parameter, so the common bare-include
+        /// path allocates nothing. The captured values are the provider representations the main query
+        /// bound (converters already applied), so the child fetch rebinds them verbatim.
         /// </summary>
+        private static Dictionary<string, object?>? CaptureDependentFilterParams(DbCommand command, IReadOnlyList<DependentQueryDefinition>? deps)
+        {
+            if (deps == null)
+                return null;
+
+            Dictionary<string, object?>? snapshot = null;
+            foreach (var dep in deps)
+            {
+                if (dep.FilterParameters == null)
+                    continue;
+                foreach (var name in dep.FilterParameters)
+                {
+                    if (snapshot != null && snapshot.ContainsKey(name))
+                        continue;
+                    if (command.Parameters.Contains(name))
+                        (snapshot ??= new Dictionary<string, object?>(StringComparer.Ordinal))[name] = command.Parameters[name].Value;
+                }
+            }
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Appends a shaped-collection filter (<c>o.Lines.Where(pred).ToList()</c>) — rendered to SQL at
+        /// plan-build time — onto the child fetch, binding the compiled parameters it references from the
+        /// captured main-command values so closure captures re-bind per execution. No-op when the dependent
+        /// query carries no filter.
+        /// </summary>
+        private static void AppendDependentFilter(
+            DbCommand cmd,
+            System.Text.StringBuilder sql,
+            DependentQueryDefinition depQuery,
+            Dictionary<string, object?>? filterParams)
+        {
+            if (depQuery.FilterSql == null)
+                return;
+
+            if (depQuery.FilterParameters != null && filterParams != null)
+            {
+                foreach (var name in depQuery.FilterParameters)
+                {
+                    if (cmd.Parameters.Contains(name))
+                        continue;
+                    filterParams.TryGetValue(name, out var value);
+                    cmd.AddParam(name, value ?? DBNull.Value);
+                }
+            }
+            sql.Append(" AND (").Append(depQuery.FilterSql).Append(')');
+        }
+
         private List<object> FetchChildrenBatch(
             DependentQueryDefinition depQuery,
             List<object> parentIds,
-            bool noTracking)
+            bool noTracking,
+            Dictionary<string, object?>? filterParams)
         {
             var children = new List<object>();
 
@@ -159,6 +217,10 @@ namespace nORM.Query
             var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
             if (globalFilterSql != null)
                 sql.Append(" AND ").Append(globalFilterSql);
+
+            // Shaped-projection per-element filter (Lines = o.Lines.Where(pred).ToList()): append the
+            // plan-rendered predicate and bind its compiled params from the captured main-command values.
+            AppendDependentFilter(cmd, sql, depQuery, filterParams);
 
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
@@ -196,6 +258,7 @@ namespace nORM.Query
             DependentQueryDefinition depQuery,
             List<object> parentIds,
             bool noTracking,
+            Dictionary<string, object?>? filterParams,
             CancellationToken ct)
         {
             var children = new List<object>();
@@ -226,6 +289,10 @@ namespace nORM.Query
             var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
             if (globalFilterSql != null)
                 sql.Append(" AND ").Append(globalFilterSql);
+
+            // Shaped-projection per-element filter (Lines = o.Lines.Where(pred).ToList()): append the
+            // plan-rendered predicate and bind its compiled params from the captured main-command values.
+            AppendDependentFilter(cmd, sql, depQuery, filterParams);
 
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
@@ -345,15 +412,41 @@ namespace nORM.Query
                     childCollection = CreateList(depQuery.CollectionElementType, 0);
                 }
 
-                depQuery.TargetCollectionProperty.SetValue(parent, childCollection);
+                ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery).SetValue(parent, childCollection);
             }
         }
 
         private static object? GetParentKeyValue(DependentQueryDefinition depQuery, object parent)
-            => GetKeyValue(depQuery.ParentKeyProperties, p => p.GetValue(parent));
+            => GetKeyValue(depQuery.ParentKeyProperties, p => ResolveOnParent(p, parent, depQuery).GetValue(parent));
 
         private static object? GetForeignKeyValue(DependentQueryDefinition depQuery, object child)
             => GetKeyValue(depQuery.ForeignKeyColumns, c => c.Getter(child));
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<(Type, string), PropertyInfo?> _projectedParentProps = new();
+
+        /// <summary>
+        /// Resolves an entity-typed navigation/key <see cref="PropertyInfo"/> against the runtime type
+        /// of <paramref name="parent"/>. For a split query feeding an Include the parent IS the entity,
+        /// so the property applies directly. For a shaped collection projection the parent is a DTO whose
+        /// members mirror the entity by name, so the same-named property is resolved (and cached). Throws
+        /// a clear precondition error rather than silently stitching empty collections when the projected
+        /// type omits the correlating property — a shaped collection projection must also project the
+        /// principal key so its children can be matched.
+        /// </summary>
+        private static PropertyInfo ResolveOnParent(PropertyInfo prop, object parent, DependentQueryDefinition depQuery)
+        {
+            if (prop.DeclaringType != null && prop.DeclaringType.IsInstanceOfType(parent))
+                return prop;
+
+            var resolved = _projectedParentProps.GetOrAdd((parent.GetType(), prop.Name),
+                static k => k.Item1.GetProperty(k.Item2));
+            if (resolved == null)
+                throw new NormQueryException(
+                    $"A shaped collection projection into '{parent.GetType().Name}' must also project the " +
+                    $"principal key '{prop.Name}' of '{depQuery.TargetCollectionProperty.DeclaringType?.Name}' so " +
+                    $"the '{depQuery.TargetCollectionProperty.Name}' collection can be correlated to its parent.");
+            return resolved;
+        }
 
         private static object? GetKeyValue<T>(IReadOnlyList<T> keyParts, Func<T, object?> getter)
         {
@@ -407,7 +500,7 @@ namespace nORM.Query
         {
             // Use cached compiled factory instead of Activator.CreateInstance.
             var emptyList = CreateList(depQuery.CollectionElementType, 0);
-            depQuery.TargetCollectionProperty.SetValue(parent, emptyList);
+            ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery).SetValue(parent, emptyList);
         }
 
         /// <summary>

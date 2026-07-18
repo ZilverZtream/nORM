@@ -58,13 +58,20 @@ namespace nORM.Query
                 // Get the target mapping for the dependent type
                 var targetMapping = _ctx.GetMapping(relation.DependentType);
 
+                // A shaped projection binding (Lines = o.Lines.Where(pred).ToList()) captured a
+                // per-element filter, rendered to SQL at translation time so its closures flow through
+                // the shared compiled-parameter channel; the child fetch ANDs it on and binds its params.
+                _detectedCollectionFilters.TryGetValue(collectionProperty, out var filter);
+
                 // Create the dependent query definition
                 var dependentQuery = new DependentQueryDefinition(
                     TargetMapping: targetMapping,
                     ForeignKeyColumns: relation.ForeignKeys,
                     ParentKeyProperties: relation.PrincipalKeys.Select(c => c.Prop).ToArray(),
                     TargetCollectionProperty: collectionProperty,
-                    CollectionElementType: elementType
+                    CollectionElementType: elementType,
+                    FilterSql: filter.Sql,
+                    FilterParameters: filter.Parameters
                 );
 
                 dependentQueries.Add(dependentQuery);

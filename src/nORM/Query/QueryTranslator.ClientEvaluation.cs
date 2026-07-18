@@ -61,6 +61,62 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// True for a shaped collection projection binding — <c>o.Lines.ToList()</c>,
+        /// <c>o.Lines.ToArray()</c>, <c>o.Lines.AsEnumerable()</c>, or the same wrapping a single
+        /// <c>o.Lines.Where(pred)</c> — where the root is a collection navigation member off the
+        /// entity parameter. SelectClauseVisitor fetches these via a split query (applying the
+        /// captured predicate to the child fetch), so the analyzer must not flag the ToList/Where/nav
+        /// members as client-eval. Mirrors the peel-order in SelectClauseVisitor.TryMatchDetectedCollection.
+        /// </summary>
+        internal static bool IsShapedCollectionBinding(MethodCallExpression node)
+        {
+            Expression current = node;
+
+            // Must terminate in a materializer over a single source: ToList/ToArray/AsEnumerable.
+            if (current is MethodCallExpression term
+                && term.Arguments.Count == 1
+                && (term.Method.DeclaringType == typeof(Enumerable) || term.Method.DeclaringType == typeof(Queryable))
+                && term.Method.Name is nameof(Enumerable.ToList) or nameof(Enumerable.ToArray) or nameof(Enumerable.AsEnumerable))
+            {
+                current = term.Arguments[0];
+            }
+            else
+            {
+                return false;
+            }
+
+            // Optional single Where(source, predicate).
+            if (current is MethodCallExpression whereCall
+                && whereCall.Arguments.Count == 2
+                && (whereCall.Method.DeclaringType == typeof(Enumerable) || whereCall.Method.DeclaringType == typeof(Queryable))
+                && whereCall.Method.Name == nameof(Enumerable.Where))
+            {
+                current = whereCall.Arguments[0];
+            }
+
+            return IsCollectionNavigationMember(current);
+        }
+
+        /// <summary>
+        /// True when <paramref name="expr"/> is a generic collection navigation member accessed
+        /// directly off a lambda parameter (e.g. <c>o.Lines</c> where Lines is a List&lt;Line&gt;).
+        /// String is excluded so <c>o.Name</c> is never mistaken for a collection.
+        /// </summary>
+        private static bool IsCollectionNavigationMember(Expression expr)
+        {
+            if (expr is not MemberExpression { Expression: ParameterExpression } m)
+                return false;
+            if (m.Member is not PropertyInfo p)
+                return false;
+            var t = p.PropertyType;
+            if (t == typeof(string) || !t.IsGenericType)
+                return false;
+            if (t.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                return true;
+            return t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+        }
+
+        /// <summary>
         /// For a projection lambda, resolves the value converter of each member whose value comes
         /// from a correlated First/Last/Min/Max subquery over a converter column — keyed by the
         /// projection member name (matching the shadow-column naming in ExtractColumnsFromProjection).
@@ -495,6 +551,13 @@ namespace nORM.Query
                 // so the subtree's Query() call and inner lambdas are not re-analyzed
                 // as client-eval leaves.
                 if (IsQueryRootedScalarAggregate(node) || IsQueryRootedScalarFirst(node))
+                    return node;
+
+                // A shaped collection binding — `o.Lines.ToList()` or
+                // `o.Lines.Where(pred).ToList()` — is fetched via a split query by
+                // SelectClauseVisitor, not materialized client-side. Admit it WITHOUT
+                // descending so its ToList/Where/nav members are not flagged as client-eval.
+                if (IsShapedCollectionBinding(node))
                     return node;
 
                 // Check if this is a method that can be translated to SQL

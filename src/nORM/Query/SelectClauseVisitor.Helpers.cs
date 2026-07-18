@@ -50,6 +50,76 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Matches a projection binding that resolves to a navigation collection, optionally
+        /// filtered: a bare <c>o.Lines</c>, <c>o.Lines.ToList()/ToArray()</c>, or
+        /// <c>o.Lines.Where(pred).ToList()</c>. The captured predicate (if any) is applied to the
+        /// split-query child fetch so only matching children populate the collection. A projection
+        /// (<c>Select</c>) into a different element type is deliberately NOT matched here — that
+        /// falls through to the general translatability path (a later stage handles it).
+        /// </summary>
+        private bool TryMatchDetectedCollection(Expression expr, out PropertyInfo navProperty, out LambdaExpression? filter)
+        {
+            navProperty = null!;
+            filter = null;
+            var current = expr;
+
+            // Peel a terminal ToList()/ToArray()/AsEnumerable().
+            if (current is MethodCallExpression term
+                && term.Arguments.Count == 1
+                && (term.Method.DeclaringType == typeof(Enumerable) || term.Method.DeclaringType == typeof(Queryable))
+                && term.Method.Name is "ToList" or "ToArray" or "AsEnumerable")
+            {
+                current = term.Arguments[0];
+            }
+
+            // A single Where(source, predicate) → capture the predicate.
+            if (current is MethodCallExpression whereCall
+                && whereCall.Arguments.Count == 2
+                && (whereCall.Method.DeclaringType == typeof(Enumerable) || whereCall.Method.DeclaringType == typeof(Queryable))
+                && whereCall.Method.Name == nameof(Enumerable.Where)
+                && UnwrapLambda(whereCall.Arguments[1]) is { Parameters.Count: 1 } predLambda)
+            {
+                filter = predLambda;
+                current = whereCall.Arguments[0];
+            }
+
+            return IsNavigationCollection(current, out navProperty);
+        }
+
+        /// <summary>
+        /// Renders a shaped collection binding's predicate to SQL against the child table, capturing the
+        /// compiled-parameter names it minted for closure captures. Rendering happens here at translation
+        /// time — while the ambient closure-ordinal scope is active and the shared compiled-parameter
+        /// channel is open — so a captured variable becomes a <c>@cpN</c> slot that the extractor re-binds
+        /// per execution rather than a literal baked into the cached plan. Returns null when the collection
+        /// has no resolvable relation (its children can't be fetched at all, so no filter is meaningful).
+        /// </summary>
+        private RenderedCollectionFilter? RenderShapedCollectionFilter(PropertyInfo navProperty, LambdaExpression filter)
+        {
+            if (_ctx == null || !_mapping.Relations.TryGetValue(navProperty.Name, out var relation))
+                return null;
+
+            var childAlias = _ctx.GetMapping(relation.DependentType).EscTable;
+            var before = SharedCompiledParams?.Count ?? 0;
+            var sql = RenderNavigationFilter(filter, childAlias);
+
+            IReadOnlyList<string> parameters = Array.Empty<string>();
+            if (SharedCompiledParams != null && SharedCompiledParams.Count > before)
+            {
+                var minted = new List<string>(SharedCompiledParams.Count - before);
+                for (var i = before; i < SharedCompiledParams.Count; i++)
+                    minted.Add(SharedCompiledParams[i]);
+                parameters = minted;
+            }
+            return new RenderedCollectionFilter(sql, parameters);
+        }
+
+        /// <summary>A lambda argument is a bare LambdaExpression (Enumerable overloads) or a Quote-wrapped one (Queryable overloads).</summary>
+        private static LambdaExpression? UnwrapLambda(Expression arg)
+            => arg as LambdaExpression
+               ?? (arg is UnaryExpression { NodeType: ExpressionType.Quote, Operand: LambdaExpression q } ? q : null);
+
+        /// <summary>
         /// Returns the active <see cref="StringBuilder"/>, throwing if called outside
         /// a <see cref="Translate"/> invocation.
         /// </summary>

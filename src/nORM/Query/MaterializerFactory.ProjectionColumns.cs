@@ -49,9 +49,9 @@ namespace nORM.Query
                     {
                         // Navigation collections are populated by the dependent-query / split-query
                         // pipeline rather than read from the row, so they must not appear as
-                        // projection columns. Detect via the source-side member type.
-                        if (ma.Expression is MemberExpression sourceMember
-                            && IsNavigationCollection(sourceMember, mapping))
+                        // projection columns. Covers bare (o.Lines) and shaped (o.Lines.Where(p).ToList())
+                        // bindings alike.
+                        if (IsShapedOrBareNavigationCollection(ma.Expression, mapping))
                         {
                             continue;
                         }
@@ -244,6 +244,37 @@ namespace nORM.Query
                 found = c.Converter;
             }
             return found;
+        }
+
+        /// <summary>
+        /// True when <paramref name="expr"/> is a navigation-collection projection binding in either
+        /// bare (<c>o.Lines</c>) or shaped (<c>o.Lines.ToList()</c>, <c>o.Lines.Where(pred).ToList()</c>)
+        /// form. The split-query / dependent-query pipeline fills these, so they must be excluded from
+        /// the row-column set. Mirrors the peel order in SelectClauseVisitor.TryMatchDetectedCollection.
+        /// </summary>
+        private static bool IsShapedOrBareNavigationCollection(Expression expr, TableMapping mapping)
+        {
+            var current = expr;
+
+            // Peel a terminating ToList/ToArray/AsEnumerable over a single source.
+            if (current is MethodCallExpression term
+                && term.Arguments.Count == 1
+                && (term.Method.DeclaringType == typeof(Enumerable) || term.Method.DeclaringType == typeof(Queryable))
+                && term.Method.Name is nameof(Enumerable.ToList) or nameof(Enumerable.ToArray) or nameof(Enumerable.AsEnumerable))
+            {
+                current = term.Arguments[0];
+
+                // Peel an optional single Where(source, predicate).
+                if (current is MethodCallExpression whereCall
+                    && whereCall.Arguments.Count == 2
+                    && (whereCall.Method.DeclaringType == typeof(Enumerable) || whereCall.Method.DeclaringType == typeof(Queryable))
+                    && whereCall.Method.Name == nameof(Enumerable.Where))
+                {
+                    current = whereCall.Arguments[0];
+                }
+            }
+
+            return current is MemberExpression member && IsNavigationCollection(member, mapping);
         }
 
         /// <summary>

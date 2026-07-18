@@ -300,6 +300,10 @@ namespace nORM.Query
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
 
+                // Snapshot any shaped-collection filter params while the command is alive (its lifetime
+                // may transfer to the reader), so the split-query phase can rebind them per execution.
+                var dependentFilterParams = CaptureDependentFilterParams(command, plan.DependentQueries);
+
                 await using var reader = await command.ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
                     .ConfigureAwait(false);
 
@@ -363,7 +367,7 @@ namespace nORM.Query
                 // Execute dependent queries for nested collections (split query for projections)
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
-                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, ct).ConfigureAwait(false);
+                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, ct).ConfigureAwait(false);
                 }
 
                 // Load owned collections (OwnsMany) for all materialized entities — including
@@ -413,6 +417,10 @@ namespace nORM.Query
 
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery();
+
+                // Snapshot any shaped-collection filter params BEFORE the reader takes over the command's
+                // lifetime (it disposes the command on reader dispose), so the split-query phase can rebind them.
+                var dependentFilterParams = CaptureDependentFilterParams(command, plan.DependentQueries);
 
                 commandLifetimeTransferred = true;
                 using var reader = command.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, GetEntityReadBehavior(plan.ElementType));
@@ -472,7 +480,7 @@ namespace nORM.Query
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
                     // Truly synchronous dependent query execution - no GetAwaiter().GetResult().
-                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking);
+                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams);
                 }
 
                 // Load owned collections (OwnsMany) for all materialized entities — symmetric with the async

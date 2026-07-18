@@ -640,11 +640,13 @@ namespace nORM.Query
             {
                 if (node.Bindings[i] is MemberAssignment assignment)
                 {
-                    // Check if this is a navigation property (collection)
-                    if (IsNavigationCollection(assignment.Expression, out var navProperty))
+                    // Check if this is a navigation collection (bare, or shaped as .Where(pred).ToList()).
+                    if (TryMatchDetectedCollection(assignment.Expression, out var navProperty, out var navFilter))
                     {
                         // Track it for later split query processing
                         _detectedCollections.Add(navProperty);
+                        if (navFilter != null && RenderShapedCollectionFilter(navProperty, navFilter) is { } rendered)
+                            _detectedCollectionFilters[navProperty] = rendered;
                         // Skip adding to SQL SELECT - it will be fetched separately
                         continue;
                     }
