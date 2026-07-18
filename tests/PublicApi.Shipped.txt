@@ -333,6 +333,8 @@ M:nORM.Core.DbConcurrencyException.#ctor(System.String)
 M:nORM.Core.DbConcurrencyException.#ctor(System.String,System.Exception)
 M:nORM.Core.DbContext.#ctor(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)
 M:nORM.Core.DbContext.#ctor(System.String,nORM.Providers.DatabaseProvider,nORM.Configuration.DbContextOptions)
+M:nORM.Core.DbContext.AddAsync``1(`0,System.Threading.CancellationToken):System.Threading.Tasks.ValueTask{nORM.Core.EntityEntry}
+M:nORM.Core.DbContext.AddRangeAsync``1(System.Collections.Generic.IEnumerable{`0},System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContext.AddRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DbContext.Add``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.ApplyNativeTenantPolicyAsync``1(System.Threading.CancellationToken):System.Threading.Tasks.Task

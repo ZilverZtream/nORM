@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 #nullable enable
 
@@ -26,6 +28,21 @@ namespace nORM.Core
             ArgumentNullException.ThrowIfNull(entities);
             foreach (var entity in entities)
                 Add(entity);
+        }
+
+        /// <summary>
+        /// Asynchronously begins tracking all of the given entities in the <see cref="EntityState.Added"/>
+        /// state, matching EF Core's <c>AddRangeAsync</c>. Keys are assigned at <c>SaveChanges</c>, so this
+        /// completes synchronously — the async signature exists for source compatibility with EF code.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entities.</typeparam>
+        /// <param name="entities">The entities to add (a list or array).</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        public Task AddRangeAsync<T>(IEnumerable<T> entities, CancellationToken ct = default) where T : class
+        {
+            ct.ThrowIfCancellationRequested();
+            AddRange(entities);
+            return Task.CompletedTask;
         }
 
         /// <summary>

@@ -40,6 +40,22 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Asynchronously begins tracking the entity in the <see cref="EntityState.Added"/> state,
+        /// matching EF Core's <c>AddAsync</c>. nORM assigns database-generated keys at <c>SaveChanges</c>
+        /// (not at add time), so this completes synchronously — the async signature exists for source
+        /// compatibility with EF code.
+        /// </summary>
+        /// <typeparam name="T">CLR type of the entity.</typeparam>
+        /// <param name="entity">The entity instance to add.</param>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        /// <returns>An <see cref="EntityEntry"/> representing the tracked entity.</returns>
+        public ValueTask<EntityEntry> AddAsync<T>(T entity, CancellationToken ct = default) where T : class
+        {
+            ct.ThrowIfCancellationRequested();
+            return new ValueTask<EntityEntry>(Add(entity));
+        }
+
+        /// <summary>
         /// Starts tracking the entity without modifying its state. Existing values are
         /// assumed to match those in the database and no update will be sent unless
         /// changes are detected.
