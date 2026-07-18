@@ -115,6 +115,8 @@ namespace nORM.Query
                 _recursionDepth = 0;
                 _singleResult = false;
                 _noTracking = false;
+                _forceTracking = false;
+                _trackingDecided = false;
                 _splitQuery = false;
                 _queryTags = null;
                 _tables = new HashSet<string>();
@@ -177,6 +179,8 @@ namespace nORM.Query
                 _contextStack.Clear();
                 _singleResult = false;
                 _noTracking = false;
+                _forceTracking = false;
+                _trackingDecided = false;
                 _splitQuery = false;
                 _queryTags = null;
                 _estimatedTimeout = default;

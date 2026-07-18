@@ -559,7 +559,8 @@ namespace nORM.Query
                     ClosureFoldedIntoSql: _t._closureFoldedIntoSql,
                     CompiledParameterOrdinals: SnapshotSlotOrdinals(_t._compiledParams),
                     CacheTables: cacheTables,
-                    AsOfTimestamp: _t._asOfTimestamp
+                    AsOfTimestamp: _t._asOfTimestamp,
+                    ForceTracking: _t._forceTracking
                 );
                 // A many-to-many include reads the association table, which is a raw
                 // user-owned table with no history — there is no data to reconstruct the

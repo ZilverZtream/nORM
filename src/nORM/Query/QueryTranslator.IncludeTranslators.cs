@@ -224,7 +224,37 @@ namespace nORM.Query
             /// <returns>The translated source expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
-                t._noTracking = true;
+                // Last-wins with AsTracking: the outermost (last-written, first-visited) operator locks the
+                // decision. Guard is a no-op for the common single-AsNoTracking query.
+                if (!t._trackingDecided)
+                {
+                    t._noTracking = true;
+                    t._trackingDecided = true;
+                }
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
+            }
+        }
+
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private sealed class AsTrackingTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Forces change-tracking ON for this query, overriding a <c>DefaultTrackingBehavior.NoTracking</c>
+            /// context default (EF Core's <c>AsTracking</c>). Passes through otherwise. Composes last-wins with
+            /// <c>AsNoTracking</c> via the shared tracking-decision guard.
+            /// </summary>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                // Only raise the force-tracking flag (which overrides the context NoTracking default); never
+                // clear _noTracking. AsOf/Include set _noTracking=true as a hard safety invariant, and leaving
+                // it untouched lets it win via trackable=false regardless of AsTracking's composition order.
+                if (!t._trackingDecided)
+                {
+                    t._forceTracking = true;
+                    t._trackingDecided = true;
+                }
                 var source = node.Object ?? node.Arguments[0];
                 return t.Visit(source);
             }

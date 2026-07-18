@@ -134,7 +134,12 @@ namespace nORM.Query
         // eras (historical roots joined to live relations). Safe to bake per plan: AsOf()
         // embeds the timestamp as an expression CONSTANT, so the plan-cache fingerprint
         // hashes the full value and every distinct timestamp gets its own plan.
-        DateTime? AsOfTimestamp = null
+        DateTime? AsOfTimestamp = null,
+        // AsTracking() sets this to force change-tracking ON for THIS query even when the context's
+        // DefaultTrackingBehavior is NoTracking — the per-query override of a no-tracking default.
+        // It overrides only the context-default (IsReadOnlyQuery) gate; AsNoTracking/AsOf still win
+        // because they set NoTracking=true, which makes the entity untrackable before this is consulted.
+        bool ForceTracking = false
     );
 
     internal sealed record BulkCudQueryShape(

@@ -208,7 +208,7 @@ namespace nORM.Query
                                  !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-                bool isReadOnly = IsReadOnlyQuery();
+                bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
                 // Snapshot any filtered-Include closure params while the command is alive (its lifetime
                 // may transfer to the reader), so the eager-load phase can rebind them per execution.
@@ -304,7 +304,7 @@ namespace nORM.Query
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
-                bool isReadOnly = IsReadOnlyQuery();
+                bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
                 // Snapshot any shaped-collection filter params while the command is alive (its lifetime
                 // may transfer to the reader), so the split-query phase can rebind them per execution.
@@ -424,7 +424,7 @@ namespace nORM.Query
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
 
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
-                bool isReadOnly = IsReadOnlyQuery();
+                bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
                 // Snapshot any shaped-collection filter params BEFORE the reader takes over the command's
                 // lifetime (it disposes the command on reader dispose), so the split-query phase can rebind them.
@@ -530,7 +530,7 @@ namespace nORM.Query
                              !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
 
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-            bool isReadOnly = IsReadOnlyQuery();
+            bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
             using var reader = command.ExecuteReaderWithInterception(_ctx, GetEntityReadBehavior(plan.ElementType));
             var syncMaterializer = plan.SyncMaterializer;

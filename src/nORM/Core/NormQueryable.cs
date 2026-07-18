@@ -496,6 +496,38 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Forces the query's results to be change-tracked, matching Entity Framework Core's
+        /// <c>AsTracking</c>. This is the per-query override of a context whose
+        /// <see cref="nORM.Configuration.DbContextOptions.DefaultTrackingBehavior"/> is
+        /// <see cref="QueryTrackingBehavior.NoTracking"/> — the results are tracked even though the context
+        /// would otherwise return them detached. When composed with <c>AsNoTracking</c> the outermost
+        /// (last-written) call wins. Has no effect on the default (already tracking) context.
+        /// </summary>
+        /// <typeparam name="T">The entity type of the query.</typeparam>
+        /// <param name="source">A nORM query started with <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>.</param>
+        /// <returns>A query whose results are tracked.</returns>
+        [RequiresDynamicCode("nORM AsTracking emits a MakeGenericMethod marker call; not NativeAOT-compatible.")]
+        [RequiresUnreferencedCode("nORM AsTracking uses reflection to resolve the open generic marker method; trimming may remove it.")]
+        public static IQueryable<T> AsTracking<T>(this IQueryable<T> source)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is not nORM.Query.NormQueryProvider)
+                throw new NormUsageException(
+                    "AsTracking can only be used with nORM queries. " +
+                    "Make sure you started with context.Query<T>() or context.Set<T>(). " +
+                    "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsTracking().");
+
+            // Self-referential marker call (like IgnoreQueryFilters/TagWith): a translator sets the
+            // force-tracking flag and strips the marker. No separate marker method is needed.
+            var method = ((System.Reflection.MethodInfo)System.Reflection.MethodBase.GetCurrentMethod()!)
+                .GetGenericMethodDefinition()
+                .MakeGenericMethod(typeof(T));
+            var call = Expression.Call(method, source.Expression);
+            return source.Provider.CreateQuery<T>(call);
+        }
+
+        /// <summary>
         /// Accepted for Entity Framework Core compatibility; nORM always eager-loads
         /// <c>Include</c> paths through coordinated follow-up queries, so this has no additional
         /// effect. Exposed on <see cref="IQueryable{T}"/> so it composes without a cast, mirroring

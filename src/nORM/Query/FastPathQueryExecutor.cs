@@ -117,6 +117,10 @@ namespace nORM.Query
             // TagWith injects a SQL comment the fast path does not emit; defer to the full pipeline.
             if (ContainsTagWith(expr))
                 return false;
+            // AsTracking overrides a NoTracking context default; the fast path's ShouldTrackResults reads
+            // only the default, so defer to the full pipeline which honors the per-query force-tracking flag.
+            if (ContainsAsTracking(expr))
+                return false;
             if (IsSimpleCountPattern(expr, out var hasPredicate))
             {
                 if (hasPredicate)
@@ -156,6 +160,10 @@ namespace nORM.Query
                 return false;
             // TagWith injects a SQL comment the fast path does not emit; defer to the full pipeline.
             if (ContainsTagWith(expr))
+                return false;
+            // AsTracking overrides a NoTracking context default; the fast path's ShouldTrackResults reads
+            // only the default, so defer to the full pipeline which honors the per-query force-tracking flag.
+            if (ContainsAsTracking(expr))
                 return false;
 
             var cacheUnsupportedMiss = ShouldCacheUnsupportedListMiss(expr);
@@ -253,6 +261,18 @@ namespace nORM.Query
             while (e is MethodCallExpression m && m.Arguments.Count > 0)
             {
                 if (m.Method.Name == "TagWith")
+                    return true;
+                e = m.Object ?? m.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>True when the query chain contains an AsTracking marker anywhere along its source spine.</summary>
+        private static bool ContainsAsTracking(Expression e)
+        {
+            while (e is MethodCallExpression m && m.Arguments.Count > 0)
+            {
+                if (m.Method.Name == "AsTracking")
                     return true;
                 e = m.Object ?? m.Arguments[0];
             }

@@ -138,6 +138,11 @@ namespace nORM.Query
         private DatabaseProvider _provider = null!;
         private bool _singleResult;
         private bool _noTracking;
+        // AsTracking() sets this to force tracking ON over a NoTracking context default. _trackingDecided
+        // gives AsNoTracking/AsTracking last-wins semantics: the outermost (last-written, first-visited)
+        // operator locks the decision so an inner one cannot override it.
+        private bool _forceTracking;
+        private bool _trackingDecided;
         private bool _splitQuery;
         // Comments captured from TagWith(...) and prepended to the generated SQL as line comments.
         private List<string>? _queryTags;
