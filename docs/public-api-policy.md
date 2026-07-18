@@ -89,6 +89,7 @@ v1.0 contract:
 | `nORM.Core.EntityEntry.Reference(string)` / `Collection(string)` / `Navigation(string)` and `nORM.Core.NavigationEntry` (`Load` / `LoadAsync` / `IsLoaded` / `CurrentValue` / `Name`) | Stable - EF Core-style explicit navigation loading | `EntityEntryNavigationLoadContractTests` | `docs/api/nORM.Core.NavigationEntry.yml` |
 | `nORM.Core.DatabaseFacade.ExecuteSqlRaw(Async)` / `ExecuteSqlInterpolated(Async)` | Stable - EF Core-style raw non-query execution | `DatabaseExecuteSqlRawContractTests` | `docs/api/nORM.Core.DatabaseFacade.yml` |
 | `nORM.Core.ChangeTracker.HasChanges()` / `DetectChanges()` | Stable - EF Core-style change-detection API | `ChangeTrackerHasChangesContractTests` | `docs/api/nORM.Core.ChangeTracker.yml` |
+| `nORM.Core.DatabaseFacade.EnsureDeletedAsync()` / `CanConnect()` / `CanConnectAsync()` | Stable - EF Core-style database lifecycle API | `DatabaseLifecycleContractTests` | `docs/api/nORM.Core.DatabaseFacade.yml` |
 
 `PublicApiSnapshotTests.Public_api_matches_v1_baseline` pins the exact shape of each entry;
 any future change requires updating `tests/PublicApi.Shipped.txt` and this table together.

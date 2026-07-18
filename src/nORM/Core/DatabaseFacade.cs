@@ -70,6 +70,86 @@ namespace nORM.Core
             return true;
         }
 
+        /// <summary>
+        /// Drops the tables for the context's mapped entities if they exist — the inverse of
+        /// <see cref="EnsureCreatedAsync"/> and the model-scoped equivalent of EF Core's <c>EnsureDeleted</c>.
+        /// Like <see cref="EnsureCreatedAsync"/> it operates only on the entities configured in the fluent
+        /// model, dropping dependents before principals so foreign keys do not block the drop. Returns
+        /// <c>true</c> when at least one table was dropped, <c>false</c> when none existed.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        /// <returns><c>true</c> if any table was dropped; otherwise <c>false</c>.</returns>
+        [RequiresDynamicCode("EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public async Task<bool> EnsureDeletedAsync(CancellationToken ct = default)
+        {
+            await _context.EnsureConnectionAsync(ct).ConfigureAwait(false);
+
+            var target = SchemaSnapshotBuilder.Build(_context);
+            if (target.Tables.Count == 0)
+                return false;
+
+            var existing = new List<TableSchema>();
+            foreach (var table in target.Tables)
+                if (await TableExistsAsync(table.Name, ct).ConfigureAwait(false))
+                    existing.Add(table);
+            if (existing.Count == 0)
+                return false;
+
+            // Drop dependents before principals (reverse of the create order) so an inline FK constraint
+            // does not block dropping a referenced table on strict providers.
+            var ordered = OrderByForeignKeyDependencies(existing);
+            ordered.Reverse();
+
+            var diff = new SchemaDiff();
+            diff.DroppedTables.AddRange(ordered);
+
+            var statements = CreateMigrationSqlGenerator().GenerateSql(diff);
+            foreach (var sql in EnumerateUpStatements(statements))
+                await ExecuteNonQueryAsync(sql, ct).ConfigureAwait(false);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Tests whether the database is reachable by opening the connection and running a trivial probe —
+        /// matching EF Core's <c>Database.CanConnectAsync</c>. Returns <c>false</c> (rather than throwing)
+        /// when the connection cannot be opened or the probe fails.
+        /// </summary>
+        /// <param name="ct">Token used to cancel the operation.</param>
+        public async Task<bool> CanConnectAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                await _context.EnsureConnectionAsync(ct).ConfigureAwait(false);
+                using var cmd = _context.CreateCommand();
+                cmd.CommandText = "SELECT 1";
+                await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+                return true;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Synchronous <see cref="CanConnectAsync"/>.</summary>
+        public bool CanConnect()
+        {
+            try
+            {
+                _context.EnsureConnection();
+                using var cmd = _context.CreateCommand();
+                cmd.CommandText = "SELECT 1";
+                cmd.ExecuteScalar();
+                return true;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return false;
+            }
+        }
+
         private async Task<bool> TableExistsAsync(string tableName, CancellationToken ct)
         {
             try
