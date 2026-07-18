@@ -70,6 +70,36 @@ namespace nORM.Core
             return true;
         }
 
+        /// <summary>Synchronous <see cref="EnsureCreatedAsync"/> (EF Core's <c>EnsureCreated</c>).</summary>
+        /// <returns><c>true</c> if any table was created; otherwise <c>false</c>.</returns>
+        [RequiresDynamicCode("EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public bool EnsureCreated()
+        {
+            _context.EnsureConnection();
+
+            var target = SchemaSnapshotBuilder.Build(_context);
+            if (target.Tables.Count == 0)
+                return false;
+
+            var missing = new List<TableSchema>();
+            foreach (var table in target.Tables)
+                if (!TableExists(table.Name))
+                    missing.Add(table);
+            if (missing.Count == 0)
+                return false;
+
+            var ordered = OrderByForeignKeyDependencies(missing);
+            var diff = new SchemaDiff();
+            diff.AddedTables.AddRange(ordered);
+
+            var statements = CreateMigrationSqlGenerator().GenerateSql(diff);
+            foreach (var sql in EnumerateUpStatements(statements))
+                ExecuteNonQuery(sql);
+
+            return true;
+        }
+
         /// <summary>
         /// Drops the tables for the context's mapped entities if they exist — the inverse of
         /// <see cref="EnsureCreatedAsync"/> and the model-scoped equivalent of EF Core's <c>EnsureDeleted</c>.
@@ -107,6 +137,38 @@ namespace nORM.Core
             var statements = CreateMigrationSqlGenerator().GenerateSql(diff);
             foreach (var sql in EnumerateUpStatements(statements))
                 await ExecuteNonQueryAsync(sql, ct).ConfigureAwait(false);
+
+            return true;
+        }
+
+        /// <summary>Synchronous <see cref="EnsureDeletedAsync"/> (EF Core's <c>EnsureDeleted</c>).</summary>
+        /// <returns><c>true</c> if any table was dropped; otherwise <c>false</c>.</returns>
+        [RequiresDynamicCode("EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [RequiresUnreferencedCode("EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        public bool EnsureDeleted()
+        {
+            _context.EnsureConnection();
+
+            var target = SchemaSnapshotBuilder.Build(_context);
+            if (target.Tables.Count == 0)
+                return false;
+
+            var existing = new List<TableSchema>();
+            foreach (var table in target.Tables)
+                if (TableExists(table.Name))
+                    existing.Add(table);
+            if (existing.Count == 0)
+                return false;
+
+            var ordered = OrderByForeignKeyDependencies(existing);
+            ordered.Reverse();
+
+            var diff = new SchemaDiff();
+            diff.DroppedTables.AddRange(ordered);
+
+            var statements = CreateMigrationSqlGenerator().GenerateSql(diff);
+            foreach (var sql in EnumerateUpStatements(statements))
+                ExecuteNonQuery(sql);
 
             return true;
         }
@@ -201,11 +263,33 @@ namespace nORM.Core
             }
         }
 
+        private bool TableExists(string tableName)
+        {
+            try
+            {
+                using var cmd = _context.CreateCommand();
+                cmd.CommandText = $"SELECT 1 FROM {_context.RawProvider.Escape(tableName)} WHERE 1 = 0";
+                cmd.ExecuteScalar();
+                return true;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return false;
+            }
+        }
+
         private async Task ExecuteNonQueryAsync(string sql, CancellationToken ct)
         {
             using var cmd = _context.CreateCommand();
             cmd.CommandText = sql;
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        private void ExecuteNonQuery(string sql)
+        {
+            using var cmd = _context.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
         }
 
         [RequiresDynamicCode("Migration SQL generators emit provider DDL and are not NativeAOT-compatible.")]
