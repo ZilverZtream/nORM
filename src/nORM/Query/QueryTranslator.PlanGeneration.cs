@@ -60,6 +60,19 @@ namespace nORM.Query
                 var rootExpr = UnwrapQueryExpression(_expression);
                 _t._rootType = GetElementType(rootExpr);
                 _t._mapping = _t.TrackMapping(_t._rootType);
+                // A FromSqlRaw/FromSqlInterpolated root replaces the mapped FROM with the raw SQL wrapped as a
+                // derived table (see the fromClause below). Reserve @p0..@p{N-1} for the raw parameters up
+                // front and advance the parameter index past them, so the composed LINQ operators' parameters
+                // (which also number from @p0) never collide with the raw SQL's placeholders.
+                if (FindRootRawSource(_expression) is { } rawSource)
+                {
+                    EnsureRawSqlComposableShape(_expression);
+                    _t._rawSqlSource = rawSource.RawSql;
+                    var rawParameters = rawSource.RawParameters;
+                    for (var i = 0; i < rawParameters.Length; i++)
+                        _t._params[_t._ctx.RawProvider.ParamPrefix + "p" + i] = rawParameters[i] ?? DBNull.Value;
+                    _t._parameterManager.Index = rawParameters.Length;
+                }
                 var baseType = _t._rootType.BaseType;
                 while (baseType != null && baseType != typeof(object))
                 {
@@ -309,7 +322,9 @@ namespace nORM.Query
                 }
                 if (_t._sql.Length == 0)
                 {
-                    var fromClause = _t._mapping.EscTable;
+                    // A FromSqlRaw root supplies the FROM source as its raw SQL wrapped in a derived table, so
+                    // Where/OrderBy/paging/projection and the global-tenant filters compose against its alias.
+                    var fromClause = _t._rawSqlSource != null ? "(" + _t._rawSqlSource + ")" : _t._mapping.EscTable;
                     // Prefer the alias THIS translator bound its root parameter to. The
                     // mapping-based reverse lookup below is ambiguous when a nested
                     // correlated subquery targets the SAME entity type as an outer scope:

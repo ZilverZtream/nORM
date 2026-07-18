@@ -147,6 +147,76 @@ namespace nORM.Query
             mc.Arguments.Count > 0
                 ? mc.Arguments[0]
                 : expression;
+
+        /// <summary>
+        /// Walks to the deepest source expression and returns the <see cref="INormRawSqlSource"/> at the root
+        /// of the query, if any — i.e. when the query started from <c>FromSqlRaw</c>/<c>FromSqlInterpolated</c>.
+        /// Descends through the operator chain (each operator's first argument) and unwraps the
+        /// <c>Convert</c>/<c>Quote</c> nodes nORM inserts for its interface-typed operators.
+        /// </summary>
+        internal static INormRawSqlSource? FindRootRawSource(Expression expression)
+        {
+            var expr = expression;
+            while (true)
+            {
+                switch (expr)
+                {
+                    case MethodCallExpression mc when mc.Arguments.Count > 0:
+                        expr = mc.Arguments[0];
+                        break;
+                    case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.Quote } u:
+                        expr = u.Operand;
+                        break;
+                    case ConstantExpression c:
+                        return c.Value as INormRawSqlSource;
+                    default:
+                        return null;
+                }
+            }
+        }
+
+        // Operators that compose cleanly on top of a FromSqlRaw derived table: they leave the raw SQL as the
+        // sole FROM source (only Where/OrderBy/paging/projection/scalar-terminals + query-config markers).
+        private static readonly System.Collections.Generic.HashSet<string> RawSqlComposableOperators =
+            new(System.StringComparer.Ordinal)
+            {
+                "Where", "Select", "OrderBy", "OrderByDescending", "ThenBy", "ThenByDescending",
+                "Skip", "Take", "Distinct", "Count", "LongCount", "Any", "All",
+                "First", "FirstOrDefault", "Single", "SingleOrDefault", "Last", "LastOrDefault",
+                "ElementAt", "ElementAtOrDefault", "Sum", "Min", "Max", "Average",
+                "AsNoTracking", "AsTracking", "AsSplitQuery", "IgnoreQueryFilters", "TagWith", "Cast",
+            };
+
+        /// <summary>
+        /// Rejects operators that can't yet compose onto a <c>FromSqlRaw</c> query — joins, <c>GroupBy</c>,
+        /// <c>Include</c>, <c>SelectMany</c>, set operators — because they build the <c>FROM</c> clause from a
+        /// different source than the raw SQL and would silently query the mapped table instead. Everything on
+        /// the whitelist keeps the raw SQL as the sole table source. Called only when a raw root is present.
+        /// </summary>
+        private static void EnsureRawSqlComposableShape(Expression expression)
+        {
+            var expr = expression;
+            while (true)
+            {
+                switch (expr)
+                {
+                    case MethodCallExpression mc when mc.Arguments.Count > 0:
+                        if (!RawSqlComposableOperators.Contains(mc.Method.Name))
+                            throw new nORM.Core.NormUnsupportedFeatureException(
+                                $"'{mc.Method.Name}' can't be composed onto a FromSqlRaw query yet. Supported: Where, " +
+                                "Select, OrderBy/ThenBy, Skip/Take, Distinct, and the scalar terminals (Count, Any, " +
+                                "First, Sum, …). For joins, GroupBy, Include, or set operators, materialise the raw " +
+                                "query first (ToList) and continue with LINQ-to-Objects, or express them in the SQL.");
+                        expr = mc.Arguments[0];
+                        break;
+                    case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.Quote } u:
+                        expr = u.Operand;
+                        break;
+                    default:
+                        return;
+                }
+            }
+        }
         private static string? ExtractPropertyName(Expression expression)
         {
             return expression switch

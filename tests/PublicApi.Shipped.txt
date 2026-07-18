@@ -370,7 +370,9 @@ M:nORM.Core.DbContext.FindAsync``1(System.Object[]):System.Threading.Tasks.Value
 M:nORM.Core.DbContext.FindAsync``1(System.Object[],System.Threading.CancellationToken):System.Threading.Tasks.ValueTask{`0}
 M:nORM.Core.DbContext.Find``1(System.Object[]):`0
 M:nORM.Core.DbContext.FromSqlInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
+M:nORM.Core.DbContext.FromSqlInterpolated``1(System.FormattableString):System.Linq.IQueryable{`0}
 M:nORM.Core.DbContext.FromSqlRawAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
+M:nORM.Core.DbContext.FromSqlRaw``1(System.String,System.Object[]):System.Linq.IQueryable{`0}
 M:nORM.Core.DbContext.GenerateNativeTenantPolicySql``1():System.String
 M:nORM.Core.DbContext.GenerateProviderNativeTemporalBootstrapSql``1():System.String
 M:nORM.Core.DbContext.GetCompiledQueryMaterializer``1(System.String):System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{`0}}

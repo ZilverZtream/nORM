@@ -238,6 +238,36 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Starts a COMPOSABLE query from a raw SQL statement: the SQL is wrapped as a derived table so the
+        /// returned <see cref="IQueryable{T}"/> can be further composed with LINQ (<c>Where</c>, <c>OrderBy</c>,
+        /// <c>Skip</c>/<c>Take</c>, projections, <c>Count</c>). The entity's global (soft-delete) and tenant
+        /// filters are applied to the outer query — tenant is always enforced, the soft-delete filter is
+        /// dropped by <c>IgnoreQueryFilters()</c> — so the SQL must SELECT the entity's columns (including the
+        /// tenant column). Parameters are referenced positionally as <c>@p0</c>, <c>@p1</c>, … Unlike
+        /// <see cref="FromSqlRawAsync{T}(string, CancellationToken, object[])"/> (which executes immediately and
+        /// returns a list), this defers execution until the composed query is enumerated.
+        /// </summary>
+        public IQueryable<T> FromSqlRaw<T>(string sql, params object[] parameters) where T : class
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(FromSqlRaw));
+            ArgumentNullException.ThrowIfNull(sql);
+            return new NormRawSqlQueryable<T>(this, sql, parameters ?? Array.Empty<object>());
+        }
+
+        /// <summary>
+        /// Composable interpolated-SQL query: each interpolation hole becomes a positional parameter, then
+        /// the statement is wrapped as a derived table like <see cref="FromSqlRaw{T}(string, object[])"/>.
+        /// </summary>
+        public IQueryable<T> FromSqlInterpolated<T>(FormattableString sql) where T : class
+        {
+            ThrowIfDisposed();
+            ArgumentNullException.ThrowIfNull(sql);
+            var prepared = BuildInterpolatedSql(sql);
+            return FromSqlRaw<T>(prepared.Sql, prepared.Parameters);
+        }
+
+        /// <summary>
         /// Executes raw SQL and materializes each row into <typeparamref name="T"/>, which — unlike
         /// <see cref="FromSqlRawAsync{T}(string, CancellationToken, object[])"/> — may be a scalar
         /// (<c>int</c>, <c>string</c>, <c>Guid</c>, …) read from the first column, or any type with a

@@ -134,6 +134,9 @@ namespace nORM.Query
         // SAME entity type as an outer scope (both entries carry the same mapping),
         // which emitted the outer scope's alias and broke every inner reference.
         private string? _selfRootAlias;
+        // Set when the query root is a FromSqlRaw source: the raw SQL wrapped as a derived table replaces the
+        // mapped table's FROM clause (see PlanGeneration), so LINQ operators compose on top of it.
+        private string? _rawSqlSource;
         private int _joinCounter;
         private DatabaseProvider _provider = null!;
         private bool _singleResult;

@@ -130,6 +130,13 @@ namespace nORM.Query
                 // global filters share a fingerprint and replay each other's plans.
                 .Extend(_ctx.GetGlobalFiltersHash());
 
+            // FromSqlRaw supplies the FROM source as a raw SQL string that the expression-structure
+            // fingerprint can't see, so distinct raw SQL (and raw-vs-mapped queries) would otherwise share a
+            // plan. Fold its hash into the key so the lookup can never return the wrong plan.
+            var rawSource = QueryTranslator.FindRootRawSource(filtered);
+            if (rawSource != null)
+                fingerprint = fingerprint.Extend(StringComparer.Ordinal.GetHashCode(rawSource.RawSql));
+
             if (_planCache.TryGet(fingerprint, out var cached)
                 && !HasClosureFoldedIntoSql(cached))
             {
@@ -145,7 +152,9 @@ namespace nORM.Query
             // invocation translates fresh against the live closure values. Run this
             // detector only after a cache miss so normal hot cached queries do not
             // pay a full tree walk on every execution.
-            bool bypassPlanCache = ExpressionContainsLocalSequenceOp(filtered);
+            // Raw-SQL queries bake their parameter values into the plan at translation, so caching would
+            // replay stale values on a same-SQL-different-parameters call; translate fresh each execution.
+            bool bypassPlanCache = ExpressionContainsLocalSequenceOp(filtered) || rawSource != null;
 
             var localFiltered = filtered;
             QueryPlan plan;
