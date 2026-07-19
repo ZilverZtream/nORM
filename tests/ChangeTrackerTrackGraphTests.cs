@@ -39,6 +39,17 @@ public class ChangeTrackerTrackGraphTests
         public Parent? Parent { get; set; }
     }
 
+    [Table("TgNotify")]
+    public class NotifyEntity : System.ComponentModel.INotifyPropertyChanged
+    {
+        private int _id;
+        private string _name = "";
+        [Key][DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get => _id; set { _id = value; PropertyChanged?.Invoke(this, new(nameof(Id))); } }
+        public string Name { get => _name; set { _name = value; PropertyChanged?.Invoke(this, new(nameof(Name))); } }
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+
     [Table("TgNode")]
     public class Node
     {
@@ -71,6 +82,7 @@ public class ChangeTrackerTrackGraphTests
                 mb.Entity<Parent>().HasMany(p => p.Children).WithOne(c => c.Parent).HasForeignKey(c => c.ParentId, p => p.Id);
                 mb.Entity<Node>().HasKey(n => n.Id);
                 mb.Entity<Node>().HasMany(n => n.Children).WithOne(n => n.Parent).HasForeignKey(n => n.ParentId, n => n.Id);
+                mb.Entity<NotifyEntity>().HasKey(n => n.Id);
             }
         };
         return new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
@@ -203,6 +215,24 @@ public class ChangeTrackerTrackGraphTests
         ctx.ChangeTracker.TrackGraph(parent, node => { count++; node.Entry.State = EntityState.Added; });
 
         Assert.Equal(2, count);   // parent + child, each once — no infinite loop
+    }
+
+    [Fact]
+    public void tracking_an_inpc_entity_leaves_a_single_property_changed_subscriber()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using var _cn = cn; using var ctx = Boot(cn);
+        var entity = new NotifyEntity { Id = 5, Name = "x" };   // keyed → Modified
+
+        ctx.ChangeTracker.TrackGraph(entity, node => node.Entry.State = EntityState.Modified);
+
+        // The throwaway probe entry also subscribes to PropertyChanged; if it is not released, the entity
+        // ends up with two live handlers (a leak + double dirty-processing). Exactly one must remain.
+        var backing = typeof(NotifyEntity)
+            .GetField("PropertyChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var handler = (Delegate?)backing!.GetValue(entity);
+        Assert.Equal(1, handler?.GetInvocationList().Length ?? 0);
+        Assert.Equal(EntityState.Modified, ctx.Entry(entity).State);
     }
 
     [Fact]

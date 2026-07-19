@@ -64,6 +64,14 @@ namespace nORM.Core
                 callback(new EntityEntryGraphNode(probe, source, nav));
 
                 var chosen = probe.State;
+
+                // The probe subscribes to PropertyChanged for an INotifyPropertyChanged entity (its
+                // InitializeTracking does). Release that subscription on the throwaway probe so it neither
+                // leaks a handler nor leaves the entity double-subscribed once the real entry below tracks it.
+                // DetachEntity only drops the subscription and lazy-load context (a no-op for a disconnected
+                // graph) — it does not clear the navigation values we still traverse.
+                probe.DetachEntity();
+
                 if (chosen == EntityState.Detached)
                     continue;
 
