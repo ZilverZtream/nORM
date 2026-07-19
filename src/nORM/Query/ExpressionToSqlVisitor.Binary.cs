@@ -1044,12 +1044,22 @@ namespace nORM.Query
                 expression is not MemberExpression member ||
                 !TableMapping.TryGetMemberAccessRoot(member, out var parameter) ||
                 !_parameterMappings.TryGetValue(parameter, out var info) ||
-                !info.Mapping.TryGetColumnForMemberAccess(member, out _))
+                !info.Mapping.TryGetColumnForMemberAccess(member, out var boolColumn))
             {
                 return false;
             }
 
             var columnSql = GetSql(member);
+            if (boolColumn.Converter != null)
+            {
+                // A bool column with a value converter stores a non-boolean provider value (e.g. 'Y'/'N').
+                // Compare against the CONVERTED representation of the expected boolean, not a raw TRUE/FALSE
+                // literal, or the predicate matches nothing.
+                var converted = boolColumn.Converter.ConvertToProvider(expectedValue);
+                _sql.Append(columnSql).Append(" = ");
+                AppendConstant(converted, converted?.GetType() ?? boolColumn.Converter.ProviderType);
+                return true;
+            }
             _sql.Append(_provider.FormatBooleanPredicate(columnSql, expectedValue));
             return true;
         }

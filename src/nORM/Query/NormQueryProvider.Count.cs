@@ -294,6 +294,11 @@ namespace nORM.Query
             {
                 if (!map.TryGetColumnForMemberAccess(boolMember, out var boolCol))
                     return false;
+                // A bool column with a value converter stores a non-boolean provider value (e.g. 'Y'/'N');
+                // the boolean-literal predicate below compares against TRUE/FALSE and misses. Defer to the
+                // full pipeline, which converts the compared value.
+                if (boolCol.Converter != null)
+                    return false;
 
                 whereClause = $" WHERE {FormatCountBooleanPredicate(boolCol.EscCol, expectedValue: true)}";
                 return true;
@@ -304,6 +309,8 @@ namespace nORM.Query
                 && negBoolMember2.Type == typeof(bool))
             {
                 if (!map.TryGetColumnForMemberAccess(negBoolMember2, out var boolCol2))
+                    return false;
+                if (boolCol2.Converter != null)
                     return false;
 
                 whereClause = $" WHERE {FormatCountBooleanPredicate(boolCol2.EscCol, expectedValue: false)}";
@@ -320,6 +327,10 @@ namespace nORM.Query
 
                 if (me.Type == typeof(bool) && constValue is bool boolValue)
                 {
+                    // Bool column with a converter: the boolean literal would not match the stored provider
+                    // value — defer to the full pipeline.
+                    if (column.Converter != null)
+                        return false;
                     whereClause = $" WHERE {FormatCountBooleanPredicate(column.EscCol, boolValue)}";
                     return true;
                 }
@@ -330,6 +341,13 @@ namespace nORM.Query
                     return true;
                 }
 
+                // Apply the column's value converter so the count matches the STORED representation, exactly
+                // as the WHERE fast path and the full pipeline do. Binding the raw model value counts the
+                // wrong rows (typically zero) — e.g. Score == 42 against a column storing 42 as -42.
+                var boundValue = column.Converter != null
+                    ? column.Converter.ConvertToProvider(constValue)
+                    : constValue;
+
                 var paramName = _ctx.RawProvider.ParamPrefix + "p0";
                 whereClause = $" WHERE {column.EscCol} = {paramName}";
 
@@ -338,7 +356,7 @@ namespace nORM.Query
                     // Only allocate a new dictionary when we actually need to add parameters
                     if (ReferenceEquals(parameters, _emptyParams))
                         parameters = new Dictionary<string, object>(1);
-                    parameters[paramName] = constValue!;
+                    parameters[paramName] = boundValue!;
                 }
 
                 return true;
