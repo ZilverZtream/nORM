@@ -420,6 +420,7 @@ M:nORM.Core.DbContextTransaction.ReleaseSavepointAsync(System.String,System.Thre
 M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
+M:nORM.Core.DebugView.ToString():System.String
 M:nORM.Core.EntityEntry.Collection(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.GetDatabaseValues():nORM.Core.PropertyValues
 M:nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{nORM.Core.PropertyValues}
@@ -1266,6 +1267,7 @@ P:nORM.Configuration.RelationshipConfiguration.PrincipalKeys:System.Collections.
 P:nORM.Configuration.RelationshipConfiguration.PrincipalNavigation:System.Reflection.PropertyInfo
 P:nORM.Configuration.ShadowPropertyConfiguration.ClrType:System.Type
 P:nORM.Configuration.ShadowPropertyConfiguration.ColumnName:System.String
+P:nORM.Core.ChangeTracker.DebugView:nORM.Core.DebugView
 P:nORM.Core.ChangeTracker.Entries:System.Collections.Generic.IEnumerable{nORM.Core.EntityEntry}
 P:nORM.Core.DatabaseFacade.CurrentContextTransaction:nORM.Core.DbContextTransaction
 P:nORM.Core.DatabaseFacade.CurrentTransaction:System.Data.Common.DbTransaction
@@ -1286,6 +1288,8 @@ P:nORM.Core.DbContext.Database:nORM.Core.DatabaseFacade
 P:nORM.Core.DbContext.Options:nORM.Configuration.DbContextOptions
 P:nORM.Core.DbContext.Provider:nORM.Providers.DatabaseProvider
 P:nORM.Core.DbContextTransaction.Transaction:System.Data.Common.DbTransaction
+P:nORM.Core.DebugView.LongView:System.String
+P:nORM.Core.DebugView.ShortView:System.String
 P:nORM.Core.EntityEntry.CurrentValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.Entity:System.Object
 P:nORM.Core.EntityEntry.IsKeySet:System.Boolean
@@ -1668,6 +1672,7 @@ T:nORM.Core.DatabaseTopology.DatabaseRole
 T:nORM.Core.DbConcurrencyException
 T:nORM.Core.DbContext
 T:nORM.Core.DbContextTransaction
+T:nORM.Core.DebugView
 T:nORM.Core.EntityEntry
 T:nORM.Core.EntityEntryGraphNode
 T:nORM.Core.EntityState

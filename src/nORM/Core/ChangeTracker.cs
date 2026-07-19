@@ -503,6 +503,14 @@ namespace nORM.Core
         public IEnumerable<EntityEntry> Entries => _entriesByReference.Values.OrderBy(e => e.AttachSequence);
 
         /// <summary>
+        /// A human-readable snapshot of the tracked entities for debugging (EF Core
+        /// <c>ChangeTracker.DebugView</c> parity): <c>DebugView.ShortView</c> lists one line per entity
+        /// (type, key, state) and <c>DebugView.LongView</c> adds each property's value. Reflects the tracker's
+        /// current state; call <see cref="DetectChanges()"/> first to refresh states against pending edits.
+        /// </summary>
+        public DebugView DebugView => new(this);
+
+        /// <summary>
         /// Returns the tracked <see cref="EntityEntry"/> for the given entity instance, or null if not tracked.
         /// </summary>
         internal EntityEntry? GetEntryOrDefault(object entity) =>

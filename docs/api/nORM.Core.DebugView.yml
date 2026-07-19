@@ -1,0 +1,102 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.DebugView
+  commentId: T:nORM.Core.DebugView
+  id: DebugView
+  parent: nORM.Core
+  children:
+  - nORM.Core.DebugView.LongView
+  - nORM.Core.DebugView.ShortView
+  - nORM.Core.DebugView.ToString
+  langs:
+  - csharp
+  - vb
+  name: DebugView
+  nameWithType: DebugView
+  fullName: nORM.Core.DebugView
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/DebugView.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DebugView
+    path: src/nORM/Core/DebugView.cs
+    startLine: 19
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    A human-readable snapshot of the entities tracked by a <xref href="nORM.Core.ChangeTracker" data-throw-if-not-resolved="false"></xref>,
+    for debugging — the nORM equivalent of EF Core's ChangeTracker.DebugView. <xref href="nORM.Core.DebugView.ShortView" data-throw-if-not-resolved="false"></xref>
+    is one line per tracked entity (type, key, state); <xref href="nORM.Core.DebugView.LongView" data-throw-if-not-resolved="false"></xref>
+    additionally lists each mapped property's value, marks key properties, and shows the original value of a modified property.
+  syntax:
+    content: public sealed class DebugView
+    content.vb: Public NotInheritable Class DebugView
+  inheritance:
+  - System.Object
+- uid: nORM.Core.DebugView.ShortView
+  commentId: P:nORM.Core.DebugView.ShortView
+  id: ShortView
+  parent: nORM.Core.DebugView
+  langs:
+  - csharp
+  - vb
+  name: ShortView
+  nameWithType: DebugView.ShortView
+  fullName: nORM.Core.DebugView.ShortView
+  type: Property
+  namespace: nORM.Core
+  summary: One line per tracked entity — <code>Type {Key: value} State</code>.
+  syntax:
+    content: public string ShortView { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property ShortView As String
+- uid: nORM.Core.DebugView.LongView
+  commentId: P:nORM.Core.DebugView.LongView
+  id: LongView
+  parent: nORM.Core.DebugView
+  langs:
+  - csharp
+  - vb
+  name: LongView
+  nameWithType: DebugView.LongView
+  fullName: nORM.Core.DebugView.LongView
+  type: Property
+  namespace: nORM.Core
+  summary: Like ShortView, but each entity is followed by its mapped property values.
+  syntax:
+    content: public string LongView { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property LongView As String
+- uid: nORM.Core.DebugView.ToString
+  commentId: M:nORM.Core.DebugView.ToString
+  id: ToString
+  parent: nORM.Core.DebugView
+  langs:
+  - csharp
+  - vb
+  name: ToString()
+  nameWithType: DebugView.ToString()
+  fullName: nORM.Core.DebugView.ToString()
+  type: Method
+  namespace: nORM.Core
+  summary: Returns <xref href="nORM.Core.DebugView.LongView" data-throw-if-not-resolved="false"></xref> so the object renders usefully in a debugger's text view.
+  syntax:
+    content: public override string ToString()
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Overrides Function ToString() As String
+  overridden: System.Object.ToString
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core
