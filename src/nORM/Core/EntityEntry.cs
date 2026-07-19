@@ -981,14 +981,6 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Detaches the entity from the context and removes any navigation property
-        /// references that were established for change tracking or lazy loading.
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
-            Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no reflection paths are exercised.")]
-        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Aot", "IL3050:RequiresDynamicCode",
-            Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no dynamic code paths are exercised.")]
-        /// <summary>
         /// Unsubscribes this entry's change handler from an <see cref="INotifyPropertyChanged"/> entity, with
         /// none of the other detach cleanup. Used to release a transient probe entry (see
         /// <see cref="ChangeTracker.TrackGraph(object, System.Action{EntityEntryGraphNode})"/>) so it leaks no
@@ -1001,6 +993,14 @@ namespace nORM.Core
                 notify.PropertyChanged -= PropertyChangedHandler;
         }
 
+        /// <summary>
+        /// Detaches the entity from the context and removes any navigation property
+        /// references that were established for change tracking or lazy loading.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:RequiresUnreferencedCode",
+            Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no reflection paths are exercised.")]
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Aot", "IL3050:RequiresDynamicCode",
+            Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no dynamic code paths are exercised.")]
         internal void DetachEntity()
         {
             _state = EntityState.Detached;
