@@ -117,6 +117,28 @@ public class ShapedCollectionProjectionTemporalContractTests
     }
 
     [Fact]
+    public async Task child_deleted_after_the_snapshot_still_reconstructs_under_as_of()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using var _cn = cn; await using var ctx = Boot(cn);
+        ctx.Add(new Parent { Id = 1 });
+        ctx.Add(new Child { Id = 1, ParentId = 1, Val = 10 });
+        ctx.Add(new Child { Id = 2, ParentId = 1, Val = 20 });
+        await ctx.SaveChangesAsync();
+        await Task.Delay(60);
+        var t1 = await ServerNow(cn);
+        await Task.Delay(60);
+        ctx.Remove(ctx.Find<Child>(1)!); await ctx.SaveChangesAsync();   // c1 deleted AFTER t1
+
+        // At t1 both children existed. The history window includes the deleted-since child, so the projected
+        // collection reconstructs {10, 20} — the live table (c1 gone) would wrongly drop it.
+        var historic = await ((INormQueryable<Parent>)ctx.Query<Parent>())
+            .Select(p => new { p.Id, Vals = p.Children.Select(c => c.Val).ToList() })
+            .AsOf(t1).ToListAsync();
+        Assert.Equal(new[] { 10, 20 }, historic.Single().Vals.OrderBy(v => v).ToArray());
+    }
+
+    [Fact]
     public async Task collection_projection_without_as_of_still_works()
     {
         var (cn, ctx, t1) = await SeedTwoEras();
