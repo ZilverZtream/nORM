@@ -457,8 +457,33 @@ namespace nORM.Query
                     childCollection = CreateList(depQuery.CollectionElementType, 0);
                 }
 
-                ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery).SetValue(parent, childCollection);
+                AssignCollectionToTarget(ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery), parent, childCollection);
             }
+        }
+
+        /// <summary>
+        /// Assigns a fetched collection to the parent's target member. A settable property (an entity
+        /// navigation or a DTO with a setter) is assigned directly. A read-only member — an anonymous-type
+        /// projection member, which is immutable — is populated in place: the materializer pre-constructed an
+        /// empty mutable list as the constructor argument, and the children are added to THAT list because the
+        /// property can't be reassigned.
+        /// </summary>
+        private static void AssignCollectionToTarget(PropertyInfo target, object parent, IList collection)
+        {
+            if (target.CanWrite)
+            {
+                target.SetValue(parent, collection);
+                return;
+            }
+            if (target.GetValue(parent) is IList existing)
+            {
+                foreach (var item in collection)
+                    existing.Add(item);
+                return;
+            }
+            throw new nORM.Core.NormQueryException(
+                $"Navigation collection member '{target.Name}' is read-only and was not initialized to a mutable list; " +
+                "a shaped collection projection into an anonymous type requires a mutable List<T> member.");
         }
 
         /// <summary>
@@ -560,7 +585,7 @@ namespace nORM.Query
         {
             // Use cached compiled factory instead of Activator.CreateInstance.
             var emptyList = CreateList(depQuery.CollectionElementType, 0);
-            ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery).SetValue(parent, emptyList);
+            AssignCollectionToTarget(ResolveOnParent(depQuery.TargetCollectionProperty, parent, depQuery), parent, emptyList);
         }
 
         /// <summary>

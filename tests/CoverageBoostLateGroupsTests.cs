@@ -1753,11 +1753,11 @@ public class CoverageBoostGroup76Tests
         var projection = Expression.Lambda(newExpr, param);
 
         var factory = new MaterializerFactory();
-        // ExtractColumnsFromProjection skips Books (nav collection, lines 1107-1108),
-        // produces [col_Id] (1 col). GetCachedConstructor then fails because the 2-param
-        // anonymous-type ctor doesn't match 1 column → InvalidOperationException.
-        Assert.Throws<InvalidOperationException>(() =>
-            factory.CreateSyncMaterializer(mapping, anonType, projection));
+        // ExtractColumnsFromProjection excludes Books (a navigation collection) → [col_Id]. The constructor
+        // materializer no longer trips on the 2-param-vs-1-column mismatch: the collection arg is injected as
+        // an empty mutable list (the split query populates it in a real query), so the materializer builds.
+        var materializer = factory.CreateSyncMaterializer(mapping, anonType, projection);
+        Assert.NotNull(materializer);
     }
 
     [Fact]

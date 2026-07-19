@@ -171,31 +171,73 @@ namespace nORM.Query
             ParameterInfo[] parameters,
             IReadOnlyList<Expression> arguments,
             IReadOnlyList<Column> columns,
-            int startOffset)
+            int startOffset,
+            TableMapping mapping)
         {
             var reader = Expression.Parameter(typeof(DbDataReader), "reader");
             var args = new Expression[parameters.Length];
 
+            // Non-collection args map 1:1 to the projection columns (in the same order the SELECT emitted
+            // them); a shaped/bare navigation-collection arg has no column, so track the column position with
+            // a separate cursor that only advances past real columns.
+            var columnCursor = 0;
             for (var i = 0; i < parameters.Length; i++)
             {
                 var paramType = parameters[i].ParameterType;
-                var readValue = columns[i].Converter != null
-                    ? BuildConverterReadExpression(reader, columns[i].Converter!, paramType, i + startOffset)
-                    : GetOptimizedReaderCall(reader, paramType, i + startOffset);
-                if (CanSkipDbNullCheck(parameters[i], arguments[i], columns[i]))
+
+                // A navigation collection is loaded by the split-query pipeline, not read from the row.
+                // Construct an empty MUTABLE list as the constructor argument; the stitch populates it in
+                // place, because an anonymous type is immutable and its member can't be assigned afterwards.
+                if (IsShapedOrBareNavigationCollection(arguments[i], mapping))
+                {
+                    args[i] = BuildEmptyProjectedCollection(paramType);
+                    continue;
+                }
+
+                var col = columns[columnCursor];
+                var offset = columnCursor + startOffset;
+                columnCursor++;
+
+                var readValue = col.Converter != null
+                    ? BuildConverterReadExpression(reader, col.Converter!, paramType, offset)
+                    : GetOptimizedReaderCall(reader, paramType, offset);
+                if (CanSkipDbNullCheck(parameters[i], arguments[i], col))
                 {
                     args[i] = readValue;
                 }
                 else
                 {
                     var defaultValue = Expression.Default(paramType);
-                    var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(i + startOffset));
+                    var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(offset));
                     args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
                 }
             }
 
             var body = Expression.Convert(Expression.New(ctor, args), typeof(object));
             return Expression.Lambda<Func<DbDataReader, object>>(body, reader).Compile();
+        }
+
+        /// <summary>
+        /// Builds an empty, mutable <see cref="List{T}"/> assignable to a projected collection member so a
+        /// split-query stitch can populate it in place. The member type comes from the shaped collection's
+        /// terminator: <c>ToList</c>/<c>AsEnumerable</c> yield a <c>List&lt;T&gt;</c>-assignable type. A
+        /// <c>ToArray</c> member (<c>T[]</c>) is fixed-size and can't be populated after construction, so it
+        /// is rejected with guidance rather than silently returning an empty array.
+        /// </summary>
+        private static Expression BuildEmptyProjectedCollection(Type memberType)
+        {
+            var elementType = memberType.IsArray
+                ? memberType.GetElementType()
+                : (memberType.IsGenericType ? memberType.GetGenericArguments()[0] : null);
+            if (elementType == null)
+                throw new nORM.Core.NormQueryException(
+                    $"Cannot project a navigation collection into '{memberType}'.");
+            var listType = typeof(List<>).MakeGenericType(elementType);
+            if (!memberType.IsAssignableFrom(listType))
+                throw new nORM.Core.NormUnsupportedFeatureException(
+                    $"An anonymous-type projection can't populate a '{memberType.Name}' collection member. Use " +
+                    ".ToList() for the projected collection, or project into a named type with a settable property.");
+            return Expression.New(listType);
         }
 
         private static bool CanSkipDbNullCheck(ParameterInfo parameter, Expression argument, Column column)

@@ -83,6 +83,13 @@ namespace nORM.Query
                 for (int i = 0; i < newExpr.Arguments.Count; i++)
                 {
                     var arg = newExpr.Arguments[i];
+                    // Shaped or bare navigation collections (o.Lines, o.Lines.Where(p).Select(...).ToList())
+                    // are populated by the split-query pipeline and carry no row column — exclude them here,
+                    // exactly as the SELECT-clause visitor omits them from the SQL and the MemberInit path
+                    // (above) skips them. A shaped collection is a MethodCallExpression, so the bare-only
+                    // IsNavigationCollection check below would otherwise let it through as a shadow column.
+                    if (IsShapedOrBareNavigationCollection(arg, mapping))
+                        continue;
                     if (arg is MemberExpression m)
                     {
                         // Skip navigation collections - they'll be populated by split queries

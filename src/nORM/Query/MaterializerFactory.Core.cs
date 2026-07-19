@@ -176,12 +176,20 @@ namespace nORM.Query
 
             if (projection?.Body is NewExpression projectionNew
                 && projectionNew.Type == targetType
-                && projectionNew.Arguments.Count == columns.Length
                 && projectionNew.Constructor is { } projectionCtor
-                && projectionCtor.GetParameters().Length == columns.Length)
+                && projectionCtor.GetParameters().Length == projectionNew.Arguments.Count)
             {
-                var projectionCtorParams = projectionCtor.GetParameters();
-                return CreateProjectionConstructorMaterializer(projectionCtor, projectionCtorParams, projectionNew.Arguments, columns, startOffset);
+                // Shaped/bare navigation-collection args are populated by the split-query pipeline and carry no
+                // projection column (ExtractColumnsFromProjection excludes them); the materializer injects an
+                // empty mutable list for each. Every OTHER arg maps 1:1 to a column, so the column count must
+                // equal the non-collection arg count. A projection with no collection member counts every arg,
+                // so this stays byte-identical (Arguments.Count == columns.Length) for the common case.
+                var nonCollectionArgCount = projectionNew.Arguments.Count(a => !IsShapedOrBareNavigationCollection(a, mapping));
+                if (columns.Length == nonCollectionArgCount)
+                {
+                    var projectionCtorParams = projectionCtor.GetParameters();
+                    return CreateProjectionConstructorMaterializer(projectionCtor, projectionCtorParams, projectionNew.Arguments, columns, startOffset, mapping);
+                }
             }
 
             var parameterlessCtor = _parameterlessCtorCache.GetOrAdd(targetType, t => t.GetConstructor(Type.EmptyTypes));
