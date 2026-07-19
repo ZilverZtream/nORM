@@ -63,6 +63,12 @@ Read benchmarks that compare nORM to handwritten ADO.NET must distinguish:
   that leaves one connection at SQLite's default `FULL` measures fsync policy,
   not ORM overhead. Until this is equalized, SQLite single-insert rows must not
   be published.
+- Single-insert benchmarks must read the generated key back on EVERY contender
+  (nORM's default `hydrateGeneratedKeys`, EF's `SaveChanges`, and Dapper / Raw ADO
+  via `SELECT last_insert_rowid()`), or nORM and EF do strictly more work than a
+  bare INSERT and the comparison silently understates them. This is the
+  fairness-cuts-both-ways rule: align the WORK, not just the SQL. An INSERT-only
+  variant is permitted but must be labeled as not reading the key back.
 - Bulk-insert claims must use the `BulkInsert_Idiomatic_*` rows unless the
   claim explicitly says it is measuring a low-level diagnostic path. The
   `BulkInsert_Naive_*`, `BulkInsert_Batched_*`, and `Tx + per row` rows exist

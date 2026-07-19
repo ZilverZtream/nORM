@@ -84,6 +84,8 @@ namespace nORM.Benchmarks
         private SqliteCommand? _adoFirstPrepared;
         private SqliteParameter? _adoFirstIdParam;
 
+        private SqliteCommand? _adoInsertPrepared;
+
         private SqliteCommand? _adoComplexPrepared;
         private SqliteParameter? _adoComplexAgeParam;
         private SqliteParameter? _adoComplexCityParam;
@@ -274,6 +276,22 @@ namespace nORM.Benchmarks
             _adoFirstIdParam.ParameterName = "@Id";
             _adoFirstPrepared.Parameters.Add(_adoFirstIdParam);
             _adoFirstPrepared.Prepare();
+
+            // Prepared insert command reused across calls — the fair floor for nORM's prepared/pooled insert
+            // (both reuse a prepared command AND read the generated key back). The other insert baselines build
+            // a fresh command per call (the naive tier).
+            _adoInsertPrepared = _dapperConnection.CreateCommand();
+            _adoInsertPrepared.CommandText = @"
+                INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary);
+                SELECT last_insert_rowid();";
+            foreach (var pName in new[] { "@Name", "@Email", "@CreatedAt", "@IsActive", "@Age", "@City", "@Department", "@Salary" })
+            {
+                var p = _adoInsertPrepared.CreateParameter();
+                p.ParameterName = pName;
+                _adoInsertPrepared.Parameters.Add(p);
+            }
+            _adoInsertPrepared.Prepare();
         }
 
         // ========== SINGLE INSERT (reuse contexts/connections; no per-op PRAGMAs) ==========
@@ -319,9 +337,13 @@ namespace nORM.Benchmarks
         [Benchmark]
         public async Task Insert_Single_Dapper()
         {
+            // Read the generated key back too (SELECT last_insert_rowid()), matching nORM's default
+            // hydrateGeneratedKeys and EF's SaveChanges — a fair apples-to-apples single insert (INSERT +
+            // return identity), not INSERT alone, which is what a real app that uses the new row needs.
             const string sql = @"
                 INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary);
+                SELECT last_insert_rowid();";
 
             var user = new BenchmarkUser
             {
@@ -335,15 +357,18 @@ namespace nORM.Benchmarks
                 Salary = 50_000
             };
 
-            await _dapperConnection!.ExecuteAsync(sql, user);
+            user.Id = (int)await _dapperConnection!.ExecuteScalarAsync<long>(sql, user);
         }
 
         [Benchmark]
         public async Task Insert_Single_RawAdo()
         {
+            // Read the generated key back too (SELECT last_insert_rowid()) — apples-to-apples with nORM's
+            // default hydrateGeneratedKeys and EF's SaveChanges, not INSERT alone.
             const string sql = @"
                 INSERT INTO BenchmarkUser (Name, Email, CreatedAt, IsActive, Age, City, Department, Salary)
-                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary)";
+                VALUES (@Name, @Email, @CreatedAt, @IsActive, @Age, @City, @Department, @Salary);
+                SELECT last_insert_rowid();";
             using var command = _dapperConnection!.CreateCommand();
             command.CommandText = sql;
             command.Parameters.AddWithValue("@Name", "Test User ADO");
@@ -354,7 +379,24 @@ namespace nORM.Benchmarks
             command.Parameters.AddWithValue("@City", "TestCity");
             command.Parameters.AddWithValue("@Department", "TestDept");
             command.Parameters.AddWithValue("@Salary", 50_000);
-            await command.ExecuteNonQueryAsync();
+            _ = (long)(await command.ExecuteScalarAsync())!;   // INSERT + return the generated identity
+        }
+
+        [Benchmark(Description = "Insert Single Raw ADO (Prepared)")]
+        public async Task Insert_Single_RawAdo_Prepared()
+        {
+            // Reuse the prepared command (set values by ordinal) + read the key back — the fair floor for
+            // nORM's prepared/pooled insert, both preparing and hydrating the identity.
+            var p = _adoInsertPrepared!.Parameters;
+            p[0].Value = "Test User ADO";
+            p[1].Value = "test@ado.com";
+            p[2].Value = DateTime.Now.ToString("O");
+            p[3].Value = 1;
+            p[4].Value = 25;
+            p[5].Value = "TestCity";
+            p[6].Value = "TestDept";
+            p[7].Value = 50_000;
+            _ = (long)(await _adoInsertPrepared.ExecuteScalarAsync())!;
         }
 
         // ========== SIMPLE QUERY (standard) ==========
