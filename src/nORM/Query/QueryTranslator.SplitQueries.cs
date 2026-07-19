@@ -118,13 +118,6 @@ namespace nORM.Query
                 _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
                 var dependentElementType = elementProjection?.ReturnType ?? elementType;
 
-                // Filtered/projected owned & many-to-many shaped projections are a later sub-increment; only a
-                // bare .ToList() is wired so far. Fail loud rather than silently drop the filter/projection.
-                if ((m2m != null || owned != null) && (filter.Sql != null || elementProjection != null))
-                    throw new NormUnsupportedFeatureException(
-                        $"Projecting the {(owned != null ? "owned" : "many-to-many")} collection '{collectionProperty.Name}' " +
-                        "with a Where(...) filter or an element projection isn't supported yet — use a bare .ToList(), or Include(...).");
-
                 // A closure-capturing element projection is applied client-side; baking it into a cached
                 // delegate would replay the first execution's captured value. Mark the plan non-cacheable so
                 // it re-translates (a fresh projection with the current capture) on every execution.

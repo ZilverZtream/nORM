@@ -347,14 +347,19 @@ namespace nORM.Query
         /// anonymous types), not the left entity, so the left key and the target collection member are resolved
         /// by NAME (via the split-query stitch helpers) rather than the mapping's entity-typed accessors. Runs
         /// the same two-phase bridge+related fetch as <see cref="LoadManyToMany"/>; related entities are kept
-        /// transient (never tracked, since the result is a projection). Bare collection only — filtered/projected
-        /// element bindings are rejected upstream at plan build for now.
+        /// transient (never tracked, since the result is a projection). A per-element <c>Where(...)</c> filter is
+        /// ANDed onto the related fetch (rendered at plan build against the right table, params re-bound from the
+        /// captured main-command values); an element projection is applied per related entity as the collection
+        /// is built.
         /// </summary>
-        public void LoadManyToManyProjection(DependentQueryDefinition depQuery, IList parents)
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("A many-to-many shaped projection may compile an element projection at runtime; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("A many-to-many shaped projection reflects over the projected type; trimming may remove the required members.")]
+        public void LoadManyToManyProjection(DependentQueryDefinition depQuery, IList parents, Dictionary<string, object?>? filterParams = null)
         {
             if (parents.Count == 0) return;
             var jtm = depQuery.M2M!;
             var rightMapping = depQuery.TargetMapping;
+            var projector = depQuery.ElementProjection is { } proj ? QueryExecutor.CompileElementProjection(proj) : null;
 
             object?[]? LeftKeyValues(object p)
             {
@@ -434,19 +439,22 @@ namespace nORM.Query
             {
                 using var cmd2 = _ctx.CreateCommand();
                 var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, jtm.RightKeyColumns, rightKeyValues.Values.ToList());
+                var rsql = new System.Text.StringBuilder($"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}");
                 if (tenantActive)
                 {
                     var rightTenantCol = _ctx.RequireTenantColumn(rightMapping, "many-to-many shaped projection right side");
                     var rtp = $"{_ctx.RawProvider.ParamPrefix}jrtenant";
-                    cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate} AND {rightTenantCol.EscCol} = {rtp}";
+                    rsql.Append($" AND {rightTenantCol.EscCol} = {rtp}");
                     cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many shaped projection right side"));
                 }
-                else
-                {
-                    cmd2.CommandText = $"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}";
-                }
                 var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
-                if (rightGlobalFilter != null) cmd2.CommandText += $" AND {rightGlobalFilter}";
+                if (rightGlobalFilter != null) rsql.Append($" AND {rightGlobalFilter}");
+                // Shaped-projection per-element filter (Tags = p.Tags.Where(pred).ToList()): the predicate was
+                // rendered at plan build against rightMapping.EscTable — the same unaliased FROM used here, so its
+                // table-qualified columns resolve — with its compiled params bound from the captured main-command
+                // values so closure captures re-bind per execution.
+                QueryExecutor.AppendDependentFilter(cmd2, rsql, depQuery, filterParams);
+                cmd2.CommandText = rsql.ToString();
                 cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
 
                 var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
@@ -471,7 +479,7 @@ namespace nORM.Query
                         foreach (var rPk in rightPks)
                         {
                             if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity)) rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
-                            if (rightEntity != null) collection.Add(rightEntity);
+                            if (rightEntity != null) collection.Add(projector != null ? projector(rightEntity) : rightEntity);
                         }
                 }
                 QueryExecutor.AssignCollectionToTarget(QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p, collection);

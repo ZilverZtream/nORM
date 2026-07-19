@@ -404,11 +404,12 @@ namespace nORM.Core
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Owned-collection projection materialization builds instances via reflection; not NativeAOT-compatible.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Owned-collection projection reflects over the owned type; trimming may remove the required members.")]
-        internal void LoadOwnedCollectionProjection(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents)
+        internal void LoadOwnedCollectionProjection(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents, Dictionary<string, object?>? filterParams = null)
         {
             if (parents.Count == 0) return;
             var ownedMap = depQuery.Owned!;
             var pkColProp = depQuery.ParentKeyProperties[0];   // the owner key column the FK references
+            var projector = depQuery.ElementProjection is { } proj ? nORM.Query.QueryExecutor.CompileElementProjection(proj) : null;
 
             object? OwnerKey(object p) => nORM.Query.QueryExecutor.ResolveOnParent(pkColProp, p, depQuery).GetValue(p);
             void AssignEmpty(object p) => nORM.Query.QueryExecutor.AssignCollectionToTarget(
@@ -433,7 +434,9 @@ namespace nORM.Core
             for (int ci = 0; ci < ownedMap.Columns.Length; ci++) { if (ci > 0) sql.Append(", "); sql.Append(ownedMap.Columns[ci].EscCol); }
             if (ownedMap.Columns.Length > 0) sql.Append(", ");
             sql.Append(ownedMap.EscForeignKeyColumn);
-            sql.Append(" FROM ").Append(ownedMap.EscTable).Append(' ').Append(_p.Escape("__ownt"))
+            // No table alias: a shaped per-element filter is rendered at plan build against the owned table's own
+            // name, so the FROM must reference it unaliased for the filter's table-qualified columns to resolve.
+            sql.Append(" FROM ").Append(ownedMap.EscTable)
                .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
             for (int pi = 0; pi < pks.Length; pi++) { if (pi > 0) sql.Append(", "); sql.Append(_p.ParamPrefix).Append("lpk").Append(pi); }
             sql.Append(')');
@@ -448,8 +451,6 @@ namespace nORM.Core
                 sql.Append(" AND ").Append(ownedTenantCol.EscCol).Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
 
             using var cmd = CreateCommand();
-            cmd.CommandText = sql.ToString();
-            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
             for (int i = 0; i < pks.Length; i++)
             {
                 var pp = cmd.CreateParameter(); pp.ParameterName = _p.ParamPrefix + "lpk" + i; pp.Value = pks[i]; cmd.Parameters.Add(pp);
@@ -459,9 +460,17 @@ namespace nORM.Core
                 var tp = cmd.CreateParameter(); tp.ParameterName = _p.ParamPrefix + "tenantId";
                 tp.Value = GetRequiredTenantId(ownedTenantCol, ownedMap.OwnedType, "owned collection shaped projection"); cmd.Parameters.Add(tp);
             }
+            // Shaped-projection per-element filter (Lines = o.Lines.Where(pred).ToList()): AND the plan-rendered
+            // predicate and bind its compiled params from the captured main-command values so closures re-bind.
+            nORM.Query.QueryExecutor.AppendDependentFilter(cmd, sql, depQuery, filterParams);
+            cmd.CommandText = sql.ToString();
+            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
 
             int fkOrdinal = ownedMap.Columns.Length;
-            var byOwnerKey = new Dictionary<object, System.Collections.IList>();
+            // Grouped by owner key as the OWNED ENTITY (object) — the element projection, when present, is applied
+            // per item at stitch time, because CollectionElementType is the PROJECTED type (a typed list here
+            // could not hold the entity we materialize).
+            var byOwnerKey = new Dictionary<object, List<object>>();
             using (var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(this, System.Data.CommandBehavior.Default))
             {
                 while (reader.Read())
@@ -479,7 +488,7 @@ namespace nORM.Core
                     var key = ConvertSimple(fkVal, pkColProp.PropertyType) ?? fkVal;   // coerce FK to the owner-key CLR type
                     if (!byOwnerKey.TryGetValue(key, out var list))
                     {
-                        list = nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0);
+                        list = new List<object>();
                         byOwnerKey[key] = list;
                     }
                     list.Add(item);
@@ -491,7 +500,7 @@ namespace nORM.Core
                 var k = OwnerKey(p);
                 var collection = nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0);
                 if (k != null && byOwnerKey.TryGetValue(k, out var loaded))
-                    foreach (var it in loaded) collection.Add(it);
+                    foreach (var it in loaded) collection.Add(projector != null ? projector(it) : it);
                 nORM.Query.QueryExecutor.AssignCollectionToTarget(
                     nORM.Query.QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p, collection);
             }

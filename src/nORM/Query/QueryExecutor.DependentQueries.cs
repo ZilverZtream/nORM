@@ -116,13 +116,13 @@ namespace nORM.Query
             {
                 if (depQuery.M2M != null)
                 {
-                    _includeProcessor.LoadManyToManyProjection(depQuery, parents);
+                    _includeProcessor.LoadManyToManyProjection(depQuery, parents, filterParams);
                     continue;
                 }
 
                 if (depQuery.Owned != null)
                 {
-                    _ctx.LoadOwnedCollectionProjection(depQuery, parents);
+                    _ctx.LoadOwnedCollectionProjection(depQuery, parents, filterParams);
                     continue;
                 }
 
@@ -224,7 +224,7 @@ namespace nORM.Query
         /// captured main-command values so closure captures re-bind per execution. No-op when the dependent
         /// query carries no filter.
         /// </summary>
-        private static void AppendDependentFilter(
+        internal static void AppendDependentFilter(
             DbCommand cmd,
             System.Text.StringBuilder sql,
             DependentQueryDefinition depQuery,
@@ -559,7 +559,7 @@ namespace nORM.Query
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Compiling an element projection emits IL at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Compiling an element projection reflects over the projected type; trimming may remove the required members. See docs/aot-trimming.md.")]
-        private static Func<object, object> CompileElementProjection(LambdaExpression projection)
+        internal static Func<object, object> CompileElementProjection(LambdaExpression projection)
         {
             var param = Expression.Parameter(typeof(object), "e");
             var typed = Expression.Convert(param, projection.Parameters[0].Type);
