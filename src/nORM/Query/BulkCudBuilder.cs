@@ -324,7 +324,7 @@ namespace nORM.Query
                         // Server-side computed form: SetProperty(x => x.Counter, x => x.Counter + 1).
                         // Translate the body against the entity columns (no alias prefix — UPDATE
                         // statements reference columns directly).
-                        var exprSql = TranslateUpdateValueExpression(valueLambda, mapping);
+                        var exprSql = TranslateUpdateValueExpression(valueLambda, mapping, parameters, targetColumn, ref paramIndex);
                         assigns.Add((column, null, null, exprSql));
                     }
                 }
@@ -395,12 +395,20 @@ namespace nORM.Query
         /// constants (inlined or captured), arithmetic / string-concat binary operators,
         /// and primitive Convert. Anything outside that surface throws.
         /// </summary>
-        private string TranslateUpdateValueExpression(LambdaExpression valueLambda, TableMapping mapping)
+        private string TranslateUpdateValueExpression(LambdaExpression valueLambda, TableMapping mapping,
+            Dictionary<string, object> parameters, Column targetColumn, ref int paramIndex)
         {
             var rowParam = valueLambda.Parameters[0];
-            return Render(valueLambda.Body);
+            // ref params cannot be captured by the local functions below, so mutate a local copy and write
+            // it back after rendering. valuePosition tracks whether a rendered node is the directly-assigned
+            // value (the body itself, or a ternary/coalesce branch) as opposed to an arithmetic/function
+            // operand — the target column's value converter only applies to the former.
+            int localParamIndex = paramIndex;
+            var rendered = Render(valueLambda.Body, valuePosition: true);
+            paramIndex = localParamIndex;
+            return rendered;
 
-            string Render(Expression e)
+            string Render(Expression e, bool valuePosition)
             {
                 switch (e)
                 {
@@ -411,14 +419,15 @@ namespace nORM.Query
                         return col.EscCol;
 
                     case ConstantExpression ce:
-                        return RenderLiteral(ce.Value);
+                        return RenderLiteral(ce.Value, valuePosition);
 
                     case UnaryExpression ue when ue.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked:
-                        return Render(ue.Operand);
+                        return Render(ue.Operand, valuePosition);
 
                     case ConditionalExpression cond:
-                        // Ternary -> CASE WHEN test THEN ifTrue ELSE ifFalse END.
-                        return $"(CASE WHEN {RenderPredicate(cond.Test)} THEN {Render(cond.IfTrue)} ELSE {Render(cond.IfFalse)} END)";
+                        // Ternary -> CASE WHEN test THEN ifTrue ELSE ifFalse END. The branches are the
+                        // assigned value, so they inherit the current value position.
+                        return $"(CASE WHEN {RenderPredicate(cond.Test)} THEN {Render(cond.IfTrue, valuePosition)} ELSE {Render(cond.IfFalse, valuePosition)} END)";
 
                     case MethodCallExpression mc when mc.Method.DeclaringType is { } dt &&
                         (dt == typeof(Math) || dt == typeof(string) || dt == typeof(Convert)):
@@ -427,8 +436,8 @@ namespace nORM.Query
                         // server-side functions like Math.Abs / Math.Min / string.Trim.
                         var fnArgs = new string[mc.Arguments.Count + (mc.Object != null ? 1 : 0)];
                         int ai = 0;
-                        if (mc.Object != null) fnArgs[ai++] = Render(mc.Object);
-                        for (int i = 0; i < mc.Arguments.Count; i++) fnArgs[ai++] = Render(mc.Arguments[i]);
+                        if (mc.Object != null) fnArgs[ai++] = Render(mc.Object, valuePosition: false);
+                        for (int i = 0; i < mc.Arguments.Count; i++) fnArgs[ai++] = Render(mc.Arguments[i], valuePosition: false);
                         var fnSql = _ctx.RawProvider.TranslateFunction(mc.Method.Name, dt, fnArgs);
                         if (fnSql == null)
                             throw new NormUnsupportedFeatureException(
@@ -443,12 +452,13 @@ namespace nORM.Query
                             && be.Left.Type == typeof(string)
                             && be.Right.Type == typeof(string))
                         {
-                            return _ctx.RawProvider.GetNullSafeConcatSql(Render(be.Left), Render(be.Right));
+                            return _ctx.RawProvider.GetNullSafeConcatSql(Render(be.Left, valuePosition: false), Render(be.Right, valuePosition: false));
                         }
-                        // Null-coalesce: `??` lowers to BinaryExpression(Coalesce). Emit COALESCE.
+                        // Null-coalesce: `??` lowers to BinaryExpression(Coalesce). Emit COALESCE. Both
+                        // operands can be the assigned value (col ?? fallback), so keep the value position.
                         if (be.NodeType == ExpressionType.Coalesce)
                         {
-                            return $"COALESCE({Render(be.Left)}, {Render(be.Right)})";
+                            return $"COALESCE({Render(be.Left, valuePosition)}, {Render(be.Right, valuePosition)})";
                         }
                         var op = be.NodeType switch
                         {
@@ -474,12 +484,12 @@ namespace nORM.Query
                                 "SetProperty value expression. For Power, use `Math.Pow(x, n)` which lowers " +
                                 "to the provider's POWER / POW function."),
                         };
-                        return $"({Render(be.Left)} {op} {Render(be.Right)})";
+                        return $"({Render(be.Left, valuePosition: false)} {op} {Render(be.Right, valuePosition: false)})";
 
                     case MemberExpression captured:
-                        // Closure-captured constant — evaluate at translation time and inline.
+                        // Closure-captured constant — evaluate at translation time.
                         if (nORM.Query.QueryTranslator.TryGetConstantValue(captured, out var capturedValue))
-                            return RenderLiteral(capturedValue);
+                            return RenderLiteral(capturedValue, valuePosition);
                         throw new NormUnsupportedFeatureException(
                             $"Cannot resolve '{captured.Member.Name}' in a SetProperty value expression.");
 
@@ -503,14 +513,38 @@ namespace nORM.Query
                 }
             }
 
-            string RenderLiteral(object? value) => value switch
+            string RenderLiteral(object? value, bool valuePosition)
             {
-                null => "NULL",
-                string s => "'" + s.Replace("'", "''") + "'",
-                bool b => b ? _ctx.RawProvider.BooleanTrueLiteral : _ctx.RawProvider.BooleanFalseLiteral,
-                IFormattable f => f.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
-                _ => System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "NULL",
-            };
+                // In value position (the assigned value or a ternary/coalesce branch), a converter column
+                // stores the provider representation — apply the converter before rendering, matching the
+                // tracked and literal write paths. Not applied to arithmetic/function operands.
+                if (valuePosition && value != null && targetColumn.Converter != null)
+                    value = targetColumn.Converter.ConvertToProvider(value);
+                switch (value)
+                {
+                    case null:
+                        return "NULL";
+                    case string s:
+                        return "'" + s.Replace("'", "''") + "'";
+                    case bool b:
+                        return b ? _ctx.RawProvider.BooleanTrueLiteral : _ctx.RawProvider.BooleanFalseLiteral;
+                    // Numeric types inline as valid, culture-invariant SQL literals.
+                    case byte or sbyte or short or ushort or int or uint or long or ulong or decimal or double or float:
+                        return ((IFormattable)value).ToString(null, System.Globalization.CultureInfo.InvariantCulture);
+                    // A plain enum column stores the underlying integral value (a converter, if any, was
+                    // applied above and would have produced a string/number, not an Enum).
+                    case Enum en:
+                        var underlying = System.Convert.ChangeType(
+                            en, Enum.GetUnderlyingType(en.GetType()), System.Globalization.CultureInfo.InvariantCulture);
+                        return ((IFormattable)underlying!).ToString(null, System.Globalization.CultureInfo.InvariantCulture);
+                    // DateTime/DateTimeOffset/Guid/TimeSpan/char/byte[]/etc. cannot be inlined safely —
+                    // parameterize so the provider binds the correct typed value (quoting, precision, layout).
+                    default:
+                        var pName = _ctx.RawProvider.ParamPrefix + "u" + localParamIndex++;
+                        parameters[pName] = value;
+                        return pName;
+                }
+            }
 
             // Predicate rendering for conditional `Test` branches. Boolean operators map to
             // SQL keywords; comparisons emit raw operators. Re-uses the value-side Render for
@@ -535,17 +569,17 @@ namespace nORM.Query
                         };
                         if (pop is "AND" or "OR")
                             return $"({RenderPredicate(pb.Left)} {pop} {RenderPredicate(pb.Right)})";
-                        return $"({Render(pb.Left)} {pop} {Render(pb.Right)})";
+                        return $"({Render(pb.Left, valuePosition: false)} {pop} {Render(pb.Right, valuePosition: false)})";
 
                     case UnaryExpression pn when pn.NodeType == ExpressionType.Not:
                         return $"(NOT {RenderPredicate(pn.Operand)})";
 
                     case MemberExpression pm when pm.Type == typeof(bool):
                         // Bare boolean column: emit `col = TRUE`.
-                        return $"({Render(pm)} = {_ctx.RawProvider.BooleanTrueLiteral})";
+                        return $"({Render(pm, valuePosition: false)} = {_ctx.RawProvider.BooleanTrueLiteral})";
 
                     default:
-                        return Render(p);
+                        return Render(p, valuePosition: false);
                 }
             }
 
@@ -612,7 +646,7 @@ namespace nORM.Query
                 // Tenant-scope the dependent aggregate so a multi-tenant UPDATE cannot fold in rows
                 // from another tenant that happen to share the same foreign-key value.
                 if (_ctx.Options.TenantProvider != null && dependent.TenantColumn is { } depTenant)
-                    conds.Add($"{depAlias}.{depTenant.EscCol} = {RenderLiteral(_ctx.GetRequiredTenantId(dependent, "ExecuteUpdate navigation aggregate"))}");
+                    conds.Add($"{depAlias}.{depTenant.EscCol} = {RenderLiteral(_ctx.GetRequiredTenantId(dependent, "ExecuteUpdate navigation aggregate"), valuePosition: false)}");
 
                 return $"(SELECT {agg} FROM {dependent.EscTable} {depAlias} WHERE {string.Join(" AND ", conds)})";
             }
@@ -634,10 +668,10 @@ namespace nORM.Query
                         return $"{alias}.{dcol.EscCol}";
 
                     case MemberExpression captured when nORM.Query.QueryTranslator.TryGetConstantValue(captured, out var capturedValue):
-                        return RenderLiteral(capturedValue);
+                        return RenderLiteral(capturedValue, valuePosition: false);
 
                     case ConstantExpression ce:
-                        return RenderLiteral(ce.Value);
+                        return RenderLiteral(ce.Value, valuePosition: false);
 
                     case BinaryExpression be:
                         var op = be.NodeType switch

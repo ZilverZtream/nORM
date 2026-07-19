@@ -32,6 +32,7 @@ public class SetPropertyComputedValueConversionTests
     {
         [Key] public int Id { get; set; }
         public DateTime ExpiresAt { get; set; }
+        public DateTime Deadline { get; set; }
         public JobStatus Status { get; set; }
         public int Counter { get; set; }
     }
@@ -54,7 +55,7 @@ public class SetPropertyComputedValueConversionTests
         using (var cmd = cn.CreateCommand())
         {
             cmd.CommandText = """
-                CREATE TABLE SpJob (Id INTEGER PRIMARY KEY, ExpiresAt TEXT, Status TEXT NOT NULL, Counter INTEGER NOT NULL);
+                CREATE TABLE SpJob (Id INTEGER PRIMARY KEY, ExpiresAt TEXT, Deadline TEXT, Status TEXT NOT NULL, Counter INTEGER NOT NULL);
                 CREATE TABLE SpGuidJob (Id INTEGER PRIMARY KEY, Ref TEXT NOT NULL);
                 INSERT INTO SpGuidJob VALUES (1, '');
                 """;
@@ -67,7 +68,7 @@ public class SetPropertyComputedValueConversionTests
             mb.Entity<GuidJob>().HasKey(j => j.Id);
         }};
         var ctx = new DbContext(cn, new SqliteProvider(), opts);
-        ctx.Add(new Job { Id = 1, ExpiresAt = new DateTime(2000, 1, 1), Status = JobStatus.Open, Counter = 10 });
+        ctx.Add(new Job { Id = 1, ExpiresAt = new DateTime(2000, 1, 1), Deadline = new DateTime(2000, 1, 1), Status = JobStatus.Open, Counter = 10 });
         ctx.SaveChangesAsync().GetAwaiter().GetResult();
         return ctx;
     }
@@ -122,6 +123,35 @@ public class SetPropertyComputedValueConversionTests
         var done = true;
 
         await ctx.Query<Job>().Where(j => j.Id == 1).ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, j => done ? JobStatus.Done : JobStatus.Open));
+
+        Assert.Equal("Done", RawScalar(cn, "SELECT Status FROM SpJob WHERE Id = 1"));
+        Assert.Equal(JobStatus.Done, ctx.Query<Job>().AsNoTracking().First(j => j.Id == 1).Status);
+    }
+
+    [Fact]
+    public async Task Row_conditional_datetime_branch_is_parameterized()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Bootstrap(cn);
+        var dateA = new DateTime(2030, 6, 7, 8, 9, 10, 456, DateTimeKind.Unspecified);
+        var dateB = new DateTime(1999, 1, 1);
+
+        // References the row (j.Counter) → computed path; the DateTime branch must be parameterized, not
+        // inlined unquoted. Counter is 10 (> 5) so dateA wins.
+        await ctx.Query<Job>().Where(j => j.Id == 1).ExecuteUpdateAsync(
+            s => s.SetProperty(j => j.Deadline, j => j.Counter > 5 ? dateA : dateB));
+
+        Assert.Equal(dateA, ctx.Query<Job>().AsNoTracking().First(j => j.Id == 1).Deadline);
+    }
+
+    [Fact]
+    public async Task Row_conditional_enum_branch_is_converted()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Bootstrap(cn);
+
+        // Row-referencing ternary assigning to a converter column: the enum branch must be converted to the
+        // provider name, not inlined as its unquoted enum name. Counter is 10 (> 5) so Done wins.
+        await ctx.Query<Job>().Where(j => j.Id == 1).ExecuteUpdateAsync(
+            s => s.SetProperty(j => j.Status, j => j.Counter > 5 ? JobStatus.Done : JobStatus.Open));
 
         Assert.Equal("Done", RawScalar(cn, "SELECT Status FROM SpJob WHERE Id = 1"));
         Assert.Equal(JobStatus.Done, ctx.Query<Job>().AsNoTracking().First(j => j.Id == 1).Status);
