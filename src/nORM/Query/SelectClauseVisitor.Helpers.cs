@@ -169,10 +169,21 @@ namespace nORM.Query
         /// </summary>
         private RenderedCollectionFilter? RenderShapedCollectionFilter(PropertyInfo navProperty, LambdaExpression filter)
         {
-            if (_ctx == null || !_mapping.Relations.TryGetValue(navProperty.Name, out var relation))
+            if (_ctx == null)
                 return null;
 
-            var childAlias = _ctx.GetMapping(relation.DependentType).EscTable;
+            // The element filter renders against the CHILD element's table: the dependent table for a relation,
+            // the related (right) table for a many-to-many, or the owned table for an owned collection. Without
+            // resolving the owned/m2m child table the filter would be silently dropped (a correctness bug).
+            string childAlias;
+            if (_mapping.Relations.TryGetValue(navProperty.Name, out var relation))
+                childAlias = _ctx.GetMapping(relation.DependentType).EscTable;
+            else if (_mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == navProperty.Name) is { } jtm)
+                childAlias = _ctx.GetMapping(jtm.RightType).EscTable;
+            else if (_mapping.OwnedCollections.FirstOrDefault(o => o.NavigationProperty.Name == navProperty.Name) is { } ownedMap)
+                childAlias = _ctx.GetMapping(ownedMap.OwnedType).EscTable;
+            else
+                return null;
             var before = SharedCompiledParams?.Count ?? 0;
             var sql = RenderNavigationFilter(filter, childAlias);
 

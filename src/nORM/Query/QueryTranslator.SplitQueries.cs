@@ -50,21 +50,35 @@ namespace nORM.Query
 
             foreach (var collectionProperty in _detectedCollections)
             {
-                // Try to find the relation for this navigation property
-                if (!_mapping.Relations.TryGetValue(collectionProperty.Name, out var relation))
+                // Resolve the collection's kind — an ordinary relation, an owned (OwnsMany) collection, or a
+                // many-to-many. Owned/m2m use separate mapping structures and are recorded on the
+                // DependentQueryDefinition's Owned/M2M discriminant so the fetch/stitch can branch (they carry
+                // no child FK property / correlate through the bridge table). The element type, filter,
+                // projection, and target-member resolution below are shared across all three kinds.
+                TableMapping targetMapping;
+                IReadOnlyList<Column> fkColumns;
+                IReadOnlyList<PropertyInfo> parentKeyProps;
+                OwnedCollectionMapping? owned = null;
+                JoinTableMapping? m2m = null;
+
+                if (_mapping.Relations.TryGetValue(collectionProperty.Name, out var relation))
                 {
-                    // Owned (OwnsMany) and many-to-many collections use separate mapping structures the
-                    // split-query stitch doesn't cover. They are admitted as shaped-collection bindings
-                    // upstream, so silently skipping here left the materializer expecting a stitched column
-                    // that never arrived — an opaque ordinal error at read time. Fail loud with an actionable
-                    // message instead of crashing (full shaped-projection support for these is a follow-up).
+                    targetMapping = _ctx.GetMapping(relation.DependentType);
+                    fkColumns = relation.ForeignKeys;
+                    parentKeyProps = relation.PrincipalKeys.Select(c => c.Prop).ToArray();
+                }
+                else
+                {
+                    // Owned/m2m shaped projections: the plan-build discriminant (Owned/M2M) and the element-
+                    // filter alias resolution are in place, but the fetch/stitch branch is the next increment,
+                    // so still fail loud for now rather than build a definition the executor can't run.
                     var isOwned = _mapping.OwnedCollections.Any(o => o.NavigationProperty.Name == collectionProperty.Name);
-                    var isManyToMany = _mapping.ManyToManyJoins.Any(j => j.LeftNavPropertyName == collectionProperty.Name);
-                    if (isOwned || isManyToMany)
+                    var isM2M = _mapping.ManyToManyJoins.Any(j => j.LeftNavPropertyName == collectionProperty.Name);
+                    if (isOwned || isM2M)
                         throw new NormUnsupportedFeatureException(
                             $"Projecting the {(isOwned ? "owned" : "many-to-many")} collection '{collectionProperty.Name}' " +
                             "into a shaped result isn't supported yet. Load it with Include(...), or fetch it in a separate query.");
-                    continue; // Skip if relation not found
+                    continue; // not a mapped collection
                 }
 
                 // Get the element type of the collection
@@ -85,9 +99,6 @@ namespace nORM.Query
 
                     elementType = iEnumerable.GetGenericArguments()[0];
                 }
-
-                // Get the target mapping for the dependent type
-                var targetMapping = _ctx.GetMapping(relation.DependentType);
 
                 // A shaped projection binding (Lines = o.Lines.Where(pred).ToList()) captured a
                 // per-element filter, rendered to SQL at translation time so its closures flow through
@@ -117,13 +128,15 @@ namespace nORM.Query
                 // Create the dependent query definition
                 var dependentQuery = new DependentQueryDefinition(
                     TargetMapping: targetMapping,
-                    ForeignKeyColumns: relation.ForeignKeys,
-                    ParentKeyProperties: relation.PrincipalKeys.Select(c => c.Prop).ToArray(),
+                    ForeignKeyColumns: fkColumns,
+                    ParentKeyProperties: parentKeyProps,
                     TargetCollectionProperty: targetMember,
                     CollectionElementType: dependentElementType,
                     FilterSql: filter.Sql,
                     FilterParameters: filter.Parameters,
-                    ElementProjection: elementProjection
+                    ElementProjection: elementProjection,
+                    Owned: owned,
+                    M2M: m2m
                 );
 
                 dependentQueries.Add(dependentQuery);

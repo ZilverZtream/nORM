@@ -300,6 +300,11 @@ namespace nORM.Query
     /// (Select(o =&gt; new Dto { Lines = o.Lines.Select(l =&gt; new LineDto{...}).ToList() })); when present
     /// CollectionElementType is the projected type and the child materializer applies this lambda
     /// client-side. Null for a bare/filtered (non-projected) collection.</param>
+    /// <param name="Owned">Set when the shaped collection is an OwnsMany owned collection; the fetch groups
+    /// children by the FK column's ordinal (owned rows carry no FK property) and materializes through the
+    /// owned mapping. Null for relations and many-to-many.</param>
+    /// <param name="M2M">Set when the shaped collection is a many-to-many; the fetch runs the two-phase
+    /// bridge+related query and correlates by the projected left-key member. Null for relations and owned.</param>
     internal sealed record DependentQueryDefinition(
         TableMapping TargetMapping,
         IReadOnlyList<Column> ForeignKeyColumns,
@@ -318,7 +323,14 @@ namespace nORM.Query
         // CollectionElementType is the PROJECTED type and the child materializer applies this lambda
         // client-side to shape each fetched child entity into it. Only closure-free, element-only
         // projections reach here (captured/outer references fall through to fail-loud at translation).
-        System.Linq.Expressions.LambdaExpression? ElementProjection = null
+        System.Linq.Expressions.LambdaExpression? ElementProjection = null,
+        // A shaped projection over an OWNED (OwnsMany) or MANY-TO-MANY collection rather than a relation.
+        // The fetch/stitch branches on these: owned rows carry no FK PROPERTY, so they are grouped by the FK
+        // column's ordinal and materialized through the owned mapping; m2m runs the two-phase bridge+related
+        // fetch. Both keep the shared parent-keying/assignment helpers, which resolve the parent key and the
+        // target member by NAME against the projected DTO. At most one is non-null; both null = a relation.
+        OwnedCollectionMapping? Owned = null,
+        JoinTableMapping? M2M = null
     )
     {
         internal Column ForeignKeyColumn => ForeignKeyColumns[0];
