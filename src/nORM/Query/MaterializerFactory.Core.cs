@@ -41,7 +41,7 @@ namespace nORM.Query
             }
         }
 
-        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false, int startOffset = 0, IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null)
+        private Func<DbDataReader, object> CreateMaterializerInternal(TableMapping mapping, Type targetType, LambdaExpression? projection = null, bool ignoreTph = false, int startOffset = 0, IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null, nORM.Mapping.IValueConverter? groupKeyConverter = null)
         {
             if (!ignoreTph && mapping.DiscriminatorColumn != null && mapping.TphMappings.Count > 0 && projection == null)
             {
@@ -172,7 +172,7 @@ namespace nORM.Query
 
             var columns = projection == null
                 ? mapping.Columns
-                : ExtractColumnsFromProjection(mapping, projection, projectionSubqueryConverters);
+                : ExtractColumnsFromProjection(mapping, projection, projectionSubqueryConverters, groupKeyConverter);
 
             if (projection?.Body is NewExpression projectionNew
                 && projectionNew.Type == targetType

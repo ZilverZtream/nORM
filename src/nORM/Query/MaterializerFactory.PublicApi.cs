@@ -74,13 +74,16 @@ namespace nORM.Query
         /// <param name="startOffset">Zero-based column offset to start reading from the data reader.</param>
         /// <param name="projectionSubqueryConverters">Optional per-member converters for projection members
         /// sourced from a correlated subquery over a converter column; folded into the cache key.</param>
+        /// <param name="groupKeyConverter">Optional converter for the IGrouping.Key column when the projection
+        /// surfaces the group key over a value-converter column; folded into the cache key.</param>
         /// <returns>A delegate that synchronously materializes objects from a data reader.</returns>
         public Func<DbDataReader, object> CreateSyncMaterializer(
             TableMapping mapping,
             Type targetType,
             LambdaExpression? projection = null,
             int startOffset = 0,
-            IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null)
+            IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null,
+            nORM.Mapping.IValueConverter? groupKeyConverter = null)
         {
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
@@ -89,7 +92,8 @@ namespace nORM.Query
                 mapping.Type,
                 targetType,
                 (projection != null ? ComputeProjectionHash(projection) : 0L)
-                    ^ QueryTranslator.ProjectionSubqueryConverterFingerprint(projectionSubqueryConverters),
+                    ^ QueryTranslator.ProjectionSubqueryConverterFingerprint(projectionSubqueryConverters)
+                    ^ (groupKeyConverter != null ? (long)groupKeyConverter.GetType().GetHashCode() : 0L),
                 mapping.TableName,
                 startOffset,
                 mapping.ConverterFingerprint,
@@ -105,7 +109,7 @@ namespace nORM.Query
                 }
 
                 // Fall back to existing reflection-based approach
-                var sync = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset, projectionSubqueryConverters);
+                var sync = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset, projectionSubqueryConverters, groupKeyConverter);
                 ValidateMaterializer(sync, mapping, targetType);
                 return sync;
             });
@@ -218,13 +222,16 @@ namespace nORM.Query
         /// <param name="startOffset">Zero-based column offset to start reading from the data reader.</param>
         /// <param name="projectionSubqueryConverters">Optional per-member converters for projection members
         /// sourced from a correlated subquery over a converter column; folded into the cache key.</param>
+        /// <param name="groupKeyConverter">Optional converter for the IGrouping.Key column when the projection
+        /// surfaces the group key over a value-converter column; folded into the cache key.</param>
         /// <returns>A delegate that materializes objects taking the reader schema into account.</returns>
         public Func<DbDataReader, CancellationToken, Task<object>> CreateSchemaAwareMaterializer(
             TableMapping mapping,
             Type targetType,
             LambdaExpression? projection = null,
             int startOffset = 0,
-            IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null)
+            IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null,
+            nORM.Mapping.IValueConverter? groupKeyConverter = null)
         {
             ArgumentNullException.ThrowIfNull(mapping);
             ArgumentNullException.ThrowIfNull(targetType);
@@ -245,7 +252,8 @@ namespace nORM.Query
                 mapping.Type,
                 targetType,
                 (projection != null ? ComputeProjectionHash(projection) : 0L)
-                    ^ QueryTranslator.ProjectionSubqueryConverterFingerprint(projectionSubqueryConverters),
+                    ^ QueryTranslator.ProjectionSubqueryConverterFingerprint(projectionSubqueryConverters)
+                    ^ (groupKeyConverter != null ? (long)groupKeyConverter.GetType().GetHashCode() : 0L),
                 mapping.TableName,
                 startOffset,
                 mapping.ConverterFingerprint,
@@ -253,7 +261,7 @@ namespace nORM.Query
 
             return _asyncCache.GetOrAdd(cacheKey, _ =>
             {
-                var baseMaterializer = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset, projectionSubqueryConverters);
+                var baseMaterializer = CreateMaterializerInternal(mapping, targetType, projection, false, startOffset, projectionSubqueryConverters, groupKeyConverter);
 
                 // For most cases, use base materializer with minimal overhead
                 if (projection == null)

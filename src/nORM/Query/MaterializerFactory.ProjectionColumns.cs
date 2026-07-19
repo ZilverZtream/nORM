@@ -35,7 +35,7 @@ namespace nORM.Query
         /// returning all columns from the mapping. Callers that need richer projection support
         /// should extend this method accordingly.
         /// </remarks>
-        private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection, IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null)
+        private static Column[] ExtractColumnsFromProjection(TableMapping mapping, LambdaExpression projection, IReadOnlyDictionary<string, nORM.Mapping.IValueConverter>? projectionSubqueryConverters = null, nORM.Mapping.IValueConverter? groupKeyConverter = null)
         {
             // MemberInit: `new TDto { A = r.A, B = r.B, ... }`. The MemberAssignment targets are
             // properties on the DTO; build a Column per assignment whose Setter binds to the DTO
@@ -109,13 +109,13 @@ namespace nORM.Query
                         {
                             var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                             var keyCol = new Column(memberName, m.Type, mapping.Type, mapping.Provider, memberName);
-                            // The grouped key column stores its provider representation (e.g. an enum
-                            // as its name). Without ConvertFromProvider the materializer reads the raw
-                            // string as the enum's underlying integer and throws. Resolve the key's
-                            // converter by its model type — safe for an enum key because a second
-                            // column of the exact same enum type (and a different converter) is not a
-                            // real schema, and the key type is part of the materializer cache key.
-                            keyCol.Converter = ResolveGroupKeyConverter(mapping, m.Type);
+                            // The grouped key column stores its provider representation (e.g. an enum name,
+                            // or a converter's stored int). Without ConvertFromProvider the materializer reads
+                            // the raw stored value as the model value. Prefer the ACTUAL key-column converter
+                            // resolved from the GroupBy key selector (threaded in and folded into the
+                            // materializer cache key); fall back to the enum-only type-match for shapes where
+                            // the caller could not resolve it (e.g. a composite key).
+                            keyCol.Converter = groupKeyConverter ?? ResolveGroupKeyConverter(mapping, m.Type);
                             cols.Add(keyCol);
                             continue;
                         }
@@ -155,7 +155,7 @@ namespace nORM.Query
                         // so the model value is materialized, mirroring the g.Key member branch above.
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         var keyParamCol = new Column(memberName, p.Type, mapping.Type, mapping.Provider, memberName);
-                        keyParamCol.Converter = ResolveGroupKeyConverter(mapping, p.Type);
+                        keyParamCol.Converter = groupKeyConverter ?? ResolveGroupKeyConverter(mapping, p.Type);
                         cols.Add(keyParamCol);
                     }
                     else if (arg is MethodCallExpression mce)

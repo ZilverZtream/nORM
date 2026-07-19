@@ -147,14 +147,32 @@ namespace nORM.Query
                 Func<DbDataReader, object> syncMaterializer;
                 Func<DbDataReader, CancellationToken, Task<object>> materializer;
 
+                nORM.Mapping.IValueConverter? ResolveActualGroupKeyConverter()
+                {
+                    if (_t._groupByKeySelector == null)
+                        return null;
+                    var kb = _t._groupByKeySelector.Body;
+                    while (kb is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } ku)
+                        kb = ku.Operand;
+                    if (kb is MemberExpression km && _t._mapping.TryGetColumnForMemberAccess(km, out var kcol))
+                        return kcol.Converter;
+                    return null;
+                }
+
                 if (_t._projection != null && _t._groupJoinInfo == null)
                 {
                     // Resolve converters for projection members whose value comes from a correlated
                     // First/Last/Min/Max subquery over a converter column, so the materializer maps
                     // the provider value back (null/empty for ordinary projections — no change).
                     var subqueryConverters = QueryTranslator.ComputeProjectionSubqueryConverters(_t._projection, _t._ctx);
-                    syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, _t._projection, projectionSubqueryConverters: subqueryConverters);
-                    materializer = _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection, projectionSubqueryConverters: subqueryConverters);
+                    // When the projection surfaces the group key (g.Key), resolve the ACTUAL key column's
+                    // converter from the GroupBy key selector so the key materializes as its model value.
+                    // Passing the real column (not a type-match) avoids the Id-vs-key-type ambiguity, and the
+                    // converter is folded into the materializer cache key so GroupBy(A) and GroupBy(B) with an
+                    // identical projection shape do not share a materializer. Null for non-GroupBy projections.
+                    var groupKeyConverter = ResolveActualGroupKeyConverter();
+                    syncMaterializer = _t._materializerFactory.CreateSyncMaterializer(_t._mapping, materializerType, _t._projection, projectionSubqueryConverters: subqueryConverters, groupKeyConverter: groupKeyConverter);
+                    materializer = _t._materializerFactory.CreateSchemaAwareMaterializer(_t._mapping, materializerType, _t._projection, projectionSubqueryConverters: subqueryConverters, groupKeyConverter: groupKeyConverter);
                 }
                 else
                 {
