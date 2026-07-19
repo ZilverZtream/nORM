@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Mapping;
 using nORM.Enterprise;
 using nORM.Providers;
 using Xunit;
@@ -149,5 +150,55 @@ public class ShapedCollectionProjectionTemporalContractTests
             .Select(p => new { p.Id, Vals = p.Children.Where(c => c.Val >= 15).Select(c => c.Val).ToList() })
             .ToList();
         Assert.Equal(new[] { 20, 100 }, rows.Single().Vals.OrderBy(v => v).ToArray());   // live era: c1=100, c2=20
+    }
+
+    [Table("SptCvParent")]
+    public class CvParent { [Key] public int Id { get; set; } public List<CvChild> Children { get; set; } = new(); }
+    [Table("SptCvChild")]
+    public class CvChild { [Key] public int Id { get; set; } public int ParentId { get; set; } public int Score { get; set; } }
+    private sealed class OffsetConverter : ValueConverter<int, int>
+    {
+        public override object? ConvertToProvider(int value) => value + 1000;   // model N stored as N+1000
+        public override object? ConvertFromProvider(int value) => value - 1000;
+    }
+
+    [Fact]
+    public async Task value_converter_column_applies_over_the_reconstructed_history()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var _cn = cn;
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE SptCvParent (Id INTEGER PRIMARY KEY);
+                CREATE TABLE SptCvChild (Id INTEGER PRIMARY KEY, ParentId INTEGER NOT NULL, Score INTEGER NOT NULL);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<CvParent>().HasKey(p => p.Id);
+                mb.Entity<CvChild>().HasKey(c => c.Id);
+                mb.Entity<CvChild>().Property<int>(c => c.Score).HasConversion(new OffsetConverter());
+                mb.Entity<CvParent>().HasMany(p => p.Children).WithOne().HasForeignKey(c => c.ParentId, p => p.Id);
+            }
+        };
+        opts.EnableTemporalVersioning();
+        await using var ctx = new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
+        ctx.Add(new CvParent { Id = 1 });
+        ctx.Add(new CvChild { Id = 1, ParentId = 1, Score = 5 });   // stored 1005
+        await ctx.SaveChangesAsync();
+        await Task.Delay(60);
+        var t1 = await ServerNow(cn);
+        await Task.Delay(60);
+        var c1 = ctx.Find<CvChild>(1)!; c1.Score = 50; await ctx.SaveChangesAsync();   // stored 1050, after t1
+
+        // The history window returns the raw stored value (1005 at t1); the materializer applies the
+        // converter, so the projected value is the model value at t1 (5) — not the raw 1005 or the live 50.
+        var historic = await ((INormQueryable<CvParent>)ctx.Query<CvParent>())
+            .Select(p => new { p.Id, Scores = p.Children.Select(c => c.Score).ToList() })
+            .AsOf(t1).ToListAsync();
+        Assert.Equal(new[] { 5 }, historic.Single().Scores);
     }
 }
