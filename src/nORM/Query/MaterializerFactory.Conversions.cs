@@ -274,6 +274,15 @@ namespace nORM.Query
                 if (dbValue is string s3) return s3.Length == 0 ? '\0' : s3[0];
                 return Convert.ToChar(dbValue, CultureInfo.InvariantCulture);
             }
+            // Guid: nORM stores it as a 36-char TEXT string (e.g. SqliteProvider writes ToString("D")); some
+            // providers return a 16-byte BLOB. Convert.ChangeType can't coerce either (Guid is not
+            // IConvertible), so a Guid column read through the generic path (e.g. an entity that also has a
+            // value-converter column) would otherwise throw. Handle both representations here.
+            if (underlyingType == typeof(Guid))
+            {
+                if (dbValue is string gs) return Guid.Parse(gs);
+                if (dbValue is byte[] gb && gb.Length == 16) return new Guid(gb);
+            }
 
             // Use cached conversion delegate for better performance.
             // Cache key uses dbValue.GetType() (runtime type): correct because the same runtime type
