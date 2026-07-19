@@ -28,6 +28,7 @@ namespace nORM.Query
             IList parents,
             bool noTracking,
             Dictionary<string, object?>? filterParams,
+            DateTime? asOf,
             CancellationToken ct)
         {
             if (parents.Count == 0)
@@ -72,7 +73,7 @@ namespace nORM.Query
 
                     var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
                     var batchIds = parentIdList.GetRange(i, batchCount);
-                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, filterParams, ct).ConfigureAwait(false);
+                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, filterParams, asOf, ct).ConfigureAwait(false);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -89,7 +90,8 @@ namespace nORM.Query
             List<DependentQueryDefinition> dependentQueries,
             IList parents,
             bool noTracking,
-            Dictionary<string, object?>? filterParams)
+            Dictionary<string, object?>? filterParams,
+            DateTime? asOf)
         {
             if (parents.Count == 0)
                 return;
@@ -120,7 +122,7 @@ namespace nORM.Query
                 {
                     var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
                     var batchIds = parentIdList.GetRange(i, batchCount);
-                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking, filterParams);
+                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking, filterParams, asOf);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -216,11 +218,38 @@ namespace nORM.Query
             sql.Append(" AND (").Append(depQuery.FilterSql).Append(')');
         }
 
+        /// <summary>
+        /// The FROM source for a dependent (split-query) child load: the live table normally, or — under AsOf
+        /// with nORM-managed history — the reconstructed history window at the timestamp, ALIASED AS the live
+        /// table name so every existing filter (FK IN, tenant, global, per-element) that references the table
+        /// by that name resolves to the reconstructed rows unchanged. Mirrors the owned-collection
+        /// reconstruction (DbContext.OwnedCollections). ProviderNative temporal is rejected upstream.
+        /// </summary>
+        private string BuildDependentFromSource(DependentQueryDefinition depQuery, DbCommand cmd, DateTime? asOf)
+        {
+            var map = depQuery.TargetMapping;
+            if (asOf == null)
+                return map.EscTable;
+            var p = _ctx.RawProvider;
+            var asOfParam = p.ParamPrefix + "__asof_child";
+            bool present = false;
+            foreach (System.Data.Common.DbParameter existing in cmd.Parameters)
+                if (existing.ParameterName == asOfParam) { present = true; break; }
+            if (!present)
+                cmd.AddParam(asOfParam, asOf.Value);
+            var history = p.Escape(map.TableName + "_History");
+            var w = p.Escape("__depw");
+            var cols = string.Join(", ", map.Columns.Select(c => c.EscCol));
+            return $"(SELECT {cols} FROM {history} {w} WHERE {asOfParam} >= {w}.{p.Escape("__ValidFrom")} " +
+                   $"AND {asOfParam} < {w}.{p.Escape("__ValidTo")}) AS {map.EscTable}";
+        }
+
         private List<object> FetchChildrenBatch(
             DependentQueryDefinition depQuery,
             List<object> parentIds,
             bool noTracking,
-            Dictionary<string, object?>? filterParams)
+            Dictionary<string, object?>? filterParams,
+            DateTime? asOf)
         {
             var children = new List<object>();
 
@@ -228,7 +257,7 @@ namespace nORM.Query
             using var cmd = _ctx.CreateCommand();
 
             var sql = new System.Text.StringBuilder();
-            sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
+            sql.Append("SELECT * FROM ").Append(BuildDependentFromSource(depQuery, cmd, asOf));
             sql.Append(" WHERE ");
             AppendDependentQueryWhere(cmd, sql, depQuery, parentIds);
 
@@ -296,6 +325,7 @@ namespace nORM.Query
             List<object> parentIds,
             bool noTracking,
             Dictionary<string, object?>? filterParams,
+            DateTime? asOf,
             CancellationToken ct)
         {
             var children = new List<object>();
@@ -303,9 +333,10 @@ namespace nORM.Query
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
 
-            // Build SQL: SELECT * FROM ChildTable WHERE ForeignKey IN (@p0, @p1, ...)
+            // Build SQL: SELECT * FROM ChildTable WHERE ForeignKey IN (@p0, @p1, ...). Under AsOf the FROM is
+            // the reconstructed history window aliased AS the table (see BuildDependentFromSource).
             var sql = new System.Text.StringBuilder();
-            sql.Append("SELECT * FROM ").Append(depQuery.TargetMapping.EscTable);
+            sql.Append("SELECT * FROM ").Append(BuildDependentFromSource(depQuery, cmd, asOf));
             sql.Append(" WHERE ");
             AppendDependentQueryWhere(cmd, sql, depQuery, parentIds);
 

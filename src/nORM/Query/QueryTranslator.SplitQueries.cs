@@ -42,19 +42,17 @@ namespace nORM.Query
                         "projection isn't supported yet — the shaped-collection loads would collide and silently " +
                         "drop one. Project each navigation at most once, or load them in separate queries.");
 
-            // A collection PROJECTION under AsOf (Select(o => new { Lines = o.Lines.Where(p).ToList() }).AsOf(t))
-            // would silently mix eras: the dependent child query (FetchChildrenBatch) reads the LIVE table, not
-            // the reconstructed history window the root reads at the timestamp — so it returns present-day child
-            // rows and applies any element filter to live values. Filtered Include under AsOf IS handled
-            // (IncludeProcessor reconstructs the era); the projection/split path is not yet. Fail loud rather
-            // than return wrong data. Proper fix: build the child FROM as the {Table}_History window with the
-            // @asof param, re-aliasing the tenant/global/element filters onto that derived table — the owned-
-            // collection path (DbContext.OwnedCollections.cs) already does exactly this for owned children.
-            if (_detectedCollections.Count > 0 && (_asOfTimestamp.HasValue || HasActiveTemporalScope))
+            // A collection PROJECTION under AsOf reconstructs its children through the history window (see
+            // FetchChildrenBatch/BuildDependentFromSource) for nORM-managed temporal storage. Provider-native
+            // temporal (SQL Server system-versioned) isn't wired through the split path yet AND can't be
+            // validated here, so it stays fail-loud rather than risk a silent era-mix — the live table would
+            // return present-day child rows and apply any element filter to live values.
+            if (_detectedCollections.Count > 0 && (_asOfTimestamp.HasValue || HasActiveTemporalScope)
+                && _ctx.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
                 throw new NormUnsupportedFeatureException(
-                    "Projecting a navigation collection under AsOf (temporal) isn't supported yet — the child " +
-                    "load would read live rows and mix eras. Use a filtered Include(...) under AsOf, or " +
-                    "materialise the query first (ToList) and project in memory.");
+                    "Projecting a navigation collection under AsOf with provider-native temporal storage isn't " +
+                    "supported yet — the child load would read live rows and mix eras. Use a filtered " +
+                    "Include(...) under AsOf, or materialise the query first (ToList) and project in memory.");
 
             foreach (var collectionProperty in _detectedCollections)
             {

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.Enterprise;
 using nORM.Providers;
 using Xunit;
 
@@ -16,13 +17,13 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins that a navigation-collection PROJECTION under AsOf fails loud rather than silently mixing eras. The
-/// split-query child load behind a shaped/bare collection projection reads the LIVE table (it doesn't yet
-/// reconstruct the history window the root reads at the timestamp), so under AsOf it would return present-day
-/// child rows and apply any element filter to live values. Until the child load reconstructs the era (the
-/// owned-collection path already does), the combination is rejected. Filtered <c>Include</c> under AsOf is a
-/// different path (IncludeProcessor reconstructs the era) and remains supported — see
-/// <see cref="FilteredIncludeTemporalContractTests"/>.
+/// Pins that a navigation-collection PROJECTION under AsOf reconstructs the historical era instead of mixing
+/// it with live rows. The split-query child load reads the {Table}_History window at the timestamp (aliased AS
+/// the live table so the FK/tenant/global/element filters resolve to the reconstructed rows), mirroring the
+/// owned-collection reconstruction — so the projected collection holds the children as they were at the
+/// timestamp and any element filter applies to those historical values. Provider-native temporal storage
+/// isn't wired through this path yet and stays fail-loud (it can't be validated without a live SQL Server).
+/// Filtered <c>Include</c> under AsOf is a separate path — see <see cref="FilteredIncludeTemporalContractTests"/>.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class ShapedCollectionProjectionTemporalContractTests
@@ -91,29 +92,28 @@ public class ShapedCollectionProjectionTemporalContractTests
     }
 
     [Fact]
-    public async Task anon_shaped_collection_projection_under_as_of_fails_loud()
+    public async Task anon_shaped_collection_projection_under_as_of_reconstructs_the_era()
     {
         var (cn, ctx, t1) = await SeedTwoEras();
         using var _cn = cn; await using var _ctx = ctx;
-        // At t1, c1 was 10 (< 15) so only c2 (20) matches. The live path leaks c1=100 — fail loud instead.
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-            await ((INormQueryable<Parent>)ctx.Query<Parent>())
-                .Select(p => new { p.Id, Vals = p.Children.Where(c => c.Val >= 15).Select(c => c.Val).ToList() })
-                .AsOf(t1).ToListAsync());
-        Assert.Contains("AsOf", ex.Message);
+        // At t1, c1 was 10 (< 15) so only c2 (20) matches; the live c1=100 must NOT leak in — the child load
+        // reads the reconstructed history window, and the element filter applies to the historical values.
+        var historic = await ((INormQueryable<Parent>)ctx.Query<Parent>())
+            .Select(p => new { p.Id, Vals = p.Children.Where(c => c.Val >= 15).Select(c => c.Val).ToList() })
+            .AsOf(t1).ToListAsync();
+        Assert.Equal(new[] { 20 }, historic.Single().Vals.OrderBy(v => v).ToArray());
     }
 
     [Fact]
-    public async Task dto_shaped_collection_projection_under_as_of_fails_loud()
+    public async Task dto_shaped_collection_projection_under_as_of_reconstructs_the_era()
     {
         var (cn, ctx, t1) = await SeedTwoEras();
         using var _cn = cn; await using var _ctx = ctx;
-        // Same shared split-query path as the anon case — the DTO projection is rejected too.
-        var ex = await Assert.ThrowsAsync<NormUnsupportedFeatureException>(async () =>
-            await ((INormQueryable<Parent>)ctx.Query<Parent>())
-                .Select(p => new ParentDto { Id = p.Id, Kids = p.Children.Select(c => new ChildDto { Val = c.Val }).ToList() })
-                .AsOf(t1).ToListAsync());
-        Assert.Contains("AsOf", ex.Message);
+        // No filter: at t1 the children were {10, 20}; the live c1=100 must reconstruct to its t1 value (10).
+        var historic = await ((INormQueryable<Parent>)ctx.Query<Parent>())
+            .Select(p => new ParentDto { Id = p.Id, Kids = p.Children.Select(c => new ChildDto { Val = c.Val }).ToList() })
+            .AsOf(t1).ToListAsync();
+        Assert.Equal(new[] { 10, 20 }, historic.Single().Kids.Select(k => k.Val).OrderBy(v => v).ToArray());
     }
 
     [Fact]

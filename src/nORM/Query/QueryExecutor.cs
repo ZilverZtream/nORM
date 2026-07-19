@@ -374,7 +374,7 @@ namespace nORM.Query
                 // Execute dependent queries for nested collections (split query for projections)
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
-                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, ct).ConfigureAwait(false);
+                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, plan.AsOfTimestamp, ct).ConfigureAwait(false);
                 }
 
                 // Load owned collections (OwnsMany) for all materialized entities — including
@@ -489,7 +489,7 @@ namespace nORM.Query
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
                     // Truly synchronous dependent query execution - no GetAwaiter().GetResult().
-                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams);
+                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, plan.AsOfTimestamp);
                 }
 
                 // Load owned collections (OwnsMany) for all materialized entities — symmetric with the async
