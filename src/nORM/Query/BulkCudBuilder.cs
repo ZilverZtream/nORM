@@ -294,11 +294,39 @@ namespace nORM.Query
                 var valueArg = StripQuotes(call.Arguments[1]);
                 if (valueArg is LambdaExpression valueLambda)
                 {
-                    // Server-side computed form: SetProperty(x => x.Counter, x => x.Counter + 1).
-                    // Translate the body against the entity columns (no alias prefix — UPDATE
-                    // statements reference columns directly).
-                    var exprSql = TranslateUpdateValueExpression(valueLambda, mapping);
-                    assigns.Add((column, null, null, exprSql));
+                    // A value body that does not reference the row parameter is a client-side value (a
+                    // captured constant, or a ternary/arithmetic over captured values). Evaluate it and route
+                    // through the literal path so the target column's value converter is applied and the value
+                    // is PARAMETERIZED. Inlining such a value via IFormattable renders a DateTime/DateTimeOffset/
+                    // Guid/TimeSpan unquoted or culture-formatted (invalid SQL or lost sub-second precision) and
+                    // an enum as its unquoted name (invalid or silently wrong), and never applies the converter.
+                    if (!BodyReferencesRow(valueLambda.Body, valueLambda.Parameters[0]))
+                    {
+                        object? literalValue;
+                        try
+                        {
+                            literalValue = System.Linq.Expressions.Expression.Lambda(valueLambda.Body).Compile().DynamicInvoke();
+                        }
+                        catch (Exception ex) when (ex is InvalidOperationException or System.Reflection.TargetInvocationException)
+                        {
+                            throw new NormUnsupportedFeatureException(
+                                "The SetProperty value could not be evaluated. Provide a literal, a captured value, " +
+                                "or an Expression<Func<T, TProperty>> over the row's own columns.", ex);
+                        }
+                        if (literalValue != null && targetColumn.Converter != null)
+                            literalValue = targetColumn.Converter.ConvertToProvider(literalValue);
+                        var pName = _ctx.RawProvider.ParamPrefix + "u" + paramIndex++;
+                        parameters[pName] = literalValue ?? DBNull.Value;
+                        assigns.Add((column, pName, literalValue, null));
+                    }
+                    else
+                    {
+                        // Server-side computed form: SetProperty(x => x.Counter, x => x.Counter + 1).
+                        // Translate the body against the entity columns (no alias prefix — UPDATE
+                        // statements reference columns directly).
+                        var exprSql = TranslateUpdateValueExpression(valueLambda, mapping);
+                        assigns.Add((column, null, null, exprSql));
+                    }
                 }
                 else if (TryGetSetValue(call.Arguments[1], out var value))
                 {
@@ -339,6 +367,25 @@ namespace nORM.Query
                 sb.Clear();
                 _stringBuilderPool.Return(sb);
             }
+        }
+
+        // Detects whether a SetProperty value body references the row parameter. A body that does not
+        // (a captured constant, or a ternary/arithmetic over captured values) is a client-side value and
+        // must be evaluated and bound as a parameter, not translated to column SQL.
+        private static bool BodyReferencesRow(Expression body, ParameterExpression rowParam)
+        {
+            var found = false;
+            new RowParameterFinder(rowParam, () => found = true).Visit(body);
+            return found;
+        }
+
+        private sealed class RowParameterFinder : ExpressionVisitor
+        {
+            private readonly ParameterExpression _target;
+            private readonly Action _onFound;
+            public RowParameterFinder(ParameterExpression target, Action onFound) { _target = target; _onFound = onFound; }
+            protected override Expression VisitParameter(ParameterExpression node)
+            { if (node == _target) _onFound(); return node; }
         }
 
         /// <summary>
