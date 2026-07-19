@@ -125,6 +125,11 @@ namespace nORM.Query
             // only the default, so defer to the full pipeline which honors the per-query force-tracking flag.
             if (ContainsAsTracking(expr))
                 return false;
+            // TPH subtype root: the fast-path SQL builders below select/count over the shared base table
+            // and emit NO discriminator predicate, so a subtype query would silently return and count
+            // sibling subtypes. Defer to the full pipeline, which appends ({disc} = value) for a subtype.
+            if (ctx.GetMapping(typeof(T)).DiscriminatorValue != null)
+                return false;
             if (IsSimpleCountPattern(expr, out var hasPredicate))
             {
                 if (hasPredicate)
@@ -172,6 +177,11 @@ namespace nORM.Query
             // AsTracking overrides a NoTracking context default; the fast path's ShouldTrackResults reads
             // only the default, so defer to the full pipeline which honors the per-query force-tracking flag.
             if (ContainsAsTracking(expr))
+                return false;
+            // TPH subtype root: the fast-path SQL builders below select/page over the shared base table
+            // and emit NO discriminator predicate, so a subtype query would silently return sibling
+            // subtypes (and materialize them as the wrong type). Defer to the full pipeline.
+            if (ctx.GetMapping(typeof(T)).DiscriminatorValue != null)
                 return false;
 
             var cacheUnsupportedMiss = ShouldCacheUnsupportedListMiss(expr);

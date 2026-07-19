@@ -134,6 +134,11 @@ namespace nORM.Query
                 return false;
             var elementType = GetElementType(constant);
             var map = _ctx.GetMapping(elementType);
+            // TPH subtype root: this fast path emits "SELECT ... FROM base" with no discriminator predicate,
+            // so First()/FirstOrDefault() on a subtype would return a sibling subtype's row (silent-wrong).
+            // Defer to the full translator, which appends ({disc} = value) for a subtype root.
+            if (map.DiscriminatorValue != null)
+                return false;
             var whereKey = whereLambda == null ? "" : BuildSimpleWhereCacheKey(whereLambda);
             var cacheKey = string.Concat("SIMPLE:", elementType.FullName, ":", resultMethodName ?? "", ":", whereKey);
             if (!_simpleSqlCache.TryGetValue(cacheKey, out var cachedSql))

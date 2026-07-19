@@ -68,6 +68,12 @@ namespace nORM.Query
 
             var elementType = GetElementType(constant);
 
+            // TPH subtype root: this count fast path emits "COUNT(*) FROM base" with no discriminator
+            // predicate, so counting a subtype would include sibling subtypes (silent-wrong). Defer to the
+            // full plan path, which appends the discriminator filter for a subtype root.
+            if (_ctx.GetMapping(elementType).DiscriminatorValue != null)
+                return false;
+
             if (!TryBuildCountCacheKey(elementType, predicate, allowComplex: false, out var cacheKey))
                 return false; // Complex predicates fall back to normal path
 
@@ -141,6 +147,11 @@ namespace nORM.Query
                 return false;
 
             var elementType = GetElementType(constant);
+            // TPH subtype root: this count fast path emits "COUNT(*) FROM base" with no discriminator
+            // predicate, so counting a subtype would include sibling subtypes (silent-wrong). Defer to the
+            // full plan path, which appends the discriminator filter for a subtype root.
+            if (_ctx.GetMapping(elementType).DiscriminatorValue != null)
+                return false;
             if (!TryBuildCountCacheKey(elementType, predicate, allowComplex: true, out var countCacheKey))
                 return false;
 
