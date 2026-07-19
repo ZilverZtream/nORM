@@ -72,9 +72,9 @@ namespace nORM.Query
             if (body is not MemberExpression member)
                 throw new NormUnsupportedFeatureException(
                     "Include/ThenInclude supports a plain navigation or a filtered navigation ('nav.Where(pred)'). " +
-                    "Ordering or limiting an included collection (e.g. OrderBy/OrderByDescending/Take/Skip inside Include) " +
-                    "is not yet supported — load the collection and order or limit it after materialization, or use a " +
-                    "separate query for the top-N rows.");
+                    "Ordering or limiting an included collection (e.g. OrderBy/OrderByDescending/Take/Skip inside " +
+                    "Include) is not yet supported. Project the ordered / top-N collection instead, which is " +
+                    "supported: Select(b => new { b.Id, Recent = b.Posts.OrderByDescending(p => p.Date).Take(3).ToList() }).");
             return member;
         }
 
