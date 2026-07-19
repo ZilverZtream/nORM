@@ -62,6 +62,27 @@ namespace nORM.Core
         /// </summary>
         public object? Entity { get; private set; }
 
+        /// <summary>
+        /// Gets a value indicating whether the entity's primary key has been assigned a non-default value
+        /// (Entity Framework Core parity). Any key column still at its CLR default (0, <see cref="Guid.Empty"/>,
+        /// or <c>null</c>) makes the key unset — so a store-generated key reads as unset until the database
+        /// assigns it. A keyless entity, or a detached entry that has released its entity, is always unset.
+        /// </summary>
+        public bool IsKeySet
+        {
+            get
+            {
+                var entity = Entity;
+                if (entity == null) return false;
+                var keys = _mapping.KeyColumns;
+                if (keys.Length == 0) return false;
+                foreach (var col in keys)
+                    if (ChangeTracker.IsDefaultKeyValue(col.Getter(entity), col.Prop.PropertyType))
+                        return false;
+                return true;
+            }
+        }
+
         private EntityState _state;
 
         /// <summary>

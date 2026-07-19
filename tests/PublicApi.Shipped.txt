@@ -1278,6 +1278,7 @@ P:nORM.Core.DbContext.Provider:nORM.Providers.DatabaseProvider
 P:nORM.Core.DbContextTransaction.Transaction:System.Data.Common.DbTransaction
 P:nORM.Core.EntityEntry.CurrentValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.Entity:System.Object
+P:nORM.Core.EntityEntry.IsKeySet:System.Boolean
 P:nORM.Core.EntityEntry.OriginalValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.State:nORM.Core.EntityState
 P:nORM.Core.NavigationEntry.CurrentValue:System.Object

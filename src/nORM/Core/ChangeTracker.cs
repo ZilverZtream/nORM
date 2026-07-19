@@ -746,7 +746,7 @@ namespace nORM.Core
         /// for common DB-generated key types (0 for integer types, <see cref="Guid.Empty"/>
         /// for GUIDs, <c>null</c> for any type).
         /// </summary>
-        private static bool IsDefaultKeyValue(object? value, Type type)
+        internal static bool IsDefaultKeyValue(object? value, Type type)
         {
             if (value is null) return true;
             var underlying = Nullable.GetUnderlyingType(type) ?? type;
