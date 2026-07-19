@@ -176,5 +176,44 @@ namespace nORM.Providers
             }
             throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
         }
+
+        /// <summary>
+        /// Releases a previously created savepoint (RELEASE SAVEPOINT) via the ADO.NET
+        /// <c>DbTransaction.Release(string)</c> API. Checks the CancellationToken before executing so a
+        /// pre-cancelled token throws <see cref="OperationCanceledException"/>.
+        /// </summary>
+        /// <param name="transaction">Transaction containing the savepoint.</param>
+        /// <param name="name">Name of the savepoint to release.</param>
+        /// <param name="ct">Cancellation token.</param>
+        public override Task ReleaseSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            // Honour the CancellationToken -- a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
+            var releaseMethod = transaction.GetType().GetMethod("Release", new[] { typeof(string) }) ??
+                                transaction.GetType().GetMethod("ReleaseSavepoint", new[] { typeof(string) });
+            if (releaseMethod != null)
+            {
+                try
+                {
+                    releaseMethod.Invoke(transaction, new object[] { name });
+                    ct.ThrowIfCancellationRequested();
+                    return Task.CompletedTask;
+                }
+                catch (System.Reflection.TargetInvocationException ex)
+                {
+                    // Unwrap and rethrow the inner exception from reflection invoke.
+                    // NotSupportedException from a base DbTransaction.Release indicates the transaction type
+                    // does not support releasing savepoints — map to NormUnsupportedFeatureException.
+                    if (ex.InnerException is NotSupportedException)
+                        throw new NormUnsupportedFeatureException(
+                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
+                    if (ex.InnerException != null)
+                        throw ex.InnerException;
+                    throw;
+                }
+            }
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
     }
 }

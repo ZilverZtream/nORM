@@ -125,6 +125,19 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Releases (destroys) a previously created savepoint, keeping the work done since it was created but
+        /// making it no longer a rollback target. The default implementation throws as savepoints are provider
+        /// specific. Providers whose engine auto-releases savepoints (SQL Server) override this as a no-op.
+        /// </summary>
+        /// <param name="transaction">The active transaction.</param>
+        /// <param name="name">Name of the savepoint to release.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        public virtual Task ReleaseSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+        }
+
+        /// <summary>
         /// Performs provider-specific initialization when a connection is opened.
         /// </summary>
         /// <param name="connection">The open connection to initialize.</param>

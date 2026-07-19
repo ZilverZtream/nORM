@@ -165,6 +165,20 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Releases a previously created savepoint inside this nORM-managed transaction without exposing the
+        /// underlying provider transaction handle. The work done since the savepoint is KEPT — the savepoint
+        /// simply stops being a rollback target.
+        /// </summary>
+        /// <param name="name">Name of the savepoint to release.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task that completes when the savepoint has been released.</returns>
+        public Task ReleaseSavepointAsync(string name, CancellationToken ct = default)
+        {
+            EnsureUsable();
+            return _context.ReleaseSavepointCoreAsync(_transaction!, name, ct);
+        }
+
+        /// <summary>
         /// Disposes the transaction and clears it from the owning <see cref="DbContext"/>.
         /// Interlocked.CompareExchange ensures only one concurrent caller proceeds.
         /// </summary>

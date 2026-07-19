@@ -393,6 +393,7 @@ M:nORM.Core.DbContext.Query(System.String):System.Linq.IQueryable
 M:nORM.Core.DbContext.QueryUnchangedAsync``1(System.String,System.Threading.CancellationToken,System.Object[]):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.QueryUnchangedInterpolatedAsync``1(System.FormattableString,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.RegisterForDisposal(System.IDisposable):System.Void
+M:nORM.Core.DbContext.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContext.RemoveRange``1(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DbContext.Remove``1(`0):nORM.Core.EntityEntry
 M:nORM.Core.DbContext.RestoreTemporalVersionAsync``1(System.Collections.Generic.IReadOnlyList{System.Object},System.DateTime,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -415,6 +416,7 @@ M:nORM.Core.DbContextTransaction.CommitAsync(System.Threading.CancellationToken)
 M:nORM.Core.DbContextTransaction.CreateSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.Dispose():System.Void
 M:nORM.Core.DbContextTransaction.DisposeAsync():System.Threading.Tasks.ValueTask
+M:nORM.Core.DbContextTransaction.ReleaseSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
@@ -828,6 +830,7 @@ M:nORM.Providers.DatabaseProvider.NormalizeDecimalForCompare(System.String):Syst
 M:nORM.Providers.DatabaseProvider.NormalizeTimeSpanForCompare(System.String):System.String
 M:nORM.Providers.DatabaseProvider.NullSafeEqual(System.String,System.String):System.String
 M:nORM.Providers.DatabaseProvider.NullSafeNotEqual(System.String,System.String):System.String
+M:nORM.Providers.DatabaseProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String):System.String
@@ -891,6 +894,7 @@ M:nORM.Providers.MySqlProvider.GetToStringSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.GetTruncateToIntSql(System.String):System.String
 M:nORM.Providers.MySqlProvider.IntrospectTableColumnsAsync(System.Data.Common.DbConnection,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.IReadOnlyList{nORM.Providers.DatabaseProvider.LiveColumnInfo}}
 M:nORM.Providers.MySqlProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
+M:nORM.Providers.MySqlProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.MySqlProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.MySqlProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.MySqlProvider.TranslateJsonPathAccess(System.String,System.String):System.String
@@ -950,6 +954,7 @@ M:nORM.Providers.PostgresProvider.IsAvailableAsync():System.Threading.Tasks.Task
 M:nORM.Providers.PostgresProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
 M:nORM.Providers.PostgresProvider.NullSafeEqual(System.String,System.String):System.String
 M:nORM.Providers.PostgresProvider.NullSafeNotEqual(System.String,System.String):System.String
+M:nORM.Providers.PostgresProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.PostgresProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.PostgresProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.PostgresProvider.TranslateJsonPathAccess(System.String,System.String):System.String
@@ -1015,6 +1020,7 @@ M:nORM.Providers.SqlServerProvider.IntrospectTableColumnsAsync(System.Data.Commo
 M:nORM.Providers.SqlServerProvider.IsAvailableAsync():System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Providers.SqlServerProvider.IsNullOrEmptySql(System.String):System.String
 M:nORM.Providers.SqlServerProvider.IsObjectNotFoundError(System.Data.Common.DbException):System.Boolean
+M:nORM.Providers.SqlServerProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqlServerProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqlServerProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.SqlServerProvider.TranslateJsonPathAccess(System.String,System.String):System.String
@@ -1078,6 +1084,7 @@ M:nORM.Providers.SqliteProvider.NormalizeDecimalForCompare(System.String):System
 M:nORM.Providers.SqliteProvider.NormalizeTimeSpanForCompare(System.String):System.String
 M:nORM.Providers.SqliteProvider.NullSafeEqual(System.String,System.String):System.String
 M:nORM.Providers.SqliteProvider.NullSafeNotEqual(System.String,System.String):System.String
+M:nORM.Providers.SqliteProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.SqliteProvider.TranslateFunction(System.String,System.Type,System.String[]):System.String
 M:nORM.Providers.SqliteProvider.TranslateJsonPathAccess(System.String,System.String):System.String

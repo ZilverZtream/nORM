@@ -161,6 +161,37 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Releases a previously created savepoint within the provided transaction. Unlike a rollback, the work
+        /// done since the savepoint is KEPT — the savepoint simply stops being a rollback target. Savepoints
+        /// are released automatically when the transaction commits, so an explicit release is only needed to
+        /// free the name (or resources) earlier.
+        /// </summary>
+        /// <param name="transaction">The active database transaction.</param>
+        /// <param name="name">Name of the savepoint to release.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <returns>A task that completes when the savepoint has been released.</returns>
+        /// <exception cref="NormUsageException">Thrown when <paramref name="transaction"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or empty.</exception>
+        public Task ReleaseSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+            ThrowIfStrictProviderMobilityEscapeHatch(nameof(ReleaseSavepointAsync));
+            return ReleaseSavepointCoreAsync(transaction, name, ct);
+        }
+
+        internal async Task ReleaseSavepointCoreAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            if (transaction == null)
+                throw new NormUsageException("No active transaction.");
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Savepoint name cannot be null or empty.", nameof(name));
+            await _p.ReleaseSavepointAsync(transaction, name, ct).ConfigureAwait(false);
+            // The released savepoint is no longer a rollback target, so its key snapshot is obsolete; the rows
+            // inserted since it are KEPT (unlike a rollback), so their stamped keys stay valid as-is.
+            _savepointKeySnapshots?.Remove(name);
+        }
+
+        /// <summary>
         /// Captures the current DB-generated key values of every Added entity, keyed by entity
         /// reference, so a subsequent rollback can tell which keys were stamped afterwards.
         /// </summary>

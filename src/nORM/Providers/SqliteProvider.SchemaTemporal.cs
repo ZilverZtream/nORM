@@ -281,5 +281,27 @@ namespace nORM.Providers
             }
             throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
         }
+
+        /// <summary>
+        /// Releases a previously created savepoint (RELEASE SAVEPOINT), keeping its work but removing it as a
+        /// rollback target. Checks the CancellationToken before executing so that pre-cancelled tokens
+        /// correctly throw <see cref="OperationCanceledException"/>.
+        /// </summary>
+        /// <param name="transaction">The active SQLite transaction.</param>
+        /// <param name="name">Name of the savepoint to release.</param>
+        /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        public override Task ReleaseSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            // Honour the CancellationToken - a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
+            if (transaction is SqliteTransaction sqliteTransaction)
+            {
+                sqliteTransaction.Release(name);
+                ct.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            }
+            throw new ArgumentException("Transaction must be a SqliteTransaction.", nameof(transaction));
+        }
     }
 }

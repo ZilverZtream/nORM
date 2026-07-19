@@ -198,5 +198,24 @@ IF OBJECT_ID(N'dbo.fn_norm_rls_{baseTableName}', N'IF') IS NOT NULL
             }
             throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));
         }
+
+        /// <summary>
+        /// Releasing a savepoint is a no-op on SQL Server: the engine has no RELEASE SAVEPOINT statement and
+        /// releases savepoints automatically when the transaction commits (rolling back to an outer savepoint
+        /// still discards inner ones). This matches EF Core's SQL Server behaviour — the work done since the
+        /// savepoint is kept and the savepoint simply stops being an explicit rollback target.
+        /// </summary>
+        /// <param name="transaction">The transaction containing the savepoint.</param>
+        /// <param name="name">Name of the savepoint to release (unused; SQL Server auto-releases).</param>
+        /// <param name="ct">Cancellation token.</param>
+        public override Task ReleaseSavepointAsync(DbTransaction transaction, string name, CancellationToken ct = default)
+        {
+            // Honour the CancellationToken -- a pre-cancelled token must throw immediately.
+            ct.ThrowIfCancellationRequested();
+
+            if (transaction is SqlTransaction)
+                return Task.CompletedTask;
+            throw new ArgumentException("Transaction must be a SqlTransaction.", nameof(transaction));
+        }
     }
 }

@@ -46,6 +46,7 @@ public sealed class ProviderMobilityStrictSurfaceGuardTests
             "Method:Query",
             "Method:QueryUnchangedAsync",
             "Method:QueryUnchangedInterpolatedAsync",
+            "Method:ReleaseSavepointAsync",
             "Method:RollbackToSavepointAsync",
             "Method:SqlQueryInterpolatedAsync",
             "Method:SqlQueryRawAsync",
