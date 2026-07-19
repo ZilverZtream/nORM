@@ -77,7 +77,7 @@ namespace nORM.Core
 
                 var tracked = Track(entity, chosen, mapping);
 
-                foreach (var (childNav, child) in EnumerateNavigationChildren(entity, mapping))
+                foreach (var (childNav, child) in EnumerateNavigationChildren(ctx, entity, mapping))
                     stack.Push((child, tracked, childNav));
             }
         }
@@ -90,12 +90,12 @@ namespace nORM.Core
         /// </summary>
         [RequiresDynamicCode("Reads navigation properties via reflection.")]
         [RequiresUnreferencedCode("Reflects over navigation properties.")]
-        private static IEnumerable<(string Nav, object Child)> EnumerateNavigationChildren(object entity, TableMapping mapping)
+        private static IEnumerable<(string Nav, object Child)> EnumerateNavigationChildren(DbContext context, object entity, TableMapping mapping)
         {
             foreach (var navProp in mapping.ReferenceNavigations)
             {
                 var value = navProp.GetValue(entity);
-                if (value != null)
+                if (value != null && IsMappedReferenceRelationship(context, mapping, navProp))
                     yield return (navProp.Name, value);
             }
 
@@ -124,6 +124,27 @@ namespace nORM.Core
                             yield return (join.LeftNavPropertyName, child);
                 }
             }
+        }
+
+        /// <summary>
+        /// Whether a reference navigation is an actual mapped relationship, not merely a class-shaped property.
+        /// <see cref="TableMapping.ReferenceNavigations"/> is discovered by CLR shape (every public class-typed
+        /// property that isn't a mapped column, collection, or owned nav), so it also contains references that
+        /// are NOT relationships — e.g. a partially-populated lookup reference with no foreign key, or a plain
+        /// non-entity POCO. Following those would let TrackGraph track an unrelated row (silently overwriting it
+        /// on save) or a non-entity (crashing at save). This mirrors the gate relationship fixup applies: the
+        /// target must resolve to a single-keyed principal reachable by a discovered foreign key (configured or
+        /// the <c>{Nav}Id</c> convention).
+        /// </summary>
+        private static bool IsMappedReferenceRelationship(DbContext context, TableMapping owner, System.Reflection.PropertyInfo navProp)
+        {
+            TableMapping principalMap;
+            try { principalMap = context.GetMapping(navProp.PropertyType); }
+            catch { return false; }
+            if (principalMap.KeyColumns.Length != 1)
+                return false;
+            return nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(
+                owner, navProp.Name, navProp.PropertyType, principalMap) != null;
         }
     }
 }

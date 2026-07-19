@@ -39,6 +39,67 @@ public class ChangeTrackerTrackGraphTests
         public Parent? Parent { get; set; }
     }
 
+    [Table("TgWidget")]
+    public class Widget
+    {
+        [Key] public int Id { get; set; }
+        public Gadget? Config { get; set; }   // a plain non-entity POCO reference
+    }
+    public class Gadget { public string Setting { get; set; } = ""; }
+
+    [Table("TgOrder")]
+    public class Order
+    {
+        [Key] public int Id { get; set; }
+        public Lookup? Status { get; set; }   // a mapped entity, but NO foreign key / relationship to it
+    }
+    [Table("TgLookup")]
+    public class Lookup { [Key] public int Id { get; set; } public string Label { get; set; } = ""; }
+
+    private static DbContext ReferenceContext(SqliteConnection cn)
+    {
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Widget>().HasKey(w => w.Id);
+                mb.Entity<Order>().HasKey(o => o.Id);
+                mb.Entity<Lookup>().HasKey(l => l.Id);
+            }
+        };
+        return new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
+    }
+
+    [Fact]
+    public void a_non_entity_reference_property_is_not_traversed()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using var _cn = cn; using var ctx = ReferenceContext(cn);
+        var widget = new Widget { Id = 1, Config = new Gadget { Setting = "x" } };
+
+        ctx.ChangeTracker.TrackGraph(widget, AddOrUpdate);
+
+        Assert.Equal(EntityState.Modified, ctx.Entry(widget).State);
+        // ReferenceNavigations is shape-based, so Config (a non-entity POCO) is a candidate — but it has no
+        // key/relationship, so it must NOT be tracked (else SaveChanges crashes on a phantom Gadget table).
+        Assert.Throws<InvalidOperationException>(() => ctx.Entry(widget.Config!));
+    }
+
+    [Fact]
+    public void a_reference_with_no_foreign_key_relationship_is_not_traversed()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using var _cn = cn; using var ctx = ReferenceContext(cn);
+        var order = new Order { Id = 1, Status = new Lookup { Id = 5, Label = "" } };
+
+        ctx.ChangeTracker.TrackGraph(order, AddOrUpdate);
+
+        Assert.Equal(EntityState.Modified, ctx.Entry(order).State);
+        // Order.Status resolves to a keyed entity but there is no foreign key between them, so it is not a
+        // relationship — tracking it Modified would silently blank the existing Lookup row on save.
+        Assert.Throws<InvalidOperationException>(() => ctx.Entry(order.Status!));
+    }
+
     [Table("TgNotify")]
     public class NotifyEntity : System.ComponentModel.INotifyPropertyChanged
     {
