@@ -582,16 +582,18 @@ namespace nORM.Query
                     ForceTracking: _t._forceTracking,
                     IdentityResolution: _t._identityResolution
                 );
-                // A many-to-many include reads the association table, which is a raw
+                // A many-to-many navigation reads the association table, which is a raw
                 // user-owned table with no history — there is no data to reconstruct the
                 // association at the AsOf timestamp from, and silently joining LIVE
-                // associations onto historical rows would mix eras. Fail loud instead.
-                if (_t._asOfTimestamp.HasValue && plan.M2MIncludes is { Count: > 0 })
+                // associations onto historical rows would mix eras. This holds whether the
+                // navigation is materialized via Include or shaped into a projection (a
+                // split-query dependent load), so both are failed loud instead.
+                if (_t._asOfTimestamp.HasValue &&
+                    (plan.M2MIncludes is { Count: > 0 } || (plan.DependentQueries?.Any(d => d.M2M != null) ?? false)))
                     throw new NormUnsupportedFeatureException(
-                        "Include of a many-to-many navigation cannot be combined with AsOf: the " +
-                        "association table is not versioned, so the association membership at the " +
-                        "requested timestamp is unknown. Query the historical entities without the " +
-                        "many-to-many Include.");
+                        "A many-to-many navigation cannot be combined with AsOf (whether via Include or a shaped " +
+                        "projection): the association table is not versioned, so the association membership at the " +
+                        "requested timestamp is unknown. Query the historical entities without the many-to-many navigation.");
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }

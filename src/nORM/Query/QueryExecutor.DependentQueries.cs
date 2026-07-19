@@ -46,7 +46,7 @@ namespace nORM.Query
 
                 if (depQuery.Owned != null)
                 {
-                    await _ctx.LoadOwnedCollectionProjectionAsync(depQuery, parents, filterParams, ct).ConfigureAwait(false);
+                    await _ctx.LoadOwnedCollectionProjectionAsync(depQuery, parents, filterParams, asOf, ct).ConfigureAwait(false);
                     continue;
                 }
 
@@ -118,7 +118,7 @@ namespace nORM.Query
 
                 if (depQuery.Owned != null)
                 {
-                    _ctx.LoadOwnedCollectionProjection(depQuery, parents, filterParams);
+                    _ctx.LoadOwnedCollectionProjection(depQuery, parents, filterParams, asOf);
                     continue;
                 }
 

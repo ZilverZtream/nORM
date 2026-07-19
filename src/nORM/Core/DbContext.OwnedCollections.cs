@@ -395,16 +395,58 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// The FROM source for an owned shaped-projection load: the live owned table normally, or — under AsOf —
+        /// the reconstructed as-of source at the timestamp, ALIASED AS the live table name so the shaped
+        /// per-element filter (rendered at plan build against that name), the FK IN clause, and the tenant
+        /// predicate all resolve to the reconstructed rows rather than the live era. For nORM-managed history
+        /// this is the {Table}_History window; for provider-native (system-versioned) storage it is the
+        /// provider's FOR SYSTEM_TIME AS OF clause. Mirrors the owned eager reconstruction (PrepareOwnedCollectionLoad)
+        /// and the relation split-query reconstruction (QueryExecutor.BuildDependentFromSource).
+        /// </summary>
+        private string BuildOwnedProjectionFromSource(OwnedCollectionMapping ownedMap, DbCommand cmd, DateTime? asOf)
+        {
+            if (asOf == null)
+                return ownedMap.EscTable;
+            var asOfParam = _p.ParamPrefix + "__asof_ownp";
+            bool present = false;
+            foreach (System.Data.Common.DbParameter existing in cmd.Parameters)
+                if (existing.ParameterName == asOfParam) { present = true; break; }
+            if (!present)
+            {
+                var ap = cmd.CreateParameter();
+                ap.ParameterName = asOfParam;
+                ap.Value = _p.FormatTemporalAsOfParameterValue(asOf.Value);
+                cmd.Parameters.Add(ap);
+            }
+            var ownedTypeMap = GetMapping(ownedMap.OwnedType);
+            if (Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
+                return _p.GetProviderNativeTemporalAsOfFromClause(ownedTypeMap, asOfParam);
+            var history = _p.Escape(ownedTypeMap.TableName + "_History");
+            var w = _p.Escape("__ownw");
+            var windowCols = new StringBuilder();
+            for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+            {
+                if (ci > 0) windowCols.Append(", ");
+                windowCols.Append(ownedMap.Columns[ci].EscCol);
+            }
+            if (ownedMap.Columns.Length > 0) windowCols.Append(", ");
+            windowCols.Append(ownedMap.EscForeignKeyColumn);
+            return $"(SELECT {windowCols} FROM {history} {w} " +
+                   $"WHERE {asOfParam} >= {w}.{_p.Escape("__ValidFrom")} AND {asOfParam} < {w}.{_p.Escape("__ValidTo")}) AS {ownedMap.EscTable}";
+        }
+
+        /// <summary>
         /// Loads an owned (OwnsMany) collection for a SHAPED PROJECTION — the parents are projected DTOs (or
         /// anonymous types), so the owner key and the target collection member resolve by NAME (via the
         /// split-query stitch helpers) rather than the mapping's entity-typed accessors. Owned rows carry no FK
         /// property, so children are grouped by the FK column's ordinal in the SELECT and materialized with the
-        /// same hand-rolled column mapping (+ value converters) the eager-load path uses. Bare collection only —
-        /// filtered/projected element bindings are rejected upstream at plan build for now.
+        /// same hand-rolled column mapping (+ value converters) the eager-load path uses. A per-element
+        /// <c>Where(...)</c> filter and an element projection are supported; under AsOf the rows reconstruct
+        /// through the history window (see <see cref="BuildOwnedProjectionFromSource"/>).
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Owned-collection projection materialization builds instances via reflection; not NativeAOT-compatible.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Owned-collection projection reflects over the owned type; trimming may remove the required members.")]
-        internal void LoadOwnedCollectionProjection(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents, Dictionary<string, object?>? filterParams = null)
+        internal void LoadOwnedCollectionProjection(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents, Dictionary<string, object?>? filterParams = null, DateTime? asOf = null)
         {
             if (parents.Count == 0) return;
             var ownedMap = depQuery.Owned!;
@@ -430,13 +472,15 @@ namespace nORM.Core
 
             EnsureConnection();
             var pks = keys.ToArray();
+            using var cmd = CreateCommand();
             var sql = new StringBuilder("SELECT ");
             for (int ci = 0; ci < ownedMap.Columns.Length; ci++) { if (ci > 0) sql.Append(", "); sql.Append(ownedMap.Columns[ci].EscCol); }
             if (ownedMap.Columns.Length > 0) sql.Append(", ");
             sql.Append(ownedMap.EscForeignKeyColumn);
-            // No table alias: a shaped per-element filter is rendered at plan build against the owned table's own
-            // name, so the FROM must reference it unaliased for the filter's table-qualified columns to resolve.
-            sql.Append(" FROM ").Append(ownedMap.EscTable)
+            // Live table normally; under AsOf the reconstructed history window aliased AS the table name (so the
+            // shaped per-element filter, rendered at plan build against that name, resolves to the reconstructed
+            // rows). No live-table alias, so the filter's table-qualified columns resolve either way.
+            sql.Append(" FROM ").Append(BuildOwnedProjectionFromSource(ownedMap, cmd, asOf))
                .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
             for (int pi = 0; pi < pks.Length; pi++) { if (pi > 0) sql.Append(", "); sql.Append(_p.ParamPrefix).Append("lpk").Append(pi); }
             sql.Append(')');
@@ -450,7 +494,6 @@ namespace nORM.Core
             if (ownedTenantCol != null)
                 sql.Append(" AND ").Append(ownedTenantCol.EscCol).Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
 
-            using var cmd = CreateCommand();
             for (int i = 0; i < pks.Length; i++)
             {
                 var pp = cmd.CreateParameter(); pp.ParameterName = _p.ParamPrefix + "lpk" + i; pp.Value = pks[i]; cmd.Parameters.Add(pp);
@@ -514,7 +557,7 @@ namespace nORM.Core
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Owned-collection projection materialization builds instances via reflection; not NativeAOT-compatible.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Owned-collection projection reflects over the owned type; trimming may remove the required members.")]
-        internal async System.Threading.Tasks.Task LoadOwnedCollectionProjectionAsync(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents, Dictionary<string, object?>? filterParams, System.Threading.CancellationToken ct)
+        internal async System.Threading.Tasks.Task LoadOwnedCollectionProjectionAsync(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents, Dictionary<string, object?>? filterParams, DateTime? asOf, System.Threading.CancellationToken ct)
         {
             if (parents.Count == 0) return;
             var ownedMap = depQuery.Owned!;
@@ -540,13 +583,15 @@ namespace nORM.Core
 
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
             var pks = keys.ToArray();
+            await using var cmd = CreateCommand();
             var sql = new StringBuilder("SELECT ");
             for (int ci = 0; ci < ownedMap.Columns.Length; ci++) { if (ci > 0) sql.Append(", "); sql.Append(ownedMap.Columns[ci].EscCol); }
             if (ownedMap.Columns.Length > 0) sql.Append(", ");
             sql.Append(ownedMap.EscForeignKeyColumn);
-            // No table alias: a shaped per-element filter is rendered at plan build against the owned table's own
-            // name, so the FROM must reference it unaliased for the filter's table-qualified columns to resolve.
-            sql.Append(" FROM ").Append(ownedMap.EscTable)
+            // Live table normally; under AsOf the reconstructed history window aliased AS the table name (so the
+            // shaped per-element filter, rendered at plan build against that name, resolves to the reconstructed
+            // rows). No live-table alias, so the filter's table-qualified columns resolve either way.
+            sql.Append(" FROM ").Append(BuildOwnedProjectionFromSource(ownedMap, cmd, asOf))
                .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
             for (int pi = 0; pi < pks.Length; pi++) { if (pi > 0) sql.Append(", "); sql.Append(_p.ParamPrefix).Append("lpk").Append(pi); }
             sql.Append(')');
@@ -560,7 +605,6 @@ namespace nORM.Core
             if (ownedTenantCol != null)
                 sql.Append(" AND ").Append(ownedTenantCol.EscCol).Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
 
-            await using var cmd = CreateCommand();
             for (int i = 0; i < pks.Length; i++)
             {
                 var pp = cmd.CreateParameter(); pp.ParameterName = _p.ParamPrefix + "lpk" + i; pp.Value = pks[i]; cmd.Parameters.Add(pp);
