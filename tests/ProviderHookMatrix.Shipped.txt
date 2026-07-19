@@ -124,6 +124,7 @@ PrefersSyncCompiledQueryExecution
 PrefersSyncExecution
 PrefersSyncFastPathExecution
 PrefersSyncQueryPlanExecution
+ReleaseSavepointAsync
 RequiresExplicitNullOrderingForNullableKeys
 RollbackToSavepointAsync
 StoredProcedureCommandType
@@ -218,6 +219,7 @@ OrderByDecimalKeySql
 ParameterPrefixChar
 PrefersBareBooleanPredicates
 PrefersSyncExecution
+ReleaseSavepointAsync
 RollbackToSavepointAsync
 StoredProcedureCommandType
 SupportsNativeOrderedStringAggregate
@@ -306,6 +308,7 @@ OrdinalComparableStringProjection
 PrefersSyncCompiledQueryExecution
 PrefersSyncFastPathExecution
 PrefersSyncQueryPlanExecution
+ReleaseSavepointAsync
 RollbackToSavepointAsync
 SupportsNativeRowVersion
 SupportsNativeTenantSessionContext
@@ -386,6 +389,7 @@ OrdinalRelationalStringOperand
 PrefersSyncCompiledQueryExecution
 PrefersSyncFastPathExecution
 PrefersSyncQueryPlanExecution
+ReleaseSavepointAsync
 RequiresExplicitNullOrderingForNullableKeys
 RollbackToSavepointAsync
 SupportsFastPathPreparedCommandCache
@@ -466,6 +470,7 @@ OrdinalComparableStringProjection
 ParameterizeFastPathBooleanPredicates
 PrefersSyncFastPathExecution
 PrefersSyncQueryPlanExecution
+ReleaseSavepointAsync
 RollbackToSavepointAsync
 SupportsCommandGeneratedKeyRetrieval
 SupportsFastPathPreparedCommandCache
