@@ -1,0 +1,364 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.EntityEntry`1
+  commentId: T:nORM.Core.EntityEntry`1
+  id: EntityEntry`1
+  parent: nORM.Core
+  children:
+  - nORM.Core.EntityEntry`1.Collection(System.String)
+  - nORM.Core.EntityEntry`1.CurrentValues
+  - nORM.Core.EntityEntry`1.Entity
+  - nORM.Core.EntityEntry`1.Entry
+  - nORM.Core.EntityEntry`1.GetDatabaseValues
+  - nORM.Core.EntityEntry`1.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  - nORM.Core.EntityEntry`1.IsKeySet
+  - nORM.Core.EntityEntry`1.Navigation(System.String)
+  - nORM.Core.EntityEntry`1.OriginalValues
+  - nORM.Core.EntityEntry`1.Property(System.String)
+  - nORM.Core.EntityEntry`1.Property``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  - nORM.Core.EntityEntry`1.Reference(System.String)
+  - nORM.Core.EntityEntry`1.Reload
+  - nORM.Core.EntityEntry`1.ReloadAsync(System.Threading.CancellationToken)
+  - nORM.Core.EntityEntry`1.State
+  langs:
+  - csharp
+  - vb
+  name: EntityEntry<TEntity>
+  nameWithType: EntityEntry<TEntity>
+  fullName: nORM.Core.EntityEntry<TEntity>
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntryOfT.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EntityEntry`1
+    path: src/nORM/Core/EntityEntryOfT.cs
+    startLine: 21
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    A strongly-typed view over a tracked entity's <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref>
+    (Entity Framework Core parity for EntityEntry&lt;TEntity&gt;), obtained from
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.Entry&lt;TEntity&gt;. It surfaces the full
+    untyped EntityEntry API and adds a lambda-based Property selector plus a typed Entity, so property state can be
+    read or set without stringly-typed names. It converts implicitly to EntityEntry.
+  syntax:
+    content: 'public sealed class EntityEntry<TEntity> where TEntity : class'
+    typeParameters:
+    - id: TEntity
+      description: The tracked entity's CLR type.
+    content.vb: Public NotInheritable Class EntityEntry(Of TEntity)
+  inheritance:
+  - System.Object
+- uid: nORM.Core.EntityEntry`1.Entry
+  commentId: P:nORM.Core.EntityEntry`1.Entry
+  id: Entry
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Entry
+  nameWithType: EntityEntry<TEntity>.Entry
+  fullName: nORM.Core.EntityEntry<TEntity>.Entry
+  type: Property
+  namespace: nORM.Core
+  summary: The underlying untyped <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref>.
+  syntax:
+    content: public EntityEntry Entry { get; }
+    parameters: []
+    return:
+      type: nORM.Core.EntityEntry
+    content.vb: Public ReadOnly Property Entry As EntityEntry
+- uid: nORM.Core.EntityEntry`1.Entity
+  commentId: P:nORM.Core.EntityEntry`1.Entity
+  id: Entity
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Entity
+  nameWithType: EntityEntry<TEntity>.Entity
+  fullName: nORM.Core.EntityEntry<TEntity>.Entity
+  type: Property
+  namespace: nORM.Core
+  summary: The tracked entity instance, typed.
+  syntax:
+    content: public TEntity Entity { get; }
+    parameters: []
+    return:
+      type: '{TEntity}'
+    content.vb: Public ReadOnly Property Entity As TEntity
+- uid: nORM.Core.EntityEntry`1.State
+  commentId: P:nORM.Core.EntityEntry`1.State
+  id: State
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: State
+  nameWithType: EntityEntry<TEntity>.State
+  fullName: nORM.Core.EntityEntry<TEntity>.State
+  type: Property
+  namespace: nORM.Core
+  summary: The tracking state of the entity; setting it changes what SaveChanges will persist.
+  syntax:
+    content: public EntityState State { get; set; }
+    parameters: []
+    return:
+      type: nORM.Core.EntityState
+    content.vb: Public Property State As EntityState
+- uid: nORM.Core.EntityEntry`1.IsKeySet
+  commentId: P:nORM.Core.EntityEntry`1.IsKeySet
+  id: IsKeySet
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: IsKeySet
+  nameWithType: EntityEntry<TEntity>.IsKeySet
+  fullName: nORM.Core.EntityEntry<TEntity>.IsKeySet
+  type: Property
+  namespace: nORM.Core
+  summary: Whether every mapped key property has a non-default value.
+  syntax:
+    content: public bool IsKeySet { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property IsKeySet As Boolean
+- uid: nORM.Core.EntityEntry`1.CurrentValues
+  commentId: P:nORM.Core.EntityEntry`1.CurrentValues
+  id: CurrentValues
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: CurrentValues
+  nameWithType: EntityEntry<TEntity>.CurrentValues
+  fullName: nORM.Core.EntityEntry<TEntity>.CurrentValues
+  type: Property
+  namespace: nORM.Core
+  summary: The current property values of the tracked entity.
+  syntax:
+    content: public PropertyValues CurrentValues { get; }
+    parameters: []
+    return:
+      type: nORM.Core.PropertyValues
+    content.vb: Public ReadOnly Property CurrentValues As PropertyValues
+- uid: nORM.Core.EntityEntry`1.OriginalValues
+  commentId: P:nORM.Core.EntityEntry`1.OriginalValues
+  id: OriginalValues
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: OriginalValues
+  nameWithType: EntityEntry<TEntity>.OriginalValues
+  fullName: nORM.Core.EntityEntry<TEntity>.OriginalValues
+  type: Property
+  namespace: nORM.Core
+  summary: The original property values captured when the entity was first tracked.
+  syntax:
+    content: public PropertyValues OriginalValues { get; }
+    parameters: []
+    return:
+      type: nORM.Core.PropertyValues
+    content.vb: Public ReadOnly Property OriginalValues As PropertyValues
+- uid: nORM.Core.EntityEntry`1.Property(System.String)
+  commentId: M:nORM.Core.EntityEntry`1.Property(System.String)
+  id: Property(System.String)
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Property(string)
+  nameWithType: EntityEntry<TEntity>.Property(string)
+  fullName: nORM.Core.EntityEntry<TEntity>.Property(string)
+  type: Method
+  namespace: nORM.Core
+  summary: The <xref href="nORM.Core.PropertyEntry" data-throw-if-not-resolved="false"></xref> for a mapped property by name.
+  syntax:
+    content: public PropertyEntry Property(string propertyName)
+    parameters:
+    - id: propertyName
+      type: System.String
+    return:
+      type: nORM.Core.PropertyEntry
+    content.vb: Public Function Property(propertyName As String) As PropertyEntry
+- uid: nORM.Core.EntityEntry`1.Property``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  commentId: M:nORM.Core.EntityEntry`1.Property``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  id: Property``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Property<TProperty>(Expression<Func<TEntity, TProperty>>)
+  nameWithType: EntityEntry<TEntity>.Property<TProperty>(Expression<Func<TEntity, TProperty>>)
+  fullName: nORM.Core.EntityEntry<TEntity>.Property<TProperty>(System.Linq.Expressions.Expression<System.Func<TEntity, TProperty>>)
+  type: Method
+  namespace: nORM.Core
+  summary: >-
+    The <xref href="nORM.Core.PropertyEntry" data-throw-if-not-resolved="false"></xref> for a mapped property selected
+    by a strongly-typed lambda, e.g. Property(o =&gt; o.Total).
+  syntax:
+    content: 'public PropertyEntry Property<TProperty>(Expression<Func<TEntity, TProperty>> propertyExpression)'
+    parameters:
+    - id: propertyExpression
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},{TProperty}}}
+      description: A simple property access on the entity.
+    typeParameters:
+    - id: TProperty
+    return:
+      type: nORM.Core.PropertyEntry
+    content.vb: Public Function Property(Of TProperty)(propertyExpression As Expression(Of Func(Of TEntity, TProperty))) As PropertyEntry
+- uid: nORM.Core.EntityEntry`1.Navigation(System.String)
+  commentId: M:nORM.Core.EntityEntry`1.Navigation(System.String)
+  id: Navigation(System.String)
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Navigation(string)
+  nameWithType: EntityEntry<TEntity>.Navigation(string)
+  fullName: nORM.Core.EntityEntry<TEntity>.Navigation(string)
+  type: Method
+  namespace: nORM.Core
+  summary: The <xref href="nORM.Core.NavigationEntry" data-throw-if-not-resolved="false"></xref> for a mapped navigation by name.
+  syntax:
+    content: public NavigationEntry Navigation(string navigationName)
+    parameters:
+    - id: navigationName
+      type: System.String
+    return:
+      type: nORM.Core.NavigationEntry
+    content.vb: Public Function Navigation(navigationName As String) As NavigationEntry
+- uid: nORM.Core.EntityEntry`1.Reference(System.String)
+  commentId: M:nORM.Core.EntityEntry`1.Reference(System.String)
+  id: Reference(System.String)
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Reference(string)
+  nameWithType: EntityEntry<TEntity>.Reference(string)
+  fullName: nORM.Core.EntityEntry<TEntity>.Reference(string)
+  type: Method
+  namespace: nORM.Core
+  summary: The <xref href="nORM.Core.NavigationEntry" data-throw-if-not-resolved="false"></xref> for a reference navigation by name.
+  syntax:
+    content: public NavigationEntry Reference(string navigationName)
+    parameters:
+    - id: navigationName
+      type: System.String
+    return:
+      type: nORM.Core.NavigationEntry
+    content.vb: Public Function Reference(navigationName As String) As NavigationEntry
+- uid: nORM.Core.EntityEntry`1.Collection(System.String)
+  commentId: M:nORM.Core.EntityEntry`1.Collection(System.String)
+  id: Collection(System.String)
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Collection(string)
+  nameWithType: EntityEntry<TEntity>.Collection(string)
+  fullName: nORM.Core.EntityEntry<TEntity>.Collection(string)
+  type: Method
+  namespace: nORM.Core
+  summary: The <xref href="nORM.Core.NavigationEntry" data-throw-if-not-resolved="false"></xref> for a collection navigation by name.
+  syntax:
+    content: public NavigationEntry Collection(string navigationName)
+    parameters:
+    - id: navigationName
+      type: System.String
+    return:
+      type: nORM.Core.NavigationEntry
+    content.vb: Public Function Collection(navigationName As String) As NavigationEntry
+- uid: nORM.Core.EntityEntry`1.Reload
+  commentId: M:nORM.Core.EntityEntry`1.Reload
+  id: Reload
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: Reload()
+  nameWithType: EntityEntry<TEntity>.Reload()
+  fullName: nORM.Core.EntityEntry<TEntity>.Reload()
+  type: Method
+  namespace: nORM.Core
+  summary: Re-reads the entity's current database values into the tracked instance and resets its state to Unchanged.
+  syntax:
+    content: public void Reload()
+    parameters: []
+    return:
+      type: System.Void
+    content.vb: Public Sub Reload()
+- uid: nORM.Core.EntityEntry`1.ReloadAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.EntityEntry`1.ReloadAsync(System.Threading.CancellationToken)
+  id: ReloadAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: ReloadAsync(CancellationToken)
+  nameWithType: EntityEntry<TEntity>.ReloadAsync(CancellationToken)
+  fullName: nORM.Core.EntityEntry<TEntity>.ReloadAsync(System.Threading.CancellationToken)
+  type: Method
+  namespace: nORM.Core
+  summary: Asynchronously re-reads the entity's current database values into the tracked instance and resets its state to Unchanged.
+  syntax:
+    content: public Task ReloadAsync(CancellationToken cancellationToken = default)
+    parameters:
+    - id: cancellationToken
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: Public Function ReloadAsync(cancellationToken As CancellationToken = Nothing) As Task
+- uid: nORM.Core.EntityEntry`1.GetDatabaseValues
+  commentId: M:nORM.Core.EntityEntry`1.GetDatabaseValues
+  id: GetDatabaseValues
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: GetDatabaseValues()
+  nameWithType: EntityEntry<TEntity>.GetDatabaseValues()
+  fullName: nORM.Core.EntityEntry<TEntity>.GetDatabaseValues()
+  type: Method
+  namespace: nORM.Core
+  summary: Reads the entity's current values from the database without changing the tracked instance, or null if the row no longer exists.
+  syntax:
+    content: public PropertyValues? GetDatabaseValues()
+    parameters: []
+    return:
+      type: nORM.Core.PropertyValues
+    content.vb: Public Function GetDatabaseValues() As PropertyValues
+- uid: nORM.Core.EntityEntry`1.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.EntityEntry`1.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  id: GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.EntityEntry`1
+  langs:
+  - csharp
+  - vb
+  name: GetDatabaseValuesAsync(CancellationToken)
+  nameWithType: EntityEntry<TEntity>.GetDatabaseValuesAsync(CancellationToken)
+  fullName: nORM.Core.EntityEntry<TEntity>.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  type: Method
+  namespace: nORM.Core
+  summary: Asynchronously reads the entity's current values from the database without changing the tracked instance, or null if the row no longer exists.
+  syntax:
+    content: public Task<PropertyValues?> GetDatabaseValuesAsync(CancellationToken cancellationToken = default)
+    parameters:
+    - id: cancellationToken
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{nORM.Core.PropertyValues}
+    content.vb: Public Function GetDatabaseValuesAsync(cancellationToken As CancellationToken = Nothing) As Task(Of PropertyValues)
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core

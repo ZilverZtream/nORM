@@ -141,5 +141,17 @@ namespace nORM.Core
 
             return existingEntry;
         }
+
+        /// <summary>
+        /// Strongly-typed <see cref="Entry(object)"/> (EF Core parity): returns an
+        /// <see cref="EntityEntry{TEntity}"/> over the tracked entity, adding lambda-based property access
+        /// (<c>ctx.Entry(order).Property(o =&gt; o.Total)</c>) on top of the untyped entry.
+        /// </summary>
+        /// <typeparam name="TEntity">The entity's CLR type.</typeparam>
+        /// <param name="entity">The tracked entity whose entry is requested.</param>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="entity"/> is null or invalid.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the entity is not currently tracked.</exception>
+        public EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class
+            => new EntityEntry<TEntity>(Entry((object)entity));
     }
 }

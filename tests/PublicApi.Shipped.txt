@@ -362,6 +362,7 @@ M:nORM.Core.DbContext.Dispose():System.Void
 M:nORM.Core.DbContext.DisposeAsync():System.Threading.Tasks.ValueTask
 M:nORM.Core.DbContext.DropNativeTenantPolicyAsync``1(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContext.Entry(System.Object):nORM.Core.EntityEntry
+M:nORM.Core.DbContext.Entry``1(`0):nORM.Core.EntityEntry{`0}
 M:nORM.Core.DbContext.ExecuteCompiledQueryListAsync``1(System.Data.Common.DbCommand,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{`0}},System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsAsyncEnumerable``1(System.String,System.Threading.CancellationToken,System.Object):System.Collections.Generic.IAsyncEnumerable{`0}
 M:nORM.Core.DbContext.ExecuteStoredProcedureAsync``1(System.String,System.Threading.CancellationToken,System.Object):System.Threading.Tasks.Task{System.Collections.Generic.List{`0}}
@@ -430,6 +431,15 @@ M:nORM.Core.EntityEntry.Property(System.String):nORM.Core.PropertyEntry
 M:nORM.Core.EntityEntry.Reference(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.Reload():System.Void
 M:nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
+M:nORM.Core.EntityEntry{`0}.Collection(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry{`0}.GetDatabaseValues():nORM.Core.PropertyValues
+M:nORM.Core.EntityEntry{`0}.GetDatabaseValuesAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{nORM.Core.PropertyValues}
+M:nORM.Core.EntityEntry{`0}.Navigation(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry{`0}.Property(System.String):nORM.Core.PropertyEntry
+M:nORM.Core.EntityEntry{`0}.Property``1(System.Linq.Expressions.Expression{System.Func{`0,`0}}):nORM.Core.PropertyEntry
+M:nORM.Core.EntityEntry{`0}.Reference(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry{`0}.Reload():System.Void
+M:nORM.Core.EntityEntry{`0}.ReloadAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.IMemoryMonitor.GetAvailableMemory():System.Int64
 M:nORM.Core.INormDbContextFactory{`0}.CreateDbContext():`0
 M:nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
@@ -1304,6 +1314,12 @@ P:nORM.Core.EntityEntryGraphNode{`0}.Entry:nORM.Core.EntityEntry
 P:nORM.Core.EntityEntryGraphNode{`0}.InboundNavigation:System.String
 P:nORM.Core.EntityEntryGraphNode{`0}.NodeState:`0
 P:nORM.Core.EntityEntryGraphNode{`0}.SourceEntry:nORM.Core.EntityEntry
+P:nORM.Core.EntityEntry{`0}.CurrentValues:nORM.Core.PropertyValues
+P:nORM.Core.EntityEntry{`0}.Entity:`0
+P:nORM.Core.EntityEntry{`0}.Entry:nORM.Core.EntityEntry
+P:nORM.Core.EntityEntry{`0}.IsKeySet:System.Boolean
+P:nORM.Core.EntityEntry{`0}.OriginalValues:nORM.Core.PropertyValues
+P:nORM.Core.EntityEntry{`0}.State:nORM.Core.EntityState
 P:nORM.Core.NavigationEntry.CurrentValue:System.Object
 P:nORM.Core.NavigationEntry.IsLoaded:System.Boolean
 P:nORM.Core.NavigationEntry.Name:System.String
@@ -1686,6 +1702,7 @@ T:nORM.Core.DebugView
 T:nORM.Core.EntityEntry
 T:nORM.Core.EntityEntryGraphNode
 T:nORM.Core.EntityEntryGraphNode{`0}
+T:nORM.Core.EntityEntry{`0}
 T:nORM.Core.EntityState
 T:nORM.Core.IMemoryMonitor
 T:nORM.Core.INormDbContextFactory{`0}
