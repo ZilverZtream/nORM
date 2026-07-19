@@ -20,6 +20,13 @@ Read benchmarks that compare nORM to handwritten ADO.NET must distinguish:
 - `RawAdo_PreparedOptimized`: prepared command reuse plus the optimized reader.
 - `RawAdo_PreparedTypedNoBox`: prepared command reuse plus the typed/no-box
   reader floor.
+- `RawAdo_SyncPreparedOptimized`: prepared command reuse plus the optimized
+  reader, read **synchronously**. This is the fairest floor for a provider whose
+  nORM path executes synchronously internally (e.g. SQLite via
+  `PrefersSyncExecution`): the async raw-ADO tiers pay a sync-over-async wrapper
+  cost on the provider's ADO driver that nORM legitimately skips. A
+  "ties/beats raw ADO" claim on such a provider must clear this row, not only the
+  async prepared tier.
 - `Dapper`: Dapper SQL execution with Dapper materialization.
 - `Dapper_Prepared`: only permitted when Dapper still performs materialization.
   A prepared `DbCommand` that is read manually is a Raw ADO benchmark, not a
@@ -33,6 +40,13 @@ Read benchmarks that compare nORM to handwritten ADO.NET must distinguish:
   `RawAdo_PreparedOptimized` for the same provider, SQL shape, row count, and
   projection.
 - If nORM only beats `RawAdo_Convenience`, say so explicitly.
+- On a provider whose nORM path runs synchronously internally, measure nORM
+  against `RawAdo_SyncPreparedOptimized` before any "ties raw ADO" claim — the
+  async prepared tier is not the true floor there.
+- Fairness adjustments always strengthen the baseline to the best code a
+  perf-conscious developer would write; never handicap nORM (e.g. forcing an
+  async wrapper it does not need) to flatten a genuine architectural advantage.
+  A real, user-visible nORM advantage is not something to neutralize.
 - Dapper comparisons must use typed materialization for typed nORM projections.
 - Dynamic Dapper rows and typed nORM projections are not equivalent unless the
   claim is explicitly about dynamic result shapes.

@@ -442,6 +442,22 @@ namespace nORM.Benchmarks
             return await ReadUsersOptimizedAsync(_adoSimplePrepared!);
         }
 
+        [Benchmark(Description = "Query Simple Raw ADO (Sync Prepared Optimized)")]
+        public List<BenchmarkUser> Query_Simple_RawAdo_SyncPreparedOptimized()
+        {
+            // The true floor for nORM's SQLite read path, which runs SYNCHRONOUSLY internally
+            // (SqliteProvider.PrefersSyncExecution). The async raw-ADO tiers pay a sync-over-async
+            // wrapper cost on Microsoft.Data.Sqlite that nORM legitimately skips, so this sync,
+            // prepared, indexed-read baseline is the fairest peer — nORM must be measured against
+            // this, not only the async tiers, before any "ties/beats raw ADO" claim.
+            _adoSimpleTakeParam!.Value = 10;
+            using var reader = _adoSimplePrepared!.ExecuteReader();
+            var users = new List<BenchmarkUser>();
+            while (reader.Read())
+                users.Add(ReadUserOptimized(reader));
+            return users;
+        }
+
         // ========== COMPLEX QUERY (standard) ==========
 
         [Benchmark]
