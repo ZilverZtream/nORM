@@ -529,6 +529,50 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Overload that threads caller <paramref name="parameterState"/> to a STATIC
+        /// <paramref name="initializeParameters"/> so the hot path allocates no per-call closure. The
+        /// initializer runs once, on the cache miss, before <c>Prepare()</c>.
+        /// </summary>
+        internal FastPathPreparedCommand GetOrCreateFastPathPreparedCommand<TState>(
+            string cacheKey,
+            string sql,
+            int commandTimeout,
+            TState parameterState,
+            Action<DbCommand, TState> initializeParameters)
+        {
+            return _fastPathPreparedCommandCache.GetOrAdd(cacheKey, static (_, s) =>
+            {
+                var cmd = s.Context.CreateCommand();
+                try
+                {
+                    cmd.CommandText = s.Sql;
+                    cmd.CommandTimeout = s.CommandTimeout;
+                    s.InitializeParameters(cmd, s.ParameterState);
+                    try
+                    {
+                        cmd.Prepare();
+                    }
+                    catch (NotSupportedException)
+                    {
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                    catch (DbException)
+                    {
+                    }
+
+                    return new FastPathPreparedCommand(cmd);
+                }
+                catch
+                {
+                    cmd.Dispose();
+                    throw;
+                }
+            }, (Context: this, Sql: sql, CommandTimeout: commandTimeout, ParameterState: parameterState, InitializeParameters: initializeParameters));
+        }
+
+        /// <summary>
         /// X1: Creates a <see cref="DbCommand"/> that is fully lifecycle-aware:
         /// opens the connection if closed, binds the active transaction, and participates in
         /// command interception. Generated <c>[CompileTimeQuery]</c> methods must use this

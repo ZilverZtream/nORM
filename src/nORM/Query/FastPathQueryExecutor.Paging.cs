@@ -172,11 +172,13 @@ namespace nORM.Query
             {
                 // Key by the SQL itself (already computed, unique per shape) to avoid a per-call key-string
                 // allocation on the hot path; the paging SQL is structurally distinct from the simple path's.
+                // Static initializer + state tuple so no per-call closure is allocated.
                 var prepared = ctx.GetOrCreateFastPathPreparedCommand(
                     sql,
                     sql,
                     timeout,
-                    command => BindFilteredOrderedPageParameters(command, ctx, info));
+                    (ctx, info),
+                    static (command, s) => BindFilteredOrderedPageParameters(command, s.ctx, s.info));
                 return ExecuteFilteredOrderedPagePreparedListAsync<T>(prepared, ctx, info, map, track, ct);
             }
 

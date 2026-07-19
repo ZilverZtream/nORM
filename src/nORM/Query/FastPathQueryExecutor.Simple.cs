@@ -123,15 +123,18 @@ namespace nORM.Query
             {
                 // Key the pooled command by the SQL itself (already computed + cached, unique per shape) so
                 // the hot path allocates no per-call key string. The SQL is 1:1 with its shape cache key, and
-                // structurally distinct from the paging path's SQL, so it cannot collide.
+                // structurally distinct from the paging path's SQL, so it cannot collide. Pass parameter state
+                // to a STATIC initializer so no per-call closure is allocated (the initializer runs once, on
+                // the cache miss).
                 var prepared = ctx.GetOrCreateFastPathPreparedCommand(
                     sql,
                     sql,
                     timeout,
-                    command =>
+                    (ctx, info, hasParam: !isNull && !isBoolTrue && !isBoolFalse),
+                    static (command, s) =>
                     {
-                        if (!isNull && !isBoolTrue && !isBoolFalse)
-                            command.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
+                        if (s.hasParam)
+                            command.AddOptimizedParam(s.ctx.RawProvider.ParamPrefix + "p0", s.info.Value!);
                     });
                 return ExecuteSimpleWherePreparedListAsync<T>(prepared, ctx, info, isNull, isBoolTrue, isBoolFalse, takeCount, map, track, ct);
             }
