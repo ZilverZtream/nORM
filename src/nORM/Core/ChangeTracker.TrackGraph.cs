@@ -117,8 +117,10 @@ namespace nORM.Core
 
             foreach (var join in mapping.ManyToManyJoins)
             {
-                var navProp = mapping.Type.GetProperty(join.LeftNavPropertyName);
-                if (navProp?.GetValue(entity) is IEnumerable collection and not string)
+                // Use the join's compiled collection getter rather than GetProperty(name).GetValue: the
+                // latter throws AmbiguousMatchException when a derived type shadows the nav with `new` and
+                // misses an explicit-interface implementation.
+                if (join.LeftCollectionGetter(entity) is { } collection)
                 {
                     foreach (var child in collection)
                         if (child != null)
