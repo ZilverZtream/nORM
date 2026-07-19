@@ -485,5 +485,141 @@ namespace nORM.Query
                 QueryExecutor.AssignCollectionToTarget(QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p, collection);
             }
         }
+
+        /// <summary>
+        /// Truly asynchronous twin of <see cref="LoadManyToManyProjection"/> for the true-async execution path
+        /// (SQL Server / PostgreSQL / MySQL — SQLite routes ToListAsync through the sync path). Uses async reader
+        /// APIs end to end so no thread blocks on I/O; the SQL building, key correlation, filter, and element
+        /// projection are identical to the sync loader.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("A many-to-many shaped projection may compile an element projection at runtime; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("A many-to-many shaped projection reflects over the projected type; trimming may remove the required members.")]
+        public async Task LoadManyToManyProjectionAsync(DependentQueryDefinition depQuery, IList parents, Dictionary<string, object?>? filterParams, CancellationToken ct)
+        {
+            if (parents.Count == 0) return;
+            var jtm = depQuery.M2M!;
+            var rightMapping = depQuery.TargetMapping;
+            var projector = depQuery.ElementProjection is { } proj ? QueryExecutor.CompileElementProjection(proj) : null;
+
+            object?[]? LeftKeyValues(object p)
+            {
+                var kv = new object?[depQuery.ParentKeyProperties.Count];
+                for (int i = 0; i < kv.Length; i++)
+                {
+                    kv[i] = QueryExecutor.ResolveOnParent(depQuery.ParentKeyProperties[i], p, depQuery).GetValue(p);
+                    if (kv[i] == null) return null;
+                }
+                return kv;
+            }
+
+            void AssignEmpty(object p) => QueryExecutor.AssignCollectionToTarget(
+                QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p,
+                QueryExecutor.CreateList(depQuery.CollectionElementType, 0));
+
+            var parentKeyValues = new Dictionary<object, object?[]>();
+            foreach (var p in parents.Cast<object>())
+            {
+                var kv = LeftKeyValues(p);
+                if (kv == null) continue;
+                var pk = jtm.CreateLeftKeyFromValues(kv);
+                if (pk != null) parentKeyValues.TryAdd(pk, kv);
+            }
+            if (parentKeyValues.Count == 0)
+            {
+                foreach (var p in parents.Cast<object>()) AssignEmpty(p);
+                return;
+            }
+
+            var leftKeyGroups = parentKeyValues.Values.ToList();
+            await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+            await using var cmd = _ctx.CreateCommand();
+
+            var leftMapping = _ctx.GetMapping(jtm.LeftType);
+            var tenantActive = _ctx.Options.TenantProvider != null;
+            var leftPredicate = BuildColumnValuePredicate(cmd, _ctx.RawProvider.ParamPrefix, "jlfk", "jt", jtm.EscLeftFkColumns, leftKeyGroups);
+            var selectedJoinColumns = string.Join(", ", jtm.EscLeftFkColumns.Concat(jtm.EscRightFkColumns).Select(c => "jt." + c));
+            if (tenantActive)
+            {
+                var leftTenantCol = _ctx.RequireTenantColumn(leftMapping, "many-to-many shaped projection left side");
+                var tp = $"{_ctx.RawProvider.ParamPrefix}jttenant";
+                var leftJoinPredicate = BuildColumnJoinPredicate("jt", jtm.EscLeftFkColumns, "lt", jtm.LeftKeyColumns);
+                cmd.CommandText = $"SELECT {selectedJoinColumns} FROM {jtm.EscTableName} jt INNER JOIN {leftMapping.EscTable} lt ON {leftJoinPredicate} WHERE lt.{leftTenantCol.EscCol} = {tp} AND {leftPredicate}";
+                cmd.AddParam(tp, _ctx.GetRequiredTenantId(leftMapping, "many-to-many shaped projection"));
+            }
+            else
+            {
+                cmd.CommandText = $"SELECT {selectedJoinColumns} FROM {jtm.EscTableName} jt WHERE {leftPredicate}";
+            }
+            cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
+
+            var joinRows = new Dictionary<object, List<object>>();
+            var allRightPks = new HashSet<object>();
+            var rightKeyValues = new Dictionary<object, object?[]>();
+            var leftKeyWidth = jtm.LeftFkColumns.Count;
+            var rightKeyWidth = jtm.RightFkColumns.Count;
+            await using (var jReader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, System.Data.CommandBehavior.Default, ct).ConfigureAwait(false))
+            {
+                while (await jReader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var leftValues = ReadKeyValues(jReader, 0, leftKeyWidth);
+                    var rightValues = ReadKeyValues(jReader, leftKeyWidth, rightKeyWidth);
+                    if (leftValues == null || rightValues == null) continue;
+                    var lPk = jtm.CreateLeftKeyFromValues(leftValues);
+                    var rPk = jtm.CreateRightKeyFromValues(rightValues);
+                    if (lPk == null || rPk == null) continue;
+                    if (!joinRows.TryGetValue(lPk, out var rList)) joinRows[lPk] = rList = new List<object>();
+                    rList.Add(rPk);
+                    allRightPks.Add(rPk);
+                    rightKeyValues.TryAdd(rPk, rightValues);
+                }
+            }
+
+            var rightEntitiesByPk = new Dictionary<object, object>();
+            if (allRightPks.Count > 0)
+            {
+                await using var cmd2 = _ctx.CreateCommand();
+                var rightPredicate = BuildColumnValuePredicate(cmd2, _ctx.RawProvider.ParamPrefix, "jrpk", null, jtm.RightKeyColumns, rightKeyValues.Values.ToList());
+                var rsql = new System.Text.StringBuilder($"SELECT * FROM {rightMapping.EscTable} WHERE {rightPredicate}");
+                if (tenantActive)
+                {
+                    var rightTenantCol = _ctx.RequireTenantColumn(rightMapping, "many-to-many shaped projection right side");
+                    var rtp = $"{_ctx.RawProvider.ParamPrefix}jrtenant";
+                    rsql.Append($" AND {rightTenantCol.EscCol} = {rtp}");
+                    cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many shaped projection right side"));
+                }
+                var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+                if (rightGlobalFilter != null) rsql.Append($" AND {rightGlobalFilter}");
+                QueryExecutor.AppendDependentFilter(cmd2, rsql, depQuery, filterParams);
+                cmd2.CommandText = rsql.ToString();
+                cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
+
+                var rightMat = _materializerFactory.CreateSyncMaterializer(rightMapping, jtm.RightType);
+                await using var rReader = await cmd2.ExecuteReaderWithInterceptionAsync(_ctx, System.Data.CommandBehavior.Default, ct).ConfigureAwait(false);
+                while (await rReader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var rightEntity = rightMat(rReader);   // transient — a projected result is never tracked
+                    var rpk = jtm.GetRightKey(rightEntity);
+                    if (rpk != null) rightEntitiesByPk[rpk] = rightEntity;
+                }
+            }
+
+            foreach (var p in parents.Cast<object>())
+            {
+                var collection = QueryExecutor.CreateList(depQuery.CollectionElementType, 0);
+                var kv = LeftKeyValues(p);
+                var leftPk = kv != null ? jtm.CreateLeftKeyFromValues(kv) : null;
+                if (leftPk != null)
+                {
+                    if (!joinRows.TryGetValue(leftPk, out var rightPks)) rightPks = CoercedLookup(joinRows, leftPk);
+                    if (rightPks != null)
+                        foreach (var rPk in rightPks)
+                        {
+                            if (!rightEntitiesByPk.TryGetValue(rPk, out var rightEntity)) rightEntity = CoercedLookup(rightEntitiesByPk, rPk);
+                            if (rightEntity != null) collection.Add(projector != null ? projector(rightEntity) : rightEntity);
+                        }
+                }
+                QueryExecutor.AssignCollectionToTarget(QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p, collection);
+            }
+        }
     }
 }

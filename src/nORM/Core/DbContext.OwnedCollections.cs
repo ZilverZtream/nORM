@@ -506,6 +506,115 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Truly asynchronous twin of <see cref="LoadOwnedCollectionProjection"/> for the true-async execution
+        /// path (SQL Server / PostgreSQL / MySQL — SQLite routes ToListAsync through the sync path). Uses async
+        /// reader APIs end to end; the SQL building, FK-ordinal grouping, filter, and element projection are
+        /// identical to the sync loader.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Owned-collection projection materialization builds instances via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Owned-collection projection reflects over the owned type; trimming may remove the required members.")]
+        internal async System.Threading.Tasks.Task LoadOwnedCollectionProjectionAsync(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents, Dictionary<string, object?>? filterParams, System.Threading.CancellationToken ct)
+        {
+            if (parents.Count == 0) return;
+            var ownedMap = depQuery.Owned!;
+            var pkColProp = depQuery.ParentKeyProperties[0];   // the owner key column the FK references
+            var projector = depQuery.ElementProjection is { } proj ? nORM.Query.QueryExecutor.CompileElementProjection(proj) : null;
+
+            object? OwnerKey(object p) => nORM.Query.QueryExecutor.ResolveOnParent(pkColProp, p, depQuery).GetValue(p);
+            void AssignEmpty(object p) => nORM.Query.QueryExecutor.AssignCollectionToTarget(
+                nORM.Query.QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p,
+                nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0));
+
+            var keys = new HashSet<object>();
+            foreach (var p in parents.Cast<object>())
+            {
+                var k = OwnerKey(p);
+                if (k != null) keys.Add(k);
+            }
+            if (keys.Count == 0)
+            {
+                foreach (var p in parents.Cast<object>()) AssignEmpty(p);
+                return;
+            }
+
+            await EnsureConnectionAsync(ct).ConfigureAwait(false);
+            var pks = keys.ToArray();
+            var sql = new StringBuilder("SELECT ");
+            for (int ci = 0; ci < ownedMap.Columns.Length; ci++) { if (ci > 0) sql.Append(", "); sql.Append(ownedMap.Columns[ci].EscCol); }
+            if (ownedMap.Columns.Length > 0) sql.Append(", ");
+            sql.Append(ownedMap.EscForeignKeyColumn);
+            // No table alias: a shaped per-element filter is rendered at plan build against the owned table's own
+            // name, so the FROM must reference it unaliased for the filter's table-qualified columns to resolve.
+            sql.Append(" FROM ").Append(ownedMap.EscTable)
+               .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
+            for (int pi = 0; pi < pks.Length; pi++) { if (pi > 0) sql.Append(", "); sql.Append(_p.ParamPrefix).Append("lpk").Append(pi); }
+            sql.Append(')');
+
+            Column? ownedTenantCol = null;
+            if (Options.TenantProvider != null)
+                ownedTenantCol = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName)
+                    ?? throw new NormConfigurationException(
+                        $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' does not map " +
+                        $"tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned loads.");
+            if (ownedTenantCol != null)
+                sql.Append(" AND ").Append(ownedTenantCol.EscCol).Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
+
+            await using var cmd = CreateCommand();
+            for (int i = 0; i < pks.Length; i++)
+            {
+                var pp = cmd.CreateParameter(); pp.ParameterName = _p.ParamPrefix + "lpk" + i; pp.Value = pks[i]; cmd.Parameters.Add(pp);
+            }
+            if (ownedTenantCol != null)
+            {
+                var tp = cmd.CreateParameter(); tp.ParameterName = _p.ParamPrefix + "tenantId";
+                tp.Value = GetRequiredTenantId(ownedTenantCol, ownedMap.OwnedType, "owned collection shaped projection"); cmd.Parameters.Add(tp);
+            }
+            // Shaped-projection per-element filter (Lines = o.Lines.Where(pred).ToList()): AND the plan-rendered
+            // predicate and bind its compiled params from the captured main-command values so closures re-bind.
+            nORM.Query.QueryExecutor.AppendDependentFilter(cmd, sql, depQuery, filterParams);
+            cmd.CommandText = sql.ToString();
+            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
+
+            int fkOrdinal = ownedMap.Columns.Length;
+            // Grouped by owner key as the OWNED ENTITY (object) — the element projection, when present, is applied
+            // per item at stitch time, because CollectionElementType is the PROJECTED type.
+            var byOwnerKey = new Dictionary<object, List<object>>();
+            await using (var reader = await cmd.ExecuteReaderWithInterceptionAsync(this, System.Data.CommandBehavior.Default, ct).ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    var item = Activator.CreateInstance(ownedMap.OwnedType)!;
+                    for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+                    {
+                        var col = ownedMap.Columns[ci];
+                        if (reader.IsDBNull(ci)) continue;
+                        var raw = reader.GetValue(ci);
+                        col.Setter(item, col.Converter != null ? col.Converter.ConvertFromProvider(raw) : ConvertSimple(raw, col.Prop.PropertyType));
+                    }
+                    if (reader.IsDBNull(fkOrdinal)) continue;
+                    var fkVal = reader.GetValue(fkOrdinal);
+                    var key = ConvertSimple(fkVal, pkColProp.PropertyType) ?? fkVal;   // coerce FK to the owner-key CLR type
+                    if (!byOwnerKey.TryGetValue(key, out var list))
+                    {
+                        list = new List<object>();
+                        byOwnerKey[key] = list;
+                    }
+                    list.Add(item);
+                }
+            }
+
+            foreach (var p in parents.Cast<object>())
+            {
+                var k = OwnerKey(p);
+                var collection = nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0);
+                if (k != null && byOwnerKey.TryGetValue(k, out var loaded))
+                    foreach (var it in loaded) collection.Add(projector != null ? projector(it) : it);
+                nORM.Query.QueryExecutor.AssignCollectionToTarget(
+                    nORM.Query.QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p, collection);
+            }
+        }
+
         /// <summary>Converts a DB value to the target CLR type using safe fallback logic.</summary>
         private static object? ConvertSimple(object raw, Type targetType)
         {

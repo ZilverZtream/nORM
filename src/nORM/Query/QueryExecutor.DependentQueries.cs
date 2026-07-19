@@ -39,20 +39,16 @@ namespace nORM.Query
                 ct.ThrowIfCancellationRequested();
 
                 if (depQuery.M2M != null)
-                    // The many-to-many shaped-projection loader is currently sync-only; SQLite (the common
-                    // shaped-projection target) executes through the sync path, so this only guards the true-async
-                    // providers until the async loader lands. Fail loud rather than sync-over-async.
-                    throw new NormUnsupportedFeatureException(
-                        "Projecting a many-to-many collection into a shaped result is not yet supported on this " +
-                        "provider's asynchronous execution path. Materialise with a synchronous ToList(), or load " +
-                        "it with Include(...).");
+                {
+                    await _includeProcessor.LoadManyToManyProjectionAsync(depQuery, parents, filterParams, ct).ConfigureAwait(false);
+                    continue;
+                }
 
                 if (depQuery.Owned != null)
-                    // Same as the m2m gate above: the owned shaped-projection loader is sync-only for now, so this
-                    // guards the true-async providers until the async loader lands. Fail loud, never sync-over-async.
-                    throw new NormUnsupportedFeatureException(
-                        "Projecting an owned collection into a shaped result is not yet supported on this provider's " +
-                        "asynchronous execution path. Materialise with a synchronous ToList(), or load it with Include(...).");
+                {
+                    await _ctx.LoadOwnedCollectionProjectionAsync(depQuery, parents, filterParams, ct).ConfigureAwait(false);
+                    continue;
+                }
 
                 // Phase 1: Extract parent IDs. Composite relationships must keep the
                 // full ordered key tuple or split-query stitching can cross tenants.
