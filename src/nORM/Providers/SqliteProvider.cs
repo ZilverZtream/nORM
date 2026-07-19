@@ -34,6 +34,14 @@ namespace nORM.Providers
         internal override bool SupportsQueryPlanPreparedCommandCache => true;
 
         /// <summary>
+        /// SQLite reuses a pooled prepared command on the simple/paging fast paths, exactly as it already
+        /// does on the full query-plan path (<see cref="SupportsQueryPlanPreparedCommandCache"/>). This removes
+        /// a fresh <c>DbCommand</c>+<c>DbParameter</c> allocation and re-parse per call on the hot read path —
+        /// the largest remaining gap between the runtime and compiled paths — for the common repeated query.
+        /// </summary>
+        internal override bool SupportsFastPathPreparedCommandCache => true;
+
+        /// <summary>
         /// Bare boolean predicates avoid steering SQLite toward low-selectivity boolean indexes
         /// when a more selective conjunct is available.
         /// </summary>

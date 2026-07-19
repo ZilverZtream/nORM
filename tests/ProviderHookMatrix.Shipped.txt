@@ -222,6 +222,7 @@ PrefersSyncExecution
 ReleaseSavepointAsync
 RollbackToSavepointAsync
 StoredProcedureCommandType
+SupportsFastPathPreparedCommandCache
 SupportsNativeOrderedStringAggregate
 SupportsQueryPlanPreparedCommandCache
 TranslateFunction
