@@ -22,8 +22,10 @@ namespace nORM.Tests;
 /// it with live rows. The split-query child load reads the {Table}_History window at the timestamp (aliased AS
 /// the live table so the FK/tenant/global/element filters resolve to the reconstructed rows), mirroring the
 /// owned-collection reconstruction — so the projected collection holds the children as they were at the
-/// timestamp and any element filter applies to those historical values. Provider-native temporal storage
-/// isn't wired through this path yet and stays fail-loud (it can't be validated without a live SQL Server).
+/// timestamp and any element filter applies to those historical values. Provider-native (SQL Server
+/// system-versioned) storage reconstructs through the same child load via the FOR SYSTEM_TIME AS OF clause —
+/// see <see cref="ProviderNativeShapedCollectionTemporalTests"/> (deterministic routing) and
+/// <see cref="LiveProviderNativeShapedCollectionTemporalTests"/> (live reconstruction).
 /// Filtered <c>Include</c> under AsOf is a separate path — see <see cref="FilteredIncludeTemporalContractTests"/>.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]

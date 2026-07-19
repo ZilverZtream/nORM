@@ -219,11 +219,13 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// The FROM source for a dependent (split-query) child load: the live table normally, or — under AsOf
-        /// with nORM-managed history — the reconstructed history window at the timestamp, ALIASED AS the live
-        /// table name so every existing filter (FK IN, tenant, global, per-element) that references the table
-        /// by that name resolves to the reconstructed rows unchanged. Mirrors the owned-collection
-        /// reconstruction (DbContext.OwnedCollections). ProviderNative temporal is rejected upstream.
+        /// The FROM source for a dependent (split-query) child load: the live table normally, or — under AsOf —
+        /// the reconstructed as-of source at the timestamp. For nORM-managed history this is the {Table}_History
+        /// window ALIASED AS the live table name; for provider-native temporal (SQL Server system-versioning)
+        /// it is the provider's <c>FOR SYSTEM_TIME AS OF</c> clause, which keeps the table's own name. Either
+        /// way the table reference resolves under its live name, so every existing filter (FK IN, tenant,
+        /// global, per-element) that references the table by that name binds to the reconstructed rows
+        /// unchanged. Mirrors the owned-collection reconstruction (DbContext.OwnedCollections).
         /// </summary>
         private string BuildDependentFromSource(DependentQueryDefinition depQuery, DbCommand cmd, DateTime? asOf)
         {
@@ -237,6 +239,11 @@ namespace nORM.Query
                 if (existing.ParameterName == asOfParam) { present = true; break; }
             if (!present)
                 cmd.AddParam(asOfParam, asOf.Value);
+            // Provider-native temporal delegates reconstruction to the engine's system-versioning; the clause
+            // ({EscTable} FOR SYSTEM_TIME AS OF @asof) preserves the table's own name, so the child load's
+            // FK/tenant/global/element filters resolve exactly as they do against the live table.
+            if (_ctx.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
+                return p.GetProviderNativeTemporalAsOfFromClause(map, asOfParam);
             var history = p.Escape(map.TableName + "_History");
             var w = p.Escape("__depw");
             var cols = string.Join(", ", map.Columns.Select(c => c.EscCol));

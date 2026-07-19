@@ -42,17 +42,11 @@ namespace nORM.Query
                         "projection isn't supported yet — the shaped-collection loads would collide and silently " +
                         "drop one. Project each navigation at most once, or load them in separate queries.");
 
-            // A collection PROJECTION under AsOf reconstructs its children through the history window (see
-            // FetchChildrenBatch/BuildDependentFromSource) for nORM-managed temporal storage. Provider-native
-            // temporal (SQL Server system-versioned) isn't wired through the split path yet AND can't be
-            // validated here, so it stays fail-loud rather than risk a silent era-mix — the live table would
-            // return present-day child rows and apply any element filter to live values.
-            if (_detectedCollections.Count > 0 && (_asOfTimestamp.HasValue || HasActiveTemporalScope)
-                && _ctx.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
-                throw new NormUnsupportedFeatureException(
-                    "Projecting a navigation collection under AsOf with provider-native temporal storage isn't " +
-                    "supported yet — the child load would read live rows and mix eras. Use a filtered " +
-                    "Include(...) under AsOf, or materialise the query first (ToList) and project in memory.");
+            // A collection PROJECTION under AsOf reconstructs its children at the timestamp through the child
+            // load's as-of FROM source (see FetchChildrenBatch/BuildDependentFromSource): the {Table}_History
+            // window for nORM-managed storage, or the provider's FOR SYSTEM_TIME AS OF clause for
+            // provider-native (system-versioned) storage. Both keep the table's own name so the FK/tenant/
+            // global/element filters resolve to the reconstructed rows, never the live era.
 
             foreach (var collectionProperty in _detectedCollections)
             {

@@ -34,29 +34,45 @@ namespace nORM.Versioning
 
             await CreateTagsTableIfNotExistsAsync(context, conn, ct).ConfigureAwait(false);
 
+            var providerNative = context.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative;
+            if (providerNative && !context.RawProvider.SupportsProviderNativeTemporalTables)
+                throw new NormUnsupportedFeatureException(
+                    $"{context.RawProvider.GetType().Name} does not support provider-native temporal tables.");
+
             foreach (var mapping in context.GetAllMappings())
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (context.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative)
-                {
-                    if (!context.RawProvider.SupportsProviderNativeTemporalTables)
-                        throw new NormUnsupportedFeatureException(
-                            $"{context.RawProvider.GetType().Name} does not support provider-native temporal tables.");
+                // Temporal storage is only meaningful for real entity tables with a primary key: provider-native
+                // system-versioning requires one, and nORM-managed history correlates row versions by key.
+                // A keyless mapping here is never a temporal candidate — it is a scalar/projection type that
+                // leaked into the mapping cache when the query pipeline probed a member type via GetMapping
+                // (a projected List<int>, an anonymous shape). Skipping it keeps the automatic sweep robust;
+                // an explicit per-entity request (GenerateProviderNativeTemporalBootstrapSql<T>) still fails
+                // loud for a genuinely keyless entity the caller named.
+                if (mapping.KeyColumns.Length == 0)
+                    continue;
 
+                // Introspect the LIVE physical column set up front. It doubles as an existence gate: a keyed
+                // mapping whose table has NO physical columns does not exist as a table, so it is a projection
+                // type that carries a convention 'Id' key (a named DTO) yet still leaked into the mapping cache
+                // via a query-pipeline member probe, or a base table not created yet — neither is a versioning
+                // target. Skipping keeps the sweep from ALTERing a phantom table. For the nORM-managed branch the
+                // columns are also required directly: they mirror custom precision/length AND cover columns that
+                // exist only physically (an owned collection's foreign key, a raw ADD COLUMN), which history
+                // tables/triggers built from the mapped property set alone would silently omit.
+                var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
+                    .ConfigureAwait(false);
+                if (liveColumns.Count == 0)
+                    continue;
+
+                if (providerNative)
+                {
                     var bootstrapSql = context.RawProvider.GenerateProviderNativeTemporalBootstrapSql(mapping);
                     await ExecuteDdlAsync(context, conn, bootstrapSql, ct).ConfigureAwait(false);
                 }
                 else
                 {
-                    // Introspect the LIVE physical column set before generating any temporal DDL:
-                    // it mirrors custom precision/length AND covers columns that exist only
-                    // physically (an owned collection's foreign key, a raw ADD COLUMN) — history
-                    // tables and triggers built from the mapped property set alone would silently
-                    // omit those values, making owned rows uncorrelatable at a past timestamp.
-                    var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
-                        .ConfigureAwait(false);
-
                     if (!await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
                     {
                         var createHistoryTableSql = context.RawProvider.GenerateCreateHistoryTableSql(mapping, liveColumns);
