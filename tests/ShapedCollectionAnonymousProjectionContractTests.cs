@@ -154,6 +154,24 @@ public class ShapedCollectionAnonymousProjectionContractTests
     }
 
     [Fact]
+    public void two_projections_of_the_same_nav_fail_loud_not_silent()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Ctx(cn);
+        // Both members project o.Lines with different filters. The per-nav detection maps collide, so one
+        // would silently come back empty — fail loud instead of returning wrong data.
+        var ex = Assert.Throws<NormUnsupportedFeatureException>(() =>
+            ctx.Query<Order>()
+                .Select(o => new
+                {
+                    o.Id,
+                    Big = o.Lines.Where(l => l.Qty > 4).Select(l => l.Sku).ToList(),
+                    Small = o.Lines.Where(l => l.Qty <= 4).Select(l => l.Sku).ToList(),
+                })
+                .ToList());
+        Assert.Contains("Lines", ex.Message);
+    }
+
+    [Fact]
     public void toarray_collection_member_fails_loud()
     {
         using var cn = new SqliteConnection("Data Source=:memory:"); cn.Open(); using var ctx = Ctx(cn);

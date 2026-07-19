@@ -28,6 +28,20 @@ namespace nORM.Query
         {
             var dependentQueries = new List<DependentQueryDefinition>();
 
+            // Two shaped/bare bindings over the SAME navigation (new { A = o.Lines.Where(x).ToList(),
+            // B = o.Lines.Where(y).ToList() }) collide: the per-navigation filter/projection/target maps keep
+            // only the last binding, so the split query would run once and stitch a single member, leaving the
+            // other SILENTLY EMPTY. Fail loud instead of returning wrong data. (_detectedCollections keeps both
+            // entries even though the maps collided, so the duplicate is detectable here.) Supporting multiple
+            // projections of one navigation is a follow-up (the maps would need to key by target member).
+            var seenNavigations = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var c in _detectedCollections)
+                if (!seenNavigations.Add(c.Name))
+                    throw new NormUnsupportedFeatureException(
+                        $"Projecting the navigation collection '{c.Name}' into more than one member of a single " +
+                        "projection isn't supported yet — the shaped-collection loads would collide and silently " +
+                        "drop one. Project each navigation at most once, or load them in separate queries.");
+
             foreach (var collectionProperty in _detectedCollections)
             {
                 // Try to find the relation for this navigation property
