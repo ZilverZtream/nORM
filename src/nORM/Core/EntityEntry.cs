@@ -988,6 +988,19 @@ namespace nORM.Core
             Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no reflection paths are exercised.")]
         [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Aot", "IL3050:RequiresDynamicCode",
             Justification = "CleanupNavigationContext only accesses a ConditionalWeakTable and disposes a context — no dynamic code paths are exercised.")]
+        /// <summary>
+        /// Unsubscribes this entry's change handler from an <see cref="INotifyPropertyChanged"/> entity, with
+        /// none of the other detach cleanup. Used to release a transient probe entry (see
+        /// <see cref="ChangeTracker.TrackGraph(object, System.Action{EntityEntryGraphNode})"/>) so it leaks no
+        /// handler, while leaving the entity's navigation/lazy-load context — which may be shared with another
+        /// context via the process-wide table — completely untouched.
+        /// </summary>
+        internal void UnsubscribeNotifications()
+        {
+            if (Entity is INotifyPropertyChanged notify)
+                notify.PropertyChanged -= PropertyChangedHandler;
+        }
+
         internal void DetachEntity()
         {
             _state = EntityState.Detached;

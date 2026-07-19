@@ -66,11 +66,12 @@ namespace nORM.Core
                 var chosen = probe.State;
 
                 // The probe subscribes to PropertyChanged for an INotifyPropertyChanged entity (its
-                // InitializeTracking does). Release that subscription on the throwaway probe so it neither
+                // InitializeTracking does). Release only that subscription on the throwaway probe so it neither
                 // leaks a handler nor leaves the entity double-subscribed once the real entry below tracks it.
-                // DetachEntity only drops the subscription and lazy-load context (a no-op for a disconnected
-                // graph) — it does not clear the navigation values we still traverse.
-                probe.DetachEntity();
+                // Unlike DetachEntity, this leaves the entity's lazy-load context untouched — that context is
+                // shared process-wide, so disposing it here would silently disable lazy loading for the same
+                // instance in another context.
+                probe.UnsubscribeNotifications();
 
                 if (chosen == EntityState.Detached)
                     continue;
