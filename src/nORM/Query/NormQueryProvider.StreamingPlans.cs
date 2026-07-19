@@ -152,9 +152,14 @@ namespace nORM.Query
             // invocation translates fresh against the live closure values. Run this
             // detector only after a cache miss so normal hot cached queries do not
             // pay a full tree walk on every execution.
-            // Raw-SQL queries bake their parameter values into the plan at translation, so caching would
-            // replay stale values on a same-SQL-different-parameters call; translate fresh each execution.
-            bool bypassPlanCache = ExpressionContainsLocalSequenceOp(filtered) || rawSource != null;
+            // Raw-SQL queries bake their POSITIONAL parameter values into the plan at translation, so caching
+            // would replay stale values on a same-SQL-different-parameters call — bypass those. But a raw
+            // query with NO positional parameters has nothing to replay: its SQL is already folded into the
+            // fingerprint (above) so distinct SQL never collides, and any composed closures re-bind through
+            // the normal compiled-parameter path. Caching those avoids re-translating on every execution
+            // (a parameterless FromSqlRaw was allocating ~2x a plain query for exactly this reason).
+            bool bypassPlanCache = ExpressionContainsLocalSequenceOp(filtered)
+                || (rawSource != null && rawSource.RawParameters.Length > 0);
 
             var localFiltered = filtered;
             QueryPlan plan;
