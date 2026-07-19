@@ -38,6 +38,15 @@ namespace nORM.Query
             {
                 ct.ThrowIfCancellationRequested();
 
+                if (depQuery.M2M != null)
+                    // The many-to-many shaped-projection loader is currently sync-only; SQLite (the common
+                    // shaped-projection target) executes through the sync path, so this only guards the true-async
+                    // providers until the async loader lands. Fail loud rather than sync-over-async.
+                    throw new NormUnsupportedFeatureException(
+                        "Projecting a many-to-many collection into a shaped result is not yet supported on this " +
+                        "provider's asynchronous execution path. Materialise with a synchronous ToList(), or load " +
+                        "it with Include(...).");
+
                 // Phase 1: Extract parent IDs. Composite relationships must keep the
                 // full ordered key tuple or split-query stitching can cross tenants.
                 var parentIds = new HashSet<object>();
@@ -98,6 +107,12 @@ namespace nORM.Query
 
             foreach (var depQuery in dependentQueries)
             {
+                if (depQuery.M2M != null)
+                {
+                    _includeProcessor.LoadManyToManyProjection(depQuery, parents);
+                    continue;
+                }
+
                 var parentIds = new HashSet<object>();
                 foreach (var parent in parents.Cast<object>())
                 {
@@ -506,7 +521,7 @@ namespace nORM.Query
         /// empty mutable list as the constructor argument, and the children are added to THAT list because the
         /// property can't be reassigned.
         /// </summary>
-        private static void AssignCollectionToTarget(PropertyInfo target, object parent, IList collection)
+        internal static void AssignCollectionToTarget(PropertyInfo target, object parent, IList collection)
         {
             if (target.CanWrite)
             {
@@ -556,7 +571,7 @@ namespace nORM.Query
         /// type omits the correlating property — a shaped collection projection must also project the
         /// principal key so its children can be matched.
         /// </summary>
-        private static PropertyInfo ResolveOnParent(PropertyInfo prop, object parent, DependentQueryDefinition depQuery)
+        internal static PropertyInfo ResolveOnParent(PropertyInfo prop, object parent, DependentQueryDefinition depQuery)
         {
             if (prop.DeclaringType != null && prop.DeclaringType.IsInstanceOfType(parent))
                 return prop;

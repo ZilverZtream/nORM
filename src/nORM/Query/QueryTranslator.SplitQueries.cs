@@ -67,17 +67,22 @@ namespace nORM.Query
                     fkColumns = relation.ForeignKeys;
                     parentKeyProps = relation.PrincipalKeys.Select(c => c.Prop).ToArray();
                 }
+                else if ((m2m = _mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == collectionProperty.Name)) != null)
+                {
+                    targetMapping = _ctx.GetMapping(m2m.RightType);
+                    fkColumns = Array.Empty<Column>();   // m2m correlates through the bridge table, not a child FK
+                    parentKeyProps = m2m.LeftKeyColumns.Select(c => c.Prop).ToArray();
+                }
+                else if (_mapping.OwnedCollections.Any(o => o.NavigationProperty.Name == collectionProperty.Name))
+                {
+                    // Owned shaped projections are the next increment; still fail loud rather than build a
+                    // definition the executor can't run.
+                    throw new NormUnsupportedFeatureException(
+                        $"Projecting the owned collection '{collectionProperty.Name}' into a shaped result isn't " +
+                        "supported yet. Load it with Include(...), or fetch it in a separate query.");
+                }
                 else
                 {
-                    // Owned/m2m shaped projections: the plan-build discriminant (Owned/M2M) and the element-
-                    // filter alias resolution are in place, but the fetch/stitch branch is the next increment,
-                    // so still fail loud for now rather than build a definition the executor can't run.
-                    var isOwned = _mapping.OwnedCollections.Any(o => o.NavigationProperty.Name == collectionProperty.Name);
-                    var isM2M = _mapping.ManyToManyJoins.Any(j => j.LeftNavPropertyName == collectionProperty.Name);
-                    if (isOwned || isM2M)
-                        throw new NormUnsupportedFeatureException(
-                            $"Projecting the {(isOwned ? "owned" : "many-to-many")} collection '{collectionProperty.Name}' " +
-                            "into a shaped result isn't supported yet. Load it with Include(...), or fetch it in a separate query.");
                     continue; // not a mapped collection
                 }
 
@@ -111,6 +116,13 @@ namespace nORM.Query
                 // projection client-side over each fetched child entity.
                 _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
                 var dependentElementType = elementProjection?.ReturnType ?? elementType;
+
+                // Filtered/projected many-to-many shaped projections are a later sub-increment; only a bare
+                // .ToList() is wired so far. Fail loud rather than silently drop the filter/projection.
+                if (m2m != null && (filter.Sql != null || elementProjection != null))
+                    throw new NormUnsupportedFeatureException(
+                        $"Projecting the many-to-many collection '{collectionProperty.Name}' with a Where(...) filter " +
+                        "or an element projection isn't supported yet — use a bare .ToList(), or Include(...).");
 
                 // A closure-capturing element projection is applied client-side; baking it into a cached
                 // delegate would replay the first execution's captured value. Mark the plan non-cacheable so

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -76,12 +77,34 @@ public class ShapedProjectionUnsupportedCollectionTests
     }
 
     [Fact]
-    public void Shaping_a_many_to_many_collection_fails_loud_not_crash()
+    public void Shaping_a_bare_many_to_many_collection_loads_the_related_entities()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        var rows = ctx.Query<Post>().Select(p => new { p.Id, Tags = p.Tags.ToList() }).ToList();
+        var post = Assert.Single(rows);
+        Assert.Equal(1, post.Id);
+        Assert.Equal("x", Assert.Single(post.Tags).Label);
+    }
+
+    [Fact]
+    public async Task Shaping_a_bare_many_to_many_collection_loads_via_the_sync_execution_path_for_sqlite()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        // SQLite routes ToListAsync through the synchronous materialize path, so the m2m projection loads.
+        var rows = await ((INormQueryable<Post>)ctx.Query<Post>())
+            .Select(p => new { p.Id, Tags = p.Tags.ToList() }).ToListAsync();
+        Assert.Equal("x", Assert.Single(Assert.Single(rows).Tags).Label);
+    }
+
+    [Fact]
+    public void Filtered_many_to_many_shaped_projection_still_fails_loud()
     {
         using var ctx = Ctx(out var cn);
         using var _cn = cn;
         var ex = Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Post>().Select(p => new { p.Id, Tags = p.Tags.ToList() }).ToList());
+            ctx.Query<Post>().Select(p => new { p.Id, Tags = p.Tags.Where(t => t.Id > 0).ToList() }).ToList());
         Assert.Contains("many-to-many", ex.Message);
     }
 
