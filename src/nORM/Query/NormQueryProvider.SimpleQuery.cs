@@ -299,6 +299,44 @@ namespace nORM.Query
             var plan = GetOrBuildSimplePlan<TResult>(sql);
             bool returnsList = !plan.SingleResult;
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
+
+            // Pool the prepared command for the common single-row First/FirstOrDefault path (parity with the
+            // list fast path): reuse one prepared command per shape and rebind values, instead of allocating a
+            // fresh DbCommand + DbParameter and re-parsing the SQL every call. Excludes Single/SingleOrDefault
+            // (need a second-row read for duplicate detection) and interceptor/transaction contexts.
+            if (!returnsList
+                && requestedMethodName is not ("Single" or "SingleOrDefault")
+                && _ctx.RawProvider.SupportsFastPathPreparedCommandCache
+                && _ctx.Options.CommandInterceptors.Count == 0
+                && _ctx.CurrentTransaction == null)
+            {
+                var prepared = _ctx.GetOrCreateFastPathPreparedCommand(
+                    sql, sql, (int)plan.CommandTimeout.TotalSeconds, parameters,
+                    static (command, ps) => { foreach (var p in ps) command.AddOptimizedParam(p.Key, p.Value); });
+                await prepared.Gate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    var pooledCmd = prepared.Command;
+                    if (pooledCmd.Parameters.Count > 0)
+                    {
+                        int i = 0;
+                        foreach (var p in parameters)
+                            ParameterAssign.AssignValue(pooledCmd.Parameters[i++], p.Value);
+                    }
+                    var single = await _executor.MaterializeSinglePooledAsync(plan, pooledCmd, ct).ConfigureAwait(false);
+                    sw?.Stop();
+                    _ctx.Options.Logger?.LogQuery(sql, parameters, sw?.Elapsed ?? default, single != null ? 1 : 0);
+                    if (single != null) return (TResult)single;
+                    if (requestedMethodName == nameof(Queryable.First))
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return default!;
+                }
+                finally
+                {
+                    prepared.Gate.Release();
+                }
+            }
+
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = sql;

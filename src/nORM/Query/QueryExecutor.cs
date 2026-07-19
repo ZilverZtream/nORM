@@ -400,6 +400,39 @@ namespace nORM.Query
             }
         }
 
+        /// <summary>
+        /// Reads a single-result First/FirstOrDefault query from a POOLED prepared command WITHOUT disposing
+        /// it — the caller owns the command's lifetime (a per-context prepared-command pool with a gate).
+        /// Mirrors the SingleResult branch of <see cref="MaterializeAsync"/> (tracking + client projection).
+        /// Returns the materialized entity, or null when no row matched. Not for Single/SingleOrDefault, which
+        /// need a second row read for duplicate detection.
+        /// </summary>
+        public async Task<object?> MaterializeSinglePooledAsync(QueryPlan plan, DbCommand command, CancellationToken ct)
+        {
+            var trackable = !plan.NoTracking &&
+                            plan.ElementType.IsClass &&
+                            !plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal) &&
+                            _ctx.IsMapped(plan.ElementType) &&
+                            !_ctx.GetMapping(plan.ElementType).IsKeyless;
+            TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
+            bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
+
+            await using var reader = await command
+                .ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
+                .ConfigureAwait(false);
+            object? result = null;
+            if (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                ct.ThrowIfCancellationRequested();
+                var entity = plan.SyncMaterializer(reader);
+                if (plan.ClientProjection != null)
+                    entity = plan.ClientProjection(entity);
+                result = ProcessEntity(entity, trackable, entityMap, isReadOnly);
+            }
+            await reader.DisposeAsync().ConfigureAwait(false);
+            return result;
+        }
+
         public IList Materialize(QueryPlan plan, DbCommand cmd)
         {
             var command = cmd;
