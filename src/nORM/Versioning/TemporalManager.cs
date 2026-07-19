@@ -39,31 +39,27 @@ namespace nORM.Versioning
                 throw new NormUnsupportedFeatureException(
                     $"{context.RawProvider.GetType().Name} does not support provider-native temporal tables.");
 
+            // The sweep must version only REAL entity tables. GetAllMappings also yields projection types
+            // (anonymous shapes, and named DTOs that pick up a convention 'Id' key) that the query pipeline
+            // cached while probing member types — versioning those tries to ALTER/CREATE a table that does not
+            // exist. Physical-existence introspection is NOT a safe discriminator here: it is scoped to the
+            // provider's default schema (dbo/public), so a real table an unqualified mapping resolves to in a
+            // non-default login schema would introspect as absent and be silently skipped — permanent, silent
+            // history loss. Instead, gate on the entity closure reachable from configured/queried roots through
+            // navigations; projections are never in it, and a real table is included regardless of its schema.
+            var realEntityTypes = BuildRealEntityTypeClosure(context);
+
             foreach (var mapping in context.GetAllMappings())
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Temporal storage is only meaningful for real entity tables with a primary key: provider-native
-                // system-versioning requires one, and nORM-managed history correlates row versions by key.
-                // A keyless mapping here is never a temporal candidate — it is a scalar/projection type that
-                // leaked into the mapping cache when the query pipeline probed a member type via GetMapping
-                // (a projected List<int>, an anonymous shape). Skipping it keeps the automatic sweep robust;
-                // an explicit per-entity request (GenerateProviderNativeTemporalBootstrapSql<T>) still fails
-                // loud for a genuinely keyless entity the caller named.
-                if (mapping.KeyColumns.Length == 0)
+                if (!realEntityTypes.Contains(mapping.Type))
                     continue;
 
-                // Introspect the LIVE physical column set up front. It doubles as an existence gate: a keyed
-                // mapping whose table has NO physical columns does not exist as a table, so it is a projection
-                // type that carries a convention 'Id' key (a named DTO) yet still leaked into the mapping cache
-                // via a query-pipeline member probe, or a base table not created yet — neither is a versioning
-                // target. Skipping keeps the sweep from ALTERing a phantom table. For the nORM-managed branch the
-                // columns are also required directly: they mirror custom precision/length AND cover columns that
-                // exist only physically (an owned collection's foreign key, a raw ADD COLUMN), which history
-                // tables/triggers built from the mapped property set alone would silently omit.
-                var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
-                    .ConfigureAwait(false);
-                if (liveColumns.Count == 0)
+                // Temporal storage is only meaningful for a table with a primary key: provider-native
+                // system-versioning requires one, and nORM-managed history correlates row versions by key.
+                // A keyless entity (HasNoKey) can never be reconstructed by key, so it is not a candidate.
+                if (mapping.KeyColumns.Length == 0)
                     continue;
 
                 if (providerNative)
@@ -73,6 +69,14 @@ namespace nORM.Versioning
                 }
                 else
                 {
+                    // Introspect the LIVE physical column set: it mirrors custom precision/length AND covers
+                    // columns that exist only physically (an owned collection's foreign key, a raw ADD COLUMN),
+                    // which history tables/triggers built from the mapped property set alone would silently
+                    // omit. When the table is in a non-default schema this returns empty and the DDL generators
+                    // fall back to the mapped column set (typed by provider representation) — still correct.
+                    var liveColumns = await IntrospectTableColumnsAsync(context, conn, mapping.TableName, ct)
+                        .ConfigureAwait(false);
+
                     if (!await HistoryTableExistsAsync(context, conn, mapping, ct).ConfigureAwait(false))
                     {
                         var createHistoryTableSql = context.RawProvider.GenerateCreateHistoryTableSql(mapping, liveColumns);
@@ -83,6 +87,45 @@ namespace nORM.Versioning
                     await ExecuteDdlAsync(context, conn, createTriggersSql, ct).ConfigureAwait(false);
                 }
             }
+        }
+
+        /// <summary>
+        /// The set of CLR types that are genuine mapped entities: configured/queried roots plus every entity
+        /// reachable from them through relationship collections, reference navigations, owned collections, and
+        /// many-to-many joins. Query projection types (DTOs, anonymous shapes) leak into the mapping cache via
+        /// member-type probes but are never reachable this way, so they are excluded — without a physical-table
+        /// probe that would be blind to non-default schemas.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Walks navigation metadata that reflects over entity members.")]
+        private static HashSet<Type> BuildRealEntityTypeClosure(DbContext context)
+        {
+            var real = new HashSet<Type>();
+            var queue = new Queue<TableMapping>();
+
+            void Consider(Type? type)
+            {
+                if (type != null && real.Add(type))
+                    queue.Enqueue(context.GetMapping(type));
+            }
+
+            foreach (var mapping in context.GetAllMappings())
+                if (context.IsMapped(mapping.Type) && real.Add(mapping.Type))
+                    queue.Enqueue(mapping);
+
+            while (queue.Count > 0)
+            {
+                var mapping = queue.Dequeue();
+                foreach (var relation in mapping.Relations.Values)
+                    Consider(relation.DependentType);
+                foreach (var referenceNav in mapping.ReferenceNavigations)
+                    Consider(referenceNav.PropertyType);
+                foreach (var owned in mapping.OwnedCollections)
+                    Consider(owned.OwnedType);
+                foreach (var join in mapping.ManyToManyJoins)
+                    Consider(join.RightType);
+            }
+
+            return real;
         }
 
         private static void ThrowIfTemporalBootstrapTargetsProtectedDatabase(DatabaseProvider provider, DbConnection conn)
