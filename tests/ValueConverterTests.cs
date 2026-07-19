@@ -404,7 +404,9 @@ public class ValueConverterTests
         using var cn = CreateAndOpenDb(ProductTextStatusSchema);
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = "INSERT INTO Product (Name, Status, Score, Tag) VALUES ('Widget', 'unused', '99', NULL)";
+            // Status must be a valid ProductStatus value ('1' = Active): the materializer now fails loud on
+            // an unconvertible column rather than silently defaulting it. This test only asserts Score.
+            cmd.CommandText = "INSERT INTO Product (Name, Status, Score, Tag) VALUES ('Widget', '1', '99', NULL)";
             cmd.ExecuteNonQuery();
         }
         var opts = new DbContextOptions
@@ -489,7 +491,9 @@ public class ValueConverterTests
         using var cn = CreateAndOpenDb(ProductTextStatusSchema);
         using (var cmd = cn.CreateCommand())
         {
-            cmd.CommandText = "INSERT INTO Product (Name, Status, Score, Tag) VALUES ('Widget', 'unused', '77', 'HELLO')";
+            // Status must be a valid ProductStatus value ('1' = Active): the materializer now fails loud on
+            // an unconvertible column rather than silently defaulting it. This test only asserts Score and Tag.
+            cmd.CommandText = "INSERT INTO Product (Name, Status, Score, Tag) VALUES ('Widget', '1', '77', 'HELLO')";
             cmd.ExecuteNonQuery();
         }
         var opts = new DbContextOptions

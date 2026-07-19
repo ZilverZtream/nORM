@@ -234,14 +234,20 @@ namespace nORM.Query
                                     value = ConvertDbValue(rawValue, col.Prop.PropertyType);
                                 col.Setter(entity, value);
                             }
-                            catch (InvalidCastException)
+                            catch (Exception ex) when (ex is InvalidCastException or FormatException)
                             {
-                                // skip columns that cannot be converted (e.g., no converter configured
-                                // but DB type doesn't match property type)
-                            }
-                            catch (FormatException)
-                            {
-                                // skip columns with format mismatches during conversion
+                                // Fail loud: silently leaving the property at its CLR default is silent-wrong.
+                                // The optimized materializer path already throws on a type mismatch, so surface
+                                // it here too for consistency. (ConvertDbValue already rethrows as
+                                // InvalidOperationException; this catches a converter's ConvertFromProvider or a
+                                // setter rejecting an incompatible value.)
+                                throw new InvalidOperationException(
+                                    $"Failed to materialize column '{col.Name}' into {targetType.Name}.{col.Prop.Name} " +
+                                    $"(type {col.Prop.PropertyType.Name}). " +
+                                    (col.Converter != null
+                                        ? "The value converter could not convert the stored value."
+                                        : "The database value's type does not match the property; configure a value converter or align the column type.") +
+                                    $" ({ex.Message})", ex);
                             }
                         }
                         return entity!;
@@ -293,8 +299,13 @@ namespace nORM.Query
                             if (reader.IsDBNull(ord)) continue;
                             var rawVal = reader.GetValue(ord);
                             try { col.Setter(entity, ConvertDbValue(rawVal, col.Prop.PropertyType)); }
-                            catch (InvalidCastException) { /* shadow column type mismatch - skip silently */ }
-                            catch (FormatException) { /* shadow column format mismatch - skip silently */ }
+                            catch (Exception ex) when (ex is InvalidCastException or FormatException)
+                            {
+                                // Fail loud rather than silently defaulting the shadow property (silent-wrong).
+                                throw new InvalidOperationException(
+                                    $"Failed to materialize shadow column '{col.Name}' (type {col.Prop.PropertyType.Name}): " +
+                                    $"the stored value could not be converted or assigned. ({ex.Message})", ex);
+                            }
                         }
                         else
                         {
