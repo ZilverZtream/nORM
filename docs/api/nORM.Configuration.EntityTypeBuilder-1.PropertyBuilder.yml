@@ -19,6 +19,9 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
   langs:
@@ -399,6 +402,118 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired(Boolean)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired(Boolean)
   name.vb: IsRequired(Boolean)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  id: ValueGeneratedOnAdd
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: ValueGeneratedOnAdd()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAdd()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAdd()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValueGeneratedOnAdd
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 116
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures the property as store-generated on INSERT (EF Core's <code>ValueGeneratedOnAdd</code>) —
+
+    e.g. an identity/serial key or a column with a database default. The column is omitted from
+
+    generated INSERT statements so the database supplies the value.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder ValueGeneratedOnAdd()
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function ValueGeneratedOnAdd() As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAdd()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAdd()
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  id: ValueGeneratedNever
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: ValueGeneratedNever()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedNever()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedNever()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValueGeneratedNever
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 127
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures the property as never store-generated (EF Core's <code>ValueGeneratedNever</code>): nORM
+
+    always writes the CLR value, clearing any attribute-derived database-generated flag.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder ValueGeneratedNever()
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function ValueGeneratedNever() As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedNever()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedNever()
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  id: ValueGeneratedOnAddOrUpdate
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: ValueGeneratedOnAddOrUpdate()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValueGeneratedOnAddOrUpdate
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 139
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures the property as store-generated on INSERT and UPDATE (EF Core's
+
+    <code>ValueGeneratedOnAddOrUpdate</code>) — a computed column. It is omitted from generated INSERT and
+
+    UPDATE statements so the database supplies the value.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder ValueGeneratedOnAddOrUpdate()
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function ValueGeneratedOnAddOrUpdate() As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate()
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   id: IsUnicode(System.Boolean)
@@ -417,7 +532,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 116
+    startLine: 151
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -459,7 +574,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 128
+    startLine: 163
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -501,7 +616,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 141
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -546,7 +661,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 155
+    startLine: 190
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -594,7 +709,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCollation
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 169
+    startLine: 204
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -641,7 +756,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasComputedColumnSql
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 184
+    startLine: 219
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -691,7 +806,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 196
+    startLine: 231
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -732,7 +847,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 206
+    startLine: 241
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1904,6 +2019,30 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAdd
+  name: ValueGeneratedOnAdd
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAdd
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAdd
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAdd
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAdd
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedNever
+  name: ValueGeneratedNever
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedNever
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedNever
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedNever
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedNever
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAddOrUpdate
+  name: ValueGeneratedOnAddOrUpdate
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_

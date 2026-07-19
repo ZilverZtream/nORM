@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 213
+    startLine: 248
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -44,6 +44,9 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
@@ -85,7 +88,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 224
+    startLine: 259
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -403,6 +406,69 @@ references:
     name: Boolean
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAdd
+  name: ValueGeneratedOnAdd()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAdd()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAdd()
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAdd()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAdd()
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+    name: ValueGeneratedOnAdd
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAdd
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
+    name: ValueGeneratedOnAdd
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAdd
+  - name: (
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedNever
+  name: ValueGeneratedNever()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedNever()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedNever()
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedNever()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedNever()
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+    name: ValueGeneratedNever
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedNever
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
+    name: ValueGeneratedNever
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedNever
+  - name: (
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAddOrUpdate
+  name: ValueGeneratedOnAddOrUpdate()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+    name: ValueGeneratedOnAddOrUpdate
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAddOrUpdate
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+    name: ValueGeneratedOnAddOrUpdate
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAddOrUpdate
+  - name: (
   - name: )
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)

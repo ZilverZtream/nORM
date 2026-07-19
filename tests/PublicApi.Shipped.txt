@@ -209,6 +209,9 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasPrecision(System.I
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsFixedLength(System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsRequired(System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsUnicode(System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
+M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.ValueGeneratedNever():nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
+M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.ValueGeneratedOnAdd():nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
+M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.ValueGeneratedOnAddOrUpdate():nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder{`1}.HasConversion``1(nORM.Mapping.ValueConverter{`1,`0}):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.Property``1(System.Linq.Expressions.Expression{System.Func{`0,`0}}):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.Property``1(System.String):nORM.Configuration.EntityTypeBuilder{`0}.ShadowPropertyBuilder
@@ -1221,6 +1224,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collection
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.TableSplitWith:System.Type
 P:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
+P:nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption}
 P:nORM.Configuration.IdentityOptionsConfiguration.Increment:System.Int64
 P:nORM.Configuration.IdentityOptionsConfiguration.Seed:System.Int64
 P:nORM.Configuration.IndexAttribute.FilterSql:System.String

@@ -31,6 +31,7 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.TableName
   - nORM.Configuration.IEntityTypeConfiguration.TableSplitWith
   - nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
+  - nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings
   langs:
   - csharp
   - vb
@@ -451,6 +452,40 @@ items:
       type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
     content.vb: ReadOnly Property RequiredSettings As IReadOnlyDictionary(Of PropertyInfo, Boolean)
   overload: nORM.Configuration.IEntityTypeConfiguration.RequiredSettings*
+- uid: nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings
+  id: ValueGeneratedSettings
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ValueGeneratedSettings
+  nameWithType: IEntityTypeConfiguration.ValueGeneratedSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValueGeneratedSettings
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 86
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets the store value-generation strategy configured via the fluent API (ValueGeneratedOnAdd /
+
+    Never / OnAddOrUpdate), overriding the attribute-derived database-generated flag.
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, DatabaseGeneratedOption> ValueGeneratedSettings { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption}
+    content.vb: ReadOnly Property ValueGeneratedSettings As IReadOnlyDictionary(Of PropertyInfo, DatabaseGeneratedOption)
+  overload: nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings*
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   id: UnicodeSettings
@@ -469,7 +504,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UnicodeSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 85
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -500,7 +535,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FixedLengthSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 90
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -531,7 +566,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precisions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 95
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -562,7 +597,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 101
+    startLine: 107
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -596,7 +631,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 106
+    startLine: 112
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -627,7 +662,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 111
+    startLine: 117
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -658,7 +693,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 116
+    startLine: 122
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -689,7 +724,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 121
+    startLine: 127
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -720,7 +755,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 126
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -751,7 +786,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 131
+    startLine: 137
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -782,7 +817,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 136
+    startLine: 142
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -813,7 +848,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converters
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 139
+    startLine: 145
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -844,7 +879,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 145
+    startLine: 151
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -878,7 +913,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyRelationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 150
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2044,6 +2079,59 @@ references:
     name: Boolean
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_ValueGeneratedSettings
+  name: ValueGeneratedSettings
+  nameWithType: IEntityTypeConfiguration.ValueGeneratedSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<PropertyInfo, DatabaseGeneratedOption>
+  nameWithType: IReadOnlyDictionary<PropertyInfo, DatabaseGeneratedOption>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Reflection.PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption>
+  nameWithType.vb: IReadOnlyDictionary(Of PropertyInfo, DatabaseGeneratedOption)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Reflection.PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption)
+  name.vb: IReadOnlyDictionary(Of PropertyInfo, DatabaseGeneratedOption)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption
+    name: DatabaseGeneratedOption
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.componentmodel.dataannotations.schema.databasegeneratedoption
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption
+    name: DatabaseGeneratedOption
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.componentmodel.dataannotations.schema.databasegeneratedoption
   - name: )
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings

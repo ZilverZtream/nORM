@@ -84,7 +84,7 @@ namespace nORM.Mapping
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == info.Property) ?? false) || info.IsKey;
             IsTimestamp = info.IsTimestamp;
-            IsDbGenerated = info.IsDbGenerated;
+            IsDbGenerated = ResolveIsDbGenerated(fluentConfig, info.Property, info.IsDbGenerated);
             IsNullable = prefix != null || DetermineIsNullable(info.Property);
             ForeignKeyPrincipalTypeName = info.ForeignKeyName;
             if (ForeignKeyPrincipalTypeName == null && !IsKey)
@@ -139,7 +139,8 @@ namespace nORM.Mapping
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
             IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
-            IsDbGenerated = pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption is DatabaseGeneratedOption.Identity or DatabaseGeneratedOption.Computed;
+            IsDbGenerated = ResolveIsDbGenerated(fluentConfig, pi,
+                pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption is DatabaseGeneratedOption.Identity or DatabaseGeneratedOption.Computed);
             IsNullable = prefix != null || DetermineIsNullable(pi);
             ForeignKeyPrincipalTypeName = pi.GetCustomAttribute<ForeignKeyAttribute>()?.Name;
             if (ForeignKeyPrincipalTypeName == null && !IsKey)
@@ -217,6 +218,16 @@ namespace nORM.Mapping
             {
                 return null;
             }
+        }
+
+        // Fluent Property(x => x.Col).ValueGeneratedOnAdd()/Never()/OnAddOrUpdate() overrides the
+        // attribute-derived database-generated flag: Identity/Computed mark the column store-generated (so it
+        // is omitted from INSERT/UPDATE), None clears it.
+        private static bool ResolveIsDbGenerated(IEntityTypeConfiguration? config, PropertyInfo prop, bool attributeDefault)
+        {
+            if (config != null && config.ValueGeneratedSettings.TryGetValue(prop, out var option))
+                return option is DatabaseGeneratedOption.Identity or DatabaseGeneratedOption.Computed;
+            return attributeDefault;
         }
 
         private static bool DetermineIsNullable(PropertyInfo property)

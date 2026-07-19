@@ -109,6 +109,41 @@ namespace nORM.Configuration
             }
 
             /// <summary>
+            /// Configures the property as store-generated on INSERT (EF Core's <c>ValueGeneratedOnAdd</c>) —
+            /// e.g. an identity/serial key or a column with a database default. The column is omitted from
+            /// generated INSERT statements so the database supplies the value.
+            /// </summary>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            public PropertyBuilder ValueGeneratedOnAdd()
+            {
+                _parent._config.SetValueGenerated(_property, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Identity);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures the property as never store-generated (EF Core's <c>ValueGeneratedNever</c>): nORM
+            /// always writes the CLR value, clearing any attribute-derived database-generated flag.
+            /// </summary>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            public PropertyBuilder ValueGeneratedNever()
+            {
+                _parent._config.SetValueGenerated(_property, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.None);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures the property as store-generated on INSERT and UPDATE (EF Core's
+            /// <c>ValueGeneratedOnAddOrUpdate</c>) — a computed column. It is omitted from generated INSERT and
+            /// UPDATE statements so the database supplies the value.
+            /// </summary>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            public PropertyBuilder ValueGeneratedOnAddOrUpdate()
+            {
+                _parent._config.SetValueGenerated(_property, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.Computed);
+                return this;
+            }
+
+            /// <summary>
             /// Configures whether this string property uses Unicode-capable storage.
             /// </summary>
             /// <param name="unicode">True for Unicode text storage; false for non-Unicode text storage.</param>

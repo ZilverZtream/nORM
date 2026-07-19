@@ -81,6 +81,12 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, bool> RequiredSettings { get; }
 
         /// <summary>
+        /// Gets the store value-generation strategy configured via the fluent API (ValueGeneratedOnAdd /
+        /// Never / OnAddOrUpdate), overriding the attribute-derived database-generated flag.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> ValueGeneratedSettings { get; }
+
+        /// <summary>
         /// Gets Unicode text metadata configured for string properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, bool> UnicodeSettings { get; }

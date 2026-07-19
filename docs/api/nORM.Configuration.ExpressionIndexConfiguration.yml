@@ -27,7 +27,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 194
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -71,7 +71,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 194
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -111,7 +111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 194
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -140,7 +140,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 194
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -169,7 +169,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 194
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -198,7 +198,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FilterSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 194
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -227,7 +227,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IncludedColumnNames
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 197
+    startLine: 203
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -258,7 +258,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NullSortOrder
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 200
+    startLine: 206
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -289,7 +289,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NullsNotDistinct
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 203
+    startLine: 209
   assemblies:
   - nORM
   namespace: nORM.Configuration

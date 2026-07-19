@@ -26,6 +26,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptionValues { get; } = new();
             public Dictionary<PropertyInfo, int> MaxLengthValues { get; } = new();
             public Dictionary<PropertyInfo, bool> RequiredValues { get; } = new();
+            public Dictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> ValueGeneratedValues { get; } = new();
             public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
             public Dictionary<PropertyInfo, bool> FixedLengthValues { get; } = new();
             public Dictionary<PropertyInfo, PrecisionConfiguration> PrecisionValues { get; } = new();
@@ -50,6 +51,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IEntityTypeConfiguration.IdentityOptions => IdentityOptionValues;
             IReadOnlyDictionary<PropertyInfo, int> IEntityTypeConfiguration.MaxLengths => MaxLengthValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.RequiredSettings => RequiredValues;
+            IReadOnlyDictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> IEntityTypeConfiguration.ValueGeneratedSettings => ValueGeneratedValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.FixedLengthSettings => FixedLengthValues;
             IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> IEntityTypeConfiguration.Precisions => PrecisionValues;
@@ -201,6 +203,17 @@ namespace nORM.Configuration
             {
                 ArgumentNullException.ThrowIfNull(prop);
                 RequiredValues[prop] = required;
+            }
+
+            /// <summary>
+            /// Sets the store value-generation strategy for a property (EF Core's ValueGeneratedOnAdd /
+            /// Never / OnAddOrUpdate). Identity/Computed mark the column database-generated so it is omitted
+            /// from INSERT (and UPDATE) statements; None clears the flag even if an attribute set it.
+            /// </summary>
+            public void SetValueGenerated(PropertyInfo prop, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption option)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                ValueGeneratedValues[prop] = option;
             }
 
             /// <summary>
