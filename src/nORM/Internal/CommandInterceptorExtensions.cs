@@ -39,6 +39,22 @@ namespace nORM.Internal
                 : null;
 
         /// <summary>
+        /// Disposes a command while holding the connection's serialization gate. Command disposal finalizes
+        /// the provider's prepared statement, which touches the same underlying connection handle that
+        /// <c>ExecuteScalar</c>/<c>ExecuteReader</c>/<c>ExecuteNonQuery</c> use. On a sync-serialized
+        /// connection (e.g. SQLite, which is not safe for concurrent use of one connection) an ungated
+        /// dispose races a concurrent execution on another thread and can NRE or corrupt state; gating it
+        /// keeps the whole per-connection command lifecycle serialized. Deadlock-safe: the execution block
+        /// releases the gate before the disposing finally runs, so this never re-acquires a gate it holds.
+        /// </summary>
+        private static void DisposeCommandSerialized(DbCommand command, SemaphoreSlim gate)
+        {
+            gate.Wait();
+            try { command.Dispose(); }
+            finally { gate.Release(); }
+        }
+
+        /// <summary>
         /// Executes <see cref="DbCommand.ExecuteNonQueryAsync()"/> while invoking any registered
         /// command interceptors before and after execution.
         /// </summary>
@@ -393,7 +409,7 @@ namespace nORM.Internal
             finally
             {
                 if (disposeCommand)
-                    command.Dispose();
+                    DisposeCommandSerialized(command, gate);
             }
         }
 
