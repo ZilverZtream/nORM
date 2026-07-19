@@ -882,6 +882,29 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns the non-key columns flagged modified for this entry — the SET column set a partial-column
+        /// UPDATE would write. Reads the per-column change flags (<c>_changedProperties</c>), which are the
+        /// source of truth AFTER change detection has run: a value-detected edit flags the changed columns, an
+        /// INotifyPropertyChanged edit flags them incrementally, and a forced <c>State = Modified</c> /
+        /// <c>ctx.Update</c> flags ALL columns (so the UPDATE stays full, matching EF). Callers must run
+        /// detection first (the SaveChanges pipeline does). An empty result means nothing is flagged — the
+        /// caller falls back to a full update so a Modified entity never silently skips its write. Key columns
+        /// are never included (they are the WHERE predicate, never updated).
+        /// </summary>
+        internal Column[] GetChangedColumns()
+        {
+            if (_changedProperties is null || _nonKeyColumns is null)
+                return Array.Empty<Column>();
+            List<Column>? changed = null;
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
+            {
+                if (_changedProperties[i])
+                    (changed ??= new List<Column>()).Add(_nonKeyColumns[i]);
+            }
+            return changed is null ? Array.Empty<Column>() : changed.ToArray();
+        }
+
+        /// <summary>
         /// Compares the current entity values against the original snapshot to update
         /// the <see cref="EntityState"/>. This method is used for entities that do not
         /// notify when properties change.

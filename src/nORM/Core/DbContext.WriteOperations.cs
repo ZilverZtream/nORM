@@ -756,7 +756,7 @@ namespace nORM.Core
         private static bool HasExplicitRelationshipDependency(TableMapping dependent, TableMapping candidatePrincipal)
             => candidatePrincipal.Relations.Values.Any(r => r.DependentType == dependent.Type);
 
-        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null)
+        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null, IReadOnlyList<Column>? setColumns = null)
         {
             var index = startIndex;
             switch (operation)
@@ -784,7 +784,10 @@ namespace nORM.Core
                         if (map.ClientManagedConcurrencyToken)
                             tc.Setter(entity, ConcurrencyTokenGenerator.Next(tc, whereTokenBatched));
                     }
-                    foreach (var col in map.UpdateColumns)
+                    // SET values — only the changed columns for a partial update (setColumns), or every
+                    // mutable column for a full/forced update. Must match BuildUpdateBatch's SET emission
+                    // exactly (same subset, same order) or the positional @pN parameters misalign.
+                    foreach (var col in (setColumns ?? (IReadOnlyList<Column>)map.UpdateColumns))
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;

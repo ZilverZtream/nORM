@@ -200,6 +200,26 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// The SET column subset for one entry's partial UPDATE: the columns flagged changed for the entry
+        /// (<see cref="EntityEntry.GetChangedColumns"/>) intersected with the mutable allowlist
+        /// <paramref name="updateColSet"/> (so a changed key / token / db-generated column can never leak into
+        /// the SET). Falls back to the full <see cref="TableMapping.UpdateColumns"/> when nothing eligible is
+        /// flagged — a forced Modified entity (ctx.Update / State = Modified) flags ALL columns, and a
+        /// navigation/owned-only change flags none — so a Modified row is never silently skipped nor given an
+        /// invalid empty SET clause.
+        /// </summary>
+        private static IReadOnlyList<Column> ComputeUpdateSetColumns(EntityEntry entry, TableMapping map, HashSet<Column> updateColSet)
+        {
+            var changed = entry.GetChangedColumns();
+            if (changed.Length == 0)
+                return map.UpdateColumns;
+            var filtered = new List<Column>(changed.Length);
+            foreach (var c in changed)
+                if (updateColSet.Contains(c)) filtered.Add(c);
+            return filtered.Count > 0 && filtered.Count < map.UpdateColumns.Length ? filtered : map.UpdateColumns;
+        }
+
+        /// <summary>
         /// Builds and executes a batched UPDATE statement for the provided entities.
         /// </summary>
         /// <param name="cmd">The command used to execute the batch.</param>
@@ -232,6 +252,10 @@ namespace nORM.Core
                         "to the MySQL connection string for full OCC guarantees.",
                         map.Type.Name);
             }
+
+            // Allowlist of columns eligible for the SET clause (mutable: non-key, non-timestamp,
+            // non-db-generated). Built once per batch since the mapping is constant.
+            var updateColSet = new HashSet<Column>(map.UpdateColumns);
 
             foreach (var entry in batch)
             {
@@ -267,10 +291,14 @@ namespace nORM.Core
                             "Detach the entity, modify the key, then re-attach.");
                 }
 
-                sql.Append(BuildUpdateBatch(map, paramIndex)).Append(';');
+                // Partial-column UPDATE: the SAME setCols array feeds both the SQL builder and the parameter
+                // binder, keeping the positional @pN parameters aligned. See ComputeUpdateSetColumns.
+                var setCols = ComputeUpdateSetColumns(entry, map, updateColSet);
+
+                sql.Append(BuildUpdateBatch(map, setCols, paramIndex)).Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
                     entity,
-                    WriteOperation.Update, paramIndex, entry.OriginalToken);
+                    WriteOperation.Update, paramIndex, entry.OriginalToken, setCols);
             }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
@@ -549,7 +577,18 @@ namespace nORM.Core
             return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix}{tokenPrefix} VALUES ({paramNames}){identityFragment}";
         }
 
+        // Full-column overload (used for template-length estimation): updates every mutable column.
         private string BuildUpdateBatch(TableMapping map, int startParamIndex)
+            => BuildUpdateBatch(map, map.UpdateColumns, startParamIndex);
+
+        /// <summary>
+        /// Builds one entity's batched UPDATE, writing only <paramref name="setColumns"/> in the SET clause
+        /// (a subset of <see cref="TableMapping.UpdateColumns"/> — the changed columns for a partial update, or
+        /// all of them for a forced/full update). The concurrency-token SET slot, key/token/tenant WHERE
+        /// predicates, and positional parameter order are identical to the full-column form, so
+        /// <see cref="AddParametersBatched"/> MUST bind the SAME <paramref name="setColumns"/> in the same order.
+        /// </summary>
+        private string BuildUpdateBatch(TableMapping map, IReadOnlyList<Column> setColumns, int startParamIndex)
         {
             if (map.KeyColumns.Length == 0)
                 throw new NormConfigurationException(string.Format(
@@ -568,10 +607,10 @@ namespace nORM.Core
 
             var setSb = new StringBuilder();
             var idx = startParamIndex;
-            for (int i = 0; i < map.UpdateColumns.Length; i++)
+            for (int i = 0; i < setColumns.Count; i++)
             {
                 if (i > 0) setSb.Append(", ");
-                setSb.Append(map.UpdateColumns[i].EscCol)
+                setSb.Append(setColumns[i].EscCol)
                     .Append('=')
                     .Append(_p.ParamPrefix).Append('p').Append(idx++);
             }
