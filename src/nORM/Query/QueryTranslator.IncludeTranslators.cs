@@ -69,7 +69,13 @@ namespace nORM.Query
                 if (body is UnaryExpression innerConvert)
                     body = innerConvert.Operand;
             }
-            return (MemberExpression)body;
+            if (body is not MemberExpression member)
+                throw new NormUnsupportedFeatureException(
+                    "Include/ThenInclude supports a plain navigation or a filtered navigation ('nav.Where(pred)'). " +
+                    "Ordering or limiting an included collection (e.g. OrderBy/OrderByDescending/Take/Skip inside Include) " +
+                    "is not yet supported — load the collection and order or limit it after materialization, or use a " +
+                    "separate query for the top-N rows.");
+            return member;
         }
 
         /// <summary>
