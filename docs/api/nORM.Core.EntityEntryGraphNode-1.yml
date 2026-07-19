@@ -1,0 +1,123 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.EntityEntryGraphNode`1
+  commentId: T:nORM.Core.EntityEntryGraphNode`1
+  id: EntityEntryGraphNode`1
+  parent: nORM.Core
+  children:
+  - nORM.Core.EntityEntryGraphNode`1.Entry
+  - nORM.Core.EntityEntryGraphNode`1.InboundNavigation
+  - nORM.Core.EntityEntryGraphNode`1.NodeState
+  - nORM.Core.EntityEntryGraphNode`1.SourceEntry
+  langs:
+  - csharp
+  - vb
+  name: EntityEntryGraphNode<TState>
+  nameWithType: EntityEntryGraphNode<TState>
+  fullName: nORM.Core.EntityEntryGraphNode<TState>
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntryGraphNode.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EntityEntryGraphNode`1
+    path: src/nORM/Core/EntityEntryGraphNode.cs
+    startLine: 51
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    A node visited during the stateful <xref href="nORM.Core.ChangeTracker" data-throw-if-not-resolved="false"></xref>.TrackGraph&lt;TState&gt;,
+    carrying the caller's TState alongside the entry, its source, and the inbound navigation (Entity Framework
+    Core parity). The callback assigns Entry.State to track the entity and returns whether to descend.
+  syntax:
+    content: public sealed class EntityEntryGraphNode<TState>
+    typeParameters:
+    - id: TState
+      description: Type of the state value threaded through the traversal.
+    content.vb: Public NotInheritable Class EntityEntryGraphNode(Of TState)
+  inheritance:
+  - System.Object
+- uid: nORM.Core.EntityEntryGraphNode`1.Entry
+  commentId: P:nORM.Core.EntityEntryGraphNode`1.Entry
+  id: Entry
+  parent: nORM.Core.EntityEntryGraphNode`1
+  langs:
+  - csharp
+  - vb
+  name: Entry
+  nameWithType: EntityEntryGraphNode<TState>.Entry
+  fullName: nORM.Core.EntityEntryGraphNode<TState>.Entry
+  type: Property
+  namespace: nORM.Core
+  summary: The entry for the entity currently being visited; set its State to begin tracking it.
+  syntax:
+    content: public EntityEntry Entry { get; }
+    parameters: []
+    return:
+      type: nORM.Core.EntityEntry
+    content.vb: Public ReadOnly Property Entry As EntityEntry
+- uid: nORM.Core.EntityEntryGraphNode`1.SourceEntry
+  commentId: P:nORM.Core.EntityEntryGraphNode`1.SourceEntry
+  id: SourceEntry
+  parent: nORM.Core.EntityEntryGraphNode`1
+  langs:
+  - csharp
+  - vb
+  name: SourceEntry
+  nameWithType: EntityEntryGraphNode<TState>.SourceEntry
+  fullName: nORM.Core.EntityEntryGraphNode<TState>.SourceEntry
+  type: Property
+  namespace: nORM.Core
+  summary: The entry this node was reached from, or null when this node is the root.
+  syntax:
+    content: public EntityEntry SourceEntry { get; }
+    parameters: []
+    return:
+      type: nORM.Core.EntityEntry
+    content.vb: Public ReadOnly Property SourceEntry As EntityEntry
+- uid: nORM.Core.EntityEntryGraphNode`1.InboundNavigation
+  commentId: P:nORM.Core.EntityEntryGraphNode`1.InboundNavigation
+  id: InboundNavigation
+  parent: nORM.Core.EntityEntryGraphNode`1
+  langs:
+  - csharp
+  - vb
+  name: InboundNavigation
+  nameWithType: EntityEntryGraphNode<TState>.InboundNavigation
+  fullName: nORM.Core.EntityEntryGraphNode<TState>.InboundNavigation
+  type: Property
+  namespace: nORM.Core
+  summary: The navigation traversed from SourceEntry to reach this node, or null for the root.
+  syntax:
+    content: public string InboundNavigation { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property InboundNavigation As String
+- uid: nORM.Core.EntityEntryGraphNode`1.NodeState
+  commentId: P:nORM.Core.EntityEntryGraphNode`1.NodeState
+  id: NodeState
+  parent: nORM.Core.EntityEntryGraphNode`1
+  langs:
+  - csharp
+  - vb
+  name: NodeState
+  nameWithType: EntityEntryGraphNode<TState>.NodeState
+  fullName: nORM.Core.EntityEntryGraphNode<TState>.NodeState
+  type: Property
+  namespace: nORM.Core
+  summary: The state value threaded through the traversal from the TrackGraph call.
+  syntax:
+    content: public TState NodeState { get; }
+    parameters: []
+    return:
+      type: TState
+    content.vb: Public ReadOnly Property NodeState As TState
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core

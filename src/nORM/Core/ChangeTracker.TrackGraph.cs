@@ -84,6 +84,67 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Stateful <see cref="TrackGraph(object, Action{EntityEntryGraphNode})"/> (Entity Framework Core
+        /// parity): begins tracking <paramref name="rootEntity"/> and every entity reachable through its
+        /// navigations, threading <paramref name="state"/> to each node and invoking <paramref name="callback"/>
+        /// once per untracked entity discovered. The callback assigns <see cref="EntityEntry.State"/> on the
+        /// node's <see cref="EntityEntryGraphNode{TState}.Entry"/> to choose how the entity is tracked, and
+        /// returns whether the traversal should descend into that entity's own navigations — returning
+        /// <c>false</c> prunes the subtree independent of the tracked state. An entity already tracked by the
+        /// context is skipped and not traversed through, so a cyclic graph always terminates; no lazy loading
+        /// is enabled during the walk.
+        /// </summary>
+        /// <typeparam name="TState">Type of the state value threaded to every node.</typeparam>
+        /// <param name="rootEntity">The root of the entity graph to track.</param>
+        /// <param name="state">A value passed to <paramref name="callback"/> on every node.</param>
+        /// <param name="callback">Invoked per untracked entity; sets its state and returns whether to descend.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="rootEntity"/> or <paramref name="callback"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">The change tracker is not bound to a <see cref="DbContext"/>.</exception>
+        [RequiresDynamicCode("TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.")]
+        [RequiresUnreferencedCode("TrackGraph reflects over navigation properties; trimming may remove the required members.")]
+        public void TrackGraph<TState>(object rootEntity, TState state, Func<EntityEntryGraphNode<TState>, bool> callback)
+        {
+            ArgumentNullException.ThrowIfNull(rootEntity);
+            ArgumentNullException.ThrowIfNull(callback);
+            var ctx = Context ?? throw new InvalidOperationException(
+                "TrackGraph requires the change tracker to be bound to a DbContext.");
+
+            var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            var stack = new Stack<(object Entity, EntityEntry? Source, string? Nav)>();
+            stack.Push((rootEntity, null, null));
+
+            while (stack.Count > 0)
+            {
+                var (entity, source, nav) = stack.Pop();
+                if (entity is null || !visited.Add(entity))
+                    continue;
+
+                var existing = GetEntryOrDefault(entity);
+                if (existing != null && existing.State != EntityState.Detached)
+                    continue;
+
+                var mapping = ctx.GetMapping(entity.GetType());
+
+                // Same throwaway-probe approach as the non-generic overload (see there): the callback assigns
+                // the probe's State to choose tracking with no tracker side effect, and its bool return decides
+                // descent — independently, so a Detached (untracked) node can still be traversed, and a tracked
+                // node's subtree can be pruned.
+                var probe = new EntityEntry(entity, EntityState.Detached, mapping, _options, tracker: null);
+                var shouldVisit = callback(new EntityEntryGraphNode<TState>(probe, source, nav, state));
+                var chosen = probe.State;
+                probe.UnsubscribeNotifications();
+
+                var childSource = source;
+                if (chosen != EntityState.Detached)
+                    childSource = Track(entity, chosen, mapping);
+
+                if (shouldVisit)
+                    foreach (var (childNav, child) in EnumerateNavigationChildren(ctx, entity, mapping))
+                        stack.Push((child, childSource, childNav));
+            }
+        }
+
+        /// <summary>
         /// Yields each entity referenced by <paramref name="entity"/>'s navigation properties — reference
         /// navigations, relationship collections (one-to-many, or a one-to-one reference), and many-to-many
         /// collections — paired with the navigation name. Owned collections are excluded: owned rows are part
