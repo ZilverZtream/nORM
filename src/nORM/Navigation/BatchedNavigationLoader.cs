@@ -519,6 +519,21 @@ namespace nORM.Navigation
         }
 
         /// <summary>
+        /// A trailing <c>AND discriminator = value</c> fragment when the navigation targets a TPH derived
+        /// type (e.g. <c>Owner.Dogs</c> where <c>Dog : Pet</c> share a table), otherwise empty. Without it the
+        /// lazy / explicit collection load reads every subtype sharing the foreign key — a Cat would load and
+        /// materialize as a Dog. Only derived types carry a <see cref="TableMapping.DiscriminatorValue"/>.
+        /// </summary>
+        private string BuildSubtypeDiscriminatorClause(DbCommand cmd, TableMapping mapping)
+        {
+            if (mapping.DiscriminatorValue is not { } value || mapping.DiscriminatorColumn is not { } column)
+                return string.Empty;
+            var paramName = $"{_context.RawProvider.ParamPrefix}__navdisc";
+            cmd.AddParam(paramName, value);
+            return $" AND {column.EscCol} = {paramName}";
+        }
+
+        /// <summary>
         /// Executes a single <c>WHERE IN</c> query for a chunk of foreign key values and
         /// materializes the results into tracked entities.
         /// </summary>
@@ -531,7 +546,7 @@ namespace nORM.Navigation
         {
             using var cmd = _context.CreateCommand();
             var where = BuildNavigationWhereClause(cmd, relation, chunk);
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildSubtypeDiscriminatorClause(cmd, mapping)}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
             cmd.CommandTimeout = ToSecondsClamped(timeout);
@@ -558,7 +573,7 @@ namespace nORM.Navigation
         {
             using var cmd = _context.CreateCommand();
             var where = BuildNavigationWhereClause(cmd, relation, chunk);
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildSubtypeDiscriminatorClause(cmd, mapping)}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
             cmd.CommandTimeout = ToSecondsClamped(timeout);

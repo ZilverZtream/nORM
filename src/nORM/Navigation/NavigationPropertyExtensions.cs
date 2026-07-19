@@ -57,11 +57,29 @@ namespace nORM.Navigation
             if (context == null) throw new ArgumentNullException(nameof(context));
 
             var navContext = _navigationContexts.GetValue(entity, _ => new NavigationContext(context, typeof(T)));
-            
+
             // Initialize navigation properties with lazy loading proxies
             InitializeNavigationProperties(entity, navContext);
-            
+
             return entity;
+        }
+
+        /// <summary>
+        /// Enables lazy loading for an entity materialized by the query pipeline, whose static type is only
+        /// <see cref="object"/>. Binds the navigation context to the entity's ACTUAL mapped
+        /// <paramref name="entityType"/> so the lazy-proxy load path resolves the source mapping (keys and
+        /// relations) correctly. Binding it to <see cref="object"/> (which the generic overload would infer
+        /// here) leaves the load unable to find the relationship: it no-ops yet the dispatcher marks the
+        /// navigation loaded, so a later access to the still-proxy collection recurses without bound.
+        /// </summary>
+        internal static void EnableLazyLoading(object entity, DbContext context, Type entityType)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            if (context == null) throw new ArgumentNullException(nameof(context));
+            if (entityType == null) throw new ArgumentNullException(nameof(entityType));
+
+            var navContext = EnsureTypedNavigationContext(entity, entityType, context);
+            InitializeNavigationProperties(entity, navContext);
         }
 
         /// <summary>
@@ -244,8 +262,17 @@ namespace nORM.Navigation
             
             foreach (var navProp in navigationProperties)
             {
+                var currentValue = navProp.Property.GetValue(entity);
+
+                // A property already holding a lazy proxy is fully initialized. Re-processing it would call
+                // IsEmptyEnumerable below → the proxy's Count/enumeration → force a load, which re-enters this
+                // method before the load completes and recurses without bound (StackOverflow). This happens
+                // whenever lazy loading is enabled more than once for the same entity. Leave proxies untouched.
+                if (currentValue != null && IsLazyProxy(currentValue))
+                    continue;
+
                 // Only initialize lazy loading proxies when the navigation property is null
-                if (navProp.Property.GetValue(entity) == null)
+                if (currentValue == null)
                 {
                     if (navProp.IsCollection)
                     {
@@ -274,12 +301,22 @@ namespace nORM.Navigation
                     // not reloaded. An EMPTY collection, though, is almost always just a constructor
                     // initializer (`= new()`), NOT loaded data; marking it loaded would make an explicit
                     // Load() a silent no-op. Leave empty collections unloaded so they can be loaded on demand.
-                    if (navProp.IsCollection && IsEmptyEnumerable(navProp.Property.GetValue(entity)))
+                    if (navProp.IsCollection && IsEmptyEnumerable(currentValue))
                         context.MarkAsUnloaded(navProp.Property.Name);
                     else
                         context.MarkAsLoaded(navProp.Property.Name);
                 }
             }
+        }
+
+        /// <summary>True when <paramref name="value"/> is an already-installed lazy navigation proxy
+        /// (<see cref="LazyNavigationCollection{T}"/> or <see cref="LazyNavigationReference{T}"/>).</summary>
+        private static bool IsLazyProxy(object value)
+        {
+            var type = value.GetType();
+            if (!type.IsGenericType) return false;
+            var definition = type.GetGenericTypeDefinition();
+            return definition == typeof(LazyNavigationCollection<>) || definition == typeof(LazyNavigationReference<>);
         }
 
         /// <summary>True when <paramref name="value"/> is null or an empty (non-string) sequence.</summary>

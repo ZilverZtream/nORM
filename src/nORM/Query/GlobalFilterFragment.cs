@@ -28,9 +28,9 @@ namespace nORM.Query
         /// </summary>
         internal static string? Build(DbContext ctx, TableMapping map, string qualifier, DbCommand cmd)
         {
-            if (ctx.Options.GlobalFilters.Count == 0)
-                return null;
-
+            // NOTE: do not early-return on GlobalFilters.Count == 0 — a TPH subtype dependent has no global
+            // filter yet still needs its discriminator predicate (folded into Combine below), or the eager /
+            // split-query loader folds in sibling subtypes (a Cat sharing the FK loads as a Dog).
             var combined = Combine(ctx, map.Type);
             if (combined == null)
                 return null;
@@ -112,6 +112,18 @@ namespace nORM.Query
                 }
             }
 
+            // TPH subtype: restrict the row set to rows of the derived type. This is intrinsic
+            // visibility for "the set of Dog rows" — a navigation to a TPH subtype (e.g. Owner.Dogs
+            // where Dog : Pet share a table) must not fold in sibling subtypes, or a Cat sharing the
+            // owner's foreign key silently counts and materializes as a Dog. Applying it here reaches
+            // every hand-built navigation emit (projection aggregates, WHERE-side subqueries, and via
+            // Build the split-query/Include/M2M loaders) in one place. The ROOT query applies its own
+            // discriminator in QueryTranslator.PlanGeneration and does not route through Combine, so
+            // there is no double-application there.
+            var subtypeDiscriminator = SubtypeDiscriminatorPredicate(ctx, entityType, ref param);
+            if (subtypeDiscriminator != null)
+                (bodies ??= new List<Expression>()).Add(subtypeDiscriminator);
+
             if (bodies == null)
                 return null;
 
@@ -119,6 +131,31 @@ namespace nORM.Query
             for (int i = 1; i < bodies.Count; i++)
                 combined = Expression.AndAlso(combined, bodies[i]);
             return Expression.Lambda(combined, param!);
+        }
+
+        /// <summary>
+        /// The discriminator predicate (<c>e.Discriminator == subtypeValue</c>) when <paramref name="entityType"/>
+        /// maps to a TPH derived type, otherwise <c>null</c>. Creates <paramref name="param"/> on first use so it
+        /// is shared with the combined global-filter body. Only derived types carry a
+        /// <see cref="TableMapping.DiscriminatorValue"/>; the hierarchy root and non-TPH entities return null and
+        /// are byte-identical to the pre-existing behaviour.
+        /// </summary>
+        private static Expression? SubtypeDiscriminatorPredicate(DbContext ctx, Type entityType, ref ParameterExpression? param)
+        {
+            TableMapping map;
+            try { map = ctx.GetMapping(entityType); }
+            catch { return null; }
+            if (map.DiscriminatorValue is not { } discriminatorValue || map.DiscriminatorColumn is not { } discriminatorColumn)
+                return null;
+
+            param ??= Expression.Parameter(entityType, "gf");
+            var target = Nullable.GetUnderlyingType(discriminatorColumn.Prop.PropertyType) ?? discriminatorColumn.Prop.PropertyType;
+            var value = discriminatorValue.GetType() == target ? discriminatorValue : Convert.ChangeType(discriminatorValue, target);
+            Expression columnAccess = Expression.Property(param, discriminatorColumn.Prop.Name);
+            Expression constant = Expression.Constant(value);
+            if (constant.Type != columnAccess.Type)
+                constant = Expression.Convert(constant, columnAccess.Type);
+            return Expression.Equal(columnAccess, constant);
         }
     }
 }

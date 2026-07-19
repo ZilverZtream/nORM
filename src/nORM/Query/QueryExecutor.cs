@@ -625,7 +625,11 @@ namespace nORM.Query
                 : _ctx.GetMapping(entity.GetType());
             var entry = _ctx.ChangeTracker.Track(entity, EntityState.Unchanged, actualMap);
             entity = entry.Entity!;
-            NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx);
+            // Pass the actual mapped type: `entity` is statically object here, so the generic overload would
+            // bind the navigation context to System.Object and the lazy-proxy collection load could not
+            // resolve the relationship (a no-op load that still marks the nav loaded → infinite recursion on
+            // the next access). actualMap.Type is the entity's real runtime type.
+            NavigationPropertyExtensions.EnableLazyLoading(entity, _ctx, actualMap.Type);
             return entity;
         }
 
