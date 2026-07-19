@@ -35,7 +35,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 280
+    startLine: 302
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -79,7 +79,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 280
+    startLine: 302
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -129,7 +129,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavPropertyName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 281
+    startLine: 303
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -160,7 +160,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RelatedType
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 282
+    startLine: 304
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -191,7 +191,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: JoinTableName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 283
+    startLine: 305
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -222,7 +222,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftFkColumn
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 284
+    startLine: 306
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -253,7 +253,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightFkColumn
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 285
+    startLine: 307
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -284,7 +284,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RelatedNavPropertyName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 286
+    startLine: 308
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -315,7 +315,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: JoinTableSchema
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 289
+    startLine: 311
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -346,7 +346,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftFkColumns
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 292
+    startLine: 314
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -377,7 +377,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightFkColumns
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 295
+    startLine: 317
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -408,7 +408,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftKeyProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 300
+    startLine: 322
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -439,7 +439,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightKeyProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 305
+    startLine: 327
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -470,7 +470,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftOnDelete
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 308
+    startLine: 330
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -501,7 +501,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LeftOnUpdate
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 311
+    startLine: 333
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -532,7 +532,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightOnDelete
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 314
+    startLine: 336
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -563,7 +563,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RightOnUpdate
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 317
+    startLine: 339
   assemblies:
   - nORM
   namespace: nORM.Configuration

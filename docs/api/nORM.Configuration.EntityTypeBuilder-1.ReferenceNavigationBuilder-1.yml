@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.ReferenceBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReferenceNavigationBuilder
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 963
+    path: src/nORM/Configuration/EntityTypeBuilder.ReferenceBuilders.cs
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -63,12 +63,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.ReferenceBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithOne
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 980
+    path: src/nORM/Configuration/EntityTypeBuilder.ReferenceBuilders.cs
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Configuration

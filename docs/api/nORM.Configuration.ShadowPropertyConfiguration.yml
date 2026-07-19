@@ -22,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowPropertyConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 147
+    startLine: 159
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -66,7 +66,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 147
+    startLine: 159
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -104,7 +104,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClrType
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 147
+    startLine: 159
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -135,7 +135,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 147
+    startLine: 159
   assemblies:
   - nORM
   namespace: nORM.Configuration

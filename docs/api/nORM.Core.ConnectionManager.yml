@@ -225,7 +225,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/ConnectionManager.cs
-    startLine: 536
+    startLine: 533
   assemblies:
   - nORM
   namespace: nORM.Core

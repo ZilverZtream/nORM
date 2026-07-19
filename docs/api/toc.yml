@@ -1,5 +1,12 @@
 ### YamlMime:TableOfContent
 items:
+- uid: Microsoft.Extensions.DependencyInjection
+  name: Microsoft.Extensions.DependencyInjection
+  type: Namespace
+  items:
+  - uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+    name: NormServiceCollectionExtensions
+    type: Class
 - uid: Microsoft.Extensions.Logging
   name: Microsoft.Extensions.Logging
   type: Namespace
@@ -61,6 +68,9 @@ items:
     type: Class
   - uid: nORM.Configuration.IEntityTypeConfiguration
     name: IEntityTypeConfiguration
+    type: Interface
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1
+    name: IEntityTypeConfiguration<TEntity>
     type: Interface
   - uid: nORM.Configuration.IdentityOptionsConfiguration
     name: IdentityOptionsConfiguration
@@ -162,17 +172,29 @@ items:
   - uid: nORM.Core.DbContextTransaction
     name: DbContextTransaction
     type: Class
+  - uid: nORM.Core.DebugView
+    name: DebugView
+    type: Class
   - uid: nORM.Core.EntityEntry
     name: EntityEntry
     type: Class
   - uid: nORM.Core.EntityEntryGraphNode
     name: EntityEntryGraphNode
     type: Class
+  - uid: nORM.Core.EntityEntryGraphNode`1
+    name: EntityEntryGraphNode<TState>
+    type: Class
+  - uid: nORM.Core.EntityEntry`1
+    name: EntityEntry<TEntity>
+    type: Class
   - uid: nORM.Core.EntityState
     name: EntityState
     type: Enum
   - uid: nORM.Core.IMemoryMonitor
     name: IMemoryMonitor
+    type: Interface
+  - uid: nORM.Core.INormDbContextFactory`1
+    name: INormDbContextFactory<TContext>
     type: Interface
   - uid: nORM.Core.INormIncludableQueryable`2
     name: INormIncludableQueryable<TEntity, TProperty>
@@ -182,6 +204,9 @@ items:
     type: Interface
   - uid: nORM.Core.Json
     name: Json
+    type: Class
+  - uid: nORM.Core.NavigationEntry
+    name: NavigationEntry
     type: Class
   - uid: nORM.Core.Norm
     name: Norm
@@ -236,6 +261,12 @@ items:
     type: Class
   - uid: nORM.Core.PreparedOperation`1
     name: PreparedOperation<T>
+    type: Class
+  - uid: nORM.Core.PropertyEntry
+    name: PropertyEntry
+    type: Class
+  - uid: nORM.Core.PropertyValues
+    name: PropertyValues
     type: Class
   - uid: nORM.Core.QueryTrackingBehavior
     name: QueryTrackingBehavior

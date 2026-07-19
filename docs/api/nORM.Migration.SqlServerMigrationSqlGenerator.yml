@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
+      path: src/nORM/Migration/SqlServerMigrationSqlGenerator.Validation.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlServerMigrationSqlGenerator
-    path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
-    startLine: 17
+    path: src/nORM/Migration/SqlServerMigrationSqlGenerator.Validation.cs
+    startLine: 7
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -72,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/SqlServerMigrationSqlGenerator.cs
-    startLine: 173
+    startLine: 196
   assemblies:
   - nORM
   namespace: nORM.Migration

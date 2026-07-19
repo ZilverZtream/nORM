@@ -21,12 +21,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ProviderMobilityTranslationDecision
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 203
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 10
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -65,12 +65,12 @@ items:
   type: Constructor
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 208
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -109,12 +109,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Feature
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 225
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -140,12 +140,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Support
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 228
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -171,12 +171,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: StrictRuntimeAllowed
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 231
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -202,12 +202,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: CertificationSeverity
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 234
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -233,12 +233,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Reason
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 237
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -264,12 +264,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SuggestedFix
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 240
+    path: src/nORM/Configuration/ProviderMobilityTranslationDecision.cs
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Configuration

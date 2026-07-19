@@ -16,12 +16,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.CollectionBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionNavigationBuilder
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 1156
+    path: src/nORM/Configuration/EntityTypeBuilder.CollectionBuilders.cs
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -64,12 +64,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.CollectionBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithOne
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 1173
+    path: src/nORM/Configuration/EntityTypeBuilder.CollectionBuilders.cs
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -105,12 +105,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.CollectionBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: WithMany
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 1186
+    path: src/nORM/Configuration/EntityTypeBuilder.CollectionBuilders.cs
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Configuration

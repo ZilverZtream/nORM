@@ -7,9 +7,11 @@ items:
   children:
   - nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint(System.String,System.String)
   - nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,nORM.Configuration.IndexNullSortOrder)
   - nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   - nORM.Configuration.EntityTypeBuilder`1.HasKey(System.Linq.Expressions.Expression{System.Func{`0,System.Object}},System.String)
   - nORM.Configuration.EntityTypeBuilder`1.HasMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}})
+  - nORM.Configuration.EntityTypeBuilder`1.HasNoKey
   - nORM.Configuration.EntityTypeBuilder`1.HasOne``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
   - nORM.Configuration.EntityTypeBuilder`1.IsReadOnly
   - nORM.Configuration.EntityTypeBuilder`1.OwnsMany``1(System.Linq.Expressions.Expression{System.Func{`0,System.Collections.Generic.IEnumerable{``0}}},System.String,System.String,System.Action{nORM.Configuration.EntityTypeBuilder{``0}})
@@ -30,12 +32,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.ReferenceBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityTypeBuilder
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 17
+    path: src/nORM/Configuration/EntityTypeBuilder.ReferenceBuilders.cs
+    startLine: 12
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -86,7 +88,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 383
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -128,7 +130,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToTable
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 396
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -173,7 +175,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SharesTableWith
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 407
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -210,7 +212,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasKey
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 422
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -255,7 +257,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasKey
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 436
+    startLine: 81
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -306,7 +308,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsReadOnly
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 473
+    startLine: 118
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -323,6 +325,43 @@ items:
   overload: nORM.Configuration.EntityTypeBuilder`1.IsReadOnly*
   nameWithType.vb: EntityTypeBuilder(Of TEntity).IsReadOnly()
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).IsReadOnly()
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasNoKey
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasNoKey
+  id: HasNoKey
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: HasNoKey()
+  nameWithType: EntityTypeBuilder<TEntity>.HasNoKey()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasNoKey()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasNoKey
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 129
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures this entity as keyless — a query type with no primary key, matching EF Core's
+
+    <code>HasNoKey()</code>. Keyless entities are materialized from queries (including database views and
+
+    read models) but are never change-tracked and cannot be saved.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> HasNoKey()
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+    content.vb: Public Function HasNoKey() As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.HasNoKey*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasNoKey()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasNoKey()
 - uid: nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint(System.String,System.String)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint(System.String,System.String)
   id: HasCheckConstraint(System.String,System.String)
@@ -341,7 +380,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCheckConstraint
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 487
+    startLine: 143
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -389,7 +428,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasExpressionIndex
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 500
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -417,6 +456,61 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).HasExpressionIndex(String, String, Boolean, String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasExpressionIndex(String, String, Boolean, String)
   name.vb: HasExpressionIndex(String, String, Boolean, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,nORM.Configuration.IndexNullSortOrder)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex(System.String,System.String,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,nORM.Configuration.IndexNullSortOrder)
+  id: HasExpressionIndex(System.String,System.String,System.Boolean,System.String,System.Collections.Generic.IReadOnlyList{System.String},System.Boolean,nORM.Configuration.IndexNullSortOrder)
+  parent: nORM.Configuration.EntityTypeBuilder`1
+  langs:
+  - csharp
+  - vb
+  name: HasExpressionIndex(string, string, bool, string?, IReadOnlyList<string>?, bool, IndexNullSortOrder)
+  nameWithType: EntityTypeBuilder<TEntity>.HasExpressionIndex(string, string, bool, string?, IReadOnlyList<string>?, bool, IndexNullSortOrder)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasExpressionIndex(string, string, bool, string?, System.Collections.Generic.IReadOnlyList<string>?, bool, nORM.Configuration.IndexNullSortOrder)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasExpressionIndex
+    path: src/nORM/Configuration/EntityTypeBuilder.cs
+    startLine: 172
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Configures a provider-specific expression index with optional covering columns and PostgreSQL null semantics.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity> HasExpressionIndex(string name, string expressionSql, bool isUnique, string? filterSql, IReadOnlyList<string>? includedColumnNames, bool nullsNotDistinct = false, IndexNullSortOrder nullSortOrder = IndexNullSortOrder.Default)
+    parameters:
+    - id: name
+      type: System.String
+      description: Database index name.
+    - id: expressionSql
+      type: System.String
+      description: Provider SQL expression used as the index key.
+    - id: isUnique
+      type: System.Boolean
+      description: Whether the index enforces uniqueness.
+    - id: filterSql
+      type: System.String
+      description: Optional provider SQL predicate for a filtered/partial expression index.
+    - id: includedColumnNames
+      type: System.Collections.Generic.IReadOnlyList{System.String}
+      description: Provider column names included as non-key covering columns where supported.
+    - id: nullsNotDistinct
+      type: System.Boolean
+      description: Whether a unique PostgreSQL index treats null values as equal.
+    - id: nullSortOrder
+      type: nORM.Configuration.IndexNullSortOrder
+      description: Explicit provider null ordering for the expression key.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1
+    content.vb: Public Function HasExpressionIndex(name As String, expressionSql As String, isUnique As Boolean, filterSql As String, includedColumnNames As IReadOnlyList(Of String), nullsNotDistinct As Boolean = False, nullSortOrder As IndexNullSortOrder = IndexNullSortOrder.Default) As EntityTypeBuilder(Of TEntity)
+  overload: nORM.Configuration.EntityTypeBuilder`1.HasExpressionIndex*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasExpressionIndex(String, String, Boolean, String, IReadOnlyList(Of String), Boolean, IndexNullSortOrder)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasExpressionIndex(String, String, Boolean, String, System.Collections.Generic.IReadOnlyList(Of String), Boolean, nORM.Configuration.IndexNullSortOrder)
+  name.vb: HasExpressionIndex(String, String, Boolean, String, IReadOnlyList(Of String), Boolean, IndexNullSortOrder)
 - uid: nORM.Configuration.EntityTypeBuilder`1.Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
   id: Property(System.Linq.Expressions.Expression{System.Func{`0,System.Object}})
@@ -435,7 +529,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 512
+    startLine: 191
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -477,7 +571,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 526
+    startLine: 205
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -522,7 +616,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 540
+    startLine: 219
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -567,7 +661,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnsOne
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 556
+    startLine: 235
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -618,7 +712,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnsMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 586
+    startLine: 265
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -684,7 +778,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnsMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 615
+    startLine: 294
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -755,7 +849,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasMany
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 657
+    startLine: 343
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -800,7 +894,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasOne
     path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 671
+    startLine: 357
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2082,6 +2176,14 @@ references:
   fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.IsReadOnly
   nameWithType.vb: EntityTypeBuilder(Of TEntity).IsReadOnly
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).IsReadOnly
+- uid: nORM.Configuration.EntityTypeBuilder`1.HasNoKey*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.HasNoKey
+  href: nORM.Configuration.EntityTypeBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_HasNoKey
+  name: HasNoKey
+  nameWithType: EntityTypeBuilder<TEntity>.HasNoKey
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.HasNoKey
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).HasNoKey
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).HasNoKey
 - uid: nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.HasCheckConstraint
   href: nORM.Configuration.EntityTypeBuilder-1.html#nORM_Configuration_EntityTypeBuilder_1_HasCheckConstraint_System_String_System_String_
@@ -2109,6 +2211,113 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: System.Collections.Generic.IReadOnlyList{System.String}
+  commentId: T:System.Collections.Generic.IReadOnlyList{System.String}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyList`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<string>
+  nameWithType: IReadOnlyList<string>
+  fullName: System.Collections.Generic.IReadOnlyList<string>
+  nameWithType.vb: IReadOnlyList(Of String)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of String)
+  name.vb: IReadOnlyList(Of String)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
+- uid: System.Collections.Generic.IReadOnlyList`1
+  commentId: T:System.Collections.Generic.IReadOnlyList`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  name: IReadOnlyList<T>
+  nameWithType: IReadOnlyList<T>
+  fullName: System.Collections.Generic.IReadOnlyList<T>
+  nameWithType.vb: IReadOnlyList(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyList(Of T)
+  name.vb: IReadOnlyList(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyList`1
+    name: IReadOnlyList
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Collections.Generic
+  commentId: N:System.Collections.Generic
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Collections.Generic
+  nameWithType: System.Collections.Generic
+  fullName: System.Collections.Generic
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Collections
+    name: Collections
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections
+  - name: .
+  - uid: System.Collections.Generic
+    name: Generic
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
   commentId: T:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
   parent: nORM.Configuration

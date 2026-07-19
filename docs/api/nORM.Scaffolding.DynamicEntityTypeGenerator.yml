@@ -17,12 +17,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.SqlParsing.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DynamicEntityTypeGenerator
-    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 26
+    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.SqlParsing.cs
+    startLine: 5
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -85,12 +85,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.Generation.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityTypeAsync
-    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 76
+    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.Generation.cs
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -157,12 +157,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.Generation.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateEntityType
-    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 108
+    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.Generation.cs
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -229,12 +229,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
+      path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.SchemaSignature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputeSchemaSignature
-    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.cs
-    startLine: 293
+    path: src/nORM/Scaffolding/DynamicEntityTypeGenerator.SchemaSignature.cs
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Scaffolding

@@ -8,6 +8,7 @@ items:
   - nORM.Core.INormQueryable`1.AnyAsync(System.Threading.CancellationToken)
   - nORM.Core.INormQueryable`1.AsAsyncEnumerable(System.Threading.CancellationToken)
   - nORM.Core.INormQueryable`1.AsNoTracking
+  - nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
   - nORM.Core.INormQueryable`1.AsSplitQuery
   - nORM.Core.INormQueryable`1.CountAsync(System.Threading.CancellationToken)
   - nORM.Core.INormQueryable`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
@@ -33,7 +34,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 65
+    startLine: 113
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -62,6 +63,7 @@ items:
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.ContainsAsync``1({T},System.Threading.CancellationToken)
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{T},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{T},System.Collections.Generic.IEnumerable{{TInner}},{TResult}}})
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.Join``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{T},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{T},{TInner},{TResult}}})
+  - System.Linq.IQueryable{`0}.nORM.Core.NormQueryable.ToQueryString``1
   - System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.DateTime)
   - System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.String)
   - nORM.Core.INormQueryable`1.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
@@ -89,7 +91,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Include
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 72
+    startLine: 120
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -129,7 +131,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTracking
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 75
+    startLine: 123
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -143,6 +145,43 @@ items:
   overload: nORM.Core.INormQueryable`1.AsNoTracking*
   nameWithType.vb: INormQueryable(Of T).AsNoTracking()
   fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTracking()
+- uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  id: AsNoTrackingWithIdentityResolution
+  parent: nORM.Core.INormQueryable`1
+  langs:
+  - csharp
+  - vb
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsNoTrackingWithIdentityResolution
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 130
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Disables change tracking but still resolves entity identity: a root entity whose key appears more
+
+    than once in one result set (e.g. from <code>Concat</code> or a self-join/SelectMany flatten) is returned
+
+    as a single shared instance. Matches EF Core's <code>AsNoTrackingWithIdentityResolution</code>.
+  example: []
+  syntax:
+    content: INormQueryable<T> AsNoTrackingWithIdentityResolution()
+    return:
+      type: nORM.Core.INormQueryable`1
+    content.vb: Function AsNoTrackingWithIdentityResolution() As INormQueryable(Of T)
+  overload: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution*
+  nameWithType.vb: INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
 - uid: nORM.Core.INormQueryable`1.AsSplitQuery
   commentId: M:nORM.Core.INormQueryable`1.AsSplitQuery
   id: AsSplitQuery
@@ -161,11 +200,16 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsSplitQuery
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 80
+    startLine: 137
   assemblies:
   - nORM
   namespace: nORM.Core
-  summary: Splits collection navigations into multiple queries to reduce result set inflation.
+  summary: >-
+    Accepted for EF Core compatibility and has no additional effect:
+
+    <xref href="nORM.Core.INormQueryable%601.Include%60%601(System.Linq.Expressions.Expression%7bSystem.Func%7b%600%2c%60%600%7d%7d)" data-throw-if-not-resolved="false"></xref> always eager-loads its navigation paths
+
+    through coordinated follow-up queries.
   example: []
   syntax:
     content: INormQueryable<T> AsSplitQuery()
@@ -193,7 +237,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsAsyncEnumerable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 83
+    startLine: 140
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -228,7 +272,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 86
+    startLine: 143
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -263,7 +307,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToArrayAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 89
+    startLine: 146
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -298,7 +342,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 92
+    startLine: 149
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -333,7 +377,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AnyAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 95
+    startLine: 152
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -368,7 +412,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 98
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -403,7 +447,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstOrDefaultAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 101
+    startLine: 158
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -438,7 +482,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 104
+    startLine: 161
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -473,7 +517,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleOrDefaultAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 107
+    startLine: 164
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -508,7 +552,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteDeleteAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 110
+    startLine: 167
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -543,7 +587,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteUpdateAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 113
+    startLine: 170
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1192,6 +1236,53 @@ references:
   - name: " "
   - name: TResult
   - name: )
+  - name: )
+  - name: )
+- uid: System.Linq.IQueryable{`0}.nORM.Core.NormQueryable.ToQueryString``1
+  commentId: M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  parent: nORM.Core.NormQueryable
+  definition: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  name: ToQueryString<T>(IQueryable<T>)
+  nameWithType: NormQueryable.ToQueryString<T>(IQueryable<T>)
+  fullName: nORM.Core.NormQueryable.ToQueryString<T>(System.Linq.IQueryable<T>)
+  nameWithType.vb: NormQueryable.ToQueryString(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormQueryable.ToQueryString(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: ToQueryString(Of T)(IQueryable(Of T))
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{`0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{`0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
   - name: )
   - name: )
 - uid: System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.DateTime)
@@ -2392,6 +2483,59 @@ references:
   - name: )
   - name: )
   - name: )
+- uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  isExternal: true
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  name: ToQueryString<T>(IQueryable<T>)
+  nameWithType: NormQueryable.ToQueryString<T>(IQueryable<T>)
+  fullName: nORM.Core.NormQueryable.ToQueryString<T>(System.Linq.IQueryable<T>)
+  nameWithType.vb: NormQueryable.ToQueryString(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormQueryable.ToQueryString(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: ToQueryString(Of T)(IQueryable(Of T))
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: nORM.Core.NormQueryable
+  commentId: T:nORM.Core.NormQueryable
+  parent: nORM.Core
+  href: nORM.Core.NormQueryable.html
+  name: NormQueryable
+  nameWithType: NormQueryable
+  fullName: nORM.Core.NormQueryable
 - uid: nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   commentId: M:nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   isExternal: true
@@ -3168,6 +3312,80 @@ references:
   - name: Of
   - name: " "
   - name: T
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution*
+  commentId: Overload:nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution
+  nameWithType: INormQueryable<T>.AsNoTrackingWithIdentityResolution
+  fullName: nORM.Core.INormQueryable<T>.AsNoTrackingWithIdentityResolution
+  nameWithType.vb: INormQueryable(Of T).AsNoTrackingWithIdentityResolution
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTrackingWithIdentityResolution
+- uid: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  commentId: M:nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  name: Include<TProperty>(Expression<Func<T, TProperty>>)
+  nameWithType: INormQueryable<T>.Include<TProperty>(Expression<Func<T, TProperty>>)
+  fullName: nORM.Core.INormQueryable<T>.Include<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: INormQueryable(Of T).Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Core.INormQueryable(Of T).Include(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+    name: Include
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+    name: Include
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
   - name: )
 - uid: nORM.Core.INormQueryable`1.AsSplitQuery*
   commentId: Overload:nORM.Core.INormQueryable`1.AsSplitQuery

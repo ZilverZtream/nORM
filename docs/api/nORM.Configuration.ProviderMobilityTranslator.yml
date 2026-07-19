@@ -23,12 +23,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslator.Runtime.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ProviderMobilityTranslator
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 307
+    path: src/nORM/Configuration/ProviderMobilityTranslator.Runtime.cs
+    startLine: 6
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -70,7 +70,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Decisions
     path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 358
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -101,7 +101,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Decide
     path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 364
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -129,12 +129,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslator.Findings.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TryDecideFindingKind
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 372
+    path: src/nORM/Configuration/ProviderMobilityTranslator.Findings.cs
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -154,42 +154,126 @@ items:
   nameWithType.vb: ProviderMobilityTranslator.TryDecideFindingKind(String, ProviderMobilityTranslationDecision)
   fullName.vb: nORM.Configuration.ProviderMobilityTranslator.TryDecideFindingKind(String, nORM.Configuration.ProviderMobilityTranslationDecision)
   name.vb: TryDecideFindingKind(String, ProviderMobilityTranslationDecision)
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
-  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
-  id: DecideRuntimeFeature(System.String)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
+  id: DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
   parent: nORM.Configuration.ProviderMobilityTranslator
   langs:
   - csharp
   - vb
-  name: DecideRuntimeFeature(string)
-  nameWithType: ProviderMobilityTranslator.DecideRuntimeFeature(string)
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(string)
+  name: DecideProviderImplementationProfile(DatabaseProvider, Version?, bool)
+  nameWithType: ProviderMobilityTranslator.DecideProviderImplementationProfile(DatabaseProvider, Version?, bool)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider, System.Version?, bool)
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslator.Implementation.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
-    id: DecideRuntimeFeature
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 387
+    id: DecideProviderImplementationProfile
+    path: src/nORM/Configuration/ProviderMobilityTranslator.Implementation.cs
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Configuration
-  summary: Gets the provider-mobility decision for a runtime strict-mode feature name.
+  summary: >-
+    Builds a provider target profile from the concrete nORM provider implementation.
+
+    This includes capability descriptors plus provider SQL translation strategies
+
+    that are not exposed on <xref href="nORM.Providers.ProviderCapabilities" data-throw-if-not-resolved="false"></xref>.
   example: []
   syntax:
-    content: public static ProviderMobilityTranslationDecision DecideRuntimeFeature(string feature)
+    content: public static IReadOnlyList<ProviderMobilityProviderDecision> DecideProviderImplementationProfile(DatabaseProvider provider, Version? actualServerVersion = null, bool requireActualServerVersion = false)
     parameters:
-    - id: feature
-      type: System.String
+    - id: provider
+      type: nORM.Providers.DatabaseProvider
+    - id: actualServerVersion
+      type: System.Version
+    - id: requireActualServerVersion
+      type: System.Boolean
     return:
-      type: nORM.Configuration.ProviderMobilityTranslationDecision
-    content.vb: Public Shared Function DecideRuntimeFeature(feature As String) As ProviderMobilityTranslationDecision
-  overload: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature*
-  nameWithType.vb: ProviderMobilityTranslator.DecideRuntimeFeature(String)
-  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(String)
-  name.vb: DecideRuntimeFeature(String)
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
+    content.vb: Public Shared Function DecideProviderImplementationProfile(provider As DatabaseProvider, actualServerVersion As Version = Nothing, requireActualServerVersion As Boolean = False) As IReadOnlyList(Of ProviderMobilityProviderDecision)
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile*
+  nameWithType.vb: ProviderMobilityTranslator.DecideProviderImplementationProfile(DatabaseProvider, Version, Boolean)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider, System.Version, Boolean)
+  name.vb: DecideProviderImplementationProfile(DatabaseProvider, Version, Boolean)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  id: DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideProviderCapability(ProviderCapabilities, ProviderMobilityProviderFeature)
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapability(ProviderCapabilities, ProviderMobilityProviderFeature)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities, nORM.Configuration.ProviderMobilityProviderFeature)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderCapabilities.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideProviderCapability
+    path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderCapabilities.cs
+    startLine: 14
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Decides whether a provider capability can participate in provider-mobile certification.
+  example: []
+  syntax:
+    content: public static ProviderMobilityProviderDecision DecideProviderCapability(ProviderCapabilities capabilities, ProviderMobilityProviderFeature feature)
+    parameters:
+    - id: capabilities
+      type: nORM.Providers.ProviderCapabilities
+    - id: feature
+      type: nORM.Configuration.ProviderMobilityProviderFeature
+    return:
+      type: nORM.Configuration.ProviderMobilityProviderDecision
+    content.vb: Public Shared Function DecideProviderCapability(capabilities As ProviderCapabilities, feature As ProviderMobilityProviderFeature) As ProviderMobilityProviderDecision
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability*
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  id: DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
+  parent: nORM.Configuration.ProviderMobilityTranslator
+  langs:
+  - csharp
+  - vb
+  name: DecideProviderCapabilityProfile(ProviderCapabilities, Version?, bool)
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapabilityProfile(ProviderCapabilities, Version?, bool)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities, System.Version?, bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderCapabilities.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DecideProviderCapabilityProfile
+    path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderCapabilities.cs
+    startLine: 165
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Builds a provider target capability profile from a provider descriptor.
+  example: []
+  syntax:
+    content: public static IReadOnlyList<ProviderMobilityProviderDecision> DecideProviderCapabilityProfile(ProviderCapabilities capabilities, Version? actualServerVersion = null, bool requireActualServerVersion = false)
+    parameters:
+    - id: capabilities
+      type: nORM.Providers.ProviderCapabilities
+    - id: actualServerVersion
+      type: System.Version
+    - id: requireActualServerVersion
+      type: System.Boolean
+    return:
+      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
+    content.vb: Public Shared Function DecideProviderCapabilityProfile(capabilities As ProviderCapabilities, actualServerVersion As Version = Nothing, requireActualServerVersion As Boolean = False) As IReadOnlyList(Of ProviderMobilityProviderDecision)
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile*
+  nameWithType.vb: ProviderMobilityTranslator.DecideProviderCapabilityProfile(ProviderCapabilities, Version, Boolean)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities, System.Version, Boolean)
+  name.vb: DecideProviderCapabilityProfile(ProviderCapabilities, Version, Boolean)
 - uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
   commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
   id: DecideProviderVersion(nORM.Providers.ProviderCapabilities,System.Version)
@@ -203,12 +287,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderVersions.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DecideProviderVersion
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 393
+    path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderVersions.cs
+    startLine: 12
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -241,12 +325,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderVersions.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ParseProviderVersion
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 457
+    path: src/nORM/Configuration/ProviderMobilityTranslator.ProviderVersions.cs
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -264,126 +348,42 @@ items:
   nameWithType.vb: ProviderMobilityTranslator.ParseProviderVersion(String)
   fullName.vb: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion(String)
   name.vb: ParseProviderVersion(String)
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
-  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
-  id: DecideProviderCapability(nORM.Providers.ProviderCapabilities,nORM.Configuration.ProviderMobilityProviderFeature)
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
+  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(System.String)
+  id: DecideRuntimeFeature(System.String)
   parent: nORM.Configuration.ProviderMobilityTranslator
   langs:
   - csharp
   - vb
-  name: DecideProviderCapability(ProviderCapabilities, ProviderMobilityProviderFeature)
-  nameWithType: ProviderMobilityTranslator.DecideProviderCapability(ProviderCapabilities, ProviderMobilityProviderFeature)
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability(nORM.Providers.ProviderCapabilities, nORM.Configuration.ProviderMobilityProviderFeature)
+  name: DecideRuntimeFeature(string)
+  nameWithType: ProviderMobilityTranslator.DecideRuntimeFeature(string)
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(string)
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityTranslator.Runtime.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
-    id: DecideProviderCapability
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 494
+    id: DecideRuntimeFeature
+    path: src/nORM/Configuration/ProviderMobilityTranslator.Runtime.cs
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Configuration
-  summary: Decides whether a provider capability can participate in provider-mobile certification.
+  summary: Gets the provider-mobility decision for a runtime strict-mode feature name.
   example: []
   syntax:
-    content: public static ProviderMobilityProviderDecision DecideProviderCapability(ProviderCapabilities capabilities, ProviderMobilityProviderFeature feature)
+    content: public static ProviderMobilityTranslationDecision DecideRuntimeFeature(string feature)
     parameters:
-    - id: capabilities
-      type: nORM.Providers.ProviderCapabilities
     - id: feature
-      type: nORM.Configuration.ProviderMobilityProviderFeature
+      type: System.String
     return:
-      type: nORM.Configuration.ProviderMobilityProviderDecision
-    content.vb: Public Shared Function DecideProviderCapability(capabilities As ProviderCapabilities, feature As ProviderMobilityProviderFeature) As ProviderMobilityProviderDecision
-  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability*
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
-  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
-  id: DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities,System.Version,System.Boolean)
-  parent: nORM.Configuration.ProviderMobilityTranslator
-  langs:
-  - csharp
-  - vb
-  name: DecideProviderCapabilityProfile(ProviderCapabilities, Version?, bool)
-  nameWithType: ProviderMobilityTranslator.DecideProviderCapabilityProfile(ProviderCapabilities, Version?, bool)
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities, System.Version?, bool)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: DecideProviderCapabilityProfile
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 645
-  assemblies:
-  - nORM
-  namespace: nORM.Configuration
-  summary: Builds a provider target capability profile from a provider descriptor.
-  example: []
-  syntax:
-    content: public static IReadOnlyList<ProviderMobilityProviderDecision> DecideProviderCapabilityProfile(ProviderCapabilities capabilities, Version? actualServerVersion = null, bool requireActualServerVersion = false)
-    parameters:
-    - id: capabilities
-      type: nORM.Providers.ProviderCapabilities
-    - id: actualServerVersion
-      type: System.Version
-    - id: requireActualServerVersion
-      type: System.Boolean
-    return:
-      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
-    content.vb: Public Shared Function DecideProviderCapabilityProfile(capabilities As ProviderCapabilities, actualServerVersion As Version = Nothing, requireActualServerVersion As Boolean = False) As IReadOnlyList(Of ProviderMobilityProviderDecision)
-  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile*
-  nameWithType.vb: ProviderMobilityTranslator.DecideProviderCapabilityProfile(ProviderCapabilities, Version, Boolean)
-  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile(nORM.Providers.ProviderCapabilities, System.Version, Boolean)
-  name.vb: DecideProviderCapabilityProfile(ProviderCapabilities, Version, Boolean)
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
-  commentId: M:nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
-  id: DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider,System.Version,System.Boolean)
-  parent: nORM.Configuration.ProviderMobilityTranslator
-  langs:
-  - csharp
-  - vb
-  name: DecideProviderImplementationProfile(DatabaseProvider, Version?, bool)
-  nameWithType: ProviderMobilityTranslator.DecideProviderImplementationProfile(DatabaseProvider, Version?, bool)
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider, System.Version?, bool)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: DecideProviderImplementationProfile
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 678
-  assemblies:
-  - nORM
-  namespace: nORM.Configuration
-  summary: >-
-    Builds a provider target profile from the concrete nORM provider implementation.
-
-    This includes capability descriptors plus provider SQL translation strategies
-
-    that are not exposed on <xref href="nORM.Providers.ProviderCapabilities" data-throw-if-not-resolved="false"></xref>.
-  example: []
-  syntax:
-    content: public static IReadOnlyList<ProviderMobilityProviderDecision> DecideProviderImplementationProfile(DatabaseProvider provider, Version? actualServerVersion = null, bool requireActualServerVersion = false)
-    parameters:
-    - id: provider
-      type: nORM.Providers.DatabaseProvider
-    - id: actualServerVersion
-      type: System.Version
-    - id: requireActualServerVersion
-      type: System.Boolean
-    return:
-      type: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
-    content.vb: Public Shared Function DecideProviderImplementationProfile(provider As DatabaseProvider, actualServerVersion As Version = Nothing, requireActualServerVersion As Boolean = False) As IReadOnlyList(Of ProviderMobilityProviderDecision)
-  overload: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile*
-  nameWithType.vb: ProviderMobilityTranslator.DecideProviderImplementationProfile(DatabaseProvider, Version, Boolean)
-  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile(nORM.Providers.DatabaseProvider, System.Version, Boolean)
-  name.vb: DecideProviderImplementationProfile(DatabaseProvider, Version, Boolean)
+      type: nORM.Configuration.ProviderMobilityTranslationDecision
+    content.vb: Public Shared Function DecideRuntimeFeature(feature As String) As ProviderMobilityTranslationDecision
+  overload: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature*
+  nameWithType.vb: ProviderMobilityTranslator.DecideRuntimeFeature(String)
+  fullName.vb: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature(String)
+  name.vb: DecideRuntimeFeature(String)
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -796,18 +796,6 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature*
-  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature
-  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideRuntimeFeature_System_String_
-  name: DecideRuntimeFeature
-  nameWithType: ProviderMobilityTranslator.DecideRuntimeFeature
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion*
-  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion
-  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderVersion_nORM_Providers_ProviderCapabilities_System_Version_
-  name: DecideProviderVersion
-  nameWithType: ProviderMobilityTranslator.DecideProviderVersion
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion
 - uid: nORM.Providers.ProviderCapabilities
   commentId: T:nORM.Providers.ProviderCapabilities
   parent: nORM.Providers
@@ -815,6 +803,19 @@ references:
   name: ProviderCapabilities
   nameWithType: ProviderCapabilities
   fullName: nORM.Providers.ProviderCapabilities
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderImplementationProfile_nORM_Providers_DatabaseProvider_System_Version_System_Boolean_
+  name: DecideProviderImplementationProfile
+  nameWithType: ProviderMobilityTranslator.DecideProviderImplementationProfile
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile
+- uid: nORM.Providers.DatabaseProvider
+  commentId: T:nORM.Providers.DatabaseProvider
+  parent: nORM.Providers
+  href: nORM.Providers.DatabaseProvider.html
+  name: DatabaseProvider
+  nameWithType: DatabaseProvider
+  fullName: nORM.Providers.DatabaseProvider
 - uid: System.Version
   commentId: T:System.Version
   parent: System
@@ -823,60 +824,6 @@ references:
   name: Version
   nameWithType: Version
   fullName: System.Version
-- uid: nORM.Configuration.ProviderMobilityProviderDecision
-  commentId: T:nORM.Configuration.ProviderMobilityProviderDecision
-  parent: nORM.Configuration
-  href: nORM.Configuration.ProviderMobilityProviderDecision.html
-  name: ProviderMobilityProviderDecision
-  nameWithType: ProviderMobilityProviderDecision
-  fullName: nORM.Configuration.ProviderMobilityProviderDecision
-- uid: nORM.Providers
-  commentId: N:nORM.Providers
-  href: nORM.html
-  name: nORM.Providers
-  nameWithType: nORM.Providers
-  fullName: nORM.Providers
-  spec.csharp:
-  - uid: nORM
-    name: nORM
-    href: nORM.html
-  - name: .
-  - uid: nORM.Providers
-    name: Providers
-    href: nORM.Providers.html
-  spec.vb:
-  - uid: nORM
-    name: nORM
-    href: nORM.html
-  - name: .
-  - uid: nORM.Providers
-    name: Providers
-    href: nORM.Providers.html
-- uid: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion*
-  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion
-  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_ParseProviderVersion_System_String_
-  name: ParseProviderVersion
-  nameWithType: ProviderMobilityTranslator.ParseProviderVersion
-  fullName: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability*
-  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability
-  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderCapability_nORM_Providers_ProviderCapabilities_nORM_Configuration_ProviderMobilityProviderFeature_
-  name: DecideProviderCapability
-  nameWithType: ProviderMobilityTranslator.DecideProviderCapability
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability
-- uid: nORM.Configuration.ProviderMobilityProviderFeature
-  commentId: T:nORM.Configuration.ProviderMobilityProviderFeature
-  parent: nORM.Configuration
-  href: nORM.Configuration.ProviderMobilityProviderFeature.html
-  name: ProviderMobilityProviderFeature
-  nameWithType: ProviderMobilityProviderFeature
-  fullName: nORM.Configuration.ProviderMobilityProviderFeature
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile*
-  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile
-  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderCapabilityProfile_nORM_Providers_ProviderCapabilities_System_Version_System_Boolean_
-  name: DecideProviderCapabilityProfile
-  nameWithType: ProviderMobilityTranslator.DecideProviderCapabilityProfile
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile
 - uid: System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
   commentId: T:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ProviderMobilityProviderDecision}
   parent: System.Collections.Generic
@@ -910,16 +857,69 @@ references:
     name: ProviderMobilityProviderDecision
     href: nORM.Configuration.ProviderMobilityProviderDecision.html
   - name: )
-- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile*
-  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile
-  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderImplementationProfile_nORM_Providers_DatabaseProvider_System_Version_System_Boolean_
-  name: DecideProviderImplementationProfile
-  nameWithType: ProviderMobilityTranslator.DecideProviderImplementationProfile
-  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderImplementationProfile
-- uid: nORM.Providers.DatabaseProvider
-  commentId: T:nORM.Providers.DatabaseProvider
-  parent: nORM.Providers
-  href: nORM.Providers.DatabaseProvider.html
-  name: DatabaseProvider
-  nameWithType: DatabaseProvider
-  fullName: nORM.Providers.DatabaseProvider
+- uid: nORM.Providers
+  commentId: N:nORM.Providers
+  href: nORM.html
+  name: nORM.Providers
+  nameWithType: nORM.Providers
+  fullName: nORM.Providers
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Providers
+    name: Providers
+    href: nORM.Providers.html
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderCapability_nORM_Providers_ProviderCapabilities_nORM_Configuration_ProviderMobilityProviderFeature_
+  name: DecideProviderCapability
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapability
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapability
+- uid: nORM.Configuration.ProviderMobilityProviderFeature
+  commentId: T:nORM.Configuration.ProviderMobilityProviderFeature
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderFeature.html
+  name: ProviderMobilityProviderFeature
+  nameWithType: ProviderMobilityProviderFeature
+  fullName: nORM.Configuration.ProviderMobilityProviderFeature
+- uid: nORM.Configuration.ProviderMobilityProviderDecision
+  commentId: T:nORM.Configuration.ProviderMobilityProviderDecision
+  parent: nORM.Configuration
+  href: nORM.Configuration.ProviderMobilityProviderDecision.html
+  name: ProviderMobilityProviderDecision
+  nameWithType: ProviderMobilityProviderDecision
+  fullName: nORM.Configuration.ProviderMobilityProviderDecision
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderCapabilityProfile_nORM_Providers_ProviderCapabilities_System_Version_System_Boolean_
+  name: DecideProviderCapabilityProfile
+  nameWithType: ProviderMobilityTranslator.DecideProviderCapabilityProfile
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderCapabilityProfile
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideProviderVersion_nORM_Providers_ProviderCapabilities_System_Version_
+  name: DecideProviderVersion
+  nameWithType: ProviderMobilityTranslator.DecideProviderVersion
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideProviderVersion
+- uid: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_ParseProviderVersion_System_String_
+  name: ParseProviderVersion
+  nameWithType: ProviderMobilityTranslator.ParseProviderVersion
+  fullName: nORM.Configuration.ProviderMobilityTranslator.ParseProviderVersion
+- uid: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature*
+  commentId: Overload:nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature
+  href: nORM.Configuration.ProviderMobilityTranslator.html#nORM_Configuration_ProviderMobilityTranslator_DecideRuntimeFeature_System_String_
+  name: DecideRuntimeFeature
+  nameWithType: ProviderMobilityTranslator.DecideRuntimeFeature
+  fullName: nORM.Configuration.ProviderMobilityTranslator.DecideRuntimeFeature

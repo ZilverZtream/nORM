@@ -22,6 +22,10 @@ items:
   - nORM.Configuration.DbContextOptions.GlobalFilters
   - nORM.Configuration.DbContextOptions.Logger
   - nORM.Configuration.DbContextOptions.MaxGroupJoinSize
+  - nORM.Configuration.DbContextOptions.MaxQueryComplexityCost
+  - nORM.Configuration.DbContextOptions.MaxQueryJoinDepth
+  - nORM.Configuration.DbContextOptions.MaxQueryParameterCount
+  - nORM.Configuration.DbContextOptions.MaxQueryWhereConditions
   - nORM.Configuration.DbContextOptions.MaxRecursionDepth
   - nORM.Configuration.DbContextOptions.NativeTenantSecurityMode
   - nORM.Configuration.DbContextOptions.NativeTenantSessionKey
@@ -135,7 +139,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeoutConfiguration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 148
+    startLine: 153
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -171,7 +175,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxRecursionDepth
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 156
+    startLine: 161
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -191,6 +195,168 @@ items:
       type: System.Int32
     content.vb: Public Property MaxRecursionDepth As Integer
   overload: nORM.Configuration.DbContextOptions.MaxRecursionDepth*
+- uid: nORM.Configuration.DbContextOptions.MaxQueryJoinDepth
+  commentId: P:nORM.Configuration.DbContextOptions.MaxQueryJoinDepth
+  id: MaxQueryJoinDepth
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: MaxQueryJoinDepth
+  nameWithType: DbContextOptions.MaxQueryJoinDepth
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryJoinDepth
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxQueryJoinDepth
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 181
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets an explicit upper bound on the number of joins a single query may
+
+    contain before translation is rejected. When null (the default), the limit scales
+
+    with available system memory (10 joins per GB, clamped between 1 and 16 GB), which
+
+    means the same query can be admitted on one machine and rejected on a smaller one.
+
+    Set an explicit value for deterministic admission across environments.
+  example: []
+  syntax:
+    content: public int? MaxQueryJoinDepth { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property MaxQueryJoinDepth As Integer?
+  overload: nORM.Configuration.DbContextOptions.MaxQueryJoinDepth*
+- uid: nORM.Configuration.DbContextOptions.MaxQueryWhereConditions
+  commentId: P:nORM.Configuration.DbContextOptions.MaxQueryWhereConditions
+  id: MaxQueryWhereConditions
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: MaxQueryWhereConditions
+  nameWithType: DbContextOptions.MaxQueryWhereConditions
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryWhereConditions
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxQueryWhereConditions
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 200
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets an explicit upper bound on the number of WHERE conditions a single
+
+    query may contain before translation is rejected. When null (the default), the
+
+    limit scales with available system memory (50 conditions per GB, clamped between
+
+    1 and 16 GB). Set an explicit value for deterministic admission across environments,
+
+    for example when dynamic filter builders or many global filters compose large predicates.
+  example: []
+  syntax:
+    content: public int? MaxQueryWhereConditions { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property MaxQueryWhereConditions As Integer?
+  overload: nORM.Configuration.DbContextOptions.MaxQueryWhereConditions*
+- uid: nORM.Configuration.DbContextOptions.MaxQueryParameterCount
+  commentId: P:nORM.Configuration.DbContextOptions.MaxQueryParameterCount
+  id: MaxQueryParameterCount
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: MaxQueryParameterCount
+  nameWithType: DbContextOptions.MaxQueryParameterCount
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryParameterCount
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxQueryParameterCount
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 219
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets an explicit upper bound on the number of parameters a single query may
+
+    bind (including values expanded from local collections in Contains) before translation
+
+    is rejected. When null (the default), the limit scales with available system memory
+
+    (2000 parameters per GB, clamped between 1 and 16 GB). Providers additionally enforce
+
+    their own hard parameter ceilings regardless of this setting.
+  example: []
+  syntax:
+    content: public int? MaxQueryParameterCount { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property MaxQueryParameterCount As Integer?
+  overload: nORM.Configuration.DbContextOptions.MaxQueryParameterCount*
+- uid: nORM.Configuration.DbContextOptions.MaxQueryComplexityCost
+  commentId: P:nORM.Configuration.DbContextOptions.MaxQueryComplexityCost
+  id: MaxQueryComplexityCost
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: MaxQueryComplexityCost
+  nameWithType: DbContextOptions.MaxQueryComplexityCost
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryComplexityCost
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: MaxQueryComplexityCost
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 239
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets an explicit ceiling for the estimated complexity cost above which query
+
+    translation is rejected. When null (the default), the ceiling scales with available
+
+    system memory (10,000 per GB, clamped between 1 and 16 GB). The cost model weighs
+
+    joins quadratically, so report-style queries with many joins are the most common
+
+    reason to set an explicit ceiling. A warning is logged when a query exceeds half
+
+    the effective ceiling.
+  example: []
+  syntax:
+    content: public int? MaxQueryComplexityCost { get; set; }
+    parameters: []
+    return:
+      type: System.Nullable{System.Int32}
+    content.vb: Public Property MaxQueryComplexityCost As Integer?
+  overload: nORM.Configuration.DbContextOptions.MaxQueryComplexityCost*
 - uid: nORM.Configuration.DbContextOptions.MaxGroupJoinSize
   commentId: P:nORM.Configuration.DbContextOptions.MaxGroupJoinSize
   id: MaxGroupJoinSize
@@ -209,7 +375,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxGroupJoinSize
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 175
+    startLine: 257
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -247,7 +413,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkBatchSize
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 191
+    startLine: 273
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -283,7 +449,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Logger
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 207
+    startLine: 289
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -317,7 +483,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RetryPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 213
+    startLine: 295
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -351,7 +517,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 219
+    startLine: 301
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -385,7 +551,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantColumnName
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 225
+    startLine: 307
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -419,7 +585,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NativeTenantSecurityMode
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 234
+    startLine: 316
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -459,7 +625,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NativeTenantSessionKey
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 252
+    startLine: 334
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -493,7 +659,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnModelCreating
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 258
+    startLine: 340
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -527,7 +693,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseBatchedBulkOps
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 264
+    startLine: 346
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -561,7 +727,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UsePreciseChangeTracking
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 270
+    startLine: 352
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -595,7 +761,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EagerChangeTracking
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 276
+    startLine: 358
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -629,7 +795,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultTrackingBehavior
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 282
+    startLine: 364
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -663,7 +829,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClientEvaluationPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 290
+    startLine: 372
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -701,7 +867,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ProviderMobilityMode
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 309
+    startLine: 391
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -737,7 +903,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 339
+    startLine: 421
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -771,7 +937,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SaveChangesInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 345
+    startLine: 427
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -805,7 +971,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 352
+    startLine: 434
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -839,7 +1005,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheExpiration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 358
+    startLine: 440
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -873,7 +1039,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clone
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 367
+    startLine: 449
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -911,7 +1077,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseInMemoryCache
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 428
+    startLine: 514
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -947,7 +1113,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseStrictProviderMobility
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 445
+    startLine: 531
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -993,7 +1159,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseStrictProviderMobility
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 467
+    startLine: 553
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1046,7 +1212,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableNativeTenantSessionContext
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 483
+    startLine: 569
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1087,7 +1253,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableTemporalVersioning
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 495
+    startLine: 581
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1121,7 +1287,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableTemporalVersioning
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 507
+    startLine: 593
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1156,7 +1322,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AmbientTransactionPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 526
+    startLine: 612
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1202,7 +1368,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RequireMatchedRowOccSemantics
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 546
+    startLine: 632
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1258,7 +1424,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GlobalFilters
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 561
+    startLine: 647
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1296,7 +1462,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 571
+    startLine: 657
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1342,7 +1508,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 588
+    startLine: 674
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1383,7 +1549,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Validate
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 601
+    startLine: 687
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2472,6 +2638,81 @@ references:
   nameWithType.vb: Integer
   fullName.vb: Integer
   name.vb: Integer
+- uid: nORM.Configuration.DbContextOptions.MaxQueryJoinDepth*
+  commentId: Overload:nORM.Configuration.DbContextOptions.MaxQueryJoinDepth
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxQueryJoinDepth
+  name: MaxQueryJoinDepth
+  nameWithType: DbContextOptions.MaxQueryJoinDepth
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryJoinDepth
+- uid: System.Nullable{System.Int32}
+  commentId: T:System.Nullable{System.Int32}
+  parent: System
+  definition: System.Nullable`1
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int?
+  nameWithType: int?
+  fullName: int?
+  nameWithType.vb: Integer?
+  fullName.vb: Integer?
+  name.vb: Integer?
+  spec.csharp:
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+  spec.vb:
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '?'
+- uid: System.Nullable`1
+  commentId: T:System.Nullable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  name: Nullable<T>
+  nameWithType: Nullable<T>
+  fullName: System.Nullable<T>
+  nameWithType.vb: Nullable(Of T)
+  fullName.vb: System.Nullable(Of T)
+  name.vb: Nullable(Of T)
+  spec.csharp:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Nullable`1
+    name: Nullable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.nullable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Configuration.DbContextOptions.MaxQueryWhereConditions*
+  commentId: Overload:nORM.Configuration.DbContextOptions.MaxQueryWhereConditions
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxQueryWhereConditions
+  name: MaxQueryWhereConditions
+  nameWithType: DbContextOptions.MaxQueryWhereConditions
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryWhereConditions
+- uid: nORM.Configuration.DbContextOptions.MaxQueryParameterCount*
+  commentId: Overload:nORM.Configuration.DbContextOptions.MaxQueryParameterCount
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxQueryParameterCount
+  name: MaxQueryParameterCount
+  nameWithType: DbContextOptions.MaxQueryParameterCount
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryParameterCount
+- uid: nORM.Configuration.DbContextOptions.MaxQueryComplexityCost*
+  commentId: Overload:nORM.Configuration.DbContextOptions.MaxQueryComplexityCost
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxQueryComplexityCost
+  name: MaxQueryComplexityCost
+  nameWithType: DbContextOptions.MaxQueryComplexityCost
+  fullName: nORM.Configuration.DbContextOptions.MaxQueryComplexityCost
 - uid: nORM.Configuration.DbContextOptions.MaxGroupJoinSize*
   commentId: Overload:nORM.Configuration.DbContextOptions.MaxGroupJoinSize
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_MaxGroupJoinSize

@@ -215,7 +215,7 @@ items:
     parameters: []
     return:
       type: System.Boolean
-    content.vb: Public ReadOnly Property IsKey As Boolean
+    content.vb: Public Property IsKey As Boolean
   overload: nORM.Mapping.Column.IsKey*
 - uid: nORM.Mapping.Column.IsDbGenerated
   commentId: P:nORM.Mapping.Column.IsDbGenerated
@@ -370,7 +370,7 @@ items:
     parameters: []
     return:
       type: System.String
-    content.vb: Public ReadOnly Property ForeignKeyPrincipalTypeName As String
+    content.vb: Public Property ForeignKeyPrincipalTypeName As String
   overload: nORM.Mapping.Column.ForeignKeyPrincipalTypeName*
 - uid: nORM.Mapping.Column.Getter
   commentId: P:nORM.Mapping.Column.Getter
@@ -390,7 +390,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Getter
     path: src/nORM/Mapping/Column.cs
-    startLine: 42
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -421,7 +421,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Setter
     path: src/nORM/Mapping/Column.cs
-    startLine: 44
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -452,7 +452,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetterMethod
     path: src/nORM/Mapping/Column.cs
-    startLine: 46
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -483,7 +483,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converter
     path: src/nORM/Mapping/Column.cs
-    startLine: 48
+    startLine: 60
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -514,14 +514,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/Column.cs
-    startLine: 113
+    startLine: 125
   assemblies:
   - nORM
   namespace: nORM.Mapping
   summary: Initializes a new mapping for a regular property.
   example: []
   syntax:
-    content: public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null, Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null, MethodInfo? setterMethodOverride = null)
+    content: >-
+      [RequiresDynamicCode("Column construction builds property accessor delegates with DynamicMethod when no overrides are supplied; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("Column construction reflects over the mapped property; trimming may remove the required members.")]
+
+      public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null, Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null, MethodInfo? setterMethodOverride = null)
     parameters:
     - id: pi
       type: System.Reflection.PropertyInfo
@@ -544,8 +549,24 @@ items:
     - id: setterMethodOverride
       type: System.Reflection.MethodInfo
       description: Custom setter method.
-    content.vb: Public Sub New(pi As PropertyInfo, p As DatabaseProvider, fluentConfig As IEntityTypeConfiguration, prefix As String = Nothing, getterOverride As Func(Of Object, Object) = Nothing, setterOverride As Action(Of Object, Object) = Nothing, setterMethodOverride As MethodInfo = Nothing)
+    content.vb: >-
+      <RequiresDynamicCode("Column construction builds property accessor delegates with DynamicMethod when no overrides are supplied; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("Column construction reflects over the mapped property; trimming may remove the required members.")>
+
+      Public Sub New(pi As PropertyInfo, p As DatabaseProvider, fluentConfig As IEntityTypeConfiguration, prefix As String = Nothing, getterOverride As Func(Of Object, Object) = Nothing, setterOverride As Action(Of Object, Object) = Nothing, setterMethodOverride As MethodInfo = Nothing)
   overload: nORM.Mapping.Column.#ctor*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Column construction builds property accessor delegates with DynamicMethod when no overrides are supplied; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Column construction reflects over the mapped property; trimming may remove the required members.
   nameWithType.vb: Column.New(PropertyInfo, DatabaseProvider, IEntityTypeConfiguration, String, Func(Of Object, Object), Action(Of Object, Object), MethodInfo)
   fullName.vb: nORM.Mapping.Column.New(System.Reflection.PropertyInfo, nORM.Providers.DatabaseProvider, nORM.Configuration.IEntityTypeConfiguration, String, System.Func(Of Object, Object), System.Action(Of Object, Object), System.Reflection.MethodInfo)
   name.vb: New(PropertyInfo, DatabaseProvider, IEntityTypeConfiguration, String, Func(Of Object, Object), Action(Of Object, Object), MethodInfo)
@@ -567,7 +588,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/Column.cs
-    startLine: 164
+    startLine: 178
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -614,7 +635,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateGetterDelegate
     path: src/nORM/Mapping/Column.cs
-    startLine: 247
+    startLine: 261
   assemblies:
   - nORM
   namespace: nORM.Mapping

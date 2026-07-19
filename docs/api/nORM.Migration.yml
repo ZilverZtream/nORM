@@ -121,6 +121,12 @@ references:
   name: PostgresMigrationSqlGenerator
   nameWithType: PostgresMigrationSqlGenerator
   fullName: nORM.Migration.PostgresMigrationSqlGenerator
+- uid: nORM.Migration.SchemaSnapshotBuilder
+  commentId: T:nORM.Migration.SchemaSnapshotBuilder
+  href: nORM.Migration.SchemaSnapshotBuilder.html
+  name: SchemaSnapshotBuilder
+  nameWithType: SchemaSnapshotBuilder
+  fullName: nORM.Migration.SchemaSnapshotBuilder
 - uid: nORM.Migration.SchemaSnapshot
   commentId: T:nORM.Migration.SchemaSnapshot
   parent: nORM.Migration
@@ -164,12 +170,6 @@ references:
   name: ColumnIndexSchema
   nameWithType: ColumnIndexSchema
   fullName: nORM.Migration.ColumnIndexSchema
-- uid: nORM.Migration.SchemaSnapshotBuilder
-  commentId: T:nORM.Migration.SchemaSnapshotBuilder
-  href: nORM.Migration.SchemaSnapshotBuilder.html
-  name: SchemaSnapshotBuilder
-  nameWithType: SchemaSnapshotBuilder
-  fullName: nORM.Migration.SchemaSnapshotBuilder
 - uid: nORM.Migration.SchemaDiff
   commentId: T:nORM.Migration.SchemaDiff
   parent: nORM.Migration

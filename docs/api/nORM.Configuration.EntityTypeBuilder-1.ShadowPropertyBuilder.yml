@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowPropertyBuilder
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 934
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 217
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -60,12 +60,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnName
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 951
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 234
   assemblies:
   - nORM
   namespace: nORM.Configuration

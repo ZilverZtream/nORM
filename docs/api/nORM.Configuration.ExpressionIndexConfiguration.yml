@@ -8,8 +8,11 @@ items:
   - nORM.Configuration.ExpressionIndexConfiguration.#ctor(System.String,System.String,System.Boolean,System.String)
   - nORM.Configuration.ExpressionIndexConfiguration.ExpressionSql
   - nORM.Configuration.ExpressionIndexConfiguration.FilterSql
+  - nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames
   - nORM.Configuration.ExpressionIndexConfiguration.IsUnique
   - nORM.Configuration.ExpressionIndexConfiguration.Name
+  - nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder
+  - nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct
   langs:
   - csharp
   - vb
@@ -24,7 +27,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexConfiguration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 176
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -68,7 +71,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 176
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -108,7 +111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 176
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -137,7 +140,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 176
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -166,7 +169,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 176
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -195,7 +198,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FilterSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 176
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -206,6 +209,99 @@ items:
       type: System.String
     content.vb: Public Property FilterSql As String
   overload: nORM.Configuration.ExpressionIndexConfiguration.FilterSql*
+- uid: nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames
+  commentId: P:nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames
+  id: IncludedColumnNames
+  parent: nORM.Configuration.ExpressionIndexConfiguration
+  langs:
+  - csharp
+  - vb
+  name: IncludedColumnNames
+  nameWithType: ExpressionIndexConfiguration.IncludedColumnNames
+  fullName: nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IncludedColumnNames
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 191
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Provider column names included as non-key covering columns where supported.
+  example: []
+  syntax:
+    content: public string[] IncludedColumnNames { get; init; }
+    parameters: []
+    return:
+      type: System.String[]
+    content.vb: Public Property IncludedColumnNames As String()
+  overload: nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames*
+- uid: nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder
+  commentId: P:nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder
+  id: NullSortOrder
+  parent: nORM.Configuration.ExpressionIndexConfiguration
+  langs:
+  - csharp
+  - vb
+  name: NullSortOrder
+  nameWithType: ExpressionIndexConfiguration.NullSortOrder
+  fullName: nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullSortOrder
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 194
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: Explicit provider null ordering for the expression key.
+  example: []
+  syntax:
+    content: public IndexNullSortOrder NullSortOrder { get; init; }
+    parameters: []
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+    content.vb: Public Property NullSortOrder As IndexNullSortOrder
+  overload: nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder*
+- uid: nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct
+  commentId: P:nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct
+  id: NullsNotDistinct
+  parent: nORM.Configuration.ExpressionIndexConfiguration
+  langs:
+  - csharp
+  - vb
+  name: NullsNotDistinct
+  nameWithType: ExpressionIndexConfiguration.NullsNotDistinct
+  fullName: nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullsNotDistinct
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 197
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: True when a unique PostgreSQL expression index treats null values as equal.
+  example: []
+  syntax:
+    content: public bool NullsNotDistinct { get; init; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property NullsNotDistinct As Boolean
+  overload: nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct*
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1286,3 +1382,51 @@ references:
   name: FilterSql
   nameWithType: ExpressionIndexConfiguration.FilterSql
   fullName: nORM.Configuration.ExpressionIndexConfiguration.FilterSql
+- uid: nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames*
+  commentId: Overload:nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames
+  href: nORM.Configuration.ExpressionIndexConfiguration.html#nORM_Configuration_ExpressionIndexConfiguration_IncludedColumnNames
+  name: IncludedColumnNames
+  nameWithType: ExpressionIndexConfiguration.IncludedColumnNames
+  fullName: nORM.Configuration.ExpressionIndexConfiguration.IncludedColumnNames
+- uid: System.String[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string[]
+  nameWithType: string[]
+  fullName: string[]
+  nameWithType.vb: String()
+  fullName.vb: String()
+  name.vb: String()
+  spec.csharp:
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: (
+  - name: )
+- uid: nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder*
+  commentId: Overload:nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder
+  href: nORM.Configuration.ExpressionIndexConfiguration.html#nORM_Configuration_ExpressionIndexConfiguration_NullSortOrder
+  name: NullSortOrder
+  nameWithType: ExpressionIndexConfiguration.NullSortOrder
+  fullName: nORM.Configuration.ExpressionIndexConfiguration.NullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
+- uid: nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct*
+  commentId: Overload:nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct
+  href: nORM.Configuration.ExpressionIndexConfiguration.html#nORM_Configuration_ExpressionIndexConfiguration_NullsNotDistinct
+  name: NullsNotDistinct
+  nameWithType: ExpressionIndexConfiguration.NullsNotDistinct
+  fullName: nORM.Configuration.ExpressionIndexConfiguration.NullsNotDistinct

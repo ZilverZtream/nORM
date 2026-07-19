@@ -5,6 +5,8 @@ items:
   id: ModelBuilder
   parent: nORM.Configuration
   children:
+  - nORM.Configuration.ModelBuilder.ApplyConfiguration``1(nORM.Configuration.IEntityTypeConfiguration{``0})
+  - nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly(System.Reflection.Assembly)
   - nORM.Configuration.ModelBuilder.Entity``1
   langs:
   - csharp
@@ -20,7 +22,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ModelBuilder
     path: src/nORM/Configuration/ModelBuilder.cs
-    startLine: 10
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -62,7 +64,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entity
     path: src/nORM/Configuration/ModelBuilder.cs
-    startLine: 22
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -86,6 +88,127 @@ items:
   nameWithType.vb: ModelBuilder.Entity(Of TEntity)()
   fullName.vb: nORM.Configuration.ModelBuilder.Entity(Of TEntity)()
   name.vb: Entity(Of TEntity)()
+- uid: nORM.Configuration.ModelBuilder.ApplyConfiguration``1(nORM.Configuration.IEntityTypeConfiguration{``0})
+  commentId: M:nORM.Configuration.ModelBuilder.ApplyConfiguration``1(nORM.Configuration.IEntityTypeConfiguration{``0})
+  id: ApplyConfiguration``1(nORM.Configuration.IEntityTypeConfiguration{``0})
+  parent: nORM.Configuration.ModelBuilder
+  langs:
+  - csharp
+  - vb
+  name: ApplyConfiguration<TEntity>(IEntityTypeConfiguration<TEntity>)
+  nameWithType: ModelBuilder.ApplyConfiguration<TEntity>(IEntityTypeConfiguration<TEntity>)
+  fullName: nORM.Configuration.ModelBuilder.ApplyConfiguration<TEntity>(nORM.Configuration.IEntityTypeConfiguration<TEntity>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ModelBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ApplyConfiguration
+    path: src/nORM/Configuration/ModelBuilder.cs
+    startLine: 45
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Applies a dedicated <xref href="nORM.Configuration.IEntityTypeConfiguration%601" data-throw-if-not-resolved="false"></xref> to this model — the Entity
+
+    Framework Core pattern for keeping per-entity configuration in its own class. The configuration's
+
+    <xref href="nORM.Configuration.IEntityTypeConfiguration%601.Configure(nORM.Configuration.EntityTypeBuilder%7b%600%7d)" data-throw-if-not-resolved="false"></xref> runs against the same builder that
+
+    <xref href="nORM.Configuration.ModelBuilder.Entity%60%601" data-throw-if-not-resolved="false"></xref> returns, so it accumulates with any other configuration for the type.
+  example: []
+  syntax:
+    content: 'public ModelBuilder ApplyConfiguration<TEntity>(IEntityTypeConfiguration<TEntity> configuration) where TEntity : class'
+    parameters:
+    - id: configuration
+      type: nORM.Configuration.IEntityTypeConfiguration{{TEntity}}
+      description: The configuration to apply.
+    typeParameters:
+    - id: TEntity
+      description: The entity type being configured.
+    return:
+      type: nORM.Configuration.ModelBuilder
+      description: This <xref href="nORM.Configuration.ModelBuilder" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: Public Function ApplyConfiguration(Of TEntity As Class)(configuration As IEntityTypeConfiguration(Of TEntity)) As ModelBuilder
+  overload: nORM.Configuration.ModelBuilder.ApplyConfiguration*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">configuration</code> is null.
+  nameWithType.vb: ModelBuilder.ApplyConfiguration(Of TEntity)(IEntityTypeConfiguration(Of TEntity))
+  fullName.vb: nORM.Configuration.ModelBuilder.ApplyConfiguration(Of TEntity)(nORM.Configuration.IEntityTypeConfiguration(Of TEntity))
+  name.vb: ApplyConfiguration(Of TEntity)(IEntityTypeConfiguration(Of TEntity))
+- uid: nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly(System.Reflection.Assembly)
+  commentId: M:nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly(System.Reflection.Assembly)
+  id: ApplyConfigurationsFromAssembly(System.Reflection.Assembly)
+  parent: nORM.Configuration.ModelBuilder
+  langs:
+  - csharp
+  - vb
+  name: ApplyConfigurationsFromAssembly(Assembly)
+  nameWithType: ModelBuilder.ApplyConfigurationsFromAssembly(Assembly)
+  fullName: nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly(System.Reflection.Assembly)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/ModelBuilder.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ApplyConfigurationsFromAssembly
+    path: src/nORM/Configuration/ModelBuilder.cs
+    startLine: 62
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Scans the given assembly for all non-abstract types implementing
+
+    <xref href="nORM.Configuration.IEntityTypeConfiguration%601" data-throw-if-not-resolved="false"></xref> and applies each — the Entity Framework Core
+
+    convenience that registers every configuration class in a project at once. Each configuration
+
+    type must have a public parameterless constructor; a type implementing the interface for more than
+
+    one entity is applied once per entity.
+  example: []
+  syntax:
+    content: >-
+      [RequiresUnreferencedCode("Scans assembly types and their interfaces by reflection; trimming may remove configuration types or their members. See docs/aot-trimming.md.")]
+
+      [RequiresDynamicCode("Constructs the generic ApplyConfiguration method per discovered entity type at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      public ModelBuilder ApplyConfigurationsFromAssembly(Assembly assembly)
+    parameters:
+    - id: assembly
+      type: System.Reflection.Assembly
+      description: The assembly to scan.
+    return:
+      type: nORM.Configuration.ModelBuilder
+      description: This <xref href="nORM.Configuration.ModelBuilder" data-throw-if-not-resolved="false"></xref> for chaining.
+    content.vb: >-
+      <RequiresUnreferencedCode("Scans assembly types and their interfaces by reflection; trimming may remove configuration types or their members. See docs/aot-trimming.md.")>
+
+      <RequiresDynamicCode("Constructs the generic ApplyConfiguration method per discovered entity type at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      Public Function ApplyConfigurationsFromAssembly(assembly As Assembly) As ModelBuilder
+  overload: nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">assembly</code> is null.
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Scans assembly types and their interfaces by reflection; trimming may remove configuration types or their members. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Constructs the generic ApplyConfiguration method per discovered entity type at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.
 references:
 - uid: nORM.Configuration
   commentId: N:nORM.Configuration
@@ -1083,7 +1206,7 @@ references:
   nameWithType: ModelBuilder.Entity
   fullName: nORM.Configuration.ModelBuilder.Entity
 - uid: nORM.Configuration.EntityTypeBuilder{{TEntity}}
-  commentId: T:nORM.Configuration.EntityTypeBuilder{``0}
+  commentId: T:nORM.Configuration.EntityTypeBuilder{`0}
   parent: nORM.Configuration
   definition: nORM.Configuration.EntityTypeBuilder`1
   href: nORM.Configuration.EntityTypeBuilder-1.html
@@ -1109,3 +1232,180 @@ references:
   - name: " "
   - name: TEntity
   - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration`1
+  commentId: T:nORM.Configuration.IEntityTypeConfiguration`1
+  href: nORM.Configuration.IEntityTypeConfiguration-1.html
+  name: IEntityTypeConfiguration<TEntity>
+  nameWithType: IEntityTypeConfiguration<TEntity>
+  fullName: nORM.Configuration.IEntityTypeConfiguration<TEntity>
+  nameWithType.vb: IEntityTypeConfiguration(Of TEntity)
+  fullName.vb: nORM.Configuration.IEntityTypeConfiguration(Of TEntity)
+  name.vb: IEntityTypeConfiguration(Of TEntity)
+  spec.csharp:
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration`1.Configure(nORM.Configuration.EntityTypeBuilder{`0})
+  commentId: M:nORM.Configuration.IEntityTypeConfiguration`1.Configure(nORM.Configuration.EntityTypeBuilder{`0})
+  href: nORM.Configuration.IEntityTypeConfiguration-1.html#nORM_Configuration_IEntityTypeConfiguration_1_Configure_nORM_Configuration_EntityTypeBuilder__0__
+  name: Configure(EntityTypeBuilder<TEntity>)
+  nameWithType: IEntityTypeConfiguration<TEntity>.Configure(EntityTypeBuilder<TEntity>)
+  fullName: nORM.Configuration.IEntityTypeConfiguration<TEntity>.Configure(nORM.Configuration.EntityTypeBuilder<TEntity>)
+  nameWithType.vb: IEntityTypeConfiguration(Of TEntity).Configure(EntityTypeBuilder(Of TEntity))
+  fullName.vb: nORM.Configuration.IEntityTypeConfiguration(Of TEntity).Configure(nORM.Configuration.EntityTypeBuilder(Of TEntity))
+  name.vb: Configure(EntityTypeBuilder(Of TEntity))
+  spec.csharp:
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1.Configure(nORM.Configuration.EntityTypeBuilder{`0})
+    name: Configure
+    href: nORM.Configuration.IEntityTypeConfiguration-1.html#nORM_Configuration_IEntityTypeConfiguration_1_Configure_nORM_Configuration_EntityTypeBuilder__0__
+  - name: (
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1.Configure(nORM.Configuration.EntityTypeBuilder{`0})
+    name: Configure
+    href: nORM.Configuration.IEntityTypeConfiguration-1.html#nORM_Configuration_IEntityTypeConfiguration_1_Configure_nORM_Configuration_EntityTypeBuilder__0__
+  - name: (
+  - uid: nORM.Configuration.EntityTypeBuilder`1
+    name: EntityTypeBuilder
+    href: nORM.Configuration.EntityTypeBuilder-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: )
+- uid: nORM.Configuration.ModelBuilder.Entity``1
+  commentId: M:nORM.Configuration.ModelBuilder.Entity``1
+  href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_Entity__1
+  name: Entity<TEntity>()
+  nameWithType: ModelBuilder.Entity<TEntity>()
+  fullName: nORM.Configuration.ModelBuilder.Entity<TEntity>()
+  nameWithType.vb: ModelBuilder.Entity(Of TEntity)()
+  fullName.vb: nORM.Configuration.ModelBuilder.Entity(Of TEntity)()
+  name.vb: Entity(Of TEntity)()
+  spec.csharp:
+  - uid: nORM.Configuration.ModelBuilder.Entity``1
+    name: Entity
+    href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_Entity__1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.ModelBuilder.Entity``1
+    name: Entity
+    href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_Entity__1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: (
+  - name: )
+- uid: nORM.Configuration.ModelBuilder
+  commentId: T:nORM.Configuration.ModelBuilder
+  parent: nORM.Configuration
+  href: nORM.Configuration.ModelBuilder.html
+  name: ModelBuilder
+  nameWithType: ModelBuilder
+  fullName: nORM.Configuration.ModelBuilder
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
+- uid: nORM.Configuration.ModelBuilder.ApplyConfiguration*
+  commentId: Overload:nORM.Configuration.ModelBuilder.ApplyConfiguration
+  href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_ApplyConfiguration__1_nORM_Configuration_IEntityTypeConfiguration___0__
+  name: ApplyConfiguration
+  nameWithType: ModelBuilder.ApplyConfiguration
+  fullName: nORM.Configuration.ModelBuilder.ApplyConfiguration
+- uid: nORM.Configuration.IEntityTypeConfiguration{{TEntity}}
+  commentId: T:nORM.Configuration.IEntityTypeConfiguration{``0}
+  parent: nORM.Configuration
+  definition: nORM.Configuration.IEntityTypeConfiguration`1
+  href: nORM.Configuration.IEntityTypeConfiguration-1.html
+  name: IEntityTypeConfiguration<TEntity>
+  nameWithType: IEntityTypeConfiguration<TEntity>
+  fullName: nORM.Configuration.IEntityTypeConfiguration<TEntity>
+  nameWithType.vb: IEntityTypeConfiguration(Of TEntity)
+  fullName.vb: nORM.Configuration.IEntityTypeConfiguration(Of TEntity)
+  name.vb: IEntityTypeConfiguration(Of TEntity)
+  spec.csharp:
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Configuration.IEntityTypeConfiguration`1
+    name: IEntityTypeConfiguration
+    href: nORM.Configuration.IEntityTypeConfiguration-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+- uid: nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly*
+  commentId: Overload:nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly
+  href: nORM.Configuration.ModelBuilder.html#nORM_Configuration_ModelBuilder_ApplyConfigurationsFromAssembly_System_Reflection_Assembly_
+  name: ApplyConfigurationsFromAssembly
+  nameWithType: ModelBuilder.ApplyConfigurationsFromAssembly
+  fullName: nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly
+- uid: System.Reflection.Assembly
+  commentId: T:System.Reflection.Assembly
+  parent: System.Reflection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.reflection.assembly
+  name: Assembly
+  nameWithType: Assembly
+  fullName: System.Reflection.Assembly
+- uid: System.Reflection
+  commentId: N:System.Reflection
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Reflection
+  nameWithType: System.Reflection
+  fullName: System.Reflection
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Reflection
+    name: Reflection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Reflection
+    name: Reflection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection

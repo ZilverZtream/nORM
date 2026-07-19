@@ -78,12 +78,7 @@ items:
     records and considering historical performance, memory usage and provider limits.
   example: []
   syntax:
-    content: >-
-      [RequiresDynamicCode("Delegates to EstimateRecordSize which calls JsonSerializer.Serialize(object).")]
-
-      [RequiresUnreferencedCode("Delegates to EstimateRecordSize which reflects over entity value types.")]
-
-      public DynamicBatchSizer.BatchSizingResult CalculateOptimalBatchSize<T>(IEnumerable<T> sample, TableMapping mapping, string operationKey, int totalRecords = -1) where T : class
+    content: 'public DynamicBatchSizer.BatchSizingResult CalculateOptimalBatchSize<T>(IEnumerable<T> sample, TableMapping mapping, string operationKey, int totalRecords = -1) where T : class'
     parameters:
     - id: sample
       type: System.Collections.Generic.IEnumerable{{T}}
@@ -103,24 +98,8 @@ items:
     return:
       type: nORM.Providers.DynamicBatchSizer.BatchSizingResult
       description: Calculated sizing information including optimal batch size and estimates.
-    content.vb: >-
-      <RequiresDynamicCode("Delegates to EstimateRecordSize which calls JsonSerializer.Serialize(object).")>
-
-      <RequiresUnreferencedCode("Delegates to EstimateRecordSize which reflects over entity value types.")>
-
-      Public Function CalculateOptimalBatchSize(Of T As Class)(sample As IEnumerable(Of T), mapping As TableMapping, operationKey As String, totalRecords As Integer = -1) As DynamicBatchSizer.BatchSizingResult
+    content.vb: Public Function CalculateOptimalBatchSize(Of T As Class)(sample As IEnumerable(Of T), mapping As TableMapping, operationKey As String, totalRecords As Integer = -1) As DynamicBatchSizer.BatchSizingResult
   overload: nORM.Providers.DynamicBatchSizer.CalculateOptimalBatchSize*
-  attributes:
-  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
-    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
-    arguments:
-    - type: System.String
-      value: Delegates to EstimateRecordSize which calls JsonSerializer.Serialize(object).
-  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
-    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
-    arguments:
-    - type: System.String
-      value: Delegates to EstimateRecordSize which reflects over entity value types.
   nameWithType.vb: DynamicBatchSizer.CalculateOptimalBatchSize(Of T)(IEnumerable(Of T), TableMapping, String, Integer)
   fullName.vb: nORM.Providers.DynamicBatchSizer.CalculateOptimalBatchSize(Of T)(System.Collections.Generic.IEnumerable(Of T), nORM.Mapping.TableMapping, String, Integer)
   name.vb: CalculateOptimalBatchSize(Of T)(IEnumerable(Of T), TableMapping, String, Integer)
@@ -142,7 +121,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RecordBatchPerformance
     path: src/nORM/Providers/DynamicBatchSizer.cs
-    startLine: 308
+    startLine: 315
   assemblies:
   - nORM
   namespace: nORM.Providers

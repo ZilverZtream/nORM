@@ -227,6 +227,7 @@ M:nORM.Configuration.ExpressionIndexConfiguration.Equals(System.Object):System.B
 M:nORM.Configuration.ExpressionIndexConfiguration.Equals(nORM.Configuration.ExpressionIndexConfiguration):System.Boolean
 M:nORM.Configuration.ExpressionIndexConfiguration.GetHashCode():System.Int32
 M:nORM.Configuration.ExpressionIndexConfiguration.ToString():System.String
+M:nORM.Configuration.IEntityTypeConfiguration{`0}.Configure(nORM.Configuration.EntityTypeBuilder{`0}):System.Void
 M:nORM.Configuration.IdentityOptionsConfiguration.#ctor(System.Int64,System.Int64)
 M:nORM.Configuration.IdentityOptionsConfiguration.<Clone>$():nORM.Configuration.IdentityOptionsConfiguration
 M:nORM.Configuration.IdentityOptionsConfiguration.Deconstruct(System.Int64&,System.Int64&):System.Void
@@ -243,6 +244,8 @@ M:nORM.Configuration.ManyToManyConfiguration.Equals(nORM.Configuration.ManyToMan
 M:nORM.Configuration.ManyToManyConfiguration.GetHashCode():System.Int32
 M:nORM.Configuration.ManyToManyConfiguration.ToString():System.String
 M:nORM.Configuration.ModelBuilder.#ctor()
+M:nORM.Configuration.ModelBuilder.ApplyConfiguration``1(nORM.Configuration.IEntityTypeConfiguration{`0}):nORM.Configuration.ModelBuilder
+M:nORM.Configuration.ModelBuilder.ApplyConfigurationsFromAssembly(System.Reflection.Assembly):nORM.Configuration.ModelBuilder
 M:nORM.Configuration.ModelBuilder.Entity``1():nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.OwnedCollectionNavigation.#ctor(System.Type,System.String,System.String,nORM.Configuration.IEntityTypeConfiguration)
 M:nORM.Configuration.OwnedCollectionNavigation.<Clone>$():nORM.Configuration.OwnedCollectionNavigation
@@ -1666,6 +1669,7 @@ T:nORM.Configuration.EntityTypeBuilder{`0}.ReferenceNavigationBuilder{`1}.Refere
 T:nORM.Configuration.EntityTypeBuilder{`0}.ShadowPropertyBuilder
 T:nORM.Configuration.ExpressionIndexConfiguration
 T:nORM.Configuration.IEntityTypeConfiguration
+T:nORM.Configuration.IEntityTypeConfiguration{`0}
 T:nORM.Configuration.IdentityOptionsConfiguration
 T:nORM.Configuration.IndexAttribute
 T:nORM.Configuration.IndexNullSortOrder

@@ -15,13 +15,18 @@ items:
   - nORM.Core.DbConcurrencyException
   - nORM.Core.DbContext
   - nORM.Core.DbContextTransaction
+  - nORM.Core.DebugView
   - nORM.Core.EntityEntry
   - nORM.Core.EntityEntryGraphNode
+  - nORM.Core.EntityEntryGraphNode`1
+  - nORM.Core.EntityEntry`1
   - nORM.Core.EntityState
   - nORM.Core.IMemoryMonitor
+  - nORM.Core.INormDbContextFactory`1
   - nORM.Core.INormIncludableQueryable`2
   - nORM.Core.INormQueryable`1
   - nORM.Core.Json
+  - nORM.Core.NavigationEntry
   - nORM.Core.Norm
   - nORM.Core.NormAsyncExtensions
   - nORM.Core.NormAsyncPolicy
@@ -40,6 +45,8 @@ items:
   - nORM.Core.NormValidator
   - nORM.Core.OutputParameter
   - nORM.Core.PreparedOperation`1
+  - nORM.Core.PropertyEntry
+  - nORM.Core.PropertyValues
   - nORM.Core.QueryTrackingBehavior
   - nORM.Core.SetPropertyCalls`1
   - nORM.Core.StoredProcedureNonQueryResult
@@ -190,6 +197,13 @@ references:
   name: DbContextTransaction
   nameWithType: DbContextTransaction
   fullName: nORM.Core.DbContextTransaction
+- uid: nORM.Core.DebugView
+  commentId: T:nORM.Core.DebugView
+  parent: nORM.Core
+  href: nORM.Core.DebugView.html
+  name: DebugView
+  nameWithType: DebugView
+  fullName: nORM.Core.DebugView
 - uid: nORM.Core.EntityEntry
   commentId: T:nORM.Core.EntityEntry
   parent: nORM.Core
@@ -199,11 +213,61 @@ references:
   fullName: nORM.Core.EntityEntry
 - uid: nORM.Core.EntityEntryGraphNode
   commentId: T:nORM.Core.EntityEntryGraphNode
-  parent: nORM.Core
   href: nORM.Core.EntityEntryGraphNode.html
   name: EntityEntryGraphNode
   nameWithType: EntityEntryGraphNode
   fullName: nORM.Core.EntityEntryGraphNode
+- uid: nORM.Core.EntityEntryGraphNode`1
+  commentId: T:nORM.Core.EntityEntryGraphNode`1
+  href: nORM.Core.EntityEntryGraphNode-1.html
+  name: EntityEntryGraphNode<TState>
+  nameWithType: EntityEntryGraphNode<TState>
+  fullName: nORM.Core.EntityEntryGraphNode<TState>
+  nameWithType.vb: EntityEntryGraphNode(Of TState)
+  fullName.vb: nORM.Core.EntityEntryGraphNode(Of TState)
+  name.vb: EntityEntryGraphNode(Of TState)
+  spec.csharp:
+  - uid: nORM.Core.EntityEntryGraphNode`1
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode-1.html
+  - name: <
+  - name: TState
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.EntityEntryGraphNode`1
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TState
+  - name: )
+- uid: nORM.Core.EntityEntry`1
+  commentId: T:nORM.Core.EntityEntry`1
+  parent: nORM.Core
+  href: nORM.Core.EntityEntry-1.html
+  name: EntityEntry<TEntity>
+  nameWithType: EntityEntry<TEntity>
+  fullName: nORM.Core.EntityEntry<TEntity>
+  nameWithType.vb: EntityEntry(Of TEntity)
+  fullName.vb: nORM.Core.EntityEntry(Of TEntity)
+  name.vb: EntityEntry(Of TEntity)
+  spec.csharp:
+  - uid: nORM.Core.EntityEntry`1
+    name: EntityEntry
+    href: nORM.Core.EntityEntry-1.html
+  - name: <
+  - name: TEntity
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.EntityEntry`1
+    name: EntityEntry
+    href: nORM.Core.EntityEntry-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
 - uid: nORM.Core.EntityState
   commentId: T:nORM.Core.EntityState
   parent: nORM.Core
@@ -217,12 +281,44 @@ references:
   name: IMemoryMonitor
   nameWithType: IMemoryMonitor
   fullName: nORM.Core.IMemoryMonitor
+- uid: nORM.Core.INormDbContextFactory`1
+  commentId: T:nORM.Core.INormDbContextFactory`1
+  href: nORM.Core.INormDbContextFactory-1.html
+  name: INormDbContextFactory<TContext>
+  nameWithType: INormDbContextFactory<TContext>
+  fullName: nORM.Core.INormDbContextFactory<TContext>
+  nameWithType.vb: INormDbContextFactory(Of TContext)
+  fullName.vb: nORM.Core.INormDbContextFactory(Of TContext)
+  name.vb: INormDbContextFactory(Of TContext)
+  spec.csharp:
+  - uid: nORM.Core.INormDbContextFactory`1
+    name: INormDbContextFactory
+    href: nORM.Core.INormDbContextFactory-1.html
+  - name: <
+  - name: TContext
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormDbContextFactory`1
+    name: INormDbContextFactory
+    href: nORM.Core.INormDbContextFactory-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TContext
+  - name: )
 - uid: nORM.Core.Json
   commentId: T:nORM.Core.Json
   href: nORM.Core.Json.html
   name: Json
   nameWithType: Json
   fullName: nORM.Core.Json
+- uid: nORM.Core.NavigationEntry
+  commentId: T:nORM.Core.NavigationEntry
+  parent: nORM.Core
+  href: nORM.Core.NavigationEntry.html
+  name: NavigationEntry
+  nameWithType: NavigationEntry
+  fullName: nORM.Core.NavigationEntry
 - uid: nORM.Core.Norm
   commentId: T:nORM.Core.Norm
   href: nORM.Core.Norm.html
@@ -379,6 +475,20 @@ references:
   name: NormValidator
   nameWithType: NormValidator
   fullName: nORM.Core.NormValidator
+- uid: nORM.Core.PropertyEntry
+  commentId: T:nORM.Core.PropertyEntry
+  parent: nORM.Core
+  href: nORM.Core.PropertyEntry.html
+  name: PropertyEntry
+  nameWithType: PropertyEntry
+  fullName: nORM.Core.PropertyEntry
+- uid: nORM.Core.PropertyValues
+  commentId: T:nORM.Core.PropertyValues
+  parent: nORM.Core
+  href: nORM.Core.PropertyValues.html
+  name: PropertyValues
+  nameWithType: PropertyValues
+  fullName: nORM.Core.PropertyValues
 - uid: nORM.Core.QueryTrackingBehavior
   commentId: T:nORM.Core.QueryTrackingBehavior
   parent: nORM.Core

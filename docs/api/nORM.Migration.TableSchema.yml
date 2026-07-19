@@ -9,7 +9,9 @@ items:
   - nORM.Migration.TableSchema.Columns
   - nORM.Migration.TableSchema.ExpressionIndexes
   - nORM.Migration.TableSchema.ForeignKeys
+  - nORM.Migration.TableSchema.IsTemporal
   - nORM.Migration.TableSchema.Name
+  - nORM.Migration.TableSchema.TenantColumnName
   langs:
   - csharp
   - vb
@@ -79,6 +81,86 @@ items:
       type: System.String
     content.vb: Public Property Name As String
   overload: nORM.Migration.TableSchema.Name*
+- uid: nORM.Migration.TableSchema.IsTemporal
+  commentId: P:nORM.Migration.TableSchema.IsTemporal
+  id: IsTemporal
+  parent: nORM.Migration.TableSchema
+  langs:
+  - csharp
+  - vb
+  name: IsTemporal
+  nameWithType: TableSchema.IsTemporal
+  fullName: nORM.Migration.TableSchema.IsTemporal
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsTemporal
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 43
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    True when the table is versioned by nORM-managed (trigger-emulated) temporal storage.
+
+    Populated by <xref href="nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref> when the context has
+
+    temporal versioning enabled in an emulated storage mode. Migration generators mirror
+
+    schema changes onto the table's <code>&lt;Name&gt;_History</code> companion in lock-step and
+
+    re-emit the versioning triggers from the new schema. Provider-native temporal storage
+
+    (e.g. SQL Server system-versioning) propagates schema changes itself and stays unflagged.
+  example: []
+  syntax:
+    content: public bool IsTemporal { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsTemporal As Boolean
+  overload: nORM.Migration.TableSchema.IsTemporal*
+- uid: nORM.Migration.TableSchema.TenantColumnName
+  commentId: P:nORM.Migration.TableSchema.TenantColumnName
+  id: TenantColumnName
+  parent: nORM.Migration.TableSchema
+  langs:
+  - csharp
+  - vb
+  name: TenantColumnName
+  nameWithType: TableSchema.TenantColumnName
+  fullName: nORM.Migration.TableSchema.TenantColumnName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TenantColumnName
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 50
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    Name of the tenant-discriminator column when the entity is tenant-scoped; null otherwise.
+
+    Populated by <xref href="nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>. Temporal migration DDL
+
+    needs it because the regenerated versioning triggers scope their history-close statements
+
+    to the same tenant.
+  example: []
+  syntax:
+    content: public string? TenantColumnName { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property TenantColumnName As String
+  overload: nORM.Migration.TableSchema.TenantColumnName*
 - uid: nORM.Migration.TableSchema.Columns
   commentId: P:nORM.Migration.TableSchema.Columns
   id: Columns
@@ -97,7 +179,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 36
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -128,7 +210,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeys
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 38
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -159,7 +241,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 40
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -190,7 +272,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 42
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -1184,6 +1266,53 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
+- uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  commentId: M:nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_nORM_Core_DbContext_
+  name: Build(DbContext)
+  nameWithType: SchemaSnapshotBuilder.Build(DbContext)
+  fullName: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+  spec.csharp:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+    name: Build
+    href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_nORM_Core_DbContext_
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Migration.SchemaSnapshotBuilder.Build(nORM.Core.DbContext)
+    name: Build
+    href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_nORM_Core_DbContext_
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Migration.TableSchema.IsTemporal*
+  commentId: Overload:nORM.Migration.TableSchema.IsTemporal
+  href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_IsTemporal
+  name: IsTemporal
+  nameWithType: TableSchema.IsTemporal
+  fullName: nORM.Migration.TableSchema.IsTemporal
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Migration.TableSchema.TenantColumnName*
+  commentId: Overload:nORM.Migration.TableSchema.TenantColumnName
+  href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_TenantColumnName
+  name: TenantColumnName
+  nameWithType: TableSchema.TenantColumnName
+  fullName: nORM.Migration.TableSchema.TenantColumnName
 - uid: nORM.Migration.TableSchema.Columns*
   commentId: Overload:nORM.Migration.TableSchema.Columns
   href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_Columns

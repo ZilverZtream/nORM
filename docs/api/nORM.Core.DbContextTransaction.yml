@@ -10,6 +10,7 @@ items:
   - nORM.Core.DbContextTransaction.CreateSavepointAsync(System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContextTransaction.Dispose
   - nORM.Core.DbContextTransaction.DisposeAsync
+  - nORM.Core.DbContextTransaction.ReleaseSavepointAsync(System.String,System.Threading.CancellationToken)
   - nORM.Core.DbContextTransaction.Rollback
   - nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken)
   - nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken)
@@ -79,7 +80,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Transaction
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 31
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -113,7 +114,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Commit
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 47
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -150,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommitAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 64
+    startLine: 68
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -193,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Rollback
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 92
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -228,7 +229,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 108
+    startLine: 118
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -269,7 +270,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateSavepointAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 134
+    startLine: 147
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -313,7 +314,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackToSavepointAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 147
+    startLine: 160
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -339,6 +340,52 @@ items:
   nameWithType.vb: DbContextTransaction.RollbackToSavepointAsync(String, CancellationToken)
   fullName.vb: nORM.Core.DbContextTransaction.RollbackToSavepointAsync(String, System.Threading.CancellationToken)
   name.vb: RollbackToSavepointAsync(String, CancellationToken)
+- uid: nORM.Core.DbContextTransaction.ReleaseSavepointAsync(System.String,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbContextTransaction.ReleaseSavepointAsync(System.String,System.Threading.CancellationToken)
+  id: ReleaseSavepointAsync(System.String,System.Threading.CancellationToken)
+  parent: nORM.Core.DbContextTransaction
+  langs:
+  - csharp
+  - vb
+  name: ReleaseSavepointAsync(string, CancellationToken)
+  nameWithType: DbContextTransaction.ReleaseSavepointAsync(string, CancellationToken)
+  fullName: nORM.Core.DbContextTransaction.ReleaseSavepointAsync(string, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbContextTransaction.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReleaseSavepointAsync
+    path: src/nORM/Core/DbContextTransaction.cs
+    startLine: 174
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Releases a previously created savepoint inside this nORM-managed transaction without exposing the
+
+    underlying provider transaction handle. The work done since the savepoint is KEPT — the savepoint
+
+    simply stops being a rollback target.
+  example: []
+  syntax:
+    content: public Task ReleaseSavepointAsync(string name, CancellationToken ct = default)
+    parameters:
+    - id: name
+      type: System.String
+      description: Name of the savepoint to release.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the asynchronous operation.
+    return:
+      type: System.Threading.Tasks.Task
+      description: A task that completes when the savepoint has been released.
+    content.vb: Public Function ReleaseSavepointAsync(name As String, ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.DbContextTransaction.ReleaseSavepointAsync*
+  nameWithType.vb: DbContextTransaction.ReleaseSavepointAsync(String, CancellationToken)
+  fullName.vb: nORM.Core.DbContextTransaction.ReleaseSavepointAsync(String, System.Threading.CancellationToken)
+  name.vb: ReleaseSavepointAsync(String, CancellationToken)
 - uid: nORM.Core.DbContextTransaction.Dispose
   commentId: M:nORM.Core.DbContextTransaction.Dispose
   id: Dispose
@@ -357,7 +404,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 157
+    startLine: 184
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -390,7 +437,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 168
+    startLine: 195
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1549,6 +1596,12 @@ references:
   name: RollbackToSavepointAsync
   nameWithType: DbContextTransaction.RollbackToSavepointAsync
   fullName: nORM.Core.DbContextTransaction.RollbackToSavepointAsync
+- uid: nORM.Core.DbContextTransaction.ReleaseSavepointAsync*
+  commentId: Overload:nORM.Core.DbContextTransaction.ReleaseSavepointAsync
+  href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_ReleaseSavepointAsync_System_String_System_Threading_CancellationToken_
+  name: ReleaseSavepointAsync
+  nameWithType: DbContextTransaction.ReleaseSavepointAsync
+  fullName: nORM.Core.DbContextTransaction.ReleaseSavepointAsync
 - uid: nORM.Core.DbContextTransaction.Dispose*
   commentId: Overload:nORM.Core.DbContextTransaction.Dispose
   href: nORM.Core.DbContextTransaction.html#nORM_Core_DbContextTransaction_Dispose

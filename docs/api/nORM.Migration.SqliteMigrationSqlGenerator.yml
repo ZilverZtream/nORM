@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/SqliteMigrationSqlGenerator.cs
+      path: src/nORM/Migration/SqliteMigrationSqlGenerator.Temporal.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqliteMigrationSqlGenerator
-    path: src/nORM/Migration/SqliteMigrationSqlGenerator.cs
-    startLine: 19
+    path: src/nORM/Migration/SqliteMigrationSqlGenerator.Temporal.cs
+    startLine: 9
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -76,7 +76,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/SqliteMigrationSqlGenerator.cs
-    startLine: 343
+    startLine: 200
   assemblies:
   - nORM
   namespace: nORM.Migration

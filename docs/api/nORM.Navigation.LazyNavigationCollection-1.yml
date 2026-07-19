@@ -33,7 +33,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LazyNavigationCollection
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 637
+    startLine: 766
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -106,7 +106,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 652
+    startLine: 781
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -151,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetEnumerator
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 678
+    startLine: 807
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -185,7 +185,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetAsyncEnumerator
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 690
+    startLine: 819
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -224,7 +224,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Add
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 703
+    startLine: 832
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -259,7 +259,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 708
+    startLine: 837
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -291,7 +291,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Contains
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 713
+    startLine: 842
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -328,7 +328,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CopyTo
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 718
+    startLine: 847
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -366,7 +366,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Remove
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 723
+    startLine: 852
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -403,7 +403,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Count
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 728
+    startLine: 857
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -438,7 +438,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsReadOnly
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 735
+    startLine: 864
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -478,7 +478,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexOf
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 740
+    startLine: 869
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -515,7 +515,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Insert
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 745
+    startLine: 874
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -553,7 +553,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveAt
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 750
+    startLine: 879
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -589,7 +589,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: this[]
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 756
+    startLine: 885
   assemblies:
   - nORM
   namespace: nORM.Navigation

@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/PostgresMigrationSqlGenerator.cs
+      path: src/nORM/Migration/PostgresMigrationSqlGenerator.Temporal.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: PostgresMigrationSqlGenerator
-    path: src/nORM/Migration/PostgresMigrationSqlGenerator.cs
-    startLine: 16
+    path: src/nORM/Migration/PostgresMigrationSqlGenerator.Temporal.cs
+    startLine: 9
   assemblies:
   - nORM
   namespace: nORM.Migration

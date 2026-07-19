@@ -6,12 +6,15 @@ items:
   parent: nORM.Mapping
   children:
   - nORM.Mapping.TableMapping.#ctor(System.Type,nORM.Providers.DatabaseProvider,nORM.Core.DbContext,nORM.Configuration.IEntityTypeConfiguration)
+  - nORM.Mapping.TableMapping.ClientManagedConcurrencyToken
   - nORM.Mapping.TableMapping.Columns
   - nORM.Mapping.TableMapping.ColumnsByName
   - nORM.Mapping.TableMapping.ConverterFingerprint
   - nORM.Mapping.TableMapping.DiscriminatorColumn
+  - nORM.Mapping.TableMapping.DiscriminatorValue
   - nORM.Mapping.TableMapping.EscTable
   - nORM.Mapping.TableMapping.InsertColumns
+  - nORM.Mapping.TableMapping.IsKeyless
   - nORM.Mapping.TableMapping.IsReadOnly
   - nORM.Mapping.TableMapping.KeyColumns
   - nORM.Mapping.TableMapping.ManyToManyJoins
@@ -40,25 +43,15 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableMapping
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 21
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Mapping
   summary: Describes how a CLR type maps to a database table including column and relationship metadata.
   example: []
   syntax:
-    content: >-
-      [RequiresDynamicCode("TableMapping reflects over entity properties; not NativeAOT-compatible.")]
-
-      [RequiresUnreferencedCode("TableMapping reflects over entity properties; trimming may remove the required members.")]
-
-      public sealed class TableMapping
-    content.vb: >-
-      <RequiresDynamicCode("TableMapping reflects over entity properties; not NativeAOT-compatible.")>
-
-      <RequiresUnreferencedCode("TableMapping reflects over entity properties; trimming may remove the required members.")>
-
-      Public NotInheritable Class TableMapping
+    content: public sealed class TableMapping
+    content.vb: Public NotInheritable Class TableMapping
   inheritance:
   - System.Object
   inheritedMembers:
@@ -73,17 +66,6 @@ items:
   - nORM.Mapping.TableMapping.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.TableMapping,{TProperty}}})
   - nORM.Mapping.TableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.TableMapping,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Mapping.TableMapping.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Mapping.TableMapping,{TProperty}}},System.Threading.CancellationToken)
-  attributes:
-  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
-    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
-    arguments:
-    - type: System.String
-      value: TableMapping reflects over entity properties; not NativeAOT-compatible.
-  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
-    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
-    arguments:
-    - type: System.String
-      value: TableMapping reflects over entity properties; trimming may remove the required members.
 - uid: nORM.Mapping.TableMapping.Type
   commentId: P:nORM.Mapping.TableMapping.Type
   id: Type
@@ -102,7 +84,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Type
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 26
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -133,7 +115,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscTable
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 29
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -164,7 +146,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 32
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -195,7 +177,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnsByName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 35
+    startLine: 37
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -226,7 +208,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: KeyColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 38
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -257,7 +239,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsReadOnly
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 41
+    startLine: 43
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -270,6 +252,37 @@ items:
       type: System.Boolean
     content.vb: Public ReadOnly Property IsReadOnly As Boolean
   overload: nORM.Mapping.TableMapping.IsReadOnly*
+- uid: nORM.Mapping.TableMapping.IsKeyless
+  commentId: P:nORM.Mapping.TableMapping.IsKeyless
+  id: IsKeyless
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: IsKeyless
+  nameWithType: TableMapping.IsKeyless
+  fullName: nORM.Mapping.TableMapping.IsKeyless
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsKeyless
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: 'Gets whether this mapping is keyless (a query type): never tracked and not savable.'
+  example: []
+  syntax:
+    content: public bool IsKeyless { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property IsKeyless As Boolean
+  overload: nORM.Mapping.TableMapping.IsKeyless*
 - uid: nORM.Mapping.TableMapping.TimestampColumn
   commentId: P:nORM.Mapping.TableMapping.TimestampColumn
   id: TimestampColumn
@@ -288,7 +301,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimestampColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 44
+    startLine: 49
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -301,6 +314,40 @@ items:
       type: nORM.Mapping.Column
     content.vb: Public ReadOnly Property TimestampColumn As Column
   overload: nORM.Mapping.TableMapping.TimestampColumn*
+- uid: nORM.Mapping.TableMapping.ClientManagedConcurrencyToken
+  commentId: P:nORM.Mapping.TableMapping.ClientManagedConcurrencyToken
+  id: ClientManagedConcurrencyToken
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: ClientManagedConcurrencyToken
+  nameWithType: TableMapping.ClientManagedConcurrencyToken
+  fullName: nORM.Mapping.TableMapping.ClientManagedConcurrencyToken
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ClientManagedConcurrencyToken
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 55
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: >-
+    True when nORM writes a fresh <xref href="nORM.Mapping.TableMapping.TimestampColumn" data-throw-if-not-resolved="false"></xref> value on each UPDATE (providers
+
+    without a native rowversion). When true the token column is part of <xref href="nORM.Mapping.TableMapping.UpdateColumns" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public bool ClientManagedConcurrencyToken { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property ClientManagedConcurrencyToken As Boolean
+  overload: nORM.Mapping.TableMapping.ClientManagedConcurrencyToken*
 - uid: nORM.Mapping.TableMapping.TenantColumn
   commentId: P:nORM.Mapping.TableMapping.TenantColumn
   id: TenantColumn
@@ -319,7 +366,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TenantColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 47
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -350,7 +397,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InsertColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 50
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -381,7 +428,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 53
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -412,7 +459,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 56
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -443,7 +490,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relations
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 59
+    startLine: 70
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -474,7 +521,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 62
+    startLine: 73
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -505,7 +552,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DiscriminatorColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 65
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -518,6 +565,40 @@ items:
       type: nORM.Mapping.Column
     content.vb: Public Property DiscriminatorColumn As Column
   overload: nORM.Mapping.TableMapping.DiscriminatorColumn*
+- uid: nORM.Mapping.TableMapping.DiscriminatorValue
+  commentId: P:nORM.Mapping.TableMapping.DiscriminatorValue
+  id: DiscriminatorValue
+  parent: nORM.Mapping.TableMapping
+  langs:
+  - csharp
+  - vb
+  name: DiscriminatorValue
+  nameWithType: TableMapping.DiscriminatorValue
+  fullName: nORM.Mapping.TableMapping.DiscriminatorValue
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Mapping/TableMapping.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DiscriminatorValue
+    path: src/nORM/Mapping/TableMapping.cs
+    startLine: 82
+  assemblies:
+  - nORM
+  namespace: nORM.Mapping
+  summary: >-
+    For a TPH derived type, the fixed discriminator value that identifies this subtype
+
+    (from <xref href="nORM.Mapping.DiscriminatorValueAttribute" data-throw-if-not-resolved="false"></xref>); <code>null</code> for base or non-TPH types.
+  example: []
+  syntax:
+    content: public object? DiscriminatorValue { get; }
+    parameters: []
+    return:
+      type: System.Object
+    content.vb: Public Property DiscriminatorValue As Object
+  overload: nORM.Mapping.TableMapping.DiscriminatorValue*
 - uid: nORM.Mapping.TableMapping.TphMappings
   commentId: P:nORM.Mapping.TableMapping.TphMappings
   id: TphMappings
@@ -536,7 +617,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TphMappings
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 68
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -567,7 +648,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ConverterFingerprint
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 71
+    startLine: 99
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -598,7 +679,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowFingerprint
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 74
+    startLine: 102
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -629,7 +710,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollections
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 77
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -660,7 +741,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyJoins
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 80
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -691,14 +772,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 101
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Mapping
   summary: Creates a new <xref href="nORM.Mapping.TableMapping" data-throw-if-not-resolved="false"></xref> for the specified type and provider.
   example: []
   syntax:
-    content: public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
+    content: >-
+      [RequiresDynamicCode("TableMapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("TableMapping construction reflects over entity properties; trimming may remove the required members.")]
+
+      public TableMapping(Type t, DatabaseProvider p, DbContext ctx, IEntityTypeConfiguration? fluentConfig)
     parameters:
     - id: t
       type: System.Type
@@ -712,8 +798,24 @@ items:
     - id: fluentConfig
       type: nORM.Configuration.IEntityTypeConfiguration
       description: Optional configuration overrides.
-    content.vb: Public Sub New(t As Type, p As DatabaseProvider, ctx As DbContext, fluentConfig As IEntityTypeConfiguration)
+    content.vb: >-
+      <RequiresDynamicCode("TableMapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("TableMapping construction reflects over entity properties; trimming may remove the required members.")>
+
+      Public Sub New(t As Type, p As DatabaseProvider, ctx As DbContext, fluentConfig As IEntityTypeConfiguration)
   overload: nORM.Mapping.TableMapping.#ctor*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: TableMapping construction builds column accessor delegates via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: TableMapping construction reflects over entity properties; trimming may remove the required members.
   nameWithType.vb: TableMapping.New(Type, DatabaseProvider, DbContext, IEntityTypeConfiguration)
   fullName.vb: nORM.Mapping.TableMapping.New(System.Type, nORM.Providers.DatabaseProvider, nORM.Core.DbContext, nORM.Configuration.IEntityTypeConfiguration)
   name.vb: New(Type, DatabaseProvider, DbContext, IEntityTypeConfiguration)
@@ -735,7 +837,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetPrimaryKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 430
+    startLine: 636
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -1901,6 +2003,12 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: nORM.Mapping.TableMapping.IsKeyless*
+  commentId: Overload:nORM.Mapping.TableMapping.IsKeyless
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_IsKeyless
+  name: IsKeyless
+  nameWithType: TableMapping.IsKeyless
+  fullName: nORM.Mapping.TableMapping.IsKeyless
 - uid: nORM.Mapping.TableMapping.TimestampColumn*
   commentId: Overload:nORM.Mapping.TableMapping.TimestampColumn
   href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TimestampColumn
@@ -1914,6 +2022,24 @@ references:
   name: Column
   nameWithType: Column
   fullName: nORM.Mapping.Column
+- uid: nORM.Mapping.TableMapping.TimestampColumn
+  commentId: P:nORM.Mapping.TableMapping.TimestampColumn
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TimestampColumn
+  name: TimestampColumn
+  nameWithType: TableMapping.TimestampColumn
+  fullName: nORM.Mapping.TableMapping.TimestampColumn
+- uid: nORM.Mapping.TableMapping.UpdateColumns
+  commentId: P:nORM.Mapping.TableMapping.UpdateColumns
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_UpdateColumns
+  name: UpdateColumns
+  nameWithType: TableMapping.UpdateColumns
+  fullName: nORM.Mapping.TableMapping.UpdateColumns
+- uid: nORM.Mapping.TableMapping.ClientManagedConcurrencyToken*
+  commentId: Overload:nORM.Mapping.TableMapping.ClientManagedConcurrencyToken
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_ClientManagedConcurrencyToken
+  name: ClientManagedConcurrencyToken
+  nameWithType: TableMapping.ClientManagedConcurrencyToken
+  fullName: nORM.Mapping.TableMapping.ClientManagedConcurrencyToken
 - uid: nORM.Mapping.TableMapping.TenantColumn*
   commentId: Overload:nORM.Mapping.TableMapping.TenantColumn
   href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TenantColumn
@@ -2038,6 +2164,18 @@ references:
   name: DiscriminatorColumn
   nameWithType: TableMapping.DiscriminatorColumn
   fullName: nORM.Mapping.TableMapping.DiscriminatorColumn
+- uid: nORM.Mapping.DiscriminatorValueAttribute
+  commentId: T:nORM.Mapping.DiscriminatorValueAttribute
+  href: nORM.Mapping.DiscriminatorValueAttribute.html
+  name: DiscriminatorValueAttribute
+  nameWithType: DiscriminatorValueAttribute
+  fullName: nORM.Mapping.DiscriminatorValueAttribute
+- uid: nORM.Mapping.TableMapping.DiscriminatorValue*
+  commentId: Overload:nORM.Mapping.TableMapping.DiscriminatorValue
+  href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_DiscriminatorValue
+  name: DiscriminatorValue
+  nameWithType: TableMapping.DiscriminatorValue
+  fullName: nORM.Mapping.TableMapping.DiscriminatorValue
 - uid: nORM.Mapping.TableMapping.TphMappings*
   commentId: Overload:nORM.Mapping.TableMapping.TphMappings
   href: nORM.Mapping.TableMapping.html#nORM_Mapping_TableMapping_TphMappings

@@ -19,12 +19,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Core/NormValidator.cs
+      path: src/nORM/Core/NormValidator.RawSql.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormValidator
-    path: src/nORM/Core/NormValidator.cs
-    startLine: 22
+    path: src/nORM/Core/NormValidator.RawSql.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -46,6 +46,89 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+- uid: nORM.Core.NormValidator.ValidateConnectionString(System.String,System.String)
+  commentId: M:nORM.Core.NormValidator.ValidateConnectionString(System.String,System.String)
+  id: ValidateConnectionString(System.String,System.String)
+  parent: nORM.Core.NormValidator
+  langs:
+  - csharp
+  - vb
+  name: ValidateConnectionString(string, string)
+  nameWithType: NormValidator.ValidateConnectionString(string, string)
+  fullName: nORM.Core.NormValidator.ValidateConnectionString(string, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormValidator.ConnectionStrings.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValidateConnectionString
+    path: src/nORM/Core/NormValidator.ConnectionStrings.cs
+    startLine: 33
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Validates the supplied connection string for the specified provider, throwing if it is malformed.
+  example: []
+  syntax:
+    content: public static void ValidateConnectionString(string connectionString, string provider)
+    parameters:
+    - id: connectionString
+      type: System.String
+      description: The connection string to validate.
+    - id: provider
+      type: System.String
+      description: Normalized provider name (e.g., "sqlserver").
+    content.vb: Public Shared Sub ValidateConnectionString(connectionString As String, provider As String)
+  overload: nORM.Core.NormValidator.ValidateConnectionString*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the connection string fails validation.
+  nameWithType.vb: NormValidator.ValidateConnectionString(String, String)
+  fullName.vb: nORM.Core.NormValidator.ValidateConnectionString(String, String)
+  name.vb: ValidateConnectionString(String, String)
+- uid: nORM.Core.NormValidator.ValidateBulkOperation``1(System.Collections.Generic.IEnumerable{``0},System.String)
+  commentId: M:nORM.Core.NormValidator.ValidateBulkOperation``1(System.Collections.Generic.IEnumerable{``0},System.String)
+  id: ValidateBulkOperation``1(System.Collections.Generic.IEnumerable{``0},System.String)
+  parent: nORM.Core.NormValidator
+  langs:
+  - csharp
+  - vb
+  name: ValidateBulkOperation<T>(IEnumerable<T>, string)
+  nameWithType: NormValidator.ValidateBulkOperation<T>(IEnumerable<T>, string)
+  fullName: nORM.Core.NormValidator.ValidateBulkOperation<T>(System.Collections.Generic.IEnumerable<T>, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormValidator.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ValidateBulkOperation
+    path: src/nORM/Core/NormValidator.cs
+    startLine: 26
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Validates that a bulk operation contains a reasonable number of entities and none are null.
+  example: []
+  syntax:
+    content: 'public static void ValidateBulkOperation<T>(IEnumerable<T> entities, string operation) where T : class'
+    parameters:
+    - id: entities
+      type: System.Collections.Generic.IEnumerable{{T}}
+      description: Collection of entities to validate.
+    - id: operation
+      type: System.String
+      description: Name of the bulk operation (for error messages).
+    typeParameters:
+    - id: T
+      description: Type of the entities involved in the operation.
+    content.vb: Public Shared Sub ValidateBulkOperation(Of T As Class)(entities As IEnumerable(Of T), operation As String)
+  overload: nORM.Core.NormValidator.ValidateBulkOperation*
+  nameWithType.vb: NormValidator.ValidateBulkOperation(Of T)(IEnumerable(Of T), String)
+  fullName.vb: nORM.Core.NormValidator.ValidateBulkOperation(Of T)(System.Collections.Generic.IEnumerable(Of T), String)
+  name.vb: ValidateBulkOperation(Of T)(IEnumerable(Of T), String)
 - uid: nORM.Core.NormValidator.ValidateEntity``1(``0,System.String)
   commentId: M:nORM.Core.NormValidator.ValidateEntity``1(``0,System.String)
   id: ValidateEntity``1(``0,System.String)
@@ -59,12 +142,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Core/NormValidator.cs
+      path: src/nORM/Core/NormValidator.EntityGraph.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateEntity
-    path: src/nORM/Core/NormValidator.cs
-    startLine: 80
+    path: src/nORM/Core/NormValidator.EntityGraph.cs
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -90,47 +173,6 @@ items:
   nameWithType.vb: NormValidator.ValidateEntity(Of T)(T, String)
   fullName.vb: nORM.Core.NormValidator.ValidateEntity(Of T)(T, String)
   name.vb: ValidateEntity(Of T)(T, String)
-- uid: nORM.Core.NormValidator.ValidateBulkOperation``1(System.Collections.Generic.IEnumerable{``0},System.String)
-  commentId: M:nORM.Core.NormValidator.ValidateBulkOperation``1(System.Collections.Generic.IEnumerable{``0},System.String)
-  id: ValidateBulkOperation``1(System.Collections.Generic.IEnumerable{``0},System.String)
-  parent: nORM.Core.NormValidator
-  langs:
-  - csharp
-  - vb
-  name: ValidateBulkOperation<T>(IEnumerable<T>, string)
-  nameWithType: NormValidator.ValidateBulkOperation<T>(IEnumerable<T>, string)
-  fullName: nORM.Core.NormValidator.ValidateBulkOperation<T>(System.Collections.Generic.IEnumerable<T>, string)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/NormValidator.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: ValidateBulkOperation
-    path: src/nORM/Core/NormValidator.cs
-    startLine: 225
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  summary: Validates that a bulk operation contains a reasonable number of entities and none are null.
-  example: []
-  syntax:
-    content: 'public static void ValidateBulkOperation<T>(IEnumerable<T> entities, string operation) where T : class'
-    parameters:
-    - id: entities
-      type: System.Collections.Generic.IEnumerable{{T}}
-      description: Collection of entities to validate.
-    - id: operation
-      type: System.String
-      description: Name of the bulk operation (for error messages).
-    typeParameters:
-    - id: T
-      description: Type of the entities involved in the operation.
-    content.vb: Public Shared Sub ValidateBulkOperation(Of T As Class)(entities As IEnumerable(Of T), operation As String)
-  overload: nORM.Core.NormValidator.ValidateBulkOperation*
-  nameWithType.vb: NormValidator.ValidateBulkOperation(Of T)(IEnumerable(Of T), String)
-  fullName.vb: nORM.Core.NormValidator.ValidateBulkOperation(Of T)(System.Collections.Generic.IEnumerable(Of T), String)
-  name.vb: ValidateBulkOperation(Of T)(IEnumerable(Of T), String)
 - uid: nORM.Core.NormValidator.ValidateRawSql(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})
   commentId: M:nORM.Core.NormValidator.ValidateRawSql(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})
   id: ValidateRawSql(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})
@@ -144,12 +186,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Core/NormValidator.cs
+      path: src/nORM/Core/NormValidator.RawSql.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateRawSql
-    path: src/nORM/Core/NormValidator.cs
-    startLine: 251
+    path: src/nORM/Core/NormValidator.RawSql.cs
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -189,12 +231,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Core/NormValidator.cs
+      path: src/nORM/Core/NormValidator.RawSql.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValidateLikeEscapeChar
-    path: src/nORM/Core/NormValidator.cs
-    startLine: 1041
+    path: src/nORM/Core/NormValidator.RawSql.cs
+    startLine: 834
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -218,48 +260,6 @@ items:
   nameWithType.vb: NormValidator.ValidateLikeEscapeChar(Char)
   fullName.vb: nORM.Core.NormValidator.ValidateLikeEscapeChar(Char)
   name.vb: ValidateLikeEscapeChar(Char)
-- uid: nORM.Core.NormValidator.ValidateConnectionString(System.String,System.String)
-  commentId: M:nORM.Core.NormValidator.ValidateConnectionString(System.String,System.String)
-  id: ValidateConnectionString(System.String,System.String)
-  parent: nORM.Core.NormValidator
-  langs:
-  - csharp
-  - vb
-  name: ValidateConnectionString(string, string)
-  nameWithType: NormValidator.ValidateConnectionString(string, string)
-  fullName: nORM.Core.NormValidator.ValidateConnectionString(string, string)
-  type: Method
-  source:
-    remote:
-      path: src/nORM/Core/NormValidator.cs
-      branch: main
-      repo: https://github.com/ZilverZtream/nORM.git
-    id: ValidateConnectionString
-    path: src/nORM/Core/NormValidator.cs
-    startLine: 1064
-  assemblies:
-  - nORM
-  namespace: nORM.Core
-  summary: Validates the supplied connection string for the specified provider, throwing if it is malformed.
-  example: []
-  syntax:
-    content: public static void ValidateConnectionString(string connectionString, string provider)
-    parameters:
-    - id: connectionString
-      type: System.String
-      description: The connection string to validate.
-    - id: provider
-      type: System.String
-      description: Normalized provider name (e.g., "sqlserver").
-    content.vb: Public Shared Sub ValidateConnectionString(connectionString As String, provider As String)
-  overload: nORM.Core.NormValidator.ValidateConnectionString*
-  exceptions:
-  - type: System.ArgumentException
-    commentId: T:System.ArgumentException
-    description: Thrown when the connection string fails validation.
-  nameWithType.vb: NormValidator.ValidateConnectionString(String, String)
-  fullName.vb: nORM.Core.NormValidator.ValidateConnectionString(String, String)
-  name.vb: ValidateConnectionString(String, String)
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core
@@ -520,18 +520,19 @@ references:
   name: System
   nameWithType: System
   fullName: System
-- uid: nORM.Core.NormValidator.ValidateEntity*
-  commentId: Overload:nORM.Core.NormValidator.ValidateEntity
-  href: nORM.Core.NormValidator.html#nORM_Core_NormValidator_ValidateEntity__1___0_System_String_
-  name: ValidateEntity
-  nameWithType: NormValidator.ValidateEntity
-  fullName: nORM.Core.NormValidator.ValidateEntity
-- uid: '{T}'
-  commentId: '!:T'
-  definition: T
-  name: T
-  nameWithType: T
-  fullName: T
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
+  name: ArgumentException
+  nameWithType: ArgumentException
+  fullName: System.ArgumentException
+- uid: nORM.Core.NormValidator.ValidateConnectionString*
+  commentId: Overload:nORM.Core.NormValidator.ValidateConnectionString
+  href: nORM.Core.NormValidator.html#nORM_Core_NormValidator_ValidateConnectionString_System_String_System_String_
+  name: ValidateConnectionString
+  nameWithType: NormValidator.ValidateConnectionString
+  fullName: nORM.Core.NormValidator.ValidateConnectionString
 - uid: System.String
   commentId: T:System.String
   parent: System
@@ -543,10 +544,6 @@ references:
   nameWithType.vb: String
   fullName.vb: String
   name.vb: String
-- uid: T
-  name: T
-  nameWithType: T
-  fullName: T
 - uid: nORM.Core.NormValidator.ValidateBulkOperation*
   commentId: Overload:nORM.Core.NormValidator.ValidateBulkOperation
   href: nORM.Core.NormValidator.html#nORM_Core_NormValidator_ValidateBulkOperation__1_System_Collections_Generic_IEnumerable___0__System_String_
@@ -647,13 +644,22 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
-- uid: System.ArgumentException
-  commentId: T:System.ArgumentException
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
-  name: ArgumentException
-  nameWithType: ArgumentException
-  fullName: System.ArgumentException
+- uid: nORM.Core.NormValidator.ValidateEntity*
+  commentId: Overload:nORM.Core.NormValidator.ValidateEntity
+  href: nORM.Core.NormValidator.html#nORM_Core_NormValidator_ValidateEntity__1___0_System_String_
+  name: ValidateEntity
+  nameWithType: NormValidator.ValidateEntity
+  fullName: nORM.Core.NormValidator.ValidateEntity
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
 - uid: nORM.Core.NormValidator.ValidateRawSql*
   commentId: Overload:nORM.Core.NormValidator.ValidateRawSql
   href: nORM.Core.NormValidator.html#nORM_Core_NormValidator_ValidateRawSql_System_String_System_Collections_Generic_IReadOnlyDictionary_System_String_System_Object__
@@ -758,9 +764,3 @@ references:
   nameWithType.vb: Char
   fullName.vb: Char
   name.vb: Char
-- uid: nORM.Core.NormValidator.ValidateConnectionString*
-  commentId: Overload:nORM.Core.NormValidator.ValidateConnectionString
-  href: nORM.Core.NormValidator.html#nORM_Core_NormValidator_ValidateConnectionString_System_String_System_String_
-  name: ValidateConnectionString
-  nameWithType: NormValidator.ValidateConnectionString
-  fullName: nORM.Core.NormValidator.ValidateConnectionString

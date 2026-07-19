@@ -6,6 +6,7 @@ items:
   parent: nORM.Core
   children:
   - nORM.Core.Norm.CompileQuery``3(System.Linq.Expressions.Expression{System.Func{``0,``1,System.Linq.IQueryable{``2}}})
+  - nORM.Core.Norm.CompileTerminalQuery``3(System.Linq.Expressions.Expression{System.Func{``0,``1,``2}})
   langs:
   - csharp
   - vb
@@ -64,7 +65,12 @@ items:
   summary: Compiles the supplied query expression into a reusable delegate that executes the query asynchronously.
   example: []
   syntax:
-    content: 'public static Func<TContext, TParam, Task<List<T>>> CompileQuery<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression) where TContext : DbContext where T : class'
+    content: >-
+      [RequiresDynamicCode("Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public static Func<TContext, TParam, Task<List<T>>> CompileQuery<TContext, TParam, T>(Expression<Func<TContext, TParam, IQueryable<T>>> queryExpression) where TContext : DbContext where T : class
     parameters:
     - id: queryExpression
       type: System.Linq.Expressions.Expression{System.Func{{TContext},{TParam},System.Linq.IQueryable{{T}}}}
@@ -79,11 +85,104 @@ items:
     return:
       type: System.Func{{TContext},{TParam},System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}}
       description: A delegate that executes the query and returns the results as a <xref href="System.Collections.Generic.List%601" data-throw-if-not-resolved="false"></xref>.
-    content.vb: Public Shared Function CompileQuery(Of TContext As DbContext, TParam, T As Class)(queryExpression As Expression(Of Func(Of TContext, TParam, IQueryable(Of T)))) As Func(Of TContext, TParam, Task(Of List(Of T)))
+    content.vb: >-
+      <RequiresDynamicCode("Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Shared Function CompileQuery(Of TContext As DbContext, TParam, T As Class)(queryExpression As Expression(Of Func(Of TContext, TParam, IQueryable(Of T)))) As Func(Of TContext, TParam, Task(Of List(Of T)))
   overload: nORM.Core.Norm.CompileQuery*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.
   nameWithType.vb: Norm.CompileQuery(Of TContext, TParam, T)(Expression(Of Func(Of TContext, TParam, IQueryable(Of T))))
   fullName.vb: nORM.Core.Norm.CompileQuery(Of TContext, TParam, T)(System.Linq.Expressions.Expression(Of System.Func(Of TContext, TParam, System.Linq.IQueryable(Of T))))
   name.vb: CompileQuery(Of TContext, TParam, T)(Expression(Of Func(Of TContext, TParam, IQueryable(Of T))))
+- uid: nORM.Core.Norm.CompileTerminalQuery``3(System.Linq.Expressions.Expression{System.Func{``0,``1,``2}})
+  commentId: M:nORM.Core.Norm.CompileTerminalQuery``3(System.Linq.Expressions.Expression{System.Func{``0,``1,``2}})
+  id: CompileTerminalQuery``3(System.Linq.Expressions.Expression{System.Func{``0,``1,``2}})
+  parent: nORM.Core.Norm
+  langs:
+  - csharp
+  - vb
+  name: CompileTerminalQuery<TContext, TParam, TResult>(Expression<Func<TContext, TParam, TResult>>)
+  nameWithType: Norm.CompileTerminalQuery<TContext, TParam, TResult>(Expression<Func<TContext, TParam, TResult>>)
+  fullName: nORM.Core.Norm.CompileTerminalQuery<TContext, TParam, TResult>(System.Linq.Expressions.Expression<System.Func<TContext, TParam, TResult>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/Norm.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CompileTerminalQuery
+    path: src/nORM/Core/Norm.cs
+    startLine: 48
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Compiles a query whose body ends in a terminal operator (<code>First</code>, <code>Single</code>,
+
+    <code>Count</code>, <code>Any</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, <code>Average</code>, and their
+
+    <code>OrDefault</code>/<code>Long</code> variants) into a reusable delegate returning the terminal
+
+    result. Terminal semantics match the non-compiled runtime exactly: <code>First</code> on an
+
+    empty sequence throws <xref href="System.InvalidOperationException" data-throw-if-not-resolved="false"></xref>, <code>Single</code> enforces
+
+    cardinality, and <code>FirstOrDefault</code> returns <code>null</code>/<code>default</code>.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public static Func<TContext, TParam, Task<TResult>> CompileTerminalQuery<TContext, TParam, TResult>(Expression<Func<TContext, TParam, TResult>> queryExpression) where TContext : DbContext
+    parameters:
+    - id: queryExpression
+      type: System.Linq.Expressions.Expression{System.Func{{TContext},{TParam},{TResult}}}
+      description: Expression describing the query to compile, ending in a terminal operator.
+    typeParameters:
+    - id: TContext
+      description: Type of the <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+    - id: TParam
+      description: Type of the parameter passed to the query.
+    - id: TResult
+      description: Result type produced by the terminal operator.
+    return:
+      type: System.Func{{TContext},{TParam},System.Threading.Tasks.Task{{TResult}}}
+      description: A delegate that executes the query and returns the terminal result.
+    content.vb: >-
+      <RequiresDynamicCode("Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Shared Function CompileTerminalQuery(Of TContext As DbContext, TParam, TResult)(queryExpression As Expression(Of Func(Of TContext, TParam, TResult))) As Func(Of TContext, TParam, Task(Of TResult))
+  overload: nORM.Core.Norm.CompileTerminalQuery*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Compiled queries translate expression trees and build delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Compiled queries reflect over entity types; trimming may remove the required members. See docs/aot-trimming.md.
+  nameWithType.vb: Norm.CompileTerminalQuery(Of TContext, TParam, TResult)(Expression(Of Func(Of TContext, TParam, TResult)))
+  fullName.vb: nORM.Core.Norm.CompileTerminalQuery(Of TContext, TParam, TResult)(System.Linq.Expressions.Expression(Of System.Func(Of TContext, TParam, TResult)))
+  name.vb: CompileTerminalQuery(Of TContext, TParam, TResult)(Expression(Of Func(Of TContext, TParam, TResult)))
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core
@@ -627,4 +726,127 @@ references:
   - name: ','
   - name: " "
   - name: TResult
+  - name: )
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Core.Norm.CompileTerminalQuery*
+  commentId: Overload:nORM.Core.Norm.CompileTerminalQuery
+  href: nORM.Core.Norm.html#nORM_Core_Norm_CompileTerminalQuery__3_System_Linq_Expressions_Expression_System_Func___0___1___2___
+  name: CompileTerminalQuery
+  nameWithType: Norm.CompileTerminalQuery
+  fullName: nORM.Core.Norm.CompileTerminalQuery
+- uid: System.Linq.Expressions.Expression{System.Func{{TContext},{TParam},{TResult}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{``0,``1,``2}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TContext, TParam, TResult>>
+  nameWithType: Expression<Func<TContext, TParam, TResult>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TContext, TParam, TResult>>
+  nameWithType.vb: Expression(Of Func(Of TContext, TParam, TResult))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TContext, TParam, TResult))
+  name.vb: Expression(Of Func(Of TContext, TParam, TResult))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - name: TContext
+  - name: ','
+  - name: " "
+  - name: TParam
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TContext
+  - name: ','
+  - name: " "
+  - name: TParam
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )
+  - name: )
+- uid: System.Func{{TContext},{TParam},System.Threading.Tasks.Task{{TResult}}}
+  commentId: T:System.Func{``0,``1,System.Threading.Tasks.Task{``2}}
+  parent: System
+  definition: System.Func`3
+  href: https://learn.microsoft.com/dotnet/api/system.func-3
+  name: Func<TContext, TParam, Task<TResult>>
+  nameWithType: Func<TContext, TParam, Task<TResult>>
+  fullName: System.Func<TContext, TParam, System.Threading.Tasks.Task<TResult>>
+  nameWithType.vb: Func(Of TContext, TParam, Task(Of TResult))
+  fullName.vb: System.Func(Of TContext, TParam, System.Threading.Tasks.Task(Of TResult))
+  name.vb: Func(Of TContext, TParam, Task(Of TResult))
+  spec.csharp:
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: <
+  - name: TContext
+  - name: ','
+  - name: " "
+  - name: TParam
+  - name: ','
+  - name: " "
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`3
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-3
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TContext
+  - name: ','
+  - name: " "
+  - name: TParam
+  - name: ','
+  - name: " "
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
   - name: )

@@ -23,7 +23,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LazyNavigationReference
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 766
+    startLine: 895
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -90,7 +90,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 784
+    startLine: 913
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -135,7 +135,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetValueAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 797
+    startLine: 926
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -172,7 +172,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetValue
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 809
+    startLine: 938
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -207,7 +207,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: op_Implicit
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 823
+    startLine: 952
   assemblies:
   - nORM
   namespace: nORM.Navigation

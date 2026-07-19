@@ -23,7 +23,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationPropertyInfo
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 632
+    startLine: 761
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -69,7 +69,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 632
+    startLine: 761
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -110,7 +110,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 632
+    startLine: 761
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -139,7 +139,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TargetType
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 632
+    startLine: 761
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -168,7 +168,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsCollection
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 632
+    startLine: 761
   assemblies:
   - nORM
   namespace: nORM.Navigation

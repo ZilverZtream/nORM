@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Reflection;
 
 #nullable enable
 
@@ -28,6 +31,68 @@ namespace nORM.Configuration
             _configurations[typeof(TEntity)] = builder.Configuration;
             _builders[typeof(TEntity)] = builder;
             return builder;
+        }
+
+        /// <summary>
+        /// Applies a dedicated <see cref="IEntityTypeConfiguration{TEntity}"/> to this model — the Entity
+        /// Framework Core pattern for keeping per-entity configuration in its own class. The configuration's
+        /// <see cref="IEntityTypeConfiguration{TEntity}.Configure"/> runs against the same builder that
+        /// <see cref="Entity{TEntity}()"/> returns, so it accumulates with any other configuration for the type.
+        /// </summary>
+        /// <typeparam name="TEntity">The entity type being configured.</typeparam>
+        /// <param name="configuration">The configuration to apply.</param>
+        /// <returns>This <see cref="ModelBuilder"/> for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="configuration"/> is null.</exception>
+        public ModelBuilder ApplyConfiguration<TEntity>(IEntityTypeConfiguration<TEntity> configuration) where TEntity : class
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            configuration.Configure(Entity<TEntity>());
+            return this;
+        }
+
+        /// <summary>
+        /// Scans the given assembly for all non-abstract types implementing
+        /// <see cref="IEntityTypeConfiguration{TEntity}"/> and applies each — the Entity Framework Core
+        /// convenience that registers every configuration class in a project at once. Each configuration
+        /// type must have a public parameterless constructor; a type implementing the interface for more than
+        /// one entity is applied once per entity.
+        /// </summary>
+        /// <param name="assembly">The assembly to scan.</param>
+        /// <returns>This <see cref="ModelBuilder"/> for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="assembly"/> is null.</exception>
+        [RequiresUnreferencedCode("Scans assembly types and their interfaces by reflection; trimming may remove configuration types or their members. See docs/aot-trimming.md.")]
+        [RequiresDynamicCode("Constructs the generic ApplyConfiguration method per discovered entity type at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        public ModelBuilder ApplyConfigurationsFromAssembly(Assembly assembly)
+        {
+            ArgumentNullException.ThrowIfNull(assembly);
+
+            Type[] types;
+            try
+            {
+                types = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                // Use the loadable subset rather than failing the whole model when a sibling type
+                // in the assembly cannot be loaded (missing dependency, etc.).
+                types = (ex.Types ?? Array.Empty<Type?>()).Where(t => t != null).Select(t => t!).ToArray();
+            }
+
+            var applyMethod = typeof(ModelBuilder).GetMethod(nameof(ApplyConfiguration))!;
+            foreach (var type in types)
+            {
+                if (type.IsAbstract || type.IsInterface || type.ContainsGenericParameters)
+                    continue;
+                foreach (var iface in type.GetInterfaces())
+                {
+                    if (!iface.IsGenericType || iface.GetGenericTypeDefinition() != typeof(IEntityTypeConfiguration<>))
+                        continue;
+                    var entityType = iface.GetGenericArguments()[0];
+                    var configuration = Activator.CreateInstance(type);
+                    applyMethod.MakeGenericMethod(entityType).Invoke(this, new[] { configuration });
+                }
+            }
+            return this;
         }
 
         /// <summary>

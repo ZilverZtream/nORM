@@ -5,9 +5,23 @@ items:
   id: DatabaseFacade
   parent: nORM.Core
   children:
+  - nORM.Core.DatabaseFacade.BeginTransaction
   - nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+  - nORM.Core.DatabaseFacade.CanConnect
+  - nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
   - nORM.Core.DatabaseFacade.CurrentContextTransaction
   - nORM.Core.DatabaseFacade.CurrentTransaction
+  - nORM.Core.DatabaseFacade.EnsureCreated
+  - nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  - nORM.Core.DatabaseFacade.EnsureDeleted
+  - nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  - nORM.Core.DatabaseFacade.ExecuteSqlInterpolated(System.FormattableString)
+  - nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+  - nORM.Core.DatabaseFacade.ExecuteSqlRaw(System.String,System.Object[])
+  - nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+  - nORM.Core.DatabaseFacade.GenerateCreateScript
+  - nORM.Core.DatabaseFacade.GetDbConnection
+  - nORM.Core.DatabaseFacade.UseTransaction(System.Data.Common.DbTransaction)
   langs:
   - csharp
   - vb
@@ -22,7 +36,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseFacade
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 11
+    startLine: 16
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -49,6 +63,537 @@ items:
   - nORM.Core.DatabaseFacade.nORM.Navigation.NavigationPropertyExtensions.IsLoaded``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DatabaseFacade,{TProperty}}})
   - nORM.Core.DatabaseFacade.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DatabaseFacade,System.Collections.Generic.ICollection{{TProperty}}}},System.Threading.CancellationToken)
   - nORM.Core.DatabaseFacade.nORM.Navigation.NavigationPropertyExtensions.LoadAsync``2(System.Linq.Expressions.Expression{System.Func{nORM.Core.DatabaseFacade,{TProperty}}},System.Threading.CancellationToken)
+- uid: nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  id: EnsureCreatedAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: EnsureCreatedAsync(CancellationToken)
+  nameWithType: DatabaseFacade.EnsureCreatedAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnsureCreatedAsync
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 36
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Ensures the tables for the context's mapped entities exist, creating any that are
+
+    missing — matching Entity Framework Core's <code>EnsureCreated</code>. This is the quick
+
+    "make the schema" path for prototyping and tests; production schema management belongs
+
+    in migrations (<code>dotnet norm migrations</code>). The target schema is derived from the
+
+    fluent model (<code>DbContextOptions.OnModelCreating</code>), so only entities
+
+    configured there are created. Returns <code>true</code> when at least one table was created,
+
+    <code>false</code> when every mapped table already existed.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public Task<bool> EnsureCreatedAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+      description: <code>true</code> if any table was created; otherwise <code>false</code>.
+    content.vb: >-
+      <RequiresDynamicCode("EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function EnsureCreatedAsync(ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.DatabaseFacade.EnsureCreatedAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.DatabaseFacade.EnsureCreated
+  commentId: M:nORM.Core.DatabaseFacade.EnsureCreated
+  id: EnsureCreated
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: EnsureCreated()
+  nameWithType: DatabaseFacade.EnsureCreated()
+  fullName: nORM.Core.DatabaseFacade.EnsureCreated()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnsureCreated
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 74
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Synchronous <xref href="nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> (EF Core's <code>EnsureCreated</code>).
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public bool EnsureCreated()
+    return:
+      type: System.Boolean
+      description: <code>true</code> if any table was created; otherwise <code>false</code>.
+    content.vb: >-
+      <RequiresDynamicCode("EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function EnsureCreated() As Boolean
+  overload: nORM.Core.DatabaseFacade.EnsureCreated*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureCreated builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureCreated reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  id: EnsureDeletedAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: EnsureDeletedAsync(CancellationToken)
+  nameWithType: DatabaseFacade.EnsureDeletedAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnsureDeletedAsync
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 111
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Drops the tables for the context's mapped entities if they exist — the inverse of
+
+    <xref href="nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> and the model-scoped equivalent of EF Core's <code>EnsureDeleted</code>.
+
+    Like <xref href="nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> it operates only on the entities configured in the fluent
+
+    model, dropping dependents before principals so foreign keys do not block the drop. Returns
+
+    <code>true</code> when at least one table was dropped, <code>false</code> when none existed.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public Task<bool> EnsureDeletedAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+      description: <code>true</code> if any table was dropped; otherwise <code>false</code>.
+    content.vb: >-
+      <RequiresDynamicCode("EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function EnsureDeletedAsync(ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.DatabaseFacade.EnsureDeletedAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.DatabaseFacade.EnsureDeleted
+  commentId: M:nORM.Core.DatabaseFacade.EnsureDeleted
+  id: EnsureDeleted
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: EnsureDeleted()
+  nameWithType: DatabaseFacade.EnsureDeleted()
+  fullName: nORM.Core.DatabaseFacade.EnsureDeleted()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: EnsureDeleted
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 145
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Synchronous <xref href="nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref> (EF Core's <code>EnsureDeleted</code>).
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public bool EnsureDeleted()
+    return:
+      type: System.Boolean
+      description: <code>true</code> if any table was dropped; otherwise <code>false</code>.
+    content.vb: >-
+      <RequiresDynamicCode("EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function EnsureDeleted() As Boolean
+  overload: nORM.Core.DatabaseFacade.EnsureDeleted*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureDeleted builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: EnsureDeleted reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.DatabaseFacade.GenerateCreateScript
+  commentId: M:nORM.Core.DatabaseFacade.GenerateCreateScript
+  id: GenerateCreateScript
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: GenerateCreateScript()
+  nameWithType: DatabaseFacade.GenerateCreateScript()
+  fullName: nORM.Core.DatabaseFacade.GenerateCreateScript()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GenerateCreateScript
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 184
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the DDL that would create the tables for the context's mapped entities, as a single
+
+    script — matching Entity Framework Core's <code>Database.GenerateCreateScript</code>. This GENERATES the
+
+    SQL only: it opens no connection and executes nothing, so it is the tool for inspecting, diffing,
+
+    or exporting the schema the fluent model (<code>DbContextOptions.OnModelCreating</code>) implies. Tables
+
+    are ordered so a principal precedes its dependents (inline foreign keys). Returns an empty string
+
+    when the model configures no tables.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("GenerateCreateScript builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("GenerateCreateScript reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public string GenerateCreateScript()
+    return:
+      type: System.String
+      description: The create-table DDL for every mapped entity, one statement per line.
+    content.vb: >-
+      <RequiresDynamicCode("GenerateCreateScript builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("GenerateCreateScript reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function GenerateCreateScript() As String
+  overload: nORM.Core.DatabaseFacade.GenerateCreateScript*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: GenerateCreateScript builds a schema snapshot by reflecting over entity mappings; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: GenerateCreateScript reflects over entity types and their mapping metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+  id: CanConnectAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: CanConnectAsync(CancellationToken)
+  nameWithType: DatabaseFacade.CanConnectAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CanConnectAsync
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 217
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Tests whether the database is reachable by opening the connection and running a trivial probe —
+
+    matching EF Core's <code>Database.CanConnectAsync</code>. Returns <code>false</code> (rather than throwing)
+
+    when the connection cannot be opened or the probe fails.
+  example: []
+  syntax:
+    content: public Task<bool> CanConnectAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+    content.vb: Public Function CanConnectAsync(ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.DatabaseFacade.CanConnectAsync*
+- uid: nORM.Core.DatabaseFacade.CanConnect
+  commentId: M:nORM.Core.DatabaseFacade.CanConnect
+  id: CanConnect
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: CanConnect()
+  nameWithType: DatabaseFacade.CanConnect()
+  fullName: nORM.Core.DatabaseFacade.CanConnect()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CanConnect
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 234
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Synchronous <xref href="nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public bool CanConnect()
+    return:
+      type: System.Boolean
+    content.vb: Public Function CanConnect() As Boolean
+  overload: nORM.Core.DatabaseFacade.CanConnect*
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+  commentId: M:nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+  id: ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: ExecuteSqlRawAsync(string, CancellationToken, params object[])
+  nameWithType: DatabaseFacade.ExecuteSqlRawAsync(string, CancellationToken, params object[])
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(string, System.Threading.CancellationToken, params object[])
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteSqlRawAsync
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 363
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes a raw non-query SQL command (INSERT/UPDATE/DELETE/DDL) against the database and
+
+    returns the number of rows affected — matching EF Core's <code>Database.ExecuteSqlRawAsync</code>.
+
+    Pass values as <code class="paramref">parameters</code> (referenced positionally in the SQL) rather than
+
+    string-concatenating them, to avoid SQL injection. Participates in the active transaction.
+  example: []
+  syntax:
+    content: public Task<int> ExecuteSqlRawAsync(string sql, CancellationToken ct = default, params object[] parameters)
+    parameters:
+    - id: sql
+      type: System.String
+      description: The non-query SQL to execute.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the operation.
+    - id: parameters
+      type: System.Object[]
+      description: Parameter values referenced by the SQL.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Function ExecuteSqlRawAsync(sql As String, ct As CancellationToken = Nothing, ParamArray parameters As Object()) As Task(Of Integer)
+  overload: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync*
+  nameWithType.vb: DatabaseFacade.ExecuteSqlRawAsync(String, CancellationToken, ParamArray Object())
+  fullName.vb: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(String, System.Threading.CancellationToken, ParamArray Object())
+  name.vb: ExecuteSqlRawAsync(String, CancellationToken, ParamArray Object())
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlRaw(System.String,System.Object[])
+  commentId: M:nORM.Core.DatabaseFacade.ExecuteSqlRaw(System.String,System.Object[])
+  id: ExecuteSqlRaw(System.String,System.Object[])
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: ExecuteSqlRaw(string, params object[])
+  nameWithType: DatabaseFacade.ExecuteSqlRaw(string, params object[])
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlRaw(string, params object[])
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteSqlRaw
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 367
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Synchronous <xref href="nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String%2cSystem.Threading.CancellationToken%2cSystem.Object%5b%5d)" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public int ExecuteSqlRaw(string sql, params object[] parameters)
+    parameters:
+    - id: sql
+      type: System.String
+    - id: parameters
+      type: System.Object[]
+    return:
+      type: System.Int32
+    content.vb: Public Function ExecuteSqlRaw(sql As String, ParamArray parameters As Object()) As Integer
+  overload: nORM.Core.DatabaseFacade.ExecuteSqlRaw*
+  nameWithType.vb: DatabaseFacade.ExecuteSqlRaw(String, ParamArray Object())
+  fullName.vb: nORM.Core.DatabaseFacade.ExecuteSqlRaw(String, ParamArray Object())
+  name.vb: ExecuteSqlRaw(String, ParamArray Object())
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+  id: ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: ExecuteSqlInterpolatedAsync(FormattableString, CancellationToken)
+  nameWithType: DatabaseFacade.ExecuteSqlInterpolatedAsync(FormattableString, CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteSqlInterpolatedAsync
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 376
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Executes interpolated non-query SQL, turning each interpolation hole into a database parameter
+
+    before execution — matching EF Core's <code>Database.ExecuteSqlInterpolatedAsync</code>.
+  example: []
+  syntax:
+    content: public Task<int> ExecuteSqlInterpolatedAsync(FormattableString sql, CancellationToken ct = default)
+    parameters:
+    - id: sql
+      type: System.FormattableString
+      description: The interpolated non-query SQL; interpolation holes become parameters.
+    - id: ct
+      type: System.Threading.CancellationToken
+      description: Token used to cancel the operation.
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Function ExecuteSqlInterpolatedAsync(sql As FormattableString, ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync*
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolated(System.FormattableString)
+  commentId: M:nORM.Core.DatabaseFacade.ExecuteSqlInterpolated(System.FormattableString)
+  id: ExecuteSqlInterpolated(System.FormattableString)
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: ExecuteSqlInterpolated(FormattableString)
+  nameWithType: DatabaseFacade.ExecuteSqlInterpolated(FormattableString)
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlInterpolated(System.FormattableString)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteSqlInterpolated
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 380
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Synchronous <xref href="nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString%2cSystem.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public int ExecuteSqlInterpolated(FormattableString sql)
+    parameters:
+    - id: sql
+      type: System.FormattableString
+    return:
+      type: System.Int32
+    content.vb: Public Function ExecuteSqlInterpolated(sql As FormattableString) As Integer
+  overload: nORM.Core.DatabaseFacade.ExecuteSqlInterpolated*
 - uid: nORM.Core.DatabaseFacade.CurrentTransaction
   commentId: P:nORM.Core.DatabaseFacade.CurrentTransaction
   id: CurrentTransaction
@@ -67,7 +612,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CurrentTransaction
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 23
+    startLine: 386
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -98,7 +643,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CurrentContextTransaction
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 37
+    startLine: 400
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -134,7 +679,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BeginTransactionAsync
     path: src/nORM/Core/DatabaseFacade.cs
-    startLine: 46
+    startLine: 409
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -155,6 +700,139 @@ items:
   - type: System.InvalidOperationException
     commentId: T:System.InvalidOperationException
     description: Thrown when a transaction is already active.
+- uid: nORM.Core.DatabaseFacade.BeginTransaction
+  commentId: M:nORM.Core.DatabaseFacade.BeginTransaction
+  id: BeginTransaction
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: BeginTransaction()
+  nameWithType: DatabaseFacade.BeginTransaction()
+  fullName: nORM.Core.DatabaseFacade.BeginTransaction()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: BeginTransaction
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 427
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Synchronous <xref href="nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)" data-throw-if-not-resolved="false"></xref>, matching Entity Framework Core's
+
+    <code>BeginTransaction</code>. Begins a new database transaction for the current context and returns a
+
+    nORM-managed wrapper — commit or roll it back through the returned <xref href="nORM.Core.DbContextTransaction" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public DbContextTransaction BeginTransaction()
+    return:
+      type: nORM.Core.DbContextTransaction
+      description: A <xref href="nORM.Core.DbContextTransaction" data-throw-if-not-resolved="false"></xref> representing the started transaction.
+    content.vb: Public Function BeginTransaction() As DbContextTransaction
+  overload: nORM.Core.DatabaseFacade.BeginTransaction*
+  exceptions:
+  - type: nORM.Core.NormUsageException
+    commentId: T:nORM.Core.NormUsageException
+    description: Thrown when a transaction is already active.
+- uid: nORM.Core.DatabaseFacade.UseTransaction(System.Data.Common.DbTransaction)
+  commentId: M:nORM.Core.DatabaseFacade.UseTransaction(System.Data.Common.DbTransaction)
+  id: UseTransaction(System.Data.Common.DbTransaction)
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: UseTransaction(DbTransaction?)
+  nameWithType: DatabaseFacade.UseTransaction(DbTransaction?)
+  fullName: nORM.Core.DatabaseFacade.UseTransaction(System.Data.Common.DbTransaction?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseTransaction
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 450
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Enlists the context in an externally-created <xref href="System.Data.Common.DbTransaction" data-throw-if-not-resolved="false"></xref>, matching Entity Framework
+
+    Core's <code>Database.UseTransaction</code> — so nORM's commands and <code>SaveChanges</code> run inside a
+
+    transaction begun by raw ADO.NET or another library on the same connection (see
+
+    <xref href="nORM.Core.DatabaseFacade.GetDbConnection" data-throw-if-not-resolved="false"></xref>). The context does NOT take ownership: disposing the returned wrapper
+
+    or the context never disposes the caller's transaction, though committing or rolling it back through
+
+    the wrapper is allowed. Passing <code>null</code> clears the current transaction (without disposing it).
+
+    Because it accepts a provider-specific handle it is disallowed under strict provider mobility.
+  example: []
+  syntax:
+    content: public DbContextTransaction? UseTransaction(DbTransaction? transaction)
+    parameters:
+    - id: transaction
+      type: System.Data.Common.DbTransaction
+      description: The externally-managed transaction to enlist, or <code>null</code> to clear.
+    return:
+      type: nORM.Core.DbContextTransaction
+      description: A non-owning <xref href="nORM.Core.DbContextTransaction" data-throw-if-not-resolved="false"></xref> wrapper, or <code>null</code> when clearing.
+    content.vb: Public Function UseTransaction(transaction As DbTransaction) As DbContextTransaction
+  overload: nORM.Core.DatabaseFacade.UseTransaction*
+  exceptions:
+  - type: nORM.Core.NormUsageException
+    commentId: T:nORM.Core.NormUsageException
+    description: A transaction is already active.
+  nameWithType.vb: DatabaseFacade.UseTransaction(DbTransaction)
+  fullName.vb: nORM.Core.DatabaseFacade.UseTransaction(System.Data.Common.DbTransaction)
+  name.vb: UseTransaction(DbTransaction)
+- uid: nORM.Core.DatabaseFacade.GetDbConnection
+  commentId: M:nORM.Core.DatabaseFacade.GetDbConnection
+  id: GetDbConnection
+  parent: nORM.Core.DatabaseFacade
+  langs:
+  - csharp
+  - vb
+  name: GetDbConnection()
+  nameWithType: DatabaseFacade.GetDbConnection()
+  fullName: nORM.Core.DatabaseFacade.GetDbConnection()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DatabaseFacade.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetDbConnection
+    path: src/nORM/Core/DatabaseFacade.cs
+    startLine: 477
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the underlying provider <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref> the context uses, matching Entity
+
+    Framework Core's <code>GetDbConnection</code> — the escape hatch for interop with Dapper or raw ADO.NET
+
+    on the same connection (and any active transaction, via <xref href="nORM.Core.DatabaseFacade.CurrentTransaction" data-throw-if-not-resolved="false"></xref>). Because
+
+    it exposes a provider-specific handle it is disallowed under strict provider mobility.
+  example: []
+  syntax:
+    content: public DbConnection GetDbConnection()
+    return:
+      type: System.Data.Common.DbConnection
+      description: The context's <xref href="System.Data.Common.DbConnection" data-throw-if-not-resolved="false"></xref> (not opened by this call).
+    content.vb: Public Function GetDbConnection() As DbConnection
+  overload: nORM.Core.DatabaseFacade.GetDbConnection*
 references:
 - uid: nORM.Core.DbContext
   commentId: T:nORM.Core.DbContext
@@ -1126,83 +1804,12 @@ references:
   - uid: nORM.Navigation
     name: Navigation
     href: nORM.Navigation.html
-- uid: System.Data.Common.DbTransaction
-  commentId: T:System.Data.Common.DbTransaction
-  parent: System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
-  name: DbTransaction
-  nameWithType: DbTransaction
-  fullName: System.Data.Common.DbTransaction
-- uid: nORM.Core.DatabaseFacade.CurrentTransaction*
-  commentId: Overload:nORM.Core.DatabaseFacade.CurrentTransaction
-  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentTransaction
-  name: CurrentTransaction
-  nameWithType: DatabaseFacade.CurrentTransaction
-  fullName: nORM.Core.DatabaseFacade.CurrentTransaction
-- uid: System.Data.Common
-  commentId: N:System.Data.Common
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Data.Common
-  nameWithType: System.Data.Common
-  fullName: System.Data.Common
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Data
-    name: Data
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data
-  - name: .
-  - uid: System.Data.Common
-    name: Common
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.data.common
-- uid: nORM.Core.DatabaseFacade.CurrentContextTransaction*
-  commentId: Overload:nORM.Core.DatabaseFacade.CurrentContextTransaction
-  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentContextTransaction
-  name: CurrentContextTransaction
-  nameWithType: DatabaseFacade.CurrentContextTransaction
-  fullName: nORM.Core.DatabaseFacade.CurrentContextTransaction
-- uid: nORM.Core.DbContextTransaction
-  commentId: T:nORM.Core.DbContextTransaction
-  parent: nORM.Core
-  href: nORM.Core.DbContextTransaction.html
-  name: DbContextTransaction
-  nameWithType: DbContextTransaction
-  fullName: nORM.Core.DbContextTransaction
-- uid: System.InvalidOperationException
-  commentId: T:System.InvalidOperationException
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
-  name: InvalidOperationException
-  nameWithType: InvalidOperationException
-  fullName: System.InvalidOperationException
-- uid: nORM.Core.DatabaseFacade.BeginTransactionAsync*
-  commentId: Overload:nORM.Core.DatabaseFacade.BeginTransactionAsync
-  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_BeginTransactionAsync_System_Threading_CancellationToken_
-  name: BeginTransactionAsync
-  nameWithType: DatabaseFacade.BeginTransactionAsync
-  fullName: nORM.Core.DatabaseFacade.BeginTransactionAsync
+- uid: nORM.Core.DatabaseFacade.EnsureCreatedAsync*
+  commentId: Overload:nORM.Core.DatabaseFacade.EnsureCreatedAsync
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureCreatedAsync_System_Threading_CancellationToken_
+  name: EnsureCreatedAsync
+  nameWithType: DatabaseFacade.EnsureCreatedAsync
+  fullName: nORM.Core.DatabaseFacade.EnsureCreatedAsync
 - uid: System.Threading.CancellationToken
   commentId: T:System.Threading.CancellationToken
   parent: System.Threading
@@ -1211,26 +1818,27 @@ references:
   name: CancellationToken
   nameWithType: CancellationToken
   fullName: System.Threading.CancellationToken
-- uid: System.Threading.Tasks.Task{nORM.Core.DbContextTransaction}
-  commentId: T:System.Threading.Tasks.Task{nORM.Core.DbContextTransaction}
+- uid: System.Threading.Tasks.Task{System.Boolean}
+  commentId: T:System.Threading.Tasks.Task{System.Boolean}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
-  name: Task<DbContextTransaction>
-  nameWithType: Task<DbContextTransaction>
-  fullName: System.Threading.Tasks.Task<nORM.Core.DbContextTransaction>
-  nameWithType.vb: Task(Of DbContextTransaction)
-  fullName.vb: System.Threading.Tasks.Task(Of nORM.Core.DbContextTransaction)
-  name.vb: Task(Of DbContextTransaction)
+  name: Task<bool>
+  nameWithType: Task<bool>
+  fullName: System.Threading.Tasks.Task<bool>
+  nameWithType.vb: Task(Of Boolean)
+  fullName.vb: System.Threading.Tasks.Task(Of Boolean)
+  name.vb: Task(Of Boolean)
   spec.csharp:
   - uid: System.Threading.Tasks.Task`1
     name: Task
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
   - name: <
-  - uid: nORM.Core.DbContextTransaction
-    name: DbContextTransaction
-    href: nORM.Core.DbContextTransaction.html
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: '>'
   spec.vb:
   - uid: System.Threading.Tasks.Task`1
@@ -1240,9 +1848,10 @@ references:
   - name: (
   - name: Of
   - name: " "
-  - uid: nORM.Core.DbContextTransaction
-    name: DbContextTransaction
-    href: nORM.Core.DbContextTransaction.html
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: )
 - uid: System.Threading
   commentId: N:System.Threading
@@ -1336,3 +1945,537 @@ references:
     name: Tasks
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureCreatedAsync_System_Threading_CancellationToken_
+  name: EnsureCreatedAsync(CancellationToken)
+  nameWithType: DatabaseFacade.EnsureCreatedAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+    name: EnsureCreatedAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureCreatedAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.EnsureCreatedAsync(System.Threading.CancellationToken)
+    name: EnsureCreatedAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureCreatedAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DatabaseFacade.EnsureCreated*
+  commentId: Overload:nORM.Core.DatabaseFacade.EnsureCreated
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureCreated
+  name: EnsureCreated
+  nameWithType: DatabaseFacade.EnsureCreated
+  fullName: nORM.Core.DatabaseFacade.EnsureCreated
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Core.DatabaseFacade.EnsureDeletedAsync*
+  commentId: Overload:nORM.Core.DatabaseFacade.EnsureDeletedAsync
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureDeletedAsync_System_Threading_CancellationToken_
+  name: EnsureDeletedAsync
+  nameWithType: DatabaseFacade.EnsureDeletedAsync
+  fullName: nORM.Core.DatabaseFacade.EnsureDeletedAsync
+- uid: nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureDeletedAsync_System_Threading_CancellationToken_
+  name: EnsureDeletedAsync(CancellationToken)
+  nameWithType: DatabaseFacade.EnsureDeletedAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+    name: EnsureDeletedAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureDeletedAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.EnsureDeletedAsync(System.Threading.CancellationToken)
+    name: EnsureDeletedAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureDeletedAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DatabaseFacade.EnsureDeleted*
+  commentId: Overload:nORM.Core.DatabaseFacade.EnsureDeleted
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_EnsureDeleted
+  name: EnsureDeleted
+  nameWithType: DatabaseFacade.EnsureDeleted
+  fullName: nORM.Core.DatabaseFacade.EnsureDeleted
+- uid: nORM.Core.DatabaseFacade.GenerateCreateScript*
+  commentId: Overload:nORM.Core.DatabaseFacade.GenerateCreateScript
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_GenerateCreateScript
+  name: GenerateCreateScript
+  nameWithType: DatabaseFacade.GenerateCreateScript
+  fullName: nORM.Core.DatabaseFacade.GenerateCreateScript
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Core.DatabaseFacade.CanConnectAsync*
+  commentId: Overload:nORM.Core.DatabaseFacade.CanConnectAsync
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CanConnectAsync_System_Threading_CancellationToken_
+  name: CanConnectAsync
+  nameWithType: DatabaseFacade.CanConnectAsync
+  fullName: nORM.Core.DatabaseFacade.CanConnectAsync
+- uid: nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CanConnectAsync_System_Threading_CancellationToken_
+  name: CanConnectAsync(CancellationToken)
+  nameWithType: DatabaseFacade.CanConnectAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+    name: CanConnectAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CanConnectAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.CanConnectAsync(System.Threading.CancellationToken)
+    name: CanConnectAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CanConnectAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DatabaseFacade.CanConnect*
+  commentId: Overload:nORM.Core.DatabaseFacade.CanConnect
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CanConnect
+  name: CanConnect
+  nameWithType: DatabaseFacade.CanConnect
+  fullName: nORM.Core.DatabaseFacade.CanConnect
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync*
+  commentId: Overload:nORM.Core.DatabaseFacade.ExecuteSqlRawAsync
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlRawAsync_System_String_System_Threading_CancellationToken_System_Object___
+  name: ExecuteSqlRawAsync
+  nameWithType: DatabaseFacade.ExecuteSqlRawAsync
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync
+- uid: System.Object[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.object
+  name: object[]
+  nameWithType: object[]
+  fullName: object[]
+  nameWithType.vb: Object()
+  fullName.vb: Object()
+  name.vb: Object()
+  spec.csharp:
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: (
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Int32}
+  commentId: T:System.Threading.Tasks.Task{System.Int32}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<int>
+  nameWithType: Task<int>
+  fullName: System.Threading.Tasks.Task<int>
+  nameWithType.vb: Task(Of Integer)
+  fullName.vb: System.Threading.Tasks.Task(Of Integer)
+  name.vb: Task(Of Integer)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+  commentId: M:nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+  isExternal: true
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlRawAsync_System_String_System_Threading_CancellationToken_System_Object___
+  name: ExecuteSqlRawAsync(string, CancellationToken, params object[])
+  nameWithType: DatabaseFacade.ExecuteSqlRawAsync(string, CancellationToken, params object[])
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(string, System.Threading.CancellationToken, params object[])
+  nameWithType.vb: DatabaseFacade.ExecuteSqlRawAsync(String, CancellationToken, ParamArray Object())
+  fullName.vb: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(String, System.Threading.CancellationToken, ParamArray Object())
+  name.vb: ExecuteSqlRawAsync(String, CancellationToken, ParamArray Object())
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+    name: ExecuteSqlRawAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlRawAsync_System_String_System_Threading_CancellationToken_System_Object___
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: ','
+  - name: " "
+  - name: params
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '['
+  - name: ']'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.ExecuteSqlRawAsync(System.String,System.Threading.CancellationToken,System.Object[])
+    name: ExecuteSqlRawAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlRawAsync_System_String_System_Threading_CancellationToken_System_Object___
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: ','
+  - name: " "
+  - name: ParamArray
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: (
+  - name: )
+  - name: )
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlRaw*
+  commentId: Overload:nORM.Core.DatabaseFacade.ExecuteSqlRaw
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlRaw_System_String_System_Object___
+  name: ExecuteSqlRaw
+  nameWithType: DatabaseFacade.ExecuteSqlRaw
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlRaw
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync*
+  commentId: Overload:nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlInterpolatedAsync_System_FormattableString_System_Threading_CancellationToken_
+  name: ExecuteSqlInterpolatedAsync
+  nameWithType: DatabaseFacade.ExecuteSqlInterpolatedAsync
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync
+- uid: System.FormattableString
+  commentId: T:System.FormattableString
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.formattablestring
+  name: FormattableString
+  nameWithType: FormattableString
+  fullName: System.FormattableString
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlInterpolatedAsync_System_FormattableString_System_Threading_CancellationToken_
+  name: ExecuteSqlInterpolatedAsync(FormattableString, CancellationToken)
+  nameWithType: DatabaseFacade.ExecuteSqlInterpolatedAsync(FormattableString, CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString, System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+    name: ExecuteSqlInterpolatedAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlInterpolatedAsync_System_FormattableString_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.FormattableString
+    name: FormattableString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.formattablestring
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolatedAsync(System.FormattableString,System.Threading.CancellationToken)
+    name: ExecuteSqlInterpolatedAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlInterpolatedAsync_System_FormattableString_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.FormattableString
+    name: FormattableString
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.formattablestring
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DatabaseFacade.ExecuteSqlInterpolated*
+  commentId: Overload:nORM.Core.DatabaseFacade.ExecuteSqlInterpolated
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_ExecuteSqlInterpolated_System_FormattableString_
+  name: ExecuteSqlInterpolated
+  nameWithType: DatabaseFacade.ExecuteSqlInterpolated
+  fullName: nORM.Core.DatabaseFacade.ExecuteSqlInterpolated
+- uid: System.Data.Common.DbTransaction
+  commentId: T:System.Data.Common.DbTransaction
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbtransaction
+  name: DbTransaction
+  nameWithType: DbTransaction
+  fullName: System.Data.Common.DbTransaction
+- uid: nORM.Core.DatabaseFacade.CurrentTransaction*
+  commentId: Overload:nORM.Core.DatabaseFacade.CurrentTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentTransaction
+  name: CurrentTransaction
+  nameWithType: DatabaseFacade.CurrentTransaction
+  fullName: nORM.Core.DatabaseFacade.CurrentTransaction
+- uid: System.Data.Common
+  commentId: N:System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Data.Common
+  nameWithType: System.Data.Common
+  fullName: System.Data.Common
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Data
+    name: Data
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data
+  - name: .
+  - uid: System.Data.Common
+    name: Common
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.data.common
+- uid: nORM.Core.DatabaseFacade.CurrentContextTransaction*
+  commentId: Overload:nORM.Core.DatabaseFacade.CurrentContextTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentContextTransaction
+  name: CurrentContextTransaction
+  nameWithType: DatabaseFacade.CurrentContextTransaction
+  fullName: nORM.Core.DatabaseFacade.CurrentContextTransaction
+- uid: nORM.Core.DbContextTransaction
+  commentId: T:nORM.Core.DbContextTransaction
+  parent: nORM.Core
+  href: nORM.Core.DbContextTransaction.html
+  name: DbContextTransaction
+  nameWithType: DbContextTransaction
+  fullName: nORM.Core.DbContextTransaction
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Core.DatabaseFacade.BeginTransactionAsync*
+  commentId: Overload:nORM.Core.DatabaseFacade.BeginTransactionAsync
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_BeginTransactionAsync_System_Threading_CancellationToken_
+  name: BeginTransactionAsync
+  nameWithType: DatabaseFacade.BeginTransactionAsync
+  fullName: nORM.Core.DatabaseFacade.BeginTransactionAsync
+- uid: System.Threading.Tasks.Task{nORM.Core.DbContextTransaction}
+  commentId: T:System.Threading.Tasks.Task{nORM.Core.DbContextTransaction}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<DbContextTransaction>
+  nameWithType: Task<DbContextTransaction>
+  fullName: System.Threading.Tasks.Task<nORM.Core.DbContextTransaction>
+  nameWithType.vb: Task(Of DbContextTransaction)
+  fullName.vb: System.Threading.Tasks.Task(Of nORM.Core.DbContextTransaction)
+  name.vb: Task(Of DbContextTransaction)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: nORM.Core.DbContextTransaction
+    name: DbContextTransaction
+    href: nORM.Core.DbContextTransaction.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.DbContextTransaction
+    name: DbContextTransaction
+    href: nORM.Core.DbContextTransaction.html
+  - name: )
+- uid: nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_BeginTransactionAsync_System_Threading_CancellationToken_
+  name: BeginTransactionAsync(CancellationToken)
+  nameWithType: DatabaseFacade.BeginTransactionAsync(CancellationToken)
+  fullName: nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+    name: BeginTransactionAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_BeginTransactionAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.BeginTransactionAsync(System.Threading.CancellationToken)
+    name: BeginTransactionAsync
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_BeginTransactionAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.NormUsageException
+  commentId: T:nORM.Core.NormUsageException
+  href: nORM.Core.NormUsageException.html
+  name: NormUsageException
+  nameWithType: NormUsageException
+  fullName: nORM.Core.NormUsageException
+- uid: nORM.Core.DatabaseFacade.BeginTransaction*
+  commentId: Overload:nORM.Core.DatabaseFacade.BeginTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_BeginTransaction
+  name: BeginTransaction
+  nameWithType: DatabaseFacade.BeginTransaction
+  fullName: nORM.Core.DatabaseFacade.BeginTransaction
+- uid: nORM.Core.DatabaseFacade.GetDbConnection
+  commentId: M:nORM.Core.DatabaseFacade.GetDbConnection
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_GetDbConnection
+  name: GetDbConnection()
+  nameWithType: DatabaseFacade.GetDbConnection()
+  fullName: nORM.Core.DatabaseFacade.GetDbConnection()
+  spec.csharp:
+  - uid: nORM.Core.DatabaseFacade.GetDbConnection
+    name: GetDbConnection
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_GetDbConnection
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.DatabaseFacade.GetDbConnection
+    name: GetDbConnection
+    href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_GetDbConnection
+  - name: (
+  - name: )
+- uid: nORM.Core.DatabaseFacade.UseTransaction*
+  commentId: Overload:nORM.Core.DatabaseFacade.UseTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_UseTransaction_System_Data_Common_DbTransaction_
+  name: UseTransaction
+  nameWithType: DatabaseFacade.UseTransaction
+  fullName: nORM.Core.DatabaseFacade.UseTransaction
+- uid: System.Data.Common.DbConnection
+  commentId: T:System.Data.Common.DbConnection
+  parent: System.Data.Common
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.data.common.dbconnection
+  name: DbConnection
+  nameWithType: DbConnection
+  fullName: System.Data.Common.DbConnection
+- uid: nORM.Core.DatabaseFacade.CurrentTransaction
+  commentId: P:nORM.Core.DatabaseFacade.CurrentTransaction
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_CurrentTransaction
+  name: CurrentTransaction
+  nameWithType: DatabaseFacade.CurrentTransaction
+  fullName: nORM.Core.DatabaseFacade.CurrentTransaction
+- uid: nORM.Core.DatabaseFacade.GetDbConnection*
+  commentId: Overload:nORM.Core.DatabaseFacade.GetDbConnection
+  href: nORM.Core.DatabaseFacade.html#nORM_Core_DatabaseFacade_GetDbConnection
+  name: GetDbConnection
+  nameWithType: DatabaseFacade.GetDbConnection
+  fullName: nORM.Core.DatabaseFacade.GetDbConnection

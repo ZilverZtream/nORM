@@ -5,6 +5,13 @@ items:
   id: NormIncludableQueryableExtensions
   parent: nORM.Core
   children:
+  - nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution``1(System.Linq.IQueryable{``0})
+  - nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+  - nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery``1(System.Linq.IQueryable{``0})
+  - nORM.Core.NormIncludableQueryableExtensions.AsTracking``1(System.Linq.IQueryable{``0})
+  - nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters``1(System.Linq.IQueryable{``0})
+  - nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  - nORM.Core.NormIncludableQueryableExtensions.TagWith``1(System.Linq.IQueryable{``0},System.String)
   - nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,System.Collections.Generic.IEnumerable{``1}},System.Linq.Expressions.Expression{System.Func{``1,``2}})
   - nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
   langs:
@@ -21,7 +28,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormIncludableQueryableExtensions
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 391
+    startLine: 510
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -64,6 +71,449 @@ items:
     arguments:
     - type: System.String
       value: nORM Include extension methods reflect over navigation property metadata; trimming may remove the required members.
+- uid: nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  id: Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: Include<TEntity, TProperty>(IQueryable<TEntity>, Expression<Func<TEntity, TProperty>>)
+  nameWithType: NormIncludableQueryableExtensions.Include<TEntity, TProperty>(IQueryable<TEntity>, Expression<Func<TEntity, TProperty>>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.Include<TEntity, TProperty>(System.Linq.IQueryable<TEntity>, System.Linq.Expressions.Expression<System.Func<TEntity, TProperty>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Include
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 530
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Specifies a navigation property to eager-load, matching Entity Framework Core's
+
+    <code>Include</code> surface. This extension lets <code>Include</code> chain directly off the
+
+    <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> returned by <xref href="nORM.Core.NormQueryable.Query%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref> /
+
+    <xref href="nORM.Core.NormQueryable.Set%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref> and off standard operators such as
+
+    <code>Where</code>/<code>OrderBy</code>, whose static result type is <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref>
+
+    even though the underlying object is a nORM queryable — so no cast to
+
+    <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref> is required. When the static type already is
+
+    <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>, the instance <code>Include</code> is preferred by the
+
+    compiler and this extension is not involved.
+  example: []
+  syntax:
+    content: 'public static INormIncludableQueryable<TEntity, TProperty> Include<TEntity, TProperty>(this IQueryable<TEntity> source, Expression<Func<TEntity, TProperty>> navigationPropertyPath) where TEntity : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{TEntity}}
+      description: A nORM query started with <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>.
+    - id: navigationPropertyPath
+      type: System.Linq.Expressions.Expression{System.Func{{TEntity},{TProperty}}}
+      description: Expression identifying the navigation to include.
+    typeParameters:
+    - id: TEntity
+      description: The root entity type of the query.
+    - id: TProperty
+      description: Type of the navigation property.
+    return:
+      type: nORM.Core.INormIncludableQueryable{{TEntity},{TProperty}}
+      description: A query with the navigation included, chainable with <code>ThenInclude</code>.
+    content.vb: Public Shared Function Include(Of TEntity As Class, TProperty)(source As IQueryable(Of TEntity), navigationPropertyPath As Expression(Of Func(Of TEntity, TProperty))) As INormIncludableQueryable(Of TEntity, TProperty)
+  overload: nORM.Core.NormIncludableQueryableExtensions.Include*
+  nameWithType.vb: NormIncludableQueryableExtensions.Include(Of TEntity, TProperty)(IQueryable(Of TEntity), Expression(Of Func(Of TEntity, TProperty)))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.Include(Of TEntity, TProperty)(System.Linq.IQueryable(Of TEntity), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, TProperty)))
+  name.vb: Include(Of TEntity, TProperty)(IQueryable(Of TEntity), Expression(Of Func(Of TEntity, TProperty)))
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+  id: AsNoTracking``1(System.Linq.IQueryable{``0})
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: AsNoTracking<T>(IQueryable<T>)
+  nameWithType: NormIncludableQueryableExtensions.AsNoTracking<T>(IQueryable<T>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking<T>(System.Linq.IQueryable<T>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsNoTracking
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 564
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Disables change tracking for the query results, matching Entity Framework Core's
+
+    <code>AsNoTracking</code>. Like <xref href="nORM.Core.NormIncludableQueryableExtensions.Include%60%602(System.Linq.IQueryable%7b%60%600%7d%2cSystem.Linq.Expressions.Expression%7bSystem.Func%7b%60%600%2c%60%601%7d%7d)" data-throw-if-not-resolved="false"></xref> this extension lets
+
+    <code>AsNoTracking</code> chain off the <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> returned by
+
+    <xref href="nORM.Core.NormQueryable.Query%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>/<xref href="nORM.Core.NormQueryable.Set%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref> and off standard
+
+    operators without a cast to <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>; when the static type already
+
+    is <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref> the instance method is preferred by the compiler.
+  example: []
+  syntax:
+    content: 'public static INormQueryable<T> AsNoTracking<T>(this IQueryable<T> source) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: A nORM query started with <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>.
+    typeParameters:
+    - id: T
+      description: The entity type of the query.
+    return:
+      type: nORM.Core.INormQueryable{{T}}
+      description: An untracked query.
+    content.vb: Public Shared Function AsNoTracking(Of T As Class)(source As IQueryable(Of T)) As INormQueryable(Of T)
+  overload: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking*
+  nameWithType.vb: NormIncludableQueryableExtensions.AsNoTracking(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: AsNoTracking(Of T)(IQueryable(Of T))
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution``1(System.Linq.IQueryable{``0})
+  id: AsNoTrackingWithIdentityResolution``1(System.Linq.IQueryable{``0})
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: AsNoTrackingWithIdentityResolution<T>(IQueryable<T>)
+  nameWithType: NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution<T>(IQueryable<T>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution<T>(System.Linq.IQueryable<T>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsNoTrackingWithIdentityResolution
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 585
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    The <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> form of <xref href="nORM.Core.INormQueryable%601.AsNoTrackingWithIdentityResolution" data-throw-if-not-resolved="false"></xref>
+
+    for chains typed as <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref>; when the static type already is
+
+    <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref> the instance method is preferred by the compiler.
+  example: []
+  syntax:
+    content: 'public static INormQueryable<T> AsNoTrackingWithIdentityResolution<T>(this IQueryable<T> source) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: A nORM query started with <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>.
+    typeParameters:
+    - id: T
+      description: The entity type of the query.
+    return:
+      type: nORM.Core.INormQueryable{{T}}
+      description: An untracked query that resolves entity identity.
+    content.vb: Public Shared Function AsNoTrackingWithIdentityResolution(Of T As Class)(source As IQueryable(Of T)) As INormQueryable(Of T)
+  overload: nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution*
+  nameWithType.vb: NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: AsNoTrackingWithIdentityResolution(Of T)(IQueryable(Of T))
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsTracking``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.AsTracking``1(System.Linq.IQueryable{``0})
+  id: AsTracking``1(System.Linq.IQueryable{``0})
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: AsTracking<T>(IQueryable<T>)
+  nameWithType: NormIncludableQueryableExtensions.AsTracking<T>(IQueryable<T>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsTracking<T>(System.Linq.IQueryable<T>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsTracking
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 609
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Forces the query's results to be change-tracked, matching Entity Framework Core's
+
+    <code>AsTracking</code>. This is the per-query override of a context whose
+
+    <xref href="nORM.Configuration.DbContextOptions.DefaultTrackingBehavior" data-throw-if-not-resolved="false"></xref> is
+
+    <xref href="nORM.Core.QueryTrackingBehavior.NoTracking" data-throw-if-not-resolved="false"></xref> — the results are tracked even though the context
+
+    would otherwise return them detached. When composed with <code>AsNoTracking</code> the outermost
+
+    (last-written) call wins. Has no effect on the default (already tracking) context.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("nORM AsTracking emits a MakeGenericMethod marker call; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("nORM AsTracking uses reflection to resolve the open generic marker method; trimming may remove it.")]
+
+      public static IQueryable<T> AsTracking<T>(this IQueryable<T> source) where T : class
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: A nORM query started with <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>.
+    typeParameters:
+    - id: T
+      description: The entity type of the query.
+    return:
+      type: System.Linq.IQueryable{{T}}
+      description: A query whose results are tracked.
+    content.vb: >-
+      <RequiresDynamicCode("nORM AsTracking emits a MakeGenericMethod marker call; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("nORM AsTracking uses reflection to resolve the open generic marker method; trimming may remove it.")>
+
+      Public Shared Function AsTracking(Of T As Class)(source As IQueryable(Of T)) As IQueryable(Of T)
+  overload: nORM.Core.NormIncludableQueryableExtensions.AsTracking*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM AsTracking emits a MakeGenericMethod marker call; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM AsTracking uses reflection to resolve the open generic marker method; trimming may remove it.
+  nameWithType.vb: NormIncludableQueryableExtensions.AsTracking(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.AsTracking(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: AsTracking(Of T)(IQueryable(Of T))
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery``1(System.Linq.IQueryable{``0})
+  id: AsSplitQuery``1(System.Linq.IQueryable{``0})
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: AsSplitQuery<T>(IQueryable<T>)
+  nameWithType: NormIncludableQueryableExtensions.AsSplitQuery<T>(IQueryable<T>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery<T>(System.Linq.IQueryable<T>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsSplitQuery
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 639
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Accepted for Entity Framework Core compatibility; nORM always eager-loads
+
+    <code>Include</code> paths through coordinated follow-up queries, so this has no additional
+
+    effect. Exposed on <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> so it composes without a cast, mirroring
+
+    <xref href="nORM.Core.NormIncludableQueryableExtensions.AsNoTracking%60%601(System.Linq.IQueryable%7b%60%600%7d)" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: 'public static INormQueryable<T> AsSplitQuery<T>(this IQueryable<T> source) where T : class'
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: A nORM query started with <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>.
+    typeParameters:
+    - id: T
+      description: The entity type of the query.
+    return:
+      type: nORM.Core.INormQueryable{{T}}
+      description: The same query; eager loading is driven by Include alone.
+    content.vb: Public Shared Function AsSplitQuery(Of T As Class)(source As IQueryable(Of T)) As INormQueryable(Of T)
+  overload: nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery*
+  nameWithType.vb: NormIncludableQueryableExtensions.AsSplitQuery(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: AsSplitQuery(Of T)(IQueryable(Of T))
+- uid: nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters``1(System.Linq.IQueryable{``0})
+  id: IgnoreQueryFilters``1(System.Linq.IQueryable{``0})
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: IgnoreQueryFilters<T>(IQueryable<T>)
+  nameWithType: NormIncludableQueryableExtensions.IgnoreQueryFilters<T>(IQueryable<T>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters<T>(System.Linq.IQueryable<T>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IgnoreQueryFilters
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 665
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Bypasses the user-defined global query filters (registered via
+
+    <code>DbContextOptions.AddGlobalFilter</code>, e.g. soft-delete) for this query — the escape
+
+    hatch for admin "show deleted", restore, and audit views, matching Entity Framework
+
+    Core's <code>IgnoreQueryFilters</code>. It applies to the root query's filters.
+
+
+    <p>
+
+    IMPORTANT: it does NOT bypass tenant isolation. In nORM the tenant predicate is a
+
+    security boundary applied independently of global filters, so it always remains in
+
+    force; a query can never read another tenant's rows via IgnoreQueryFilters.
+
+    </p>
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("nORM IgnoreQueryFilters emits a MakeGenericMethod marker call; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("nORM IgnoreQueryFilters uses reflection to resolve the open generic marker method; trimming may remove it.")]
+
+      public static IQueryable<T> IgnoreQueryFilters<T>(this IQueryable<T> source) where T : class
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: A nORM query started with <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>.
+    typeParameters:
+    - id: T
+      description: The entity type of the query.
+    return:
+      type: System.Linq.IQueryable{{T}}
+      description: A query whose user global filters are suppressed.
+    content.vb: >-
+      <RequiresDynamicCode("nORM IgnoreQueryFilters emits a MakeGenericMethod marker call; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("nORM IgnoreQueryFilters uses reflection to resolve the open generic marker method; trimming may remove it.")>
+
+      Public Shared Function IgnoreQueryFilters(Of T As Class)(source As IQueryable(Of T)) As IQueryable(Of T)
+  overload: nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM IgnoreQueryFilters emits a MakeGenericMethod marker call; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM IgnoreQueryFilters uses reflection to resolve the open generic marker method; trimming may remove it.
+  nameWithType.vb: NormIncludableQueryableExtensions.IgnoreQueryFilters(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: IgnoreQueryFilters(Of T)(IQueryable(Of T))
+- uid: nORM.Core.NormIncludableQueryableExtensions.TagWith``1(System.Linq.IQueryable{``0},System.String)
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.TagWith``1(System.Linq.IQueryable{``0},System.String)
+  id: TagWith``1(System.Linq.IQueryable{``0},System.String)
+  isExtensionMethod: true
+  parent: nORM.Core.NormIncludableQueryableExtensions
+  langs:
+  - csharp
+  - vb
+  name: TagWith<T>(IQueryable<T>, string)
+  nameWithType: NormIncludableQueryableExtensions.TagWith<T>(IQueryable<T>, string)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.TagWith<T>(System.Linq.IQueryable<T>, string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TagWith
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 697
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Adds a comment tag to the generated SQL for this query, matching EF Core's <code>TagWith</code>. The
+
+    tag is emitted as a leading SQL line comment (injection-safe: each line is prefixed with
+
+    <code>-- </code>), which is invaluable for correlating a query in database logs, an APM trace, or a
+
+    slow-query report back to the source. Multiple <code>TagWith</code> calls accumulate. Has no effect on
+
+    results.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("nORM TagWith emits a MakeGenericMethod marker call; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("nORM TagWith uses reflection to resolve the open generic marker method; trimming may remove it.")]
+
+      public static IQueryable<T> TagWith<T>(this IQueryable<T> source, string tag) where T : class
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: The source query.
+    - id: tag
+      type: System.String
+      description: The comment to embed in the generated SQL.
+    typeParameters:
+    - id: T
+      description: The query element type.
+    return:
+      type: System.Linq.IQueryable{{T}}
+      description: A query that emits the tag comment in its SQL.
+    content.vb: >-
+      <RequiresDynamicCode("nORM TagWith emits a MakeGenericMethod marker call; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("nORM TagWith uses reflection to resolve the open generic marker method; trimming may remove it.")>
+
+      Public Shared Function TagWith(Of T As Class)(source As IQueryable(Of T), tag As String) As IQueryable(Of T)
+  overload: nORM.Core.NormIncludableQueryableExtensions.TagWith*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM TagWith emits a MakeGenericMethod marker call; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM TagWith uses reflection to resolve the open generic marker method; trimming may remove it.
+  nameWithType.vb: NormIncludableQueryableExtensions.TagWith(Of T)(IQueryable(Of T), String)
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.TagWith(Of T)(System.Linq.IQueryable(Of T), String)
+  name.vb: TagWith(Of T)(IQueryable(Of T), String)
 - uid: nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
   commentId: M:nORM.Core.NormIncludableQueryableExtensions.ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
   id: ThenInclude``3(nORM.Core.INormIncludableQueryable{``0,``1},System.Linq.Expressions.Expression{System.Func{``1,``2}})
@@ -83,7 +533,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 404
+    startLine: 727
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -132,7 +582,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 426
+    startLine: 750
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -425,6 +875,643 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: System.Linq.IQueryable`1
+  commentId: T:System.Linq.IQueryable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<T>
+  nameWithType: IQueryable<T>
+  fullName: System.Linq.IQueryable<T>
+  nameWithType.vb: IQueryable(Of T)
+  fullName.vb: System.Linq.IQueryable(Of T)
+  name.vb: IQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+  commentId: M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  name: Query<T>(DbContext)
+  nameWithType: NormQueryable.Query<T>(DbContext)
+  fullName: nORM.Core.NormQueryable.Query<T>(nORM.Core.DbContext)
+  nameWithType.vb: NormQueryable.Query(Of T)(DbContext)
+  fullName.vb: nORM.Core.NormQueryable.Query(Of T)(nORM.Core.DbContext)
+  name.vb: Query(Of T)(DbContext)
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+    name: Query
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+    name: Query
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+  commentId: M:nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Set__1_nORM_Core_DbContext_
+  name: Set<T>(DbContext)
+  nameWithType: NormQueryable.Set<T>(DbContext)
+  fullName: nORM.Core.NormQueryable.Set<T>(nORM.Core.DbContext)
+  nameWithType.vb: NormQueryable.Set(Of T)(DbContext)
+  fullName.vb: nORM.Core.NormQueryable.Set(Of T)(nORM.Core.DbContext)
+  name.vb: Set(Of T)(DbContext)
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+    name: Set
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Set__1_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+    name: Set
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Set__1_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Core.INormQueryable`1
+  commentId: T:nORM.Core.INormQueryable`1
+  parent: nORM.Core
+  href: nORM.Core.INormQueryable-1.html
+  name: INormQueryable<T>
+  nameWithType: INormQueryable<T>
+  fullName: nORM.Core.INormQueryable<T>
+  nameWithType.vb: INormQueryable(Of T)
+  fullName.vb: nORM.Core.INormQueryable(Of T)
+  name.vb: INormQueryable(Of T)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.NormIncludableQueryableExtensions.Include*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.Include
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_Include__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___
+  name: Include
+  nameWithType: NormIncludableQueryableExtensions.Include
+  fullName: nORM.Core.NormIncludableQueryableExtensions.Include
+- uid: System.Linq.IQueryable{{TEntity}}
+  commentId: T:System.Linq.IQueryable{``0}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<TEntity>
+  nameWithType: IQueryable<TEntity>
+  fullName: System.Linq.IQueryable<TEntity>
+  nameWithType.vb: IQueryable(Of TEntity)
+  fullName.vb: System.Linq.IQueryable(Of TEntity)
+  name.vb: IQueryable(Of TEntity)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+- uid: System.Linq.Expressions.Expression{System.Func{{TEntity},{TProperty}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`0,``0}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<TEntity, TProperty>>
+  nameWithType: Expression<Func<TEntity, TProperty>>
+  fullName: System.Linq.Expressions.Expression<System.Func<TEntity, TProperty>>
+  nameWithType.vb: Expression(Of Func(Of TEntity, TProperty))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of TEntity, TProperty))
+  name.vb: Expression(Of Func(Of TEntity, TProperty))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+- uid: nORM.Core.INormIncludableQueryable{{TEntity},{TProperty}}
+  commentId: T:nORM.Core.INormIncludableQueryable{``0,``1}
+  parent: nORM.Core
+  definition: nORM.Core.INormIncludableQueryable`2
+  href: nORM.Core.INormIncludableQueryable-2.html
+  name: INormIncludableQueryable<TEntity, TProperty>
+  nameWithType: INormIncludableQueryable<TEntity, TProperty>
+  fullName: nORM.Core.INormIncludableQueryable<TEntity, TProperty>
+  nameWithType.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  fullName.vb: nORM.Core.INormIncludableQueryable(Of TEntity, TProperty)
+  name.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  spec.csharp:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+- uid: System.Linq
+  commentId: N:System.Linq
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq
+  nameWithType: System.Linq
+  fullName: System.Linq
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: System.Linq.Expressions
+  commentId: N:System.Linq.Expressions
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Linq.Expressions
+  nameWithType: System.Linq.Expressions
+  fullName: System.Linq.Expressions
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Linq
+    name: Linq
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq
+  - name: .
+  - uid: System.Linq.Expressions
+    name: Expressions
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
+- uid: nORM.Core.INormIncludableQueryable`2
+  commentId: T:nORM.Core.INormIncludableQueryable`2
+  href: nORM.Core.INormIncludableQueryable-2.html
+  name: INormIncludableQueryable<TEntity, TProperty>
+  nameWithType: INormIncludableQueryable<TEntity, TProperty>
+  fullName: nORM.Core.INormIncludableQueryable<TEntity, TProperty>
+  nameWithType.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  fullName.vb: nORM.Core.INormIncludableQueryable(Of TEntity, TProperty)
+  name.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  spec.csharp:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+- uid: nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+  isExternal: true
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_Include__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___
+  name: Include<TEntity, TProperty>(IQueryable<TEntity>, Expression<Func<TEntity, TProperty>>)
+  nameWithType: NormIncludableQueryableExtensions.Include<TEntity, TProperty>(IQueryable<TEntity>, Expression<Func<TEntity, TProperty>>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.Include<TEntity, TProperty>(System.Linq.IQueryable<TEntity>, System.Linq.Expressions.Expression<System.Func<TEntity, TProperty>>)
+  nameWithType.vb: NormIncludableQueryableExtensions.Include(Of TEntity, TProperty)(IQueryable(Of TEntity), Expression(Of Func(Of TEntity, TProperty)))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.Include(Of TEntity, TProperty)(System.Linq.IQueryable(Of TEntity), System.Linq.Expressions.Expression(Of System.Func(Of TEntity, TProperty)))
+  name.vb: Include(Of TEntity, TProperty)(IQueryable(Of TEntity), Expression(Of Func(Of TEntity, TProperty)))
+  spec.csharp:
+  - uid: nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: Include
+    href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_Include__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: TEntity
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormIncludableQueryableExtensions.Include``2(System.Linq.IQueryable{``0},System.Linq.Expressions.Expression{System.Func{``0,``1}})
+    name: Include
+    href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_Include__2_System_Linq_IQueryable___0__System_Linq_Expressions_Expression_System_Func___0___1___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.AsNoTracking
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsNoTracking__1_System_Linq_IQueryable___0__
+  name: AsNoTracking
+  nameWithType: NormIncludableQueryableExtensions.AsNoTracking
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking
+- uid: System.Linq.IQueryable{{T}}
+  commentId: T:System.Linq.IQueryable{``0}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<T>
+  nameWithType: IQueryable<T>
+  fullName: System.Linq.IQueryable<T>
+  nameWithType.vb: IQueryable(Of T)
+  fullName.vb: System.Linq.IQueryable(Of T)
+  name.vb: IQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.INormQueryable{{T}}
+  commentId: T:nORM.Core.INormQueryable{``0}
+  parent: nORM.Core
+  definition: nORM.Core.INormQueryable`1
+  href: nORM.Core.INormQueryable-1.html
+  name: INormQueryable<T>
+  nameWithType: INormQueryable<T>
+  fullName: nORM.Core.INormQueryable<T>
+  nameWithType.vb: INormQueryable(Of T)
+  fullName.vb: nORM.Core.INormQueryable(Of T)
+  name.vb: INormQueryable(Of T)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  nameWithType.vb: INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsNoTrackingWithIdentityResolution__1_System_Linq_IQueryable___0__
+  name: AsNoTrackingWithIdentityResolution
+  nameWithType: NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution
+- uid: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  commentId: P:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_DefaultTrackingBehavior
+  name: DefaultTrackingBehavior
+  nameWithType: DbContextOptions.DefaultTrackingBehavior
+  fullName: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
+- uid: nORM.Core.QueryTrackingBehavior.NoTracking
+  commentId: F:nORM.Core.QueryTrackingBehavior.NoTracking
+  href: nORM.Core.QueryTrackingBehavior.html#nORM_Core_QueryTrackingBehavior_NoTracking
+  name: NoTracking
+  nameWithType: QueryTrackingBehavior.NoTracking
+  fullName: nORM.Core.QueryTrackingBehavior.NoTracking
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsTracking*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.AsTracking
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsTracking__1_System_Linq_IQueryable___0__
+  name: AsTracking
+  nameWithType: NormIncludableQueryableExtensions.AsTracking
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsTracking
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+  isExternal: true
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsNoTracking__1_System_Linq_IQueryable___0__
+  name: AsNoTracking<T>(IQueryable<T>)
+  nameWithType: NormIncludableQueryableExtensions.AsNoTracking<T>(IQueryable<T>)
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking<T>(System.Linq.IQueryable<T>)
+  nameWithType.vb: NormIncludableQueryableExtensions.AsNoTracking(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: AsNoTracking(Of T)(IQueryable(Of T))
+  spec.csharp:
+  - uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+    name: AsNoTracking
+    href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsNoTracking__1_System_Linq_IQueryable___0__
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{``0})
+    name: AsNoTracking
+    href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsNoTracking__1_System_Linq_IQueryable___0__
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_AsSplitQuery__1_System_Linq_IQueryable___0__
+  name: AsSplitQuery
+  nameWithType: NormIncludableQueryableExtensions.AsSplitQuery
+  fullName: nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery
+- uid: nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_IgnoreQueryFilters__1_System_Linq_IQueryable___0__
+  name: IgnoreQueryFilters
+  nameWithType: NormIncludableQueryableExtensions.IgnoreQueryFilters
+  fullName: nORM.Core.NormIncludableQueryableExtensions.IgnoreQueryFilters
+- uid: nORM.Core.NormIncludableQueryableExtensions.TagWith*
+  commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.TagWith
+  href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_TagWith__1_System_Linq_IQueryable___0__System_String_
+  name: TagWith
+  nameWithType: NormIncludableQueryableExtensions.TagWith
+  fullName: nORM.Core.NormIncludableQueryableExtensions.TagWith
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
 - uid: nORM.Core.NormIncludableQueryableExtensions.ThenInclude*
   commentId: Overload:nORM.Core.NormIncludableQueryableExtensions.ThenInclude
   href: nORM.Core.NormIncludableQueryableExtensions.html#nORM_Core_NormIncludableQueryableExtensions_ThenInclude__3_nORM_Core_INormIncludableQueryable___0___1__System_Linq_Expressions_Expression_System_Func___1___2___
@@ -513,135 +1600,6 @@ references:
   - name: TProperty
   - name: )
   - name: )
-- uid: nORM.Core.INormIncludableQueryable{{TEntity},{TProperty}}
-  commentId: T:nORM.Core.INormIncludableQueryable{``0,``2}
-  parent: nORM.Core
-  definition: nORM.Core.INormIncludableQueryable`2
-  href: nORM.Core.INormIncludableQueryable-2.html
-  name: INormIncludableQueryable<TEntity, TProperty>
-  nameWithType: INormIncludableQueryable<TEntity, TProperty>
-  fullName: nORM.Core.INormIncludableQueryable<TEntity, TProperty>
-  nameWithType.vb: INormIncludableQueryable(Of TEntity, TProperty)
-  fullName.vb: nORM.Core.INormIncludableQueryable(Of TEntity, TProperty)
-  name.vb: INormIncludableQueryable(Of TEntity, TProperty)
-  spec.csharp:
-  - uid: nORM.Core.INormIncludableQueryable`2
-    name: INormIncludableQueryable
-    href: nORM.Core.INormIncludableQueryable-2.html
-  - name: <
-  - name: TEntity
-  - name: ','
-  - name: " "
-  - name: TProperty
-  - name: '>'
-  spec.vb:
-  - uid: nORM.Core.INormIncludableQueryable`2
-    name: INormIncludableQueryable
-    href: nORM.Core.INormIncludableQueryable-2.html
-  - name: (
-  - name: Of
-  - name: " "
-  - name: TEntity
-  - name: ','
-  - name: " "
-  - name: TProperty
-  - name: )
-- uid: nORM.Core.INormIncludableQueryable`2
-  commentId: T:nORM.Core.INormIncludableQueryable`2
-  href: nORM.Core.INormIncludableQueryable-2.html
-  name: INormIncludableQueryable<TEntity, TProperty>
-  nameWithType: INormIncludableQueryable<TEntity, TProperty>
-  fullName: nORM.Core.INormIncludableQueryable<TEntity, TProperty>
-  nameWithType.vb: INormIncludableQueryable(Of TEntity, TProperty)
-  fullName.vb: nORM.Core.INormIncludableQueryable(Of TEntity, TProperty)
-  name.vb: INormIncludableQueryable(Of TEntity, TProperty)
-  spec.csharp:
-  - uid: nORM.Core.INormIncludableQueryable`2
-    name: INormIncludableQueryable
-    href: nORM.Core.INormIncludableQueryable-2.html
-  - name: <
-  - name: TEntity
-  - name: ','
-  - name: " "
-  - name: TProperty
-  - name: '>'
-  spec.vb:
-  - uid: nORM.Core.INormIncludableQueryable`2
-    name: INormIncludableQueryable
-    href: nORM.Core.INormIncludableQueryable-2.html
-  - name: (
-  - name: Of
-  - name: " "
-  - name: TEntity
-  - name: ','
-  - name: " "
-  - name: TProperty
-  - name: )
-- uid: System.Linq.Expressions.Expression`1
-  commentId: T:System.Linq.Expressions.Expression`1
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
-  name: Expression<TDelegate>
-  nameWithType: Expression<TDelegate>
-  fullName: System.Linq.Expressions.Expression<TDelegate>
-  nameWithType.vb: Expression(Of TDelegate)
-  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
-  name.vb: Expression(Of TDelegate)
-  spec.csharp:
-  - uid: System.Linq.Expressions.Expression`1
-    name: Expression
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
-  - name: <
-  - name: TDelegate
-  - name: '>'
-  spec.vb:
-  - uid: System.Linq.Expressions.Expression`1
-    name: Expression
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: TDelegate
-  - name: )
-- uid: System.Linq.Expressions
-  commentId: N:System.Linq.Expressions
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system
-  name: System.Linq.Expressions
-  nameWithType: System.Linq.Expressions
-  fullName: System.Linq.Expressions
-  spec.csharp:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Linq
-    name: Linq
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq
-  - name: .
-  - uid: System.Linq.Expressions
-    name: Expressions
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
-  spec.vb:
-  - uid: System
-    name: System
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system
-  - name: .
-  - uid: System.Linq
-    name: Linq
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq
-  - name: .
-  - uid: System.Linq.Expressions
-    name: Expressions
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions
 - uid: nORM.Core.INormIncludableQueryable{{TEntity},System.Collections.Generic.IEnumerable{{TPreviousProperty}}}
   commentId: T:nORM.Core.INormIncludableQueryable{``0,System.Collections.Generic.IEnumerable{``1}}
   parent: nORM.Core

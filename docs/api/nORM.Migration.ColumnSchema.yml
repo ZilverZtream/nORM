@@ -8,6 +8,7 @@ items:
   - nORM.Migration.ColumnSchema.ClrType
   - nORM.Migration.ColumnSchema.Collation
   - nORM.Migration.ColumnSchema.ComputedColumnSql
+  - nORM.Migration.ColumnSchema.DefaultConstraintName
   - nORM.Migration.ColumnSchema.DefaultValue
   - nORM.Migration.ColumnSchema.IdentityIncrement
   - nORM.Migration.ColumnSchema.IdentitySeed
@@ -40,7 +41,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 99
+    startLine: 121
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -82,7 +83,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 102
+    startLine: 124
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -113,7 +114,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PreviousName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 109
+    startLine: 131
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -151,7 +152,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClrType
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 121
+    startLine: 143
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -162,7 +163,7 @@ items:
 
     callers that produce <xref href="nORM.Migration.ColumnSchema" data-throw-if-not-resolved="false"></xref> instances should always populate this
 
-    field — leaving it empty will cause all four SQL generators to fall back to their
+    field - leaving it empty will cause all four SQL generators to fall back to their
 
     default type (e.g. NVARCHAR(MAX) for SQL Server) and may suppress spurious alter
 
@@ -193,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxLength
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 123
+    startLine: 145
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -224,7 +225,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 128
+    startLine: 150
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -258,7 +259,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 130
+    startLine: 152
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -289,7 +290,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precision
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 132
+    startLine: 154
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -320,7 +321,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Scale
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 134
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -351,7 +352,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 136
+    startLine: 158
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -382,7 +383,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsPrimaryKey
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 138
+    startLine: 160
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -413,7 +414,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 140
+    startLine: 162
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -444,7 +445,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 142
+    startLine: 164
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -475,7 +476,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexOrder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 144
+    startLine: 166
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -506,7 +507,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Indexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 146
+    startLine: 168
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -537,7 +538,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValue
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 148
+    startLine: 170
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -550,6 +551,37 @@ items:
       type: System.String
     content.vb: Public Property DefaultValue As String
   overload: nORM.Migration.ColumnSchema.DefaultValue*
+- uid: nORM.Migration.ColumnSchema.DefaultConstraintName
+  commentId: P:nORM.Migration.ColumnSchema.DefaultConstraintName
+  id: DefaultConstraintName
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: DefaultConstraintName
+  nameWithType: ColumnSchema.DefaultConstraintName
+  fullName: nORM.Migration.ColumnSchema.DefaultConstraintName
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DefaultConstraintName
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 172
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Optional provider default-constraint name associated with <xref href="nORM.Migration.ColumnSchema.DefaultValue" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public string? DefaultConstraintName { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property DefaultConstraintName As String
+  overload: nORM.Migration.ColumnSchema.DefaultConstraintName*
 - uid: nORM.Migration.ColumnSchema.Collation
   commentId: P:nORM.Migration.ColumnSchema.Collation
   id: Collation
@@ -568,7 +600,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collation
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 150
+    startLine: 174
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -599,7 +631,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsIdentity
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 152
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -630,7 +662,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentitySeed
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 154
+    startLine: 178
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -661,7 +693,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentityIncrement
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 156
+    startLine: 180
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -692,7 +724,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 158
+    startLine: 182
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -723,7 +755,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsStoredComputedColumn
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 160
+    startLine: 184
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -2002,6 +2034,18 @@ references:
   name: DefaultValue
   nameWithType: ColumnSchema.DefaultValue
   fullName: nORM.Migration.ColumnSchema.DefaultValue
+- uid: nORM.Migration.ColumnSchema.DefaultValue
+  commentId: P:nORM.Migration.ColumnSchema.DefaultValue
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_DefaultValue
+  name: DefaultValue
+  nameWithType: ColumnSchema.DefaultValue
+  fullName: nORM.Migration.ColumnSchema.DefaultValue
+- uid: nORM.Migration.ColumnSchema.DefaultConstraintName*
+  commentId: Overload:nORM.Migration.ColumnSchema.DefaultConstraintName
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_DefaultConstraintName
+  name: DefaultConstraintName
+  nameWithType: ColumnSchema.DefaultConstraintName
+  fullName: nORM.Migration.ColumnSchema.DefaultConstraintName
 - uid: nORM.Migration.ColumnSchema.Collation*
   commentId: Overload:nORM.Migration.ColumnSchema.Collation
   href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_Collation

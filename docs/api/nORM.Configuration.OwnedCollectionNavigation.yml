@@ -25,7 +25,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigation
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 265
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -69,7 +69,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 265
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -113,7 +113,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedType
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 265
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -144,7 +144,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 265
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -175,7 +175,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeyName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 265
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -206,7 +206,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Configuration
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 265
+    startLine: 287
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -237,7 +237,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaName
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 268
+    startLine: 290
   assemblies:
   - nORM
   namespace: nORM.Configuration

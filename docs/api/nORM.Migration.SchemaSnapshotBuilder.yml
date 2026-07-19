@@ -16,12 +16,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Builder.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaSnapshotBuilder
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 190
+    path: src/nORM/Migration/SchemaSnapshot.Builder.cs
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -77,12 +77,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Builder.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 218
+    path: src/nORM/Migration/SchemaSnapshot.Builder.cs
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -104,8 +104,9 @@ items:
             Fluent API overrides (e.g. <code>ToTable()</code>, <code>HasColumnName()</code>, <code>HasKey()</code>)
             are <b>not</b> visible here.</li><li>Scans all non-abstract classes in the assembly that carry <code>[Table]</code> or a
             <code>[Key]</code>-annotated property. The context-based overload only includes types
-            explicitly registered with the fluent model builder.</li><li>Does not include foreign key constraints (no fluent Relation metadata available).</li><li>May produce duplicate <code>TableSchema</code> entries if two entity types share the
-            same <code>[Table]</code> name — see the duplicate-name guard for details.</li></ul>
+            explicitly registered with the fluent model builder.</li><li>Does not include foreign key constraints (no fluent Relation metadata available).</li><li>Cannot see <xref href="nORM.Configuration.DbContextOptions" data-throw-if-not-resolved="false"></xref>, so <xref href="nORM.Migration.TableSchema.IsTemporal" data-throw-if-not-resolved="false"></xref>
+            is never set - temporal-aware migration DDL requires the context overload.</li><li>May produce duplicate <code>TableSchema</code> entries if two entity types share the
+            same <code>[Table]</code> name - see the duplicate-name guard for details.</li></ul>
   example: []
   syntax:
     content: public static SchemaSnapshot Build(Assembly assembly)
@@ -131,12 +132,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Builder.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Build
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 403
+    path: src/nORM/Migration/SchemaSnapshot.Builder.cs
+    startLine: 252
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -471,6 +472,19 @@ references:
     name: DbContext
     href: nORM.Core.DbContext.html
   - name: )
+- uid: nORM.Configuration.DbContextOptions
+  commentId: T:nORM.Configuration.DbContextOptions
+  parent: nORM.Configuration
+  href: nORM.Configuration.DbContextOptions.html
+  name: DbContextOptions
+  nameWithType: DbContextOptions
+  fullName: nORM.Configuration.DbContextOptions
+- uid: nORM.Migration.TableSchema.IsTemporal
+  commentId: P:nORM.Migration.TableSchema.IsTemporal
+  href: nORM.Migration.TableSchema.html#nORM_Migration_TableSchema_IsTemporal
+  name: IsTemporal
+  nameWithType: TableSchema.IsTemporal
+  fullName: nORM.Migration.TableSchema.IsTemporal
 - uid: nORM.Migration.SchemaSnapshotBuilder.Build*
   commentId: Overload:nORM.Migration.SchemaSnapshotBuilder.Build
   href: nORM.Migration.SchemaSnapshotBuilder.html#nORM_Migration_SchemaSnapshotBuilder_Build_System_Reflection_Assembly_
@@ -485,6 +499,28 @@ references:
   name: Assembly
   nameWithType: Assembly
   fullName: System.Reflection.Assembly
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
 - uid: System.Reflection
   commentId: N:System.Reflection
   isExternal: true

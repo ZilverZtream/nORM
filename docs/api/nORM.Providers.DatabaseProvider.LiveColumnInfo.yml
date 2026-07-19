@@ -18,12 +18,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Providers/DatabaseProvider.cs
+      path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: LiveColumnInfo
-    path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 466
+    path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -69,12 +69,12 @@ items:
   type: Constructor
   source:
     remote:
-      path: src/nORM/Providers/DatabaseProvider.cs
+      path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
-    path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 466
+    path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -92,10 +92,13 @@ items:
     parameters:
     - id: Name
       type: System.String
+      description: Column name.
     - id: SqlType
       type: System.String
+      description: Provider SQL type.
     - id: IsNullable
       type: System.Boolean
+      description: Whether the database column allows NULL.
     content.vb: Public Sub New(Name As String, SqlType As String, IsNullable As Boolean)
   overload: nORM.Providers.DatabaseProvider.LiveColumnInfo.#ctor*
   nameWithType.vb: DatabaseProvider.LiveColumnInfo.New(String, String, Boolean)
@@ -114,15 +117,17 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Providers/DatabaseProvider.cs
+      path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
-    path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 466
+    path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Column name.
+  example: []
   syntax:
     content: public string Name { get; init; }
     parameters: []
@@ -143,15 +148,17 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Providers/DatabaseProvider.cs
+      path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlType
-    path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 466
+    path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Provider SQL type.
+  example: []
   syntax:
     content: public string SqlType { get; init; }
     parameters: []
@@ -172,15 +179,17 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Providers/DatabaseProvider.cs
+      path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
-    path: src/nORM/Providers/DatabaseProvider.cs
-    startLine: 466
+    path: src/nORM/Providers/DatabaseProvider.TemporalTenant.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Providers
+  summary: Whether the database column allows NULL.
+  example: []
   syntax:
     content: public bool IsNullable { get; init; }
     parameters: []

@@ -5,7 +5,18 @@ items:
   id: EntityEntry
   parent: nORM.Core
   children:
+  - nORM.Core.EntityEntry.Collection(System.String)
+  - nORM.Core.EntityEntry.CurrentValues
   - nORM.Core.EntityEntry.Entity
+  - nORM.Core.EntityEntry.GetDatabaseValues
+  - nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  - nORM.Core.EntityEntry.IsKeySet
+  - nORM.Core.EntityEntry.Navigation(System.String)
+  - nORM.Core.EntityEntry.OriginalValues
+  - nORM.Core.EntityEntry.Property(System.String)
+  - nORM.Core.EntityEntry.Reference(System.String)
+  - nORM.Core.EntityEntry.Reload
+  - nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken)
   - nORM.Core.EntityEntry.State
   langs:
   - csharp
@@ -21,7 +32,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityEntry
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 24
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -76,7 +87,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entity
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 50
+    startLine: 62
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -92,6 +103,44 @@ items:
       type: System.Object
     content.vb: Public Property Entity As Object
   overload: nORM.Core.EntityEntry.Entity*
+- uid: nORM.Core.EntityEntry.IsKeySet
+  commentId: P:nORM.Core.EntityEntry.IsKeySet
+  id: IsKeySet
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: IsKeySet
+  nameWithType: EntityEntry.IsKeySet
+  fullName: nORM.Core.EntityEntry.IsKeySet
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsKeySet
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets a value indicating whether the entity's primary key has been assigned a non-default value
+
+    (Entity Framework Core parity). Any key column still at its CLR default (0, <xref href="System.Guid.Empty" data-throw-if-not-resolved="false"></xref>,
+
+    or <code>null</code>) makes the key unset — so a store-generated key reads as unset until the database
+
+    assigns it. A keyless entity, or a detached entry that has released its entity, is always unset.
+  example: []
+  syntax:
+    content: public bool IsKeySet { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public ReadOnly Property IsKeySet As Boolean
+  overload: nORM.Core.EntityEntry.IsKeySet*
 - uid: nORM.Core.EntityEntry.State
   commentId: P:nORM.Core.EntityEntry.State
   id: State
@@ -110,22 +159,505 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: State
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 56
+    startLine: 97
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: >-
-    Gets or sets the current <xref href="nORM.Core.EntityState" data-throw-if-not-resolved="false"></xref> of the tracked entity
+    Gets or sets the current <xref href="nORM.Core.EntityState" data-throw-if-not-resolved="false"></xref> of the tracked entity within the context.
 
-    within the context.
+    Assigning a new state performs the corresponding tracker transition — setting
+
+    <xref href="nORM.Core.EntityState.Modified" data-throw-if-not-resolved="false"></xref> flags the entity for a full UPDATE, <xref href="nORM.Core.EntityState.Deleted" data-throw-if-not-resolved="false"></xref>
+
+    for a DELETE (or detaches a never-inserted <xref href="nORM.Core.EntityState.Added" data-throw-if-not-resolved="false"></xref> entity),
+
+    <xref href="nORM.Core.EntityState.Unchanged" data-throw-if-not-resolved="false"></xref> accepts the current values as the clean baseline, and
+
+    <xref href="nORM.Core.EntityState.Detached" data-throw-if-not-resolved="false"></xref> stops tracking the entity — mirroring
+
+    <code>DbContext.Update</code>/<code>Remove</code>/<code>Attach</code>. Internal bookkeeping uses
+
+    <xref href="nORM.Core.EntityEntry.SetStateInternal(nORM.Core.EntityState)" data-throw-if-not-resolved="false"></xref>, which assigns the field without any transition side effects.
   example: []
   syntax:
-    content: public EntityState State { get; }
+    content: public EntityState State { get; set; }
     parameters: []
     return:
       type: nORM.Core.EntityState
     content.vb: Public Property State As EntityState
   overload: nORM.Core.EntityEntry.State*
+- uid: nORM.Core.EntityEntry.CurrentValues
+  commentId: P:nORM.Core.EntityEntry.CurrentValues
+  id: CurrentValues
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: CurrentValues
+  nameWithType: EntityEntry.CurrentValues
+  fullName: nORM.Core.EntityEntry.CurrentValues
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CurrentValues
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 194
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets the entity's current property values as a mutable bag. Writing a value assigns it to the
+
+    entity and marks the entry dirty, mirroring EF's <code>CurrentValues</code>.
+  example: []
+  syntax:
+    content: public PropertyValues CurrentValues { get; }
+    parameters: []
+    return:
+      type: nORM.Core.PropertyValues
+    content.vb: Public ReadOnly Property CurrentValues As PropertyValues
+  overload: nORM.Core.EntityEntry.CurrentValues*
+- uid: nORM.Core.EntityEntry.OriginalValues
+  commentId: P:nORM.Core.EntityEntry.OriginalValues
+  id: OriginalValues
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: OriginalValues
+  nameWithType: EntityEntry.OriginalValues
+  fullName: nORM.Core.EntityEntry.OriginalValues
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: OriginalValues
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 201
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets the entity's original (as-loaded / last-saved) property values as a bag. Writing a value
+
+    overrides the tracked baseline — e.g. resetting a concurrency token to the database value while
+
+    resolving a conflict — mirroring EF's <code>OriginalValues</code>. Original key values are read-only.
+  example: []
+  syntax:
+    content: public PropertyValues OriginalValues { get; }
+    parameters: []
+    return:
+      type: nORM.Core.PropertyValues
+    content.vb: Public ReadOnly Property OriginalValues As PropertyValues
+  overload: nORM.Core.EntityEntry.OriginalValues*
+- uid: nORM.Core.EntityEntry.Property(System.String)
+  commentId: M:nORM.Core.EntityEntry.Property(System.String)
+  id: Property(System.String)
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: Property(string)
+  nameWithType: EntityEntry.Property(string)
+  fullName: nORM.Core.EntityEntry.Property(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Property
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 210
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Provides access to a single mapped property's current/original value and modified state
+
+    (EF Core parity for <code>EntityEntry.Property(name)</code>). Setting <code>IsModified</code> forces or excludes
+
+    the column from the next partial-column UPDATE.
+  example: []
+  syntax:
+    content: public PropertyEntry Property(string propertyName)
+    parameters:
+    - id: propertyName
+      type: System.String
+      description: Name of a mapped property (column) on the entity.
+    return:
+      type: nORM.Core.PropertyEntry
+    content.vb: Public Function [Property](propertyName As String) As PropertyEntry
+  overload: nORM.Core.EntityEntry.Property*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when the entity has no mapped property with that name.
+  nameWithType.vb: EntityEntry.Property(String)
+  fullName.vb: nORM.Core.EntityEntry.Property(String)
+  name.vb: Property(String)
+- uid: nORM.Core.EntityEntry.Reload
+  commentId: M:nORM.Core.EntityEntry.Reload
+  id: Reload
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: Reload()
+  nameWithType: EntityEntry.Reload()
+  fullName: nORM.Core.EntityEntry.Reload()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Reload
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 222
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Overwrites the entity's column values from a fresh read of its database row and resets the
+
+    entry to <xref href="nORM.Core.EntityState.Unchanged" data-throw-if-not-resolved="false"></xref>, discarding any pending edits — mirroring EF's
+
+    <code>Reload</code>. If the row no longer exists the entity is detached. Navigation properties are
+
+    not reloaded. Throws when the entry is detached or not associated with a context.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public void Reload()
+    content.vb: >-
+      <RequiresDynamicCode("Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Sub Reload()
+  overload: nORM.Core.EntityEntry.Reload*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken)
+  id: ReloadAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: ReloadAsync(CancellationToken)
+  nameWithType: EntityEntry.ReloadAsync(CancellationToken)
+  fullName: nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ReloadAsync
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 231
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Asynchronous <xref href="nORM.Core.EntityEntry.Reload" data-throw-if-not-resolved="false"></xref>: overwrites the entity's column values from a fresh read of
+
+    its database row and resets the entry to <xref href="nORM.Core.EntityState.Unchanged" data-throw-if-not-resolved="false"></xref> (or detaches it
+
+    when the row is gone). Navigation properties are not reloaded.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public Task ReloadAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task
+    content.vb: >-
+      <RequiresDynamicCode("Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function ReloadAsync(ct As CancellationToken = Nothing) As Task
+  overload: nORM.Core.EntityEntry.ReloadAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Reload builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Reload reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.EntityEntry.GetDatabaseValues
+  commentId: M:nORM.Core.EntityEntry.GetDatabaseValues
+  id: GetDatabaseValues
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: GetDatabaseValues()
+  nameWithType: EntityEntry.GetDatabaseValues()
+  fullName: nORM.Core.EntityEntry.GetDatabaseValues()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetDatabaseValues
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 244
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Reads the entity's current values straight from its database row as a detached
+
+    <xref href="nORM.Core.PropertyValues" data-throw-if-not-resolved="false"></xref> snapshot, without disturbing the tracked entity or its state —
+
+    mirroring EF's <code>GetDatabaseValues</code>. Returns <code>null</code> when the row no longer exists. The
+
+    canonical use is resolving a <xref href="nORM.Core.DbConcurrencyException" data-throw-if-not-resolved="false"></xref>: compare the returned store
+
+    values against <xref href="nORM.Core.EntityEntry.CurrentValues" data-throw-if-not-resolved="false"></xref>/<xref href="nORM.Core.EntityEntry.OriginalValues" data-throw-if-not-resolved="false"></xref>, then
+
+    <xref href="nORM.Core.PropertyValues.SetValues(System.Object)" data-throw-if-not-resolved="false"></xref> the chosen winner back before retrying the save.
+
+    Throws when the entry is detached or not associated with a context.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public PropertyValues? GetDatabaseValues()
+    return:
+      type: nORM.Core.PropertyValues
+    content.vb: >-
+      <RequiresDynamicCode("GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function GetDatabaseValues() As PropertyValues
+  overload: nORM.Core.EntityEntry.GetDatabaseValues*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  id: GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: GetDatabaseValuesAsync(CancellationToken)
+  nameWithType: EntityEntry.GetDatabaseValuesAsync(CancellationToken)
+  fullName: nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: GetDatabaseValuesAsync
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 253
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Asynchronous <xref href="nORM.Core.EntityEntry.GetDatabaseValues" data-throw-if-not-resolved="false"></xref>: reads the entity's current database row as a
+
+    detached <xref href="nORM.Core.PropertyValues" data-throw-if-not-resolved="false"></xref> snapshot (or <code>null</code> when the row is gone) without
+
+    affecting the tracked entity.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public Task<PropertyValues?> GetDatabaseValuesAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{nORM.Core.PropertyValues}
+    content.vb: >-
+      <RequiresDynamicCode("GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Function GetDatabaseValuesAsync(ct As CancellationToken = Nothing) As Task(Of PropertyValues)
+  overload: nORM.Core.EntityEntry.GetDatabaseValuesAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: GetDatabaseValues builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: GetDatabaseValues reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+- uid: nORM.Core.EntityEntry.Navigation(System.String)
+  commentId: M:nORM.Core.EntityEntry.Navigation(System.String)
+  id: Navigation(System.String)
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: Navigation(string)
+  nameWithType: EntityEntry.Navigation(string)
+  fullName: nORM.Core.EntityEntry.Navigation(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Navigation
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 270
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets an entry for a navigation property by name (reference or collection), for inspecting
+
+    its loaded state or explicitly loading it — mirroring EF's <code>Entry(e).Navigation(name)</code>.
+  example: []
+  syntax:
+    content: public NavigationEntry Navigation(string navigationName)
+    parameters:
+    - id: navigationName
+      type: System.String
+    return:
+      type: nORM.Core.NavigationEntry
+    content.vb: Public Function Navigation(navigationName As String) As NavigationEntry
+  overload: nORM.Core.EntityEntry.Navigation*
+  nameWithType.vb: EntityEntry.Navigation(String)
+  fullName.vb: nORM.Core.EntityEntry.Navigation(String)
+  name.vb: Navigation(String)
+- uid: nORM.Core.EntityEntry.Reference(System.String)
+  commentId: M:nORM.Core.EntityEntry.Reference(System.String)
+  id: Reference(System.String)
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: Reference(string)
+  nameWithType: EntityEntry.Reference(string)
+  fullName: nORM.Core.EntityEntry.Reference(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Reference
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 277
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets an entry for a reference (to-one) navigation property by name, e.g.
+
+    <code>Entry(order).Reference("Customer").Load()</code>.
+  example: []
+  syntax:
+    content: public NavigationEntry Reference(string navigationName)
+    parameters:
+    - id: navigationName
+      type: System.String
+    return:
+      type: nORM.Core.NavigationEntry
+    content.vb: Public Function Reference(navigationName As String) As NavigationEntry
+  overload: nORM.Core.EntityEntry.Reference*
+  nameWithType.vb: EntityEntry.Reference(String)
+  fullName.vb: nORM.Core.EntityEntry.Reference(String)
+  name.vb: Reference(String)
+- uid: nORM.Core.EntityEntry.Collection(System.String)
+  commentId: M:nORM.Core.EntityEntry.Collection(System.String)
+  id: Collection(System.String)
+  parent: nORM.Core.EntityEntry
+  langs:
+  - csharp
+  - vb
+  name: Collection(string)
+  nameWithType: EntityEntry.Collection(string)
+  fullName: nORM.Core.EntityEntry.Collection(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/EntityEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Collection
+    path: src/nORM/Core/EntityEntry.cs
+    startLine: 284
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Gets an entry for a collection (to-many) navigation property by name, e.g.
+
+    <code>Entry(order).Collection("Lines").Load()</code>.
+  example: []
+  syntax:
+    content: public NavigationEntry Collection(string navigationName)
+    parameters:
+    - id: navigationName
+      type: System.String
+    return:
+      type: nORM.Core.NavigationEntry
+    content.vb: Public Function Collection(navigationName As String) As NavigationEntry
+  overload: nORM.Core.EntityEntry.Collection*
+  nameWithType.vb: EntityEntry.Collection(String)
+  fullName.vb: nORM.Core.EntityEntry.Collection(String)
+  name.vb: Collection(String)
 references:
 - uid: nORM.Core.EntityEntry
   commentId: T:nORM.Core.EntityEntry
@@ -1118,6 +1650,30 @@ references:
   name: Entity
   nameWithType: EntityEntry.Entity
   fullName: nORM.Core.EntityEntry.Entity
+- uid: System.Guid.Empty
+  commentId: F:System.Guid.Empty
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.guid.empty
+  name: Empty
+  nameWithType: Guid.Empty
+  fullName: System.Guid.Empty
+- uid: nORM.Core.EntityEntry.IsKeySet*
+  commentId: Overload:nORM.Core.EntityEntry.IsKeySet
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_IsKeySet
+  name: IsKeySet
+  nameWithType: EntityEntry.IsKeySet
+  fullName: nORM.Core.EntityEntry.IsKeySet
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
 - uid: nORM.Core.EntityState
   commentId: T:nORM.Core.EntityState
   parent: nORM.Core
@@ -1125,9 +1681,385 @@ references:
   name: EntityState
   nameWithType: EntityState
   fullName: nORM.Core.EntityState
+- uid: nORM.Core.EntityState.Modified
+  commentId: F:nORM.Core.EntityState.Modified
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Modified
+  name: Modified
+  nameWithType: EntityState.Modified
+  fullName: nORM.Core.EntityState.Modified
+- uid: nORM.Core.EntityState.Deleted
+  commentId: F:nORM.Core.EntityState.Deleted
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Deleted
+  name: Deleted
+  nameWithType: EntityState.Deleted
+  fullName: nORM.Core.EntityState.Deleted
+- uid: nORM.Core.EntityState.Added
+  commentId: F:nORM.Core.EntityState.Added
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Added
+  name: Added
+  nameWithType: EntityState.Added
+  fullName: nORM.Core.EntityState.Added
+- uid: nORM.Core.EntityState.Unchanged
+  commentId: F:nORM.Core.EntityState.Unchanged
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Unchanged
+  name: Unchanged
+  nameWithType: EntityState.Unchanged
+  fullName: nORM.Core.EntityState.Unchanged
+- uid: nORM.Core.EntityState.Detached
+  commentId: F:nORM.Core.EntityState.Detached
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Detached
+  name: Detached
+  nameWithType: EntityState.Detached
+  fullName: nORM.Core.EntityState.Detached
+- uid: nORM.Core.EntityEntry.SetStateInternal(nORM.Core.EntityState)
+  commentId: M:nORM.Core.EntityEntry.SetStateInternal(nORM.Core.EntityState)
+  href: nORM.Core.EntityState.html
+  name: SetStateInternal(EntityState)
+  nameWithType: EntityEntry.SetStateInternal(EntityState)
+  fullName: nORM.Core.EntityEntry.SetStateInternal(nORM.Core.EntityState)
+  spec.csharp:
+  - uid: nORM.Core.EntityEntry.SetStateInternal(nORM.Core.EntityState)
+    name: SetStateInternal
+  - name: (
+  - uid: nORM.Core.EntityState
+    name: EntityState
+    href: nORM.Core.EntityState.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.EntityEntry.SetStateInternal(nORM.Core.EntityState)
+    name: SetStateInternal
+  - name: (
+  - uid: nORM.Core.EntityState
+    name: EntityState
+    href: nORM.Core.EntityState.html
+  - name: )
 - uid: nORM.Core.EntityEntry.State*
   commentId: Overload:nORM.Core.EntityEntry.State
   href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_State
   name: State
   nameWithType: EntityEntry.State
   fullName: nORM.Core.EntityEntry.State
+- uid: nORM.Core.EntityEntry.CurrentValues*
+  commentId: Overload:nORM.Core.EntityEntry.CurrentValues
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_CurrentValues
+  name: CurrentValues
+  nameWithType: EntityEntry.CurrentValues
+  fullName: nORM.Core.EntityEntry.CurrentValues
+- uid: nORM.Core.PropertyValues
+  commentId: T:nORM.Core.PropertyValues
+  parent: nORM.Core
+  href: nORM.Core.PropertyValues.html
+  name: PropertyValues
+  nameWithType: PropertyValues
+  fullName: nORM.Core.PropertyValues
+- uid: nORM.Core.EntityEntry.OriginalValues*
+  commentId: Overload:nORM.Core.EntityEntry.OriginalValues
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_OriginalValues
+  name: OriginalValues
+  nameWithType: EntityEntry.OriginalValues
+  fullName: nORM.Core.EntityEntry.OriginalValues
+- uid: System.ArgumentException
+  commentId: T:System.ArgumentException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentexception
+  name: ArgumentException
+  nameWithType: ArgumentException
+  fullName: System.ArgumentException
+- uid: nORM.Core.EntityEntry.Property*
+  commentId: Overload:nORM.Core.EntityEntry.Property
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Property_System_String_
+  name: Property
+  nameWithType: EntityEntry.Property
+  fullName: nORM.Core.EntityEntry.Property
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: nORM.Core.PropertyEntry
+  commentId: T:nORM.Core.PropertyEntry
+  parent: nORM.Core
+  href: nORM.Core.PropertyEntry.html
+  name: PropertyEntry
+  nameWithType: PropertyEntry
+  fullName: nORM.Core.PropertyEntry
+- uid: nORM.Core.EntityEntry.Reload*
+  commentId: Overload:nORM.Core.EntityEntry.Reload
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Reload
+  name: Reload
+  nameWithType: EntityEntry.Reload
+  fullName: nORM.Core.EntityEntry.Reload
+- uid: nORM.Core.EntityEntry.Reload
+  commentId: M:nORM.Core.EntityEntry.Reload
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Reload
+  name: Reload()
+  nameWithType: EntityEntry.Reload()
+  fullName: nORM.Core.EntityEntry.Reload()
+  spec.csharp:
+  - uid: nORM.Core.EntityEntry.Reload
+    name: Reload
+    href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Reload
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.EntityEntry.Reload
+    name: Reload
+    href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Reload
+  - name: (
+  - name: )
+- uid: nORM.Core.EntityEntry.ReloadAsync*
+  commentId: Overload:nORM.Core.EntityEntry.ReloadAsync
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_ReloadAsync_System_Threading_CancellationToken_
+  name: ReloadAsync
+  nameWithType: EntityEntry.ReloadAsync
+  fullName: nORM.Core.EntityEntry.ReloadAsync
+- uid: System.Threading.CancellationToken
+  commentId: T:System.Threading.CancellationToken
+  parent: System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  name: CancellationToken
+  nameWithType: CancellationToken
+  fullName: System.Threading.CancellationToken
+- uid: System.Threading.Tasks.Task
+  commentId: T:System.Threading.Tasks.Task
+  parent: System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task
+  name: Task
+  nameWithType: Task
+  fullName: System.Threading.Tasks.Task
+- uid: System.Threading
+  commentId: N:System.Threading
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading
+  nameWithType: System.Threading
+  fullName: System.Threading
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+- uid: System.Threading.Tasks
+  commentId: N:System.Threading.Tasks
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system
+  name: System.Threading.Tasks
+  nameWithType: System.Threading.Tasks
+  fullName: System.Threading.Tasks
+  spec.csharp:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+  spec.vb:
+  - uid: System
+    name: System
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system
+  - name: .
+  - uid: System.Threading
+    name: Threading
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading
+  - name: .
+  - uid: System.Threading.Tasks
+    name: Tasks
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Core.DbConcurrencyException
+  commentId: T:nORM.Core.DbConcurrencyException
+  href: nORM.Core.DbConcurrencyException.html
+  name: DbConcurrencyException
+  nameWithType: DbConcurrencyException
+  fullName: nORM.Core.DbConcurrencyException
+- uid: nORM.Core.EntityEntry.CurrentValues
+  commentId: P:nORM.Core.EntityEntry.CurrentValues
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_CurrentValues
+  name: CurrentValues
+  nameWithType: EntityEntry.CurrentValues
+  fullName: nORM.Core.EntityEntry.CurrentValues
+- uid: nORM.Core.EntityEntry.OriginalValues
+  commentId: P:nORM.Core.EntityEntry.OriginalValues
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_OriginalValues
+  name: OriginalValues
+  nameWithType: EntityEntry.OriginalValues
+  fullName: nORM.Core.EntityEntry.OriginalValues
+- uid: nORM.Core.PropertyValues.SetValues(System.Object)
+  commentId: M:nORM.Core.PropertyValues.SetValues(System.Object)
+  isExternal: true
+  href: nORM.Core.PropertyValues.html#nORM_Core_PropertyValues_SetValues_System_Object_
+  name: SetValues(object)
+  nameWithType: PropertyValues.SetValues(object)
+  fullName: nORM.Core.PropertyValues.SetValues(object)
+  nameWithType.vb: PropertyValues.SetValues(Object)
+  fullName.vb: nORM.Core.PropertyValues.SetValues(Object)
+  name.vb: SetValues(Object)
+  spec.csharp:
+  - uid: nORM.Core.PropertyValues.SetValues(System.Object)
+    name: SetValues
+    href: nORM.Core.PropertyValues.html#nORM_Core_PropertyValues_SetValues_System_Object_
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.PropertyValues.SetValues(System.Object)
+    name: SetValues
+    href: nORM.Core.PropertyValues.html#nORM_Core_PropertyValues_SetValues_System_Object_
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
+- uid: nORM.Core.EntityEntry.GetDatabaseValues*
+  commentId: Overload:nORM.Core.EntityEntry.GetDatabaseValues
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_GetDatabaseValues
+  name: GetDatabaseValues
+  nameWithType: EntityEntry.GetDatabaseValues
+  fullName: nORM.Core.EntityEntry.GetDatabaseValues
+- uid: nORM.Core.EntityEntry.GetDatabaseValues
+  commentId: M:nORM.Core.EntityEntry.GetDatabaseValues
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_GetDatabaseValues
+  name: GetDatabaseValues()
+  nameWithType: EntityEntry.GetDatabaseValues()
+  fullName: nORM.Core.EntityEntry.GetDatabaseValues()
+  spec.csharp:
+  - uid: nORM.Core.EntityEntry.GetDatabaseValues
+    name: GetDatabaseValues
+    href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_GetDatabaseValues
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.EntityEntry.GetDatabaseValues
+    name: GetDatabaseValues
+    href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_GetDatabaseValues
+  - name: (
+  - name: )
+- uid: nORM.Core.EntityEntry.GetDatabaseValuesAsync*
+  commentId: Overload:nORM.Core.EntityEntry.GetDatabaseValuesAsync
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_GetDatabaseValuesAsync_System_Threading_CancellationToken_
+  name: GetDatabaseValuesAsync
+  nameWithType: EntityEntry.GetDatabaseValuesAsync
+  fullName: nORM.Core.EntityEntry.GetDatabaseValuesAsync
+- uid: System.Threading.Tasks.Task{nORM.Core.PropertyValues}
+  commentId: T:System.Threading.Tasks.Task{nORM.Core.PropertyValues}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<PropertyValues>
+  nameWithType: Task<PropertyValues>
+  fullName: System.Threading.Tasks.Task<nORM.Core.PropertyValues>
+  nameWithType.vb: Task(Of PropertyValues)
+  fullName.vb: System.Threading.Tasks.Task(Of nORM.Core.PropertyValues)
+  name.vb: Task(Of PropertyValues)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: nORM.Core.PropertyValues
+    name: PropertyValues
+    href: nORM.Core.PropertyValues.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.PropertyValues
+    name: PropertyValues
+    href: nORM.Core.PropertyValues.html
+  - name: )
+- uid: System.Threading.Tasks.Task`1
+  commentId: T:System.Threading.Tasks.Task`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<TResult>
+  nameWithType: Task<TResult>
+  fullName: System.Threading.Tasks.Task<TResult>
+  nameWithType.vb: Task(Of TResult)
+  fullName.vb: System.Threading.Tasks.Task(Of TResult)
+  name.vb: Task(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
+- uid: nORM.Core.EntityEntry.Navigation*
+  commentId: Overload:nORM.Core.EntityEntry.Navigation
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Navigation_System_String_
+  name: Navigation
+  nameWithType: EntityEntry.Navigation
+  fullName: nORM.Core.EntityEntry.Navigation
+- uid: nORM.Core.NavigationEntry
+  commentId: T:nORM.Core.NavigationEntry
+  parent: nORM.Core
+  href: nORM.Core.NavigationEntry.html
+  name: NavigationEntry
+  nameWithType: NavigationEntry
+  fullName: nORM.Core.NavigationEntry
+- uid: nORM.Core.EntityEntry.Reference*
+  commentId: Overload:nORM.Core.EntityEntry.Reference
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Reference_System_String_
+  name: Reference
+  nameWithType: EntityEntry.Reference
+  fullName: nORM.Core.EntityEntry.Reference
+- uid: nORM.Core.EntityEntry.Collection*
+  commentId: Overload:nORM.Core.EntityEntry.Collection
+  href: nORM.Core.EntityEntry.html#nORM_Core_EntityEntry_Collection_System_String_
+  name: Collection
+  nameWithType: EntityEntry.Collection
+  fullName: nORM.Core.EntityEntry.Collection

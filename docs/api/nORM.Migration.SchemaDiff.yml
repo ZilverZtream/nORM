@@ -31,12 +31,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaDiff
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1212
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -50,7 +50,7 @@ items:
 
     to throw a <xref href="System.NullReferenceException" data-throw-if-not-resolved="false"></xref>. The lists themselves must never be
 
-    set to null — <xref href="nORM.Migration.SchemaDiff.HasChanges" data-throw-if-not-resolved="false"></xref> and all four SQL generators assume non-null lists.
+    set to null - <xref href="nORM.Migration.SchemaDiff.HasChanges" data-throw-if-not-resolved="false"></xref> and all four SQL generators assume non-null lists.
   example: []
   syntax:
     content: public class SchemaDiff
@@ -83,12 +83,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedTables
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1215
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -114,12 +114,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedColumns
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1217
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -145,12 +145,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AlteredColumns
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1219
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 32
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -176,12 +176,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedIndexes
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1221
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 34
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -207,12 +207,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedIndexes
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1223
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -238,12 +238,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedTables
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1225
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 38
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -269,12 +269,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedColumns
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1227
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -300,12 +300,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedForeignKeys
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1229
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 42
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -331,12 +331,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedForeignKeys
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1231
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -362,12 +362,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedCheckConstraints
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1233
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -393,12 +393,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedCheckConstraints
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1235
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -424,12 +424,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddedExpressionIndexes
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1237
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 50
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -455,12 +455,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DroppedExpressionIndexes
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1239
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -486,12 +486,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: RenamedColumns
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1245
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -522,12 +522,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasChanges
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1248
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -553,12 +553,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasDestructiveChanges
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1260
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 73
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -587,12 +587,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Diff.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDestructiveChangeWarnings
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1265
+    path: src/nORM/Migration/SchemaSnapshot.Diff.cs
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Migration

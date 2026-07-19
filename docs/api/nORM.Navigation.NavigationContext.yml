@@ -26,7 +26,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 577
+    startLine: 706
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -72,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 584
+    startLine: 713
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -103,7 +103,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EntityType
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 589
+    startLine: 718
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -134,7 +134,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 597
+    startLine: 726
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -176,7 +176,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 608
+    startLine: 737
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -214,7 +214,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MarkAsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 614
+    startLine: 743
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -249,7 +249,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MarkAsUnloaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 620
+    startLine: 749
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -284,7 +284,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 625
+    startLine: 754
   assemblies:
   - nORM
   namespace: nORM.Navigation

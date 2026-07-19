@@ -14,11 +14,11 @@ items:
   - nORM.Scaffolding.ScaffoldOptions.EmitSequenceStubs
   - nORM.Scaffolding.ScaffoldOptions.EmitViewEntities
   - nORM.Scaffolding.ScaffoldOptions.FailOnWarnings
+  - nORM.Scaffolding.ScaffoldOptions.NoRelationships
   - nORM.Scaffolding.ScaffoldOptions.OverwriteFiles
   - nORM.Scaffolding.ScaffoldOptions.Schemas
   - nORM.Scaffolding.ScaffoldOptions.Tables
   - nORM.Scaffolding.ScaffoldOptions.UseDatabaseNames
-  - nORM.Scaffolding.ScaffoldOptions.NoRelationships
   - nORM.Scaffolding.ScaffoldOptions.UseNullableReferenceTypes
   - nORM.Scaffolding.ScaffoldOptions.UsePluralizer
   langs:
@@ -202,7 +202,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseDatabaseNames
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 47
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -242,7 +242,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NoRelationships
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 57
+    startLine: 56
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -280,7 +280,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseNullableReferenceTypes
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 56
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -320,7 +320,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ContextNamespace
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 63
+    startLine: 72
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -356,7 +356,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ContextOutputDirectory
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 71
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -394,7 +394,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ContextDirectory
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 80
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -434,7 +434,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OverwriteFiles
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 86
+    startLine: 95
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -468,7 +468,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DryRun
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 94
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -506,7 +506,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FailOnWarnings
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 101
+    startLine: 110
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -542,7 +542,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EmitRoutineStubs
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 109
+    startLine: 118
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -580,7 +580,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EmitSequenceStubs
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 117
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -618,7 +618,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EmitViewEntities
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 127
+    startLine: 136
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -660,7 +660,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EmitQueryArtifacts
     path: src/nORM/Scaffolding/ScaffoldOptions.cs
-    startLine: 136
+    startLine: 145
   assemblies:
   - nORM
   namespace: nORM.Scaffolding

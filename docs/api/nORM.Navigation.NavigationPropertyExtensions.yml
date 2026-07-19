@@ -24,7 +24,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationPropertyExtensions
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 26
+    startLine: 27
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -86,7 +86,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableLazyLoading
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 52
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -133,7 +133,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CleanupNavigationContext
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 68
+    startLine: 87
   assemblies:
   - nORM
   namespace: nORM.Navigation
@@ -170,14 +170,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 89
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Navigation
   summary: Explicitly loads a reference navigation property from the database.
   example: []
   syntax:
-    content: 'public static Task LoadAsync<T, TProperty>(this T entity, Expression<Func<T, TProperty?>> navigationProperty, CancellationToken ct = default) where T : class where TProperty : class'
+    content: >-
+      [RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public static Task LoadAsync<T, TProperty>(this T entity, Expression<Func<T, TProperty?>> navigationProperty, CancellationToken ct = default) where T : class where TProperty : class
     parameters:
     - id: entity
       type: '{T}'
@@ -190,8 +195,24 @@ items:
     - id: TProperty
     return:
       type: System.Threading.Tasks.Task
-    content.vb: Public Shared Function LoadAsync(Of T As Class, TProperty As Class)(entity As T, navigationProperty As Expression(Of Func(Of T, TProperty)), ct As CancellationToken = Nothing) As Task
+    content.vb: >-
+      <RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Shared Function LoadAsync(Of T As Class, TProperty As Class)(entity As T, navigationProperty As Expression(Of Func(Of T, TProperty)), ct As CancellationToken = Nothing) As Task
   overload: nORM.Navigation.NavigationPropertyExtensions.LoadAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.
   nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
   fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)), System.Threading.CancellationToken)
   name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, TProperty)), CancellationToken)
@@ -214,14 +235,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 108
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Navigation
   summary: Explicitly loads a collection navigation property from the database.
   example: []
   syntax:
-    content: 'public static Task LoadAsync<T, TProperty>(this T entity, Expression<Func<T, ICollection<TProperty>?>> navigationProperty, CancellationToken ct = default) where T : class where TProperty : class'
+    content: >-
+      [RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public static Task LoadAsync<T, TProperty>(this T entity, Expression<Func<T, ICollection<TProperty>?>> navigationProperty, CancellationToken ct = default) where T : class where TProperty : class
     parameters:
     - id: entity
       type: '{T}'
@@ -234,8 +260,24 @@ items:
     - id: TProperty
     return:
       type: System.Threading.Tasks.Task
-    content.vb: Public Shared Function LoadAsync(Of T As Class, TProperty As Class)(entity As T, navigationProperty As Expression(Of Func(Of T, ICollection(Of TProperty))), ct As CancellationToken = Nothing) As Task
+    content.vb: >-
+      <RequiresDynamicCode("Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Shared Function LoadAsync(Of T As Class, TProperty As Class)(entity As T, navigationProperty As Expression(Of Func(Of T, ICollection(Of TProperty))), ct As CancellationToken = Nothing) As Task
   overload: nORM.Navigation.NavigationPropertyExtensions.LoadAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Explicit loading builds a relationship query; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Explicit loading reflects over the relationship metadata; trimming may remove the required members. See docs/aot-trimming.md.
   nameWithType.vb: NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
   fullName.vb: nORM.Navigation.NavigationPropertyExtensions.LoadAsync(Of T, TProperty)(T, System.Linq.Expressions.Expression(Of System.Func(Of T, System.Collections.Generic.ICollection(Of TProperty))), System.Threading.CancellationToken)
   name.vb: LoadAsync(Of T, TProperty)(T, Expression(Of Func(Of T, ICollection(Of TProperty))), CancellationToken)
@@ -258,7 +300,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsLoaded
     path: src/nORM/Navigation/NavigationPropertyExtensions.cs
-    startLine: 127
+    startLine: 153
   assemblies:
   - nORM
   namespace: nORM.Navigation

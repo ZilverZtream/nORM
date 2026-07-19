@@ -195,7 +195,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Navigation/BatchedNavigationLoader.cs
-    startLine: 656
+    startLine: 671
   assemblies:
   - nORM
   namespace: nORM.Navigation

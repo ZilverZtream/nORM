@@ -27,7 +27,7 @@ items:
   summary: >-
     Represents the desired database schema state derived from code mappings (attributes or
 
-    fluent configuration). This is NOT a live snapshot of an actual database — it reflects
+    fluent configuration). This is NOT a live snapshot of an actual database - it reflects
 
     what the schema <em>should</em> look like based on the current entity model.
 

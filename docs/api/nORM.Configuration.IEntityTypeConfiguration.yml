@@ -10,10 +10,12 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.ColumnNames
   - nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql
   - nORM.Configuration.IEntityTypeConfiguration.Converters
+  - nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
   - nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
   - nORM.Configuration.IEntityTypeConfiguration.ExpressionIndexes
   - nORM.Configuration.IEntityTypeConfiguration.FixedLengthSettings
   - nORM.Configuration.IEntityTypeConfiguration.IdentityOptions
+  - nORM.Configuration.IEntityTypeConfiguration.IsKeyless
   - nORM.Configuration.IEntityTypeConfiguration.IsReadOnly
   - nORM.Configuration.IEntityTypeConfiguration.KeyProperties
   - nORM.Configuration.IEntityTypeConfiguration.ManyToManyRelationships
@@ -217,6 +219,40 @@ items:
       type: System.Boolean
     content.vb: ReadOnly Property IsReadOnly As Boolean
   overload: nORM.Configuration.IEntityTypeConfiguration.IsReadOnly*
+- uid: nORM.Configuration.IEntityTypeConfiguration.IsKeyless
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.IsKeyless
+  id: IsKeyless
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: IsKeyless
+  nameWithType: IEntityTypeConfiguration.IsKeyless
+  fullName: nORM.Configuration.IEntityTypeConfiguration.IsKeyless
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsKeyless
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 46
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets a value indicating whether the mapped type is keyless (a query type):
+
+    never tracked and not savable, used for views and read models.
+  example: []
+  syntax:
+    content: bool IsKeyless { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: ReadOnly Property IsKeyless As Boolean
+  overload: nORM.Configuration.IEntityTypeConfiguration.IsKeyless*
 - uid: nORM.Configuration.IEntityTypeConfiguration.ColumnNames
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames
   id: ColumnNames
@@ -235,7 +271,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnNames
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 45
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -266,7 +302,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValueSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 52
+    startLine: 58
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -284,6 +320,40 @@ items:
       type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
     content.vb: ReadOnly Property DefaultValueSql As IReadOnlyDictionary(Of PropertyInfo, String)
   overload: nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql*
+- uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
+  id: DefaultValueConstraintNames
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: DefaultValueConstraintNames
+  nameWithType: IEntityTypeConfiguration.DefaultValueConstraintNames
+  fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DefaultValueConstraintNames
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 64
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets optional provider default-constraint names configured for properties.
+
+    These names are provider DDL metadata; providers without named defaults may ignore them.
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, string> DefaultValueConstraintNames { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+    content.vb: ReadOnly Property DefaultValueConstraintNames As IReadOnlyDictionary(Of PropertyInfo, String)
+  overload: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames*
 - uid: nORM.Configuration.IEntityTypeConfiguration.IdentityOptions
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.IdentityOptions
   id: IdentityOptions
@@ -302,7 +372,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentityOptions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 57
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -333,7 +403,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxLengths
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 62
+    startLine: 74
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -364,7 +434,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UnicodeSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 67
+    startLine: 79
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -395,7 +465,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FixedLengthSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 72
+    startLine: 84
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -426,7 +496,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precisions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 77
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -457,7 +527,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 83
+    startLine: 95
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -491,7 +561,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 88
+    startLine: 100
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -522,7 +592,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 93
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -553,7 +623,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 98
+    startLine: 110
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -584,7 +654,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 103
+    startLine: 115
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -615,7 +685,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 108
+    startLine: 120
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -646,7 +716,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 113
+    startLine: 125
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -677,7 +747,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 118
+    startLine: 130
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -708,7 +778,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converters
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 121
+    startLine: 133
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -739,7 +809,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 127
+    startLine: 139
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -773,7 +843,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyRelationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 132
+    startLine: 144
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1678,6 +1748,12 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: nORM.Configuration.IEntityTypeConfiguration.IsKeyless*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.IsKeyless
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_IsKeyless
+  name: IsKeyless
+  nameWithType: IEntityTypeConfiguration.IsKeyless
+  fullName: nORM.Configuration.IEntityTypeConfiguration.IsKeyless
 - uid: nORM.Configuration.IEntityTypeConfiguration.ColumnNames*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.ColumnNames
   href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_ColumnNames
@@ -1771,6 +1847,12 @@ references:
   name: DefaultValueSql
   nameWithType: IEntityTypeConfiguration.DefaultValueSql
   fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
+- uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_DefaultValueConstraintNames
+  name: DefaultValueConstraintNames
+  nameWithType: IEntityTypeConfiguration.DefaultValueConstraintNames
+  fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
 - uid: nORM.Configuration.IEntityTypeConfiguration.IdentityOptions*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.IdentityOptions
   href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_IdentityOptions

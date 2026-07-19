@@ -7,8 +7,11 @@ items:
   children:
   - nORM.Migration.ExpressionIndexSchema.ExpressionSql
   - nORM.Migration.ExpressionIndexSchema.FilterSql
+  - nORM.Migration.ExpressionIndexSchema.IncludedColumnNames
   - nORM.Migration.ExpressionIndexSchema.IsUnique
   - nORM.Migration.ExpressionIndexSchema.Name
+  - nORM.Migration.ExpressionIndexSchema.NullSortOrder
+  - nORM.Migration.ExpressionIndexSchema.NullsNotDistinct
   langs:
   - csharp
   - vb
@@ -23,7 +26,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 59
+    startLine: 75
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -65,7 +68,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 62
+    startLine: 78
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -96,7 +99,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionSql
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 64
+    startLine: 80
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -127,7 +130,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 66
+    startLine: 82
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -158,7 +161,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FilterSql
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 68
+    startLine: 84
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -171,6 +174,99 @@ items:
       type: System.String
     content.vb: Public Property FilterSql As String
   overload: nORM.Migration.ExpressionIndexSchema.FilterSql*
+- uid: nORM.Migration.ExpressionIndexSchema.IncludedColumnNames
+  commentId: P:nORM.Migration.ExpressionIndexSchema.IncludedColumnNames
+  id: IncludedColumnNames
+  parent: nORM.Migration.ExpressionIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: IncludedColumnNames
+  nameWithType: ExpressionIndexSchema.IncludedColumnNames
+  fullName: nORM.Migration.ExpressionIndexSchema.IncludedColumnNames
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IncludedColumnNames
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 86
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Provider column names included as non-key covering columns where supported.
+  example: []
+  syntax:
+    content: public string[] IncludedColumnNames { get; set; }
+    parameters: []
+    return:
+      type: System.String[]
+    content.vb: Public Property IncludedColumnNames As String()
+  overload: nORM.Migration.ExpressionIndexSchema.IncludedColumnNames*
+- uid: nORM.Migration.ExpressionIndexSchema.NullSortOrder
+  commentId: P:nORM.Migration.ExpressionIndexSchema.NullSortOrder
+  id: NullSortOrder
+  parent: nORM.Migration.ExpressionIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: NullSortOrder
+  nameWithType: ExpressionIndexSchema.NullSortOrder
+  fullName: nORM.Migration.ExpressionIndexSchema.NullSortOrder
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullSortOrder
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 88
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: Explicit provider null ordering for the expression key.
+  example: []
+  syntax:
+    content: public IndexNullSortOrder NullSortOrder { get; set; }
+    parameters: []
+    return:
+      type: nORM.Configuration.IndexNullSortOrder
+    content.vb: Public Property NullSortOrder As IndexNullSortOrder
+  overload: nORM.Migration.ExpressionIndexSchema.NullSortOrder*
+- uid: nORM.Migration.ExpressionIndexSchema.NullsNotDistinct
+  commentId: P:nORM.Migration.ExpressionIndexSchema.NullsNotDistinct
+  id: NullsNotDistinct
+  parent: nORM.Migration.ExpressionIndexSchema
+  langs:
+  - csharp
+  - vb
+  name: NullsNotDistinct
+  nameWithType: ExpressionIndexSchema.NullsNotDistinct
+  fullName: nORM.Migration.ExpressionIndexSchema.NullsNotDistinct
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: NullsNotDistinct
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 90
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: True when a unique PostgreSQL expression index treats null values as equal.
+  example: []
+  syntax:
+    content: public bool NullsNotDistinct { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property NullsNotDistinct As Boolean
+  overload: nORM.Migration.ExpressionIndexSchema.NullsNotDistinct*
 references:
 - uid: nORM.Migration
   commentId: N:nORM.Migration
@@ -1181,3 +1277,73 @@ references:
   name: FilterSql
   nameWithType: ExpressionIndexSchema.FilterSql
   fullName: nORM.Migration.ExpressionIndexSchema.FilterSql
+- uid: nORM.Migration.ExpressionIndexSchema.IncludedColumnNames*
+  commentId: Overload:nORM.Migration.ExpressionIndexSchema.IncludedColumnNames
+  href: nORM.Migration.ExpressionIndexSchema.html#nORM_Migration_ExpressionIndexSchema_IncludedColumnNames
+  name: IncludedColumnNames
+  nameWithType: ExpressionIndexSchema.IncludedColumnNames
+  fullName: nORM.Migration.ExpressionIndexSchema.IncludedColumnNames
+- uid: System.String[]
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string[]
+  nameWithType: string[]
+  fullName: string[]
+  nameWithType.vb: String()
+  fullName.vb: String()
+  name.vb: String()
+  spec.csharp:
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: '['
+  - name: ']'
+  spec.vb:
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: (
+  - name: )
+- uid: nORM.Migration.ExpressionIndexSchema.NullSortOrder*
+  commentId: Overload:nORM.Migration.ExpressionIndexSchema.NullSortOrder
+  href: nORM.Migration.ExpressionIndexSchema.html#nORM_Migration_ExpressionIndexSchema_NullSortOrder
+  name: NullSortOrder
+  nameWithType: ExpressionIndexSchema.NullSortOrder
+  fullName: nORM.Migration.ExpressionIndexSchema.NullSortOrder
+- uid: nORM.Configuration.IndexNullSortOrder
+  commentId: T:nORM.Configuration.IndexNullSortOrder
+  parent: nORM.Configuration
+  href: nORM.Configuration.IndexNullSortOrder.html
+  name: IndexNullSortOrder
+  nameWithType: IndexNullSortOrder
+  fullName: nORM.Configuration.IndexNullSortOrder
+- uid: nORM.Configuration
+  commentId: N:nORM.Configuration
+  href: nORM.html
+  name: nORM.Configuration
+  nameWithType: nORM.Configuration
+  fullName: nORM.Configuration
+  spec.csharp:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+  spec.vb:
+  - uid: nORM
+    name: nORM
+    href: nORM.html
+  - name: .
+  - uid: nORM.Configuration
+    name: Configuration
+    href: nORM.Configuration.html
+- uid: nORM.Migration.ExpressionIndexSchema.NullsNotDistinct*
+  commentId: Overload:nORM.Migration.ExpressionIndexSchema.NullsNotDistinct
+  href: nORM.Migration.ExpressionIndexSchema.html#nORM_Migration_ExpressionIndexSchema_NullsNotDistinct
+  name: NullsNotDistinct
+  nameWithType: ExpressionIndexSchema.NullsNotDistinct
+  fullName: nORM.Migration.ExpressionIndexSchema.NullsNotDistinct

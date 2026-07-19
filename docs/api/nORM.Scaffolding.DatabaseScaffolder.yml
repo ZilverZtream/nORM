@@ -17,12 +17,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Scaffolding/DatabaseScaffolder.cs
+      path: src/nORM/Scaffolding/DatabaseScaffolder.Execution.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DatabaseScaffolder
-    path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 27
+    path: src/nORM/Scaffolding/DatabaseScaffolder.Execution.cs
+    startLine: 12
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -32,8 +32,18 @@ items:
     from an existing database schema.
   example: []
   syntax:
-    content: public static class DatabaseScaffolder
-    content.vb: Public Module DatabaseScaffolder
+    content: >-
+      [RequiresDynamicCode("Database scaffolding emits dynamic entity types and traverses live mapping metadata; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      [RequiresUnreferencedCode("Database scaffolding reflects over provider and entity metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      public static class DatabaseScaffolder
+    content.vb: >-
+      <RequiresDynamicCode("Database scaffolding emits dynamic entity types and traverses live mapping metadata; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      <RequiresUnreferencedCode("Database scaffolding reflects over provider and entity metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      Public Module DatabaseScaffolder
   inheritance:
   - System.Object
   inheritedMembers:
@@ -44,6 +54,17 @@ items:
   - System.Object.MemberwiseClone
   - System.Object.ReferenceEquals(System.Object,System.Object)
   - System.Object.ToString
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Database scaffolding emits dynamic entity types and traverses live mapping metadata; not NativeAOT-compatible. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: Database scaffolding reflects over provider and entity metadata; trimming may remove the required members. See docs/aot-trimming.md.
 - uid: nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
   commentId: M:nORM.Scaffolding.DatabaseScaffolder.ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
   id: ScaffoldAsync(System.Data.Common.DbConnection,nORM.Providers.DatabaseProvider,System.String,System.String,System.String)
@@ -62,7 +83,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 42
+    startLine: 28
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -111,7 +132,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 53
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Scaffolding
@@ -160,7 +181,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ScaffoldAsync
     path: src/nORM/Scaffolding/DatabaseScaffolder.cs
-    startLine: 65
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Scaffolding

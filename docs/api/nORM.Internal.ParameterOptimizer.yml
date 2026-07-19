@@ -122,7 +122,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddParam
     path: src/nORM/Internal/ParameterOptimizer.cs
-    startLine: 329
+    startLine: 366
   assemblies:
   - nORM
   namespace: nORM.Internal

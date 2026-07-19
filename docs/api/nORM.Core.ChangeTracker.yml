@@ -6,8 +6,14 @@ items:
   parent: nORM.Core
   children:
   - nORM.Core.ChangeTracker.#ctor(nORM.Configuration.DbContextOptions)
+  - nORM.Core.ChangeTracker.AcceptAllChanges
   - nORM.Core.ChangeTracker.Clear
+  - nORM.Core.ChangeTracker.DebugView
+  - nORM.Core.ChangeTracker.DetectChanges
   - nORM.Core.ChangeTracker.Entries
+  - nORM.Core.ChangeTracker.HasChanges
+  - nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+  - nORM.Core.ChangeTracker.TrackGraph``1(System.Object,``0,System.Func{nORM.Core.EntityEntryGraphNode{``0},System.Boolean})
   langs:
   - csharp
   - vb
@@ -17,12 +23,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Core/ChangeTracker.cs
+      path: src/nORM/Core/ChangeTracker.TrackGraph.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ChangeTracker
-    path: src/nORM/Core/ChangeTracker.cs
-    startLine: 18
+    path: src/nORM/Core/ChangeTracker.TrackGraph.cs
+    startLine: 10
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -68,7 +74,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 47
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -110,7 +116,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entries
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 434
+    startLine: 502
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -119,13 +125,11 @@ items:
 
     tracked by the context.
   remarks: >-
-    Returns a snapshot of the underlying collection. The <xref href="nORM.Core.EntityEntry" data-throw-if-not-resolved="false"></xref>
+    Returns a snapshot of the underlying collection. Assigning <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref>
 
-    objects themselves are mutable; callers should not modify entry state (such as
+    on a returned entry performs the corresponding tracker transition (the same as the
 
-    <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref>) directly, as this bypasses change-tracker
-
-    invariants. Use <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> APIs to transition entity state.
+    <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> Add/Update/Remove/Attach APIs), so it is safe to drive state from here.
   example: []
   syntax:
     content: public IEnumerable<EntityEntry> Entries { get; }
@@ -134,6 +138,153 @@ items:
       type: System.Collections.Generic.IEnumerable{nORM.Core.EntityEntry}
     content.vb: Public ReadOnly Property Entries As IEnumerable(Of EntityEntry)
   overload: nORM.Core.ChangeTracker.Entries*
+- uid: nORM.Core.ChangeTracker.DebugView
+  commentId: P:nORM.Core.ChangeTracker.DebugView
+  id: DebugView
+  parent: nORM.Core.ChangeTracker
+  langs:
+  - csharp
+  - vb
+  name: DebugView
+  nameWithType: ChangeTracker.DebugView
+  fullName: nORM.Core.ChangeTracker.DebugView
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Core/ChangeTracker.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DebugView
+    path: src/nORM/Core/ChangeTracker.cs
+    startLine: 510
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    A human-readable snapshot of the tracked entities for debugging (EF Core
+
+    <code>ChangeTracker.DebugView</code> parity): <code>DebugView.ShortView</code> lists one line per entity
+
+    (type, key, state) and <code>DebugView.LongView</code> adds each property's value. Reflects the tracker's
+
+    current state; call <xref href="nORM.Core.ChangeTracker.DetectChanges" data-throw-if-not-resolved="false"></xref> first to refresh states against pending edits.
+  example: []
+  syntax:
+    content: public DebugView DebugView { get; }
+    parameters: []
+    return:
+      type: nORM.Core.DebugView
+    content.vb: Public ReadOnly Property DebugView As DebugView
+  overload: nORM.Core.ChangeTracker.DebugView*
+- uid: nORM.Core.ChangeTracker.DetectChanges
+  commentId: M:nORM.Core.ChangeTracker.DetectChanges
+  id: DetectChanges
+  parent: nORM.Core.ChangeTracker
+  langs:
+  - csharp
+  - vb
+  name: DetectChanges()
+  nameWithType: ChangeTracker.DetectChanges()
+  fullName: nORM.Core.ChangeTracker.DetectChanges()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/ChangeTracker.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DetectChanges
+    path: src/nORM/Core/ChangeTracker.cs
+    startLine: 568
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Forces detection of changes made to tracked entities since they were loaded or last saved,
+
+    updating each entry's <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref> — matching EF Core's
+
+    <code>ChangeTracker.DetectChanges()</code>. SaveChanges runs this automatically; call it explicitly
+
+    only when you need up-to-date states before then (e.g. before <xref href="nORM.Core.ChangeTracker.HasChanges" data-throw-if-not-resolved="false"></xref> or
+
+    enumerating <xref href="nORM.Core.ChangeTracker.Entries" data-throw-if-not-resolved="false"></xref>).
+  example: []
+  syntax:
+    content: public void DetectChanges()
+    content.vb: Public Sub DetectChanges()
+  overload: nORM.Core.ChangeTracker.DetectChanges*
+- uid: nORM.Core.ChangeTracker.HasChanges
+  commentId: M:nORM.Core.ChangeTracker.HasChanges
+  id: HasChanges
+  parent: nORM.Core.ChangeTracker
+  langs:
+  - csharp
+  - vb
+  name: HasChanges()
+  nameWithType: ChangeTracker.HasChanges()
+  fullName: nORM.Core.ChangeTracker.HasChanges()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/ChangeTracker.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasChanges
+    path: src/nORM/Core/ChangeTracker.cs
+    startLine: 584
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Runs change detection and returns whether any tracked entity is pending insert, update, or
+
+    delete — matching EF Core's <code>ChangeTracker.HasChanges()</code>. Use it to skip a no-op
+
+    <code>SaveChanges</code>.
+  example: []
+  syntax:
+    content: public bool HasChanges()
+    return:
+      type: System.Boolean
+    content.vb: Public Function HasChanges() As Boolean
+  overload: nORM.Core.ChangeTracker.HasChanges*
+- uid: nORM.Core.ChangeTracker.AcceptAllChanges
+  commentId: M:nORM.Core.ChangeTracker.AcceptAllChanges
+  id: AcceptAllChanges
+  parent: nORM.Core.ChangeTracker
+  langs:
+  - csharp
+  - vb
+  name: AcceptAllChanges()
+  nameWithType: ChangeTracker.AcceptAllChanges()
+  fullName: nORM.Core.ChangeTracker.AcceptAllChanges()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/ChangeTracker.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AcceptAllChanges
+    path: src/nORM/Core/ChangeTracker.cs
+    startLine: 600
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Accepts all changes: after running change detection, every Added or Modified entry becomes
+
+    <xref href="nORM.Core.EntityState.Unchanged" data-throw-if-not-resolved="false"></xref> with its current values as the new baseline, and every Deleted
+
+    entry is detached — matching EF Core's <code>ChangeTracker.AcceptAllChanges</code>. Use it to tell the
+
+    tracker that the tracked entities now mirror the database after persisting them out of band (for
+
+    example via raw SQL). Each entry is processed by its own state, without cascading.
+  example: []
+  syntax:
+    content: public void AcceptAllChanges()
+    content.vb: Public Sub AcceptAllChanges()
+  overload: nORM.Core.ChangeTracker.AcceptAllChanges*
 - uid: nORM.Core.ChangeTracker.Clear
   commentId: M:nORM.Core.ChangeTracker.Clear
   id: Clear
@@ -152,7 +303,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 572
+    startLine: 742
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -168,6 +319,182 @@ items:
     content: public void Clear()
     content.vb: Public Sub Clear()
   overload: nORM.Core.ChangeTracker.Clear*
+- uid: nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+  commentId: M:nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+  id: TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+  parent: nORM.Core.ChangeTracker
+  langs:
+  - csharp
+  - vb
+  name: TrackGraph(object, Action<EntityEntryGraphNode>)
+  nameWithType: ChangeTracker.TrackGraph(object, Action<EntityEntryGraphNode>)
+  fullName: nORM.Core.ChangeTracker.TrackGraph(object, System.Action<nORM.Core.EntityEntryGraphNode>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/ChangeTracker.TrackGraph.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TrackGraph
+    path: src/nORM/Core/ChangeTracker.TrackGraph.cs
+    startLine: 29
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Begins tracking <code class="paramref">rootEntity</code> and every entity reachable from it through
+
+    navigation properties, invoking <code class="paramref">callback</code> once for each entity discovered that
+
+    is not already tracked (Entity Framework Core parity). The callback assigns
+
+    <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref> on the node's <xref href="nORM.Core.EntityEntryGraphNode.Entry" data-throw-if-not-resolved="false"></xref> to choose
+
+    how that entity is tracked — a common pattern is
+
+    <code>node =&gt; node.Entry.State = node.Entry.IsKeySet ? EntityState.Modified : EntityState.Added</code>.
+
+    An entity the callback leaves <xref href="nORM.Core.EntityState.Detached" data-throw-if-not-resolved="false"></xref> is not tracked and the traversal
+
+    does not descend into its navigations; an entity already tracked by the context is skipped and not
+
+    traversed through, so a cyclic graph always terminates. No lazy loading is enabled during the walk,
+
+    so traversing the graph never triggers a database query — only the navigations the caller populated
+
+    on the (typically disconnected) graph are followed.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("TrackGraph reflects over navigation properties; trimming may remove the required members.")]
+
+      public void TrackGraph(object rootEntity, Action<EntityEntryGraphNode> callback)
+    parameters:
+    - id: rootEntity
+      type: System.Object
+      description: The root of the entity graph to track.
+    - id: callback
+      type: System.Action{nORM.Core.EntityEntryGraphNode}
+      description: Invoked for each untracked entity to assign its <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref>.
+    content.vb: >-
+      <RequiresDynamicCode("TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("TrackGraph reflects over navigation properties; trimming may remove the required members.")>
+
+      Public Sub TrackGraph(rootEntity As Object, callback As Action(Of EntityEntryGraphNode))
+  overload: nORM.Core.ChangeTracker.TrackGraph*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">rootEntity</code> or <code class="paramref">callback</code> is null.
+  - type: System.InvalidOperationException
+    commentId: T:System.InvalidOperationException
+    description: The change tracker is not bound to a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: TrackGraph reflects over navigation properties; trimming may remove the required members.
+  nameWithType.vb: ChangeTracker.TrackGraph(Object, Action(Of EntityEntryGraphNode))
+  fullName.vb: nORM.Core.ChangeTracker.TrackGraph(Object, System.Action(Of nORM.Core.EntityEntryGraphNode))
+  name.vb: TrackGraph(Object, Action(Of EntityEntryGraphNode))
+- uid: nORM.Core.ChangeTracker.TrackGraph``1(System.Object,``0,System.Func{nORM.Core.EntityEntryGraphNode{``0},System.Boolean})
+  commentId: M:nORM.Core.ChangeTracker.TrackGraph``1(System.Object,``0,System.Func{nORM.Core.EntityEntryGraphNode{``0},System.Boolean})
+  id: TrackGraph``1(System.Object,``0,System.Func{nORM.Core.EntityEntryGraphNode{``0},System.Boolean})
+  parent: nORM.Core.ChangeTracker
+  langs:
+  - csharp
+  - vb
+  name: TrackGraph<TState>(object, TState, Func<EntityEntryGraphNode<TState>, bool>)
+  nameWithType: ChangeTracker.TrackGraph<TState>(object, TState, Func<EntityEntryGraphNode<TState>, bool>)
+  fullName: nORM.Core.ChangeTracker.TrackGraph<TState>(object, TState, System.Func<nORM.Core.EntityEntryGraphNode<TState>, bool>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/ChangeTracker.TrackGraph.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: TrackGraph
+    path: src/nORM/Core/ChangeTracker.TrackGraph.cs
+    startLine: 102
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Stateful <xref href="nORM.Core.ChangeTracker.TrackGraph(System.Object%2cSystem.Action%7bnORM.Core.EntityEntryGraphNode%7d)" data-throw-if-not-resolved="false"></xref> (Entity Framework Core
+
+    parity): begins tracking <code class="paramref">rootEntity</code> and every entity reachable through its
+
+    navigations, threading <code class="paramref">state</code> to each node and invoking <code class="paramref">callback</code>
+
+    once per untracked entity discovered. The callback assigns <xref href="nORM.Core.EntityEntry.State" data-throw-if-not-resolved="false"></xref> on the
+
+    node's <xref href="nORM.Core.EntityEntryGraphNode%601.Entry" data-throw-if-not-resolved="false"></xref> to choose how the entity is tracked, and
+
+    returns whether the traversal should descend into that entity's own navigations — returning
+
+    <code>false</code> prunes the subtree independent of the tracked state. An entity already tracked by the
+
+    context is skipped and not traversed through, so a cyclic graph always terminates; no lazy loading
+
+    is enabled during the walk.
+  example: []
+  syntax:
+    content: >-
+      [RequiresDynamicCode("TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.")]
+
+      [RequiresUnreferencedCode("TrackGraph reflects over navigation properties; trimming may remove the required members.")]
+
+      public void TrackGraph<TState>(object rootEntity, TState state, Func<EntityEntryGraphNode<TState>, bool> callback)
+    parameters:
+    - id: rootEntity
+      type: System.Object
+      description: The root of the entity graph to track.
+    - id: state
+      type: '{TState}'
+      description: A value passed to <code class="paramref">callback</code> on every node.
+    - id: callback
+      type: System.Func{nORM.Core.EntityEntryGraphNode{{TState}},System.Boolean}
+      description: Invoked per untracked entity; sets its state and returns whether to descend.
+    typeParameters:
+    - id: TState
+      description: Type of the state value threaded to every node.
+    content.vb: >-
+      <RequiresDynamicCode("TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.")>
+
+      <RequiresUnreferencedCode("TrackGraph reflects over navigation properties; trimming may remove the required members.")>
+
+      Public Sub TrackGraph(Of TState)(rootEntity As Object, state As TState, callback As Func(Of EntityEntryGraphNode(Of TState), Boolean))
+  overload: nORM.Core.ChangeTracker.TrackGraph*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: <code class="paramref">rootEntity</code> or <code class="paramref">callback</code> is null.
+  - type: System.InvalidOperationException
+    commentId: T:System.InvalidOperationException
+    description: The change tracker is not bound to a <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref>.
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: TrackGraph reflects over navigation properties; trimming may remove the required members.
+  nameWithType.vb: ChangeTracker.TrackGraph(Of TState)(Object, TState, Func(Of EntityEntryGraphNode(Of TState), Boolean))
+  fullName.vb: nORM.Core.ChangeTracker.TrackGraph(Of TState)(Object, TState, System.Func(Of nORM.Core.EntityEntryGraphNode(Of TState), Boolean))
+  name.vb: TrackGraph(Of TState)(Object, TState, Func(Of EntityEntryGraphNode(Of TState), Boolean))
 references:
 - uid: nORM.Core.DbContext
   commentId: T:nORM.Core.DbContext
@@ -1284,6 +1611,96 @@ references:
     name: Generic
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.collections.generic
+- uid: nORM.Core.ChangeTracker.DetectChanges
+  commentId: M:nORM.Core.ChangeTracker.DetectChanges
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_DetectChanges
+  name: DetectChanges()
+  nameWithType: ChangeTracker.DetectChanges()
+  fullName: nORM.Core.ChangeTracker.DetectChanges()
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.DetectChanges
+    name: DetectChanges
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_DetectChanges
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.DetectChanges
+    name: DetectChanges
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_DetectChanges
+  - name: (
+  - name: )
+- uid: nORM.Core.ChangeTracker.DebugView*
+  commentId: Overload:nORM.Core.ChangeTracker.DebugView
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_DebugView
+  name: DebugView
+  nameWithType: ChangeTracker.DebugView
+  fullName: nORM.Core.ChangeTracker.DebugView
+- uid: nORM.Core.DebugView
+  commentId: T:nORM.Core.DebugView
+  parent: nORM.Core
+  href: nORM.Core.DebugView.html
+  name: DebugView
+  nameWithType: DebugView
+  fullName: nORM.Core.DebugView
+- uid: nORM.Core.ChangeTracker.HasChanges
+  commentId: M:nORM.Core.ChangeTracker.HasChanges
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_HasChanges
+  name: HasChanges()
+  nameWithType: ChangeTracker.HasChanges()
+  fullName: nORM.Core.ChangeTracker.HasChanges()
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.HasChanges
+    name: HasChanges
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_HasChanges
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.HasChanges
+    name: HasChanges
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_HasChanges
+  - name: (
+  - name: )
+- uid: nORM.Core.ChangeTracker.Entries
+  commentId: P:nORM.Core.ChangeTracker.Entries
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_Entries
+  name: Entries
+  nameWithType: ChangeTracker.Entries
+  fullName: nORM.Core.ChangeTracker.Entries
+- uid: nORM.Core.ChangeTracker.DetectChanges*
+  commentId: Overload:nORM.Core.ChangeTracker.DetectChanges
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_DetectChanges
+  name: DetectChanges
+  nameWithType: ChangeTracker.DetectChanges
+  fullName: nORM.Core.ChangeTracker.DetectChanges
+- uid: nORM.Core.ChangeTracker.HasChanges*
+  commentId: Overload:nORM.Core.ChangeTracker.HasChanges
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_HasChanges
+  name: HasChanges
+  nameWithType: ChangeTracker.HasChanges
+  fullName: nORM.Core.ChangeTracker.HasChanges
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
+- uid: nORM.Core.EntityState.Unchanged
+  commentId: F:nORM.Core.EntityState.Unchanged
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Unchanged
+  name: Unchanged
+  nameWithType: EntityState.Unchanged
+  fullName: nORM.Core.EntityState.Unchanged
+- uid: nORM.Core.ChangeTracker.AcceptAllChanges*
+  commentId: Overload:nORM.Core.ChangeTracker.AcceptAllChanges
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_AcceptAllChanges
+  name: AcceptAllChanges
+  nameWithType: ChangeTracker.AcceptAllChanges
+  fullName: nORM.Core.ChangeTracker.AcceptAllChanges
 - uid: nORM.Core.ChangeTracker._trackLock
   commentId: F:nORM.Core.ChangeTracker._trackLock
   name: _trackLock
@@ -1401,3 +1818,248 @@ references:
   name: Clear
   nameWithType: ChangeTracker.Clear
   fullName: nORM.Core.ChangeTracker.Clear
+- uid: nORM.Core.EntityEntryGraphNode.Entry
+  commentId: P:nORM.Core.EntityEntryGraphNode.Entry
+  href: nORM.Core.EntityEntryGraphNode.html#nORM_Core_EntityEntryGraphNode_Entry
+  name: Entry
+  nameWithType: EntityEntryGraphNode.Entry
+  fullName: nORM.Core.EntityEntryGraphNode.Entry
+- uid: nORM.Core.EntityState.Detached
+  commentId: F:nORM.Core.EntityState.Detached
+  href: nORM.Core.EntityState.html#nORM_Core_EntityState_Detached
+  name: Detached
+  nameWithType: EntityState.Detached
+  fullName: nORM.Core.EntityState.Detached
+- uid: System.InvalidOperationException
+  commentId: T:System.InvalidOperationException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.invalidoperationexception
+  name: InvalidOperationException
+  nameWithType: InvalidOperationException
+  fullName: System.InvalidOperationException
+- uid: nORM.Core.ChangeTracker.TrackGraph*
+  commentId: Overload:nORM.Core.ChangeTracker.TrackGraph
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_TrackGraph_System_Object_System_Action_nORM_Core_EntityEntryGraphNode__
+  name: TrackGraph
+  nameWithType: ChangeTracker.TrackGraph
+  fullName: nORM.Core.ChangeTracker.TrackGraph
+- uid: System.Action{nORM.Core.EntityEntryGraphNode}
+  commentId: T:System.Action{nORM.Core.EntityEntryGraphNode}
+  parent: System
+  definition: System.Action`1
+  href: https://learn.microsoft.com/dotnet/api/system.action-1
+  name: Action<EntityEntryGraphNode>
+  nameWithType: Action<EntityEntryGraphNode>
+  fullName: System.Action<nORM.Core.EntityEntryGraphNode>
+  nameWithType.vb: Action(Of EntityEntryGraphNode)
+  fullName.vb: System.Action(Of nORM.Core.EntityEntryGraphNode)
+  name.vb: Action(Of EntityEntryGraphNode)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - uid: nORM.Core.EntityEntryGraphNode
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.EntityEntryGraphNode
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode.html
+  - name: )
+- uid: System.Action`1
+  commentId: T:System.Action`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.action-1
+  name: Action<T>
+  nameWithType: Action<T>
+  fullName: System.Action<T>
+  nameWithType.vb: Action(Of T)
+  fullName.vb: System.Action(Of T)
+  name.vb: Action(Of T)
+  spec.csharp:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+  commentId: M:nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+  isExternal: true
+  href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_TrackGraph_System_Object_System_Action_nORM_Core_EntityEntryGraphNode__
+  name: TrackGraph(object, Action<EntityEntryGraphNode>)
+  nameWithType: ChangeTracker.TrackGraph(object, Action<EntityEntryGraphNode>)
+  fullName: nORM.Core.ChangeTracker.TrackGraph(object, System.Action<nORM.Core.EntityEntryGraphNode>)
+  nameWithType.vb: ChangeTracker.TrackGraph(Object, Action(Of EntityEntryGraphNode))
+  fullName.vb: nORM.Core.ChangeTracker.TrackGraph(Object, System.Action(Of nORM.Core.EntityEntryGraphNode))
+  name.vb: TrackGraph(Object, Action(Of EntityEntryGraphNode))
+  spec.csharp:
+  - uid: nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+    name: TrackGraph
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_TrackGraph_System_Object_System_Action_nORM_Core_EntityEntryGraphNode__
+  - name: (
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: <
+  - uid: nORM.Core.EntityEntryGraphNode
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode.html
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode})
+    name: TrackGraph
+    href: nORM.Core.ChangeTracker.html#nORM_Core_ChangeTracker_TrackGraph_System_Object_System_Action_nORM_Core_EntityEntryGraphNode__
+  - name: (
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: ','
+  - name: " "
+  - uid: System.Action`1
+    name: Action
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.action-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.EntityEntryGraphNode
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode.html
+  - name: )
+  - name: )
+- uid: nORM.Core.EntityEntryGraphNode`1.Entry
+  commentId: P:nORM.Core.EntityEntryGraphNode`1.Entry
+  href: nORM.Core.EntityEntryGraphNode-1.html#nORM_Core_EntityEntryGraphNode_1_Entry
+  name: Entry
+  nameWithType: EntityEntryGraphNode<TState>.Entry
+  fullName: nORM.Core.EntityEntryGraphNode<TState>.Entry
+  nameWithType.vb: EntityEntryGraphNode(Of TState).Entry
+  fullName.vb: nORM.Core.EntityEntryGraphNode(Of TState).Entry
+- uid: '{TState}'
+  commentId: '!:TState'
+  definition: TState
+  name: TState
+  nameWithType: TState
+  fullName: TState
+- uid: System.Func{nORM.Core.EntityEntryGraphNode{{TState}},System.Boolean}
+  commentId: T:System.Func{nORM.Core.EntityEntryGraphNode{``0},System.Boolean}
+  parent: System
+  definition: System.Func`2
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<EntityEntryGraphNode<TState>, bool>
+  nameWithType: Func<EntityEntryGraphNode<TState>, bool>
+  fullName: System.Func<nORM.Core.EntityEntryGraphNode<TState>, bool>
+  nameWithType.vb: Func(Of EntityEntryGraphNode(Of TState), Boolean)
+  fullName.vb: System.Func(Of nORM.Core.EntityEntryGraphNode(Of TState), Boolean)
+  name.vb: Func(Of EntityEntryGraphNode(Of TState), Boolean)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.EntityEntryGraphNode`1
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode-1.html
+  - name: <
+  - name: TState
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.EntityEntryGraphNode`1
+    name: EntityEntryGraphNode
+    href: nORM.Core.EntityEntryGraphNode-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TState
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: TState
+  name: TState
+  nameWithType: TState
+  fullName: TState
+- uid: System.Func`2
+  commentId: T:System.Func`2
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.func-2
+  name: Func<T, TResult>
+  nameWithType: Func<T, TResult>
+  fullName: System.Func<T, TResult>
+  nameWithType.vb: Func(Of T, TResult)
+  fullName.vb: System.Func(Of T, TResult)
+  name.vb: Func(Of T, TResult)
+  spec.csharp:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TResult
+  - name: )

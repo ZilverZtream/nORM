@@ -50,12 +50,12 @@ items:
   type: Enum
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ProviderMobilityProviderFeature
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 123
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 8
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -80,12 +80,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ServerVersion
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 126
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 11
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -108,12 +108,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: JsonTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 128
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 13
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -136,12 +136,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: JsonPathTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 130
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 15
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -164,12 +164,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TemporalVersioning
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 132
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -192,12 +192,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkInsert
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 134
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 19
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -220,12 +220,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Savepoints
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 136
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 21
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -248,12 +248,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ParameterLimit
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 138
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 23
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -276,12 +276,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: NativeTenantSessionContext
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 140
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 25
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -304,12 +304,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ProviderNativeTemporalTables
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 142
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 27
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -332,12 +332,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: RowTupleComparison
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 144
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 29
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -360,12 +360,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: OrderedStringAggregate
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 146
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 31
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -388,12 +388,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: RegexTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 148
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -416,12 +416,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentifierEscaping
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 150
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 35
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -444,12 +444,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: ParameterBinding
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 152
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 37
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -472,12 +472,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: PagingTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 154
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 39
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -500,12 +500,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: BooleanPredicateTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 156
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 41
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -528,12 +528,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: NullSemantics
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 158
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 43
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -556,12 +556,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: LikeEscapeTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 160
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 45
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -584,12 +584,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: StringConcatTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 162
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -612,12 +612,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TypeConversionTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 164
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 49
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -640,12 +640,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: StringPredicateTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 166
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -668,12 +668,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: CharacterTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 168
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -696,12 +696,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: FormattingTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 170
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 55
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -724,12 +724,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DateTimeComparisonNormalization
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 172
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 57
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -752,12 +752,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: DecimalComparisonNormalization
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 174
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 59
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -780,12 +780,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TimeSpanComparisonNormalization
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 176
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -808,12 +808,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TemporalConstructionTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 178
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -836,12 +836,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TemporalArithmeticTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 180
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -864,12 +864,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: TemporalClockSource
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 182
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -892,12 +892,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: GeneratedKeyRetrieval
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 184
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -920,12 +920,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: InsertOrIgnoreTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 186
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 71
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -948,12 +948,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: CudSubqueryRewrite
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 188
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 73
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -976,12 +976,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: BitwiseXorTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 190
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 75
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1004,12 +1004,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: WindowFunctionTranslation
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 192
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 77
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1032,12 +1032,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: CaseSensitiveStringComparison
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 194
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 79
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1060,12 +1060,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/ProviderMobilityTranslation.cs
+      path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SqlStatementLengthLimit
-    path: src/nORM/Configuration/ProviderMobilityTranslation.cs
-    startLine: 196
+    path: src/nORM/Configuration/ProviderMobilityProviderFeature.cs
+    startLine: 81
   assemblies:
   - nORM
   namespace: nORM.Configuration

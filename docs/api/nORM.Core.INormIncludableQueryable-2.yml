@@ -19,7 +19,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormIncludableQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 119
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -34,6 +34,7 @@ items:
   inheritedMembers:
   - nORM.Core.INormQueryable{{TEntity}}.Include``1(System.Linq.Expressions.Expression{System.Func{{TEntity},{TProperty}}})
   - nORM.Core.INormQueryable{{TEntity}}.AsNoTracking
+  - nORM.Core.INormQueryable{{TEntity}}.AsNoTrackingWithIdentityResolution
   - nORM.Core.INormQueryable{{TEntity}}.AsSplitQuery
   - nORM.Core.INormQueryable{{TEntity}}.AsAsyncEnumerable(System.Threading.CancellationToken)
   - nORM.Core.INormQueryable{{TEntity}}.ToListAsync(System.Threading.CancellationToken)
@@ -55,6 +56,7 @@ items:
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.ContainsAsync``1({TEntity},System.Threading.CancellationToken)
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.GroupJoin``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TEntity},System.Collections.Generic.IEnumerable{{TInner}},{TResult}}})
   - System.Linq.IQueryable{`0}.nORM.Core.NormAsyncExtensions.Join``4(System.Linq.IQueryable{{TInner}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TInner},{TKey}}},System.Linq.Expressions.Expression{System.Func{{TEntity},{TInner},{TResult}}})
+  - System.Linq.IQueryable{`0}.nORM.Core.NormQueryable.ToQueryString``1
   - System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.DateTime)
   - System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.String)
   - nORM.Core.INormIncludableQueryable`2.nORM.Navigation.NavigationPropertyExtensions.EnableLazyLoading``1(nORM.Core.DbContext)
@@ -174,6 +176,28 @@ references:
   - uid: nORM.Core.INormQueryable{`0}.AsNoTracking
     name: AsNoTracking
     href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  - name: (
+  - name: )
+- uid: nORM.Core.INormQueryable{{TEntity}}.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution
+  parent: nORM.Core.INormQueryable{{TEntity}}
+  definition: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: INormQueryable<TEntity>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.INormQueryable<TEntity>.AsNoTrackingWithIdentityResolution()
+  nameWithType.vb: INormQueryable(Of TEntity).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.INormQueryable(Of TEntity).AsNoTrackingWithIdentityResolution()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
   - name: (
   - name: )
 - uid: nORM.Core.INormQueryable{{TEntity}}.AsSplitQuery
@@ -1201,6 +1225,53 @@ references:
   - name: )
   - name: )
   - name: )
+- uid: System.Linq.IQueryable{`0}.nORM.Core.NormQueryable.ToQueryString``1
+  commentId: M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  parent: nORM.Core.NormQueryable
+  definition: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  name: ToQueryString<T>(IQueryable<T>)
+  nameWithType: NormQueryable.ToQueryString<T>(IQueryable<T>)
+  fullName: nORM.Core.NormQueryable.ToQueryString<T>(System.Linq.IQueryable<T>)
+  nameWithType.vb: NormQueryable.ToQueryString(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormQueryable.ToQueryString(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: ToQueryString(Of T)(IQueryable(Of T))
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{`0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{`0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
 - uid: System.Linq.IQueryable{`0}.nORM.Core.TemporalExtensions.AsOf``1(System.DateTime)
   commentId: M:nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   parent: nORM.Core.TemporalExtensions
@@ -1946,6 +2017,26 @@ references:
   - uid: nORM.Core.INormQueryable`1.AsNoTracking
     name: AsNoTracking
     href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  - name: (
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  nameWithType.vb: INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
   - name: (
   - name: )
 - uid: nORM.Core.INormQueryable`1.AsSplitQuery
@@ -2982,6 +3073,59 @@ references:
   - name: )
   - name: )
   - name: )
+- uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  isExternal: true
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  name: ToQueryString<T>(IQueryable<T>)
+  nameWithType: NormQueryable.ToQueryString<T>(IQueryable<T>)
+  fullName: nORM.Core.NormQueryable.ToQueryString<T>(System.Linq.IQueryable<T>)
+  nameWithType.vb: NormQueryable.ToQueryString(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormQueryable.ToQueryString(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: ToQueryString(Of T)(IQueryable(Of T))
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+    name: ToQueryString
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: nORM.Core.NormQueryable
+  commentId: T:nORM.Core.NormQueryable
+  parent: nORM.Core
+  href: nORM.Core.NormQueryable.html
+  name: NormQueryable
+  nameWithType: NormQueryable
+  fullName: nORM.Core.NormQueryable
 - uid: nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   commentId: M:nORM.Core.TemporalExtensions.AsOf``1(System.Linq.IQueryable{``0},System.DateTime)
   isExternal: true

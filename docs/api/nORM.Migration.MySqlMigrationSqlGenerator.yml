@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
+      path: src/nORM/Migration/MySqlMigrationSqlGenerator.Temporal.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: MySqlMigrationSqlGenerator
-    path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
-    startLine: 18
+    path: src/nORM/Migration/MySqlMigrationSqlGenerator.Temporal.cs
+    startLine: 9
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -75,7 +75,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/MySqlMigrationSqlGenerator.cs
-    startLine: 148
+    startLine: 151
   assemblies:
   - nORM
   namespace: nORM.Migration

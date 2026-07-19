@@ -11,6 +11,7 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String,System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
@@ -28,12 +29,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 748
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 17
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -75,12 +76,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: _parent
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 751
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 20
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -106,12 +107,12 @@ items:
   type: Field
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: _property
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 753
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 22
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -137,12 +138,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnName
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 767
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 36
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -179,12 +180,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasDefaultValueSql
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 782
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 51
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -213,6 +214,54 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
   name.vb: HasDefaultValueSql(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String,System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String,System.String)
+  id: HasDefaultValueSql(System.String,System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasDefaultValueSql(string, string?)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string, string?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string, string?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasDefaultValueSql
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 65
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures SQL default metadata and preserves an optional provider default-constraint name.
+
+    This does not mark the property as database-generated and does not cause nORM to omit the column from INSERT statements.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasDefaultValueSql(string sql, string? constraintName)
+    parameters:
+    - id: sql
+      type: System.String
+      description: A SQL literal or no-argument function accepted by migration default validation.
+    - id: constraintName
+      type: System.String
+      description: Optional provider default-constraint name to preserve in migration DDL.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasDefaultValueSql(sql As String, constraintName As String) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">sql</code> is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String, String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String, String)
+  name.vb: HasDefaultValueSql(String, String)
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   id: HasIdentityOptions(System.Int64,System.Int64)
@@ -226,12 +275,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasIdentityOptions
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 793
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -269,12 +318,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasMaxLength
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 807
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 90
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -317,12 +366,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 819
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 102
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -359,12 +408,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 831
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 114
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -401,12 +450,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 844
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 127
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -446,12 +495,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 858
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 141
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -494,12 +543,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCollation
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 872
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -541,12 +590,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasComputedColumnSql
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 887
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 170
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -591,12 +640,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 899
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 182
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -632,12 +681,12 @@ items:
   type: Property
   source:
     remote:
-      path: src/nORM/Configuration/EntityTypeBuilder.cs
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
-    path: src/nORM/Configuration/EntityTypeBuilder.cs
-    startLine: 909
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 192
   assemblies:
   - nORM
   namespace: nORM.Configuration

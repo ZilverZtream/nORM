@@ -25,7 +25,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeySchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 74
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -67,7 +67,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ConstraintName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 77
+    startLine: 99
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -98,7 +98,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 79
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -129,7 +129,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalTable
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 81
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -160,7 +160,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalColumns
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 83
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -191,7 +191,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnDelete
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 88
+    startLine: 110
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -225,7 +225,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnUpdate
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 93
+    startLine: 115
   assemblies:
   - nORM
   namespace: nORM.Migration

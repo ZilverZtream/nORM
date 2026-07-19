@@ -15,12 +15,12 @@ items:
   type: Class
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Differ.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaDiffer
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1437
+    path: src/nORM/Migration/SchemaSnapshot.Differ.cs
+    startLine: 18
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -52,12 +52,12 @@ items:
   type: Method
   source:
     remote:
-      path: src/nORM/Migration/SchemaSnapshot.cs
+      path: src/nORM/Migration/SchemaSnapshot.Differ.cs
       branch: main
       repo: https://github.com/ZilverZtream/nORM.git
     id: Diff
-    path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 1445
+    path: src/nORM/Migration/SchemaSnapshot.Differ.cs
+    startLine: 26
   assemblies:
   - nORM
   namespace: nORM.Migration

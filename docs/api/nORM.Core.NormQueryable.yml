@@ -6,6 +6,8 @@ items:
   parent: nORM.Core
   children:
   - nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+  - nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+  - nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
   langs:
   - csharp
   - vb
@@ -60,6 +62,55 @@ items:
     arguments:
     - type: System.String
       value: nORM LINQ reflects over entity property metadata to build SQL; trimming may remove the required members. Annotate consumer call sites accordingly.
+- uid: nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  commentId: M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{``0})
+  id: ToQueryString``1(System.Linq.IQueryable{``0})
+  isExtensionMethod: true
+  parent: nORM.Core.NormQueryable
+  langs:
+  - csharp
+  - vb
+  name: ToQueryString<T>(IQueryable<T>)
+  nameWithType: NormQueryable.ToQueryString<T>(IQueryable<T>)
+  fullName: nORM.Core.NormQueryable.ToQueryString<T>(System.Linq.IQueryable<T>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToQueryString
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 52
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Returns the SQL this query would execute, without running it — the equivalent of Entity Framework
+
+    Core's <code>ToQueryString()</code>. Each parameter is listed as a leading comment (<code>-- @p0 = value</code>)
+
+    so the statement is self-describing. Useful for debugging, logging, and comparing against
+
+    hand-written SQL. The query is translated but never sent to the database.
+  example: []
+  syntax:
+    content: public static string ToQueryString<T>(this IQueryable<T> source)
+    parameters:
+    - id: source
+      type: System.Linq.IQueryable{{T}}
+      description: A nORM query (from <code>context.Query&lt;T&gt;()</code>/<code>Set&lt;T&gt;()</code>/<code>FromSqlRaw</code>).
+    typeParameters:
+    - id: T
+      description: The element type of the query.
+    return:
+      type: System.String
+      description: The generated SQL, preceded by one comment line per parameter.
+    content.vb: Public Shared Function ToQueryString(Of T)(source As IQueryable(Of T)) As String
+  overload: nORM.Core.NormQueryable.ToQueryString*
+  nameWithType.vb: NormQueryable.ToQueryString(Of T)(IQueryable(Of T))
+  fullName.vb: nORM.Core.NormQueryable.ToQueryString(Of T)(System.Linq.IQueryable(Of T))
+  name.vb: ToQueryString(Of T)(IQueryable(Of T))
 - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
   commentId: M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
   id: Query``1(nORM.Core.DbContext)
@@ -79,7 +130,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Query
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 32
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -102,6 +153,55 @@ items:
   nameWithType.vb: NormQueryable.Query(Of T)(DbContext)
   fullName.vb: nORM.Core.NormQueryable.Query(Of T)(nORM.Core.DbContext)
   name.vb: Query(Of T)(DbContext)
+- uid: nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+  commentId: M:nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext)
+  id: Set``1(nORM.Core.DbContext)
+  isExtensionMethod: true
+  parent: nORM.Core.NormQueryable
+  langs:
+  - csharp
+  - vb
+  name: Set<T>(DbContext)
+  nameWithType: NormQueryable.Set<T>(DbContext)
+  fullName: nORM.Core.NormQueryable.Set<T>(nORM.Core.DbContext)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/NormQueryable.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Set
+    path: src/nORM/Core/NormQueryable.cs
+    startLine: 101
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Creates a queryable source for the specified entity type backed by the provided
+
+    context. Alias for <xref href="nORM.Core.NormQueryable.Query%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>, provided for parity with the
+
+    Entity Framework Core <code>DbContext.Set&lt;T&gt;()</code> entry point so that existing
+
+    muscle memory works unchanged.
+  example: []
+  syntax:
+    content: 'public static IQueryable<T> Set<T>(this DbContext ctx) where T : class'
+    parameters:
+    - id: ctx
+      type: nORM.Core.DbContext
+      description: The <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> that provides access to the database.
+    typeParameters:
+    - id: T
+      description: The entity type to query.
+    return:
+      type: System.Linq.IQueryable{{T}}
+      description: An <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> to compose and execute queries.
+    content.vb: Public Shared Function [Set](Of T As Class)(ctx As DbContext) As IQueryable(Of T)
+  overload: nORM.Core.NormQueryable.Set*
+  nameWithType.vb: NormQueryable.Set(Of T)(DbContext)
+  fullName.vb: nORM.Core.NormQueryable.Set(Of T)(nORM.Core.DbContext)
+  name.vb: Set(Of T)(DbContext)
 references:
 - uid: nORM.Core
   commentId: N:nORM.Core
@@ -362,16 +462,16 @@ references:
   name: System
   nameWithType: System
   fullName: System
-- uid: nORM.Core.DbContext
-  commentId: T:nORM.Core.DbContext
-  parent: nORM.Core
-  href: nORM.Core.DbContext.html
-  name: DbContext
-  nameWithType: DbContext
-  fullName: nORM.Core.DbContext
-- uid: System.Linq.IQueryable`1
-  commentId: T:System.Linq.IQueryable`1
-  isExternal: true
+- uid: nORM.Core.NormQueryable.ToQueryString*
+  commentId: Overload:nORM.Core.NormQueryable.ToQueryString
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_ToQueryString__1_System_Linq_IQueryable___0__
+  name: ToQueryString
+  nameWithType: NormQueryable.ToQueryString
+  fullName: nORM.Core.NormQueryable.ToQueryString
+- uid: System.Linq.IQueryable{{T}}
+  commentId: T:System.Linq.IQueryable{``0}
+  parent: System.Linq
+  definition: System.Linq.IQueryable`1
   href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
   name: IQueryable<T>
   nameWithType: IQueryable<T>
@@ -397,16 +497,20 @@ references:
   - name: " "
   - name: T
   - name: )
-- uid: nORM.Core.NormQueryable.Query*
-  commentId: Overload:nORM.Core.NormQueryable.Query
-  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
-  name: Query
-  nameWithType: NormQueryable.Query
-  fullName: nORM.Core.NormQueryable.Query
-- uid: System.Linq.IQueryable{{T}}
-  commentId: T:System.Linq.IQueryable{``0}
-  parent: System.Linq
-  definition: System.Linq.IQueryable`1
+- uid: System.String
+  commentId: T:System.String
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.string
+  name: string
+  nameWithType: string
+  fullName: string
+  nameWithType.vb: String
+  fullName.vb: String
+  name.vb: String
+- uid: System.Linq.IQueryable`1
+  commentId: T:System.Linq.IQueryable`1
+  isExternal: true
   href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
   name: IQueryable<T>
   nameWithType: IQueryable<T>
@@ -459,3 +563,57 @@ references:
     name: Linq
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.linq
+- uid: nORM.Core.DbContext
+  commentId: T:nORM.Core.DbContext
+  parent: nORM.Core
+  href: nORM.Core.DbContext.html
+  name: DbContext
+  nameWithType: DbContext
+  fullName: nORM.Core.DbContext
+- uid: nORM.Core.NormQueryable.Query*
+  commentId: Overload:nORM.Core.NormQueryable.Query
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  name: Query
+  nameWithType: NormQueryable.Query
+  fullName: nORM.Core.NormQueryable.Query
+- uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+  commentId: M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  name: Query<T>(DbContext)
+  nameWithType: NormQueryable.Query<T>(DbContext)
+  fullName: nORM.Core.NormQueryable.Query<T>(nORM.Core.DbContext)
+  nameWithType.vb: NormQueryable.Query(Of T)(DbContext)
+  fullName.vb: nORM.Core.NormQueryable.Query(Of T)(nORM.Core.DbContext)
+  name.vb: Query(Of T)(DbContext)
+  spec.csharp:
+  - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+    name: Query
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  - name: <
+  - name: T
+  - name: '>'
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
+    name: Query
+    href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: (
+  - uid: nORM.Core.DbContext
+    name: DbContext
+    href: nORM.Core.DbContext.html
+  - name: )
+- uid: nORM.Core.NormQueryable.Set*
+  commentId: Overload:nORM.Core.NormQueryable.Set
+  href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Set__1_nORM_Core_DbContext_
+  name: Set
+  nameWithType: NormQueryable.Set
+  fullName: nORM.Core.NormQueryable.Set
