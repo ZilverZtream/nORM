@@ -73,13 +73,14 @@ namespace nORM.Query
                     fkColumns = Array.Empty<Column>();   // m2m correlates through the bridge table, not a child FK
                     parentKeyProps = m2m.LeftKeyColumns.Select(c => c.Prop).ToArray();
                 }
-                else if (_mapping.OwnedCollections.Any(o => o.NavigationProperty.Name == collectionProperty.Name))
+                else if ((owned = _mapping.OwnedCollections.FirstOrDefault(o => o.NavigationProperty.Name == collectionProperty.Name)) != null)
                 {
-                    // Owned shaped projections are the next increment; still fail loud rather than build a
-                    // definition the executor can't run.
-                    throw new NormUnsupportedFeatureException(
-                        $"Projecting the owned collection '{collectionProperty.Name}' into a shaped result isn't " +
-                        "supported yet. Load it with Include(...), or fetch it in a separate query.");
+                    targetMapping = _ctx.GetMapping(owned.OwnedType);
+                    fkColumns = Array.Empty<Column>();   // owned rows carry no FK property; grouped by the FK ordinal
+                    parentKeyProps = new[]
+                    {
+                        nORM.Core.DbContext.ResolveOwnerKeyColumnForOwnedFk(_mapping.KeyColumns, owned.ForeignKeyColumn, _mapping.Type.Name).Prop
+                    };
                 }
                 else
                 {
@@ -117,12 +118,12 @@ namespace nORM.Query
                 _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
                 var dependentElementType = elementProjection?.ReturnType ?? elementType;
 
-                // Filtered/projected many-to-many shaped projections are a later sub-increment; only a bare
-                // .ToList() is wired so far. Fail loud rather than silently drop the filter/projection.
-                if (m2m != null && (filter.Sql != null || elementProjection != null))
+                // Filtered/projected owned & many-to-many shaped projections are a later sub-increment; only a
+                // bare .ToList() is wired so far. Fail loud rather than silently drop the filter/projection.
+                if ((m2m != null || owned != null) && (filter.Sql != null || elementProjection != null))
                     throw new NormUnsupportedFeatureException(
-                        $"Projecting the many-to-many collection '{collectionProperty.Name}' with a Where(...) filter " +
-                        "or an element projection isn't supported yet — use a bare .ToList(), or Include(...).");
+                        $"Projecting the {(owned != null ? "owned" : "many-to-many")} collection '{collectionProperty.Name}' " +
+                        "with a Where(...) filter or an element projection isn't supported yet — use a bare .ToList(), or Include(...).");
 
                 // A closure-capturing element projection is applied client-side; baking it into a cached
                 // delegate would replay the first execution's captured value. Mark the plan non-cacheable so

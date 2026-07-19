@@ -15,11 +15,14 @@ namespace nORM.Tests;
 
 /// <summary>
 /// Shaping an owned (OwnsMany) or many-to-many collection into a projection —
-/// <c>Select(o =&gt; new { o.Id, Items = o.Items.ToList() })</c> — is not yet supported by the split-query
-/// stitch, which is keyed on ordinary relations. Such a binding used to be admitted upstream and then
-/// silently skipped when no relation was found, leaving the materializer expecting a stitched column that
-/// never arrived and crashing with an opaque <c>ArgumentOutOfRangeException</c>. It now fails loud with an
-/// actionable message pointing at Include or a separate query.
+/// <c>Select(o =&gt; new { o.Id, Items = o.Items.ToList() })</c> — now loads through the split-query stitch:
+/// the bridge/FK-ordinal correlation the eager-load path uses is reused with the projected DTO as the
+/// stitch target. A BARE <c>.ToList()</c> loads the related/owned rows; a binding that adds a Where(...)
+/// filter or an element projection over the owned/m2m navigation still fails loud (that sub-increment is
+/// not wired yet) rather than silently dropping the filter/projection. Previously ANY such binding was
+/// admitted upstream and then silently skipped when no ordinary relation was found, leaving the
+/// materializer expecting a stitched column that never arrived and crashing with an opaque
+/// <c>ArgumentOutOfRangeException</c>.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class ShapedProjectionUnsupportedCollectionTests
@@ -109,12 +112,34 @@ public class ShapedProjectionUnsupportedCollectionTests
     }
 
     [Fact]
-    public void Shaping_an_owned_collection_fails_loud_not_crash()
+    public void Shaping_a_bare_owned_collection_loads_the_owned_rows()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        var rows = ctx.Query<Order>().Select(o => new { o.Id, Lines = o.Lines.ToList() }).ToList();
+        var order = Assert.Single(rows);
+        Assert.Equal(1, order.Id);
+        Assert.Equal(10, Assert.Single(order.Lines).Amount);
+    }
+
+    [Fact]
+    public async Task Shaping_a_bare_owned_collection_loads_via_the_sync_execution_path_for_sqlite()
+    {
+        using var ctx = Ctx(out var cn);
+        using var _cn = cn;
+        // SQLite routes ToListAsync through the synchronous materialize path, so the owned projection loads.
+        var rows = await ((INormQueryable<Order>)ctx.Query<Order>())
+            .Select(o => new { o.Id, Lines = o.Lines.ToList() }).ToListAsync();
+        Assert.Equal(10, Assert.Single(Assert.Single(rows).Lines).Amount);
+    }
+
+    [Fact]
+    public void Filtered_owned_shaped_projection_still_fails_loud()
     {
         using var ctx = Ctx(out var cn);
         using var _cn = cn;
         var ex = Assert.Throws<NormUnsupportedFeatureException>(() =>
-            ctx.Query<Order>().Select(o => new { o.Id, Lines = o.Lines.ToList() }).ToList());
+            ctx.Query<Order>().Select(o => new { o.Id, Lines = o.Lines.Where(l => l.Amount > 0).ToList() }).ToList());
         Assert.Contains("owned", ex.Message);
     }
 }

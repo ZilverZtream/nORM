@@ -142,7 +142,7 @@ namespace nORM.Core
         /// method tries: (1) exact column name match, (2) owner-type-name-prefixed match,
         /// then falls back to the first key column.
         /// </summary>
-        private static Column ResolveOwnerKeyColumnForOwnedFk(Column[] ownerKeyColumns, string ownedFkColumnName, string ownerTypeName)
+        internal static Column ResolveOwnerKeyColumnForOwnedFk(Column[] ownerKeyColumns, string ownedFkColumnName, string ownerTypeName)
         {
             if (ownerKeyColumns.Length == 1) return ownerKeyColumns[0];
 
@@ -392,6 +392,109 @@ namespace nORM.Core
             var col2 = ownedMap.CollectionGetter(ownerEntity);
             if (col2 is System.Collections.IList list)
                 list.Add(item);
+        }
+
+        /// <summary>
+        /// Loads an owned (OwnsMany) collection for a SHAPED PROJECTION — the parents are projected DTOs (or
+        /// anonymous types), so the owner key and the target collection member resolve by NAME (via the
+        /// split-query stitch helpers) rather than the mapping's entity-typed accessors. Owned rows carry no FK
+        /// property, so children are grouped by the FK column's ordinal in the SELECT and materialized with the
+        /// same hand-rolled column mapping (+ value converters) the eager-load path uses. Bare collection only —
+        /// filtered/projected element bindings are rejected upstream at plan build for now.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Owned-collection projection materialization builds instances via reflection; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Owned-collection projection reflects over the owned type; trimming may remove the required members.")]
+        internal void LoadOwnedCollectionProjection(nORM.Query.DependentQueryDefinition depQuery, System.Collections.IList parents)
+        {
+            if (parents.Count == 0) return;
+            var ownedMap = depQuery.Owned!;
+            var pkColProp = depQuery.ParentKeyProperties[0];   // the owner key column the FK references
+
+            object? OwnerKey(object p) => nORM.Query.QueryExecutor.ResolveOnParent(pkColProp, p, depQuery).GetValue(p);
+            void AssignEmpty(object p) => nORM.Query.QueryExecutor.AssignCollectionToTarget(
+                nORM.Query.QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p,
+                nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0));
+
+            var keys = new HashSet<object>();
+            foreach (var p in parents.Cast<object>())
+            {
+                var k = OwnerKey(p);
+                if (k != null) keys.Add(k);
+            }
+            if (keys.Count == 0)
+            {
+                foreach (var p in parents.Cast<object>()) AssignEmpty(p);
+                return;
+            }
+
+            EnsureConnection();
+            var pks = keys.ToArray();
+            var sql = new StringBuilder("SELECT ");
+            for (int ci = 0; ci < ownedMap.Columns.Length; ci++) { if (ci > 0) sql.Append(", "); sql.Append(ownedMap.Columns[ci].EscCol); }
+            if (ownedMap.Columns.Length > 0) sql.Append(", ");
+            sql.Append(ownedMap.EscForeignKeyColumn);
+            sql.Append(" FROM ").Append(ownedMap.EscTable).Append(' ').Append(_p.Escape("__ownt"))
+               .Append(" WHERE ").Append(ownedMap.EscForeignKeyColumn).Append(" IN (");
+            for (int pi = 0; pi < pks.Length; pi++) { if (pi > 0) sql.Append(", "); sql.Append(_p.ParamPrefix).Append("lpk").Append(pi); }
+            sql.Append(')');
+
+            Column? ownedTenantCol = null;
+            if (Options.TenantProvider != null)
+                ownedTenantCol = Array.Find(ownedMap.Columns, c => c.PropName == Options.TenantColumnName)
+                    ?? throw new NormConfigurationException(
+                        $"TenantProvider is configured, but owned collection '{ownedMap.OwnedType.Name}' does not map " +
+                        $"tenant column '{Options.TenantColumnName}'. nORM fails closed for tenant-scoped owned loads.");
+            if (ownedTenantCol != null)
+                sql.Append(" AND ").Append(ownedTenantCol.EscCol).Append(" = ").Append(_p.ParamPrefix).Append("tenantId");
+
+            using var cmd = CreateCommand();
+            cmd.CommandText = sql.ToString();
+            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
+            for (int i = 0; i < pks.Length; i++)
+            {
+                var pp = cmd.CreateParameter(); pp.ParameterName = _p.ParamPrefix + "lpk" + i; pp.Value = pks[i]; cmd.Parameters.Add(pp);
+            }
+            if (ownedTenantCol != null)
+            {
+                var tp = cmd.CreateParameter(); tp.ParameterName = _p.ParamPrefix + "tenantId";
+                tp.Value = GetRequiredTenantId(ownedTenantCol, ownedMap.OwnedType, "owned collection shaped projection"); cmd.Parameters.Add(tp);
+            }
+
+            int fkOrdinal = ownedMap.Columns.Length;
+            var byOwnerKey = new Dictionary<object, System.Collections.IList>();
+            using (var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(this, System.Data.CommandBehavior.Default))
+            {
+                while (reader.Read())
+                {
+                    var item = Activator.CreateInstance(ownedMap.OwnedType)!;
+                    for (int ci = 0; ci < ownedMap.Columns.Length; ci++)
+                    {
+                        var col = ownedMap.Columns[ci];
+                        if (reader.IsDBNull(ci)) continue;
+                        var raw = reader.GetValue(ci);
+                        col.Setter(item, col.Converter != null ? col.Converter.ConvertFromProvider(raw) : ConvertSimple(raw, col.Prop.PropertyType));
+                    }
+                    if (reader.IsDBNull(fkOrdinal)) continue;
+                    var fkVal = reader.GetValue(fkOrdinal);
+                    var key = ConvertSimple(fkVal, pkColProp.PropertyType) ?? fkVal;   // coerce FK to the owner-key CLR type
+                    if (!byOwnerKey.TryGetValue(key, out var list))
+                    {
+                        list = nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0);
+                        byOwnerKey[key] = list;
+                    }
+                    list.Add(item);
+                }
+            }
+
+            foreach (var p in parents.Cast<object>())
+            {
+                var k = OwnerKey(p);
+                var collection = nORM.Query.QueryExecutor.CreateList(depQuery.CollectionElementType, 0);
+                if (k != null && byOwnerKey.TryGetValue(k, out var loaded))
+                    foreach (var it in loaded) collection.Add(it);
+                nORM.Query.QueryExecutor.AssignCollectionToTarget(
+                    nORM.Query.QueryExecutor.ResolveOnParent(depQuery.TargetCollectionProperty, p, depQuery), p, collection);
+            }
         }
 
         /// <summary>Converts a DB value to the target CLR type using safe fallback logic.</summary>
