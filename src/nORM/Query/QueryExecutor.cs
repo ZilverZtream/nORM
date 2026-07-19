@@ -417,19 +417,35 @@ namespace nORM.Query
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
             bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
-            await using var reader = await command
-                .ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
-                .ConfigureAwait(false);
             object? result = null;
-            if (await reader.ReadAsync(ct).ConfigureAwait(false))
+            await using (var reader = await command
+                .ExecuteReaderWithInterceptionAsync(_ctx, GetEntityReadBehavior(plan.ElementType), ct)
+                .ConfigureAwait(false))
             {
-                ct.ThrowIfCancellationRequested();
-                var entity = plan.SyncMaterializer(reader);
-                if (plan.ClientProjection != null)
-                    entity = plan.ClientProjection(entity);
-                result = ProcessEntity(entity, trackable, entityMap, isReadOnly);
+                if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var entity = plan.SyncMaterializer(reader);
+                    if (plan.ClientProjection != null)
+                        entity = plan.ClientProjection(entity);
+                    result = ProcessEntity(entity, trackable, entityMap, isReadOnly);
+                }
             }
-            await reader.DisposeAsync().ConfigureAwait(false);
+
+            // Load owned collections (OwnsMany) for the materialized entity — part of the entity even on
+            // untracked reads. The reader is disposed above so the connection is free for these queries.
+            // The simple path never carries Includes/M2M/DependentQueries, so owned collections are the only
+            // post-materialization step MaterializeAsync performs that applies here.
+            if (result != null)
+            {
+                var ownedRootMap = OwnedRootMapFor(plan, entityMap);
+                if (ownedRootMap != null && ownedRootMap.OwnedCollections.Count > 0)
+                {
+                    var single = CreateList(plan.ElementType, 1);
+                    single.Add(result);
+                    await LoadOwnedCollectionsAsync(single, ownedRootMap, ct, plan.AsOfTimestamp).ConfigureAwait(false);
+                }
+            }
             return result;
         }
 
