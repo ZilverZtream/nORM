@@ -1,0 +1,125 @@
+### YamlMime:ManagedReference
+items:
+- uid: nORM.Core.PropertyEntry
+  commentId: T:nORM.Core.PropertyEntry
+  id: PropertyEntry
+  parent: nORM.Core
+  children:
+  - nORM.Core.PropertyEntry.CurrentValue
+  - nORM.Core.PropertyEntry.IsModified
+  - nORM.Core.PropertyEntry.Name
+  - nORM.Core.PropertyEntry.OriginalValue
+  langs:
+  - csharp
+  - vb
+  name: PropertyEntry
+  nameWithType: PropertyEntry
+  fullName: nORM.Core.PropertyEntry
+  type: Class
+  source:
+    remote:
+      path: src/nORM/Core/PropertyEntry.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: PropertyEntry
+    path: src/nORM/Core/PropertyEntry.cs
+    startLine: 14
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Access to a single mapped property of a tracked entity — its current value, its as-attached original value,
+    and whether it is modified — the nORM equivalent of EF Core's PropertyEntry. Obtained from
+    <xref href="nORM.Core.EntityEntry.Property(System.String)" data-throw-if-not-resolved="false"></xref>.
+    Writing <xref href="nORM.Core.PropertyEntry.IsModified" data-throw-if-not-resolved="false"></xref> forces
+    the column into (true) or excludes it from (false) the next partial-column UPDATE.
+  syntax:
+    content: public sealed class PropertyEntry
+    content.vb: Public NotInheritable Class PropertyEntry
+  inheritance:
+  - System.Object
+- uid: nORM.Core.PropertyEntry.Name
+  commentId: P:nORM.Core.PropertyEntry.Name
+  id: Name
+  parent: nORM.Core.PropertyEntry
+  langs:
+  - csharp
+  - vb
+  name: Name
+  nameWithType: PropertyEntry.Name
+  fullName: nORM.Core.PropertyEntry.Name
+  type: Property
+  namespace: nORM.Core
+  summary: The mapped property name.
+  syntax:
+    content: public string Name { get; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public ReadOnly Property Name As String
+- uid: nORM.Core.PropertyEntry.CurrentValue
+  commentId: P:nORM.Core.PropertyEntry.CurrentValue
+  id: CurrentValue
+  parent: nORM.Core.PropertyEntry
+  langs:
+  - csharp
+  - vb
+  name: CurrentValue
+  nameWithType: PropertyEntry.CurrentValue
+  fullName: nORM.Core.PropertyEntry.CurrentValue
+  type: Property
+  namespace: nORM.Core
+  summary: The property's current value on the entity; assigning writes it back and marks the entry dirty.
+  syntax:
+    content: public object CurrentValue { get; set; }
+    parameters: []
+    return:
+      type: System.Object
+    content.vb: Public Property CurrentValue As Object
+- uid: nORM.Core.PropertyEntry.OriginalValue
+  commentId: P:nORM.Core.PropertyEntry.OriginalValue
+  id: OriginalValue
+  parent: nORM.Core.PropertyEntry
+  langs:
+  - csharp
+  - vb
+  name: OriginalValue
+  nameWithType: PropertyEntry.OriginalValue
+  fullName: nORM.Core.PropertyEntry.OriginalValue
+  type: Property
+  namespace: nORM.Core
+  summary: The property's original (as-attached / last-saved) value; assigning overrides the tracked baseline.
+  syntax:
+    content: public object OriginalValue { get; set; }
+    parameters: []
+    return:
+      type: System.Object
+    content.vb: Public Property OriginalValue As Object
+- uid: nORM.Core.PropertyEntry.IsModified
+  commentId: P:nORM.Core.PropertyEntry.IsModified
+  id: IsModified
+  parent: nORM.Core.PropertyEntry
+  langs:
+  - csharp
+  - vb
+  name: IsModified
+  nameWithType: PropertyEntry.IsModified
+  fullName: nORM.Core.PropertyEntry.IsModified
+  type: Property
+  namespace: nORM.Core
+  summary: >-
+    Whether this property is flagged modified (will appear in the next UPDATE's SET clause). Setting true forces
+    the column into the UPDATE even if unchanged; false excludes it. Not settable for a key or concurrency-token
+    column.
+  syntax:
+    content: public bool IsModified { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property IsModified As Boolean
+references:
+- uid: nORM.Core
+  commentId: N:nORM.Core
+  name: nORM.Core
+  nameWithType: nORM.Core
+  fullName: nORM.Core

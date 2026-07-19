@@ -425,6 +425,7 @@ M:nORM.Core.EntityEntry.Collection(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.GetDatabaseValues():nORM.Core.PropertyValues
 M:nORM.Core.EntityEntry.GetDatabaseValuesAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{nORM.Core.PropertyValues}
 M:nORM.Core.EntityEntry.Navigation(System.String):nORM.Core.NavigationEntry
+M:nORM.Core.EntityEntry.Property(System.String):nORM.Core.PropertyEntry
 M:nORM.Core.EntityEntry.Reference(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.Reload():System.Void
 M:nORM.Core.EntityEntry.ReloadAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
@@ -1311,6 +1312,10 @@ P:nORM.Core.OutputParameter.Precision:System.Nullable{System.Byte}
 P:nORM.Core.OutputParameter.Scale:System.Nullable{System.Byte}
 P:nORM.Core.OutputParameter.Size:System.Nullable{System.Int32}
 P:nORM.Core.OutputParameter.Value:System.Object
+P:nORM.Core.PropertyEntry.CurrentValue:System.Object
+P:nORM.Core.PropertyEntry.IsModified:System.Boolean
+P:nORM.Core.PropertyEntry.Name:System.String
+P:nORM.Core.PropertyEntry.OriginalValue:System.Object
 P:nORM.Core.PropertyValues.Item:System.Object
 P:nORM.Core.PropertyValues.Properties:System.Collections.Generic.IReadOnlyList{System.String}
 P:nORM.Core.StoredProcedureNonQueryResult.AffectedRows:System.Int32
@@ -1700,6 +1705,7 @@ T:nORM.Core.NormUsageException
 T:nORM.Core.NormValidator
 T:nORM.Core.OutputParameter
 T:nORM.Core.PreparedOperation{`0}
+T:nORM.Core.PropertyEntry
 T:nORM.Core.PropertyValues
 T:nORM.Core.QueryTrackingBehavior
 T:nORM.Core.SetPropertyCalls{`0}

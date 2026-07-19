@@ -202,6 +202,19 @@ namespace nORM.Core
         public PropertyValues OriginalValues => new PropertyValues(this, original: true);
 
         /// <summary>
+        /// Provides access to a single mapped property's current/original value and modified state
+        /// (EF Core parity for <c>EntityEntry.Property(name)</c>). Setting <c>IsModified</c> forces or excludes
+        /// the column from the next partial-column UPDATE.
+        /// </summary>
+        /// <param name="propertyName">Name of a mapped property (column) on the entity.</param>
+        /// <exception cref="ArgumentException">Thrown when the entity has no mapped property with that name.</exception>
+        public PropertyEntry Property(string propertyName)
+        {
+            ArgumentNullException.ThrowIfNull(propertyName);
+            return new PropertyEntry(this, RequireColumn(propertyName));
+        }
+
+        /// <summary>
         /// Overwrites the entity's column values from a fresh read of its database row and resets the
         /// entry to <see cref="EntityState.Unchanged"/>, discarding any pending edits — mirroring EF's
         /// <c>Reload</c>. If the row no longer exists the entity is detached. Navigation properties are
@@ -902,6 +915,61 @@ namespace nORM.Core
                     (changed ??= new List<Column>()).Add(_nonKeyColumns[i]);
             }
             return changed is null ? Array.Empty<Column>() : changed.ToArray();
+        }
+
+        /// <summary>
+        /// Whether the given column is currently flagged modified — the per-column input to a partial UPDATE and
+        /// the backing of <c>PropertyEntry.IsModified</c>. In explicit/notified mode (<c>_hasNotifiedChange</c>)
+        /// the stored flag is authoritative; otherwise it is computed on demand by comparing the current value
+        /// to the as-attached snapshot. A key or concurrency-token column (not in the change-tracked set) is
+        /// never modifiable and reports <c>false</c>.
+        /// </summary>
+        internal bool GetColumnModified(Column column)
+        {
+            UpgradeToFullTracking();
+            var entity = Entity;
+            if (entity is null || _propertyIndex is null || !_propertyIndex.TryGetValue(column.Prop.Name, out var idx))
+                return false;
+            if (_hasNotifiedChange && _changedProperties != null)
+                return _changedProperties[idx];
+            return !ValuesEqual(_getValues![idx](entity), _originalValues![idx]);
+        }
+
+        /// <summary>
+        /// Explicitly marks or unmarks a column as modified (EF Core <c>PropertyEntry.IsModified</c> setter):
+        /// <c>true</c> forces the column into the next UPDATE's SET even if its value is unchanged, <c>false</c>
+        /// excludes it. This switches the entry to explicit change tracking — the current value-based flags for
+        /// the OTHER columns are captured first (so a real edit elsewhere isn't lost), then the flags are frozen
+        /// so <see cref="DetectChanges"/> preserves this decision through SaveChanges. Entry state is recomputed
+        /// as Modified when any column flag OR a many-to-many / owned-collection change remains, else Unchanged.
+        /// Throws for a key or concurrency-token column (keys are never updated; the token is managed
+        /// automatically) or a non-tracked entry state.
+        /// </summary>
+        internal void SetColumnModified(Column column, bool value)
+        {
+            UpgradeToFullTracking();
+            if (Entity is null)
+                throw new InvalidOperationException("Cannot set the modified state of a property on a detached entry.");
+            if (State is EntityState.Added or EntityState.Deleted or EntityState.Detached)
+                throw new InvalidOperationException(
+                    $"Cannot set a property's modified state while the entry is {State}; it applies to a tracked Unchanged/Modified entity.");
+            if (_propertyIndex is null || !_propertyIndex.TryGetValue(column.Prop.Name, out var idx))
+                throw new InvalidOperationException(
+                    $"Property '{column.Prop.Name}' is a key or concurrency-token column; its modified state cannot be set " +
+                    "(keys are never updated and the concurrency token is managed automatically).");
+            // Capture sibling columns' value-based change flags before switching to explicit tracking, so a real
+            // edit elsewhere on the entity is not lost when the flags are frozen below.
+            if (!_hasNotifiedChange)
+                DetectChanges();
+            _changedProperties![idx] = value;
+            _hasNotifiedChange = true;
+            var any = false;
+            for (int i = 0; i < _changedProperties.Length; i++)
+                if (_changedProperties[i]) { any = true; break; }
+            _state = (any || HasManyToManyChanges() || HasOwnedCollectionChanges())
+                ? EntityState.Modified
+                : EntityState.Unchanged;
+            Tracker?.MarkDirty(this);
         }
 
         /// <summary>
