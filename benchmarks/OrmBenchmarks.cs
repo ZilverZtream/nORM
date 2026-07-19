@@ -81,6 +81,9 @@ namespace nORM.Benchmarks
         private SqliteCommand? _adoSimplePrepared;
         private SqliteParameter? _adoSimpleTakeParam;
 
+        private SqliteCommand? _adoFirstPrepared;
+        private SqliteParameter? _adoFirstIdParam;
+
         private SqliteCommand? _adoComplexPrepared;
         private SqliteParameter? _adoComplexAgeParam;
         private SqliteParameter? _adoComplexCityParam;
@@ -264,6 +267,13 @@ namespace nORM.Benchmarks
             _adoJoinAmountParam.Value = 100m;
             _adoJoinPrepared.Parameters.Add(_adoJoinAmountParam);
             _adoJoinPrepared.Prepare();
+
+            _adoFirstPrepared = _dapperConnection.CreateCommand();
+            _adoFirstPrepared.CommandText = $"SELECT {OptimizedUserColumns} FROM BenchmarkUser WHERE Id = @Id LIMIT 1";
+            _adoFirstIdParam = _adoFirstPrepared.CreateParameter();
+            _adoFirstIdParam.ParameterName = "@Id";
+            _adoFirstPrepared.Parameters.Add(_adoFirstIdParam);
+            _adoFirstPrepared.Prepare();
         }
 
         // ========== SINGLE INSERT (reuse contexts/connections; no per-op PRAGMAs) ==========
@@ -456,6 +466,48 @@ namespace nORM.Benchmarks
             while (reader.Read())
                 users.Add(ReadUserOptimized(reader));
             return users;
+        }
+
+        // ========== SINGLE-ROW POINT READ (FirstOrDefault by primary key) ==========
+        // All contenders run the same shape: one indexed row by Id, typed materialization. This is the
+        // ExecuteSimpleAsync path in nORM (previously unbenchmarked). Raw ADO tiers reuse the prepared
+        // command; the sync one is the true floor for nORM's sync-internal SQLite execution.
+
+        [Benchmark(Description = "Query First nORM (by key)")]
+        public async Task<BenchmarkUser?> Query_First_nORM()
+        {
+            return await NormAsyncExtensions.FirstOrDefaultAsync(
+                _nOrmContext!.Query<BenchmarkUser>(), u => u.Id == 500);
+        }
+
+        [Benchmark(Description = "Query First EF Core (by key)")]
+        public async Task<BenchmarkUser?> Query_First_EfCore()
+        {
+            return await EfQueryableExtensions.FirstOrDefaultAsync(
+                EfQueryableExtensions.AsNoTracking(_efContext!.Users), u => u.Id == 500);
+        }
+
+        [Benchmark(Description = "Query First Dapper (by key)")]
+        public async Task<BenchmarkUser?> Query_First_Dapper()
+        {
+            return await _dapperConnection!.QueryFirstOrDefaultAsync<BenchmarkUser>(
+                "SELECT * FROM BenchmarkUser WHERE Id = @Id LIMIT 1", new { Id = 500 });
+        }
+
+        [Benchmark(Description = "Query First Raw ADO (Prepared Optimized)")]
+        public async Task<BenchmarkUser?> Query_First_RawAdo_PreparedOptimized()
+        {
+            _adoFirstIdParam!.Value = 500;
+            using var reader = await _adoFirstPrepared!.ExecuteReaderAsync();
+            return await reader.ReadAsync() ? ReadUserOptimized(reader) : null;
+        }
+
+        [Benchmark(Description = "Query First Raw ADO (Sync Prepared Optimized)")]
+        public BenchmarkUser? Query_First_RawAdo_SyncPreparedOptimized()
+        {
+            _adoFirstIdParam!.Value = 500;
+            using var reader = _adoFirstPrepared!.ExecuteReader();
+            return reader.Read() ? ReadUserOptimized(reader) : null;
         }
 
         // ========== COMPLEX QUERY (standard) ==========

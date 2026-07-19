@@ -76,6 +76,12 @@ namespace nORM.Query
         private readonly IncludeProcessor _includeProcessor;
         private readonly BulkCudBuilder _cudBuilder;
         private readonly ConcurrentDictionary<string, string> _simpleSqlCache = new();
+        // Caches the fully-built QueryPlan for the simple path per (SQL, result type). Everything in the plan
+        // is stable per shape — the materializer delegates, element type, table set — and MaterializeAsync
+        // never reads plan.Parameters (the per-call parameter values flow only through the DbCommand), so one
+        // plan instance is reused across calls, eliminating the per-call record allocation, GetMapping, and
+        // two materializer-factory lookups. Instance-scoped like _simpleSqlCache: no cross-context coupling.
+        private readonly ConcurrentDictionary<(string Sql, Type ResultType), QueryPlan> _simplePlanCache = new();
         private readonly ConcurrentDictionary<ExpressionFingerprint, PooledPlanCommand> _pooledPlanCommands = new();
         /// <summary>PERF: Dedicated count SQL cache with structured keys to avoid per-call string composition and predicate-shape collisions.</summary>
         private readonly ConcurrentDictionary<CountSqlCacheKey, (string Sql, bool NeedsParam)> _countSqlCache = new();

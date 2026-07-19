@@ -240,54 +240,64 @@ namespace nORM.Query
             return true;
         }
 
-        private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName, CancellationToken ct)
-        {
-            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
-            Type resultType = typeof(TResult);
-            bool returnsList = false;
-            Type elementType;
-            if (resultType.IsGenericType)
+        /// <summary>
+        /// The cached <see cref="QueryPlan"/> for a simple-path query, keyed by (SQL, result type). Reflection
+        /// over the result type, the mapping lookup, both materializer-factory lookups, and the plan-record
+        /// allocation happen once per shape, not per call. The plan carries <see cref="_emptyParams"/> because
+        /// the per-call parameter values flow only through the DbCommand — MaterializeAsync/Materialize never
+        /// read plan.Parameters.
+        /// </summary>
+        private QueryPlan GetOrBuildSimplePlan<TResult>(string sql)
+            => _simplePlanCache.GetOrAdd((sql, typeof(TResult)), static (key, self) =>
             {
-                var genDef = resultType.GetGenericTypeDefinition();
-                if (genDef == typeof(List<>) || genDef == typeof(IEnumerable<>))
+                var resultType = key.ResultType;
+                bool returnsList = false;
+                Type elementType;
+                if (resultType.IsGenericType)
                 {
-                    elementType = resultType.GetGenericArguments()[0];
-                    returnsList = true;
+                    var genDef = resultType.GetGenericTypeDefinition();
+                    if (genDef == typeof(List<>) || genDef == typeof(IEnumerable<>))
+                    {
+                        elementType = resultType.GetGenericArguments()[0];
+                        returnsList = true;
+                    }
+                    else
+                    {
+                        elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
+                    }
                 }
                 else
                 {
                     elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
                 }
-            }
-            else
-            {
-                elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
-            }
-            var mapping = _ctx.GetMapping(elementType);
+                var mapping = self._ctx.GetMapping(elementType);
+                var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
+                var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
+                return new QueryPlan(
+                    key.Sql,
+                    _emptyParams,
+                    Array.Empty<string>(),
+                    materializer,
+                    syncMaterializer,
+                    elementType,
+                    IsScalar: false,
+                    SingleResult: !returnsList,
+                    NoTracking: false,
+                    MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
+                    Includes: _emptyIncludes,
+                    GroupJoinInfo: null,
+                    Tables: _simpleQueryTableCache.GetOrAdd(mapping.TableName, static t => new List<string>(1) { t }),
+                    SplitQuery: false,
+                    CommandTimeout: self._ctx.Options.TimeoutConfiguration.BaseTimeout,
+                    IsCacheable: false,
+                    CacheExpiration: null);
+            }, this);
 
-            // Use singleton MaterializerFactory (it only wraps static caches)
-            var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
-            var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
-
-            var plan = new QueryPlan(
-                sql,
-                parameters,
-                Array.Empty<string>(),
-                materializer,
-                syncMaterializer,
-                elementType,
-                IsScalar: false,
-                SingleResult: !returnsList,
-                NoTracking: false,
-                MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
-                Includes: _emptyIncludes,
-                GroupJoinInfo: null,
-                Tables: _simpleQueryTableCache.GetOrAdd(mapping.TableName, static t => new List<string>(1) { t }),
-                SplitQuery: false,
-                CommandTimeout: _ctx.Options.TimeoutConfiguration.BaseTimeout,
-                IsCacheable: false,
-                CacheExpiration: null
-            );
+        private async Task<TResult> ExecuteSimpleAsync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName, CancellationToken ct)
+        {
+            var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
+            var plan = GetOrBuildSimplePlan<TResult>(sql);
+            bool returnsList = !plan.SingleResult;
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
@@ -310,51 +320,8 @@ namespace nORM.Query
         private TResult ExecuteSimpleSync<TResult>(string sql, Dictionary<string, object> parameters, string? requestedMethodName = null)
         {
             var sw = _ctx.Options.Logger != null ? Stopwatch.StartNew() : null;
-            Type resultType = typeof(TResult);
-            bool returnsList = false;
-            Type elementType;
-            if (resultType.IsGenericType)
-            {
-                var genDef = resultType.GetGenericTypeDefinition();
-                if (genDef == typeof(List<>) || genDef == typeof(IEnumerable<>))
-                {
-                    elementType = resultType.GetGenericArguments()[0];
-                    returnsList = true;
-                }
-                else
-                {
-                    elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
-                }
-            }
-            else
-            {
-                elementType = resultType.IsArray ? resultType.GetElementType()! : resultType;
-            }
-            var mapping = _ctx.GetMapping(elementType);
-
-            // Use singleton MaterializerFactory (it only wraps static caches)
-            var materializer = _sharedMaterializerFactory.CreateMaterializer(mapping, elementType);
-            var syncMaterializer = _sharedMaterializerFactory.CreateSyncMaterializer(mapping, elementType);
-
-            var plan = new QueryPlan(
-                sql,
-                parameters,
-                Array.Empty<string>(),
-                materializer,
-                syncMaterializer,
-                elementType,
-                IsScalar: false,
-                SingleResult: !returnsList,
-                NoTracking: false,
-                MethodName: returnsList ? "ToList" : nameof(Queryable.FirstOrDefault),
-                Includes: _emptyIncludes,
-                GroupJoinInfo: null,
-                Tables: _simpleQueryTableCache.GetOrAdd(mapping.TableName, static t => new List<string>(1) { t }),
-                SplitQuery: false,
-                CommandTimeout: _ctx.Options.TimeoutConfiguration.BaseTimeout,
-                IsCacheable: false,
-                CacheExpiration: null
-            );
+            var plan = GetOrBuildSimplePlan<TResult>(sql);
+            bool returnsList = !plan.SingleResult;
             _ctx.EnsureConnection();
             using var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
