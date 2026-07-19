@@ -504,6 +504,7 @@ M:nORM.Core.NormMemoryCacheProvider.TryGet``1(System.String,`0&):System.Boolean
 M:nORM.Core.NormQueryException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
 M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext):System.Linq.IQueryable{`0}
 M:nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext):System.Linq.IQueryable{`0}
+M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{`0}):System.String
 M:nORM.Core.NormTimeoutException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
 M:nORM.Core.NormUnsupportedFeatureException.#ctor(System.String,System.Exception)
 M:nORM.Core.NormUsageException.#ctor(System.String,System.Exception)

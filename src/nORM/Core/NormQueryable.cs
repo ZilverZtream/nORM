@@ -42,6 +42,26 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns the SQL this query would execute, without running it — the equivalent of Entity Framework
+        /// Core's <c>ToQueryString()</c>. Each parameter is listed as a leading comment (<c>-- @p0 = value</c>)
+        /// so the statement is self-describing. Useful for debugging, logging, and comparing against
+        /// hand-written SQL. The query is translated but never sent to the database.
+        /// </summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="source">A nORM query (from <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>/<c>FromSqlRaw</c>).</param>
+        /// <returns>The generated SQL, preceded by one comment line per parameter.</returns>
+        public static string ToQueryString<T>(this IQueryable<T> source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source.Provider is not NormQueryProvider provider)
+                throw new NormUsageException(
+                    "ToQueryString can only be used with nORM queries. Start with context.Query<T>()/Set<T>() " +
+                    "or context.FromSqlRaw<T>(...). For Entity Framework queries, use " +
+                    "Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToQueryString().");
+            return provider.BuildQueryString(source.Expression);
+        }
+
+        /// <summary>
         /// Creates a queryable source for the specified entity type backed by the provided context.
         /// </summary>
         /// <typeparam name="T">The entity type to query.</typeparam>
