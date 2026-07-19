@@ -469,6 +469,7 @@ namespace nORM.Internal
                         // Route through ExecuteReaderWithInterception so registered
                         // CommandInterceptors are invoked even on the pooled sync fast path.
                         using var reader = cmd.ExecuteReaderWithInterception(ctx, CommandBehavior.Default);
+                        var (idMap, idMapping) = nORM.Query.QueryExecutor.CreateIdentityResolutionMap(ctx, cachedPlan);
                         if (cachedPlan.SingleResult)
                         {
                             var maxRows = cachedPlan.MethodName is "Single" or "SingleOrDefault" ? 2 : 1;
@@ -481,7 +482,12 @@ namespace nORM.Internal
                         else
                         {
                             while (reader.Read())
-                                list.Add((T)materializer(reader));
+                            {
+                                var entity = (T)materializer(reader);
+                                if (idMap != null)
+                                    entity = (T)nORM.Query.QueryExecutor.ResolveRootIdentity(entity!, idMap, idMapping);
+                                list.Add(entity);
+                            }
                         }
                     }
                     finally

@@ -208,7 +208,7 @@ namespace nORM.Query
                                  !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-                var (idMap, idMapping) = CreateIdentityResolutionMap(plan);
+                var (idMap, idMapping) = CreateIdentityResolutionMap(_ctx, plan);
                 bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
                 // Snapshot any filtered-Include closure params while the command is alive (its lifetime
@@ -304,7 +304,7 @@ namespace nORM.Query
                                  !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-                var (idMap, idMapping) = CreateIdentityResolutionMap(plan);
+                var (idMap, idMapping) = CreateIdentityResolutionMap(_ctx, plan);
 
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
@@ -426,7 +426,7 @@ namespace nORM.Query
                                  !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked   // only mapped entity roots
 
                 TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-                var (idMap, idMapping) = CreateIdentityResolutionMap(plan);
+                var (idMap, idMapping) = CreateIdentityResolutionMap(_ctx, plan);
 
                 // Hoist read-only check out of per-row loop: context options don't change during execution.
                 bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
@@ -536,7 +536,7 @@ namespace nORM.Query
                              !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
 
             TableMapping? entityMap = trackable ? _ctx.GetMapping(plan.ElementType) : null;
-            var (idMap, idMapping) = CreateIdentityResolutionMap(plan);
+            var (idMap, idMapping) = CreateIdentityResolutionMap(_ctx, plan);
             bool isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
 
             using var reader = command.ExecuteReaderWithInterception(_ctx, GetEntityReadBehavior(plan.ElementType));
@@ -560,14 +560,14 @@ namespace nORM.Query
         /// keyed entity root (never a projection/anonymous/keyless type). Returns (null, null) otherwise, so
         /// the per-row resolve is a no-op for every ordinary query.
         /// </summary>
-        internal (Dictionary<object, object>? Map, TableMapping? Mapping) CreateIdentityResolutionMap(QueryPlan plan)
+        internal static (Dictionary<object, object>? Map, TableMapping? Mapping) CreateIdentityResolutionMap(DbContext ctx, QueryPlan plan)
         {
             if (!(plan.NoTracking && plan.IdentityResolution)
                 || !plan.ElementType.IsClass
                 || plan.ElementType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal)
-                || !_ctx.IsMapped(plan.ElementType))
+                || !ctx.IsMapped(plan.ElementType))
                 return (null, null);
-            var mapping = _ctx.GetMapping(plan.ElementType);
+            var mapping = ctx.GetMapping(plan.ElementType);
             return mapping.IsKeyless ? (null, null) : (new Dictionary<object, object>(), mapping);
         }
 

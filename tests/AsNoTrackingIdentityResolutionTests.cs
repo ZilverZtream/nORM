@@ -94,6 +94,25 @@ public class AsNoTrackingIdentityResolutionTests
     }
 
     [Fact]
+    public async Task identity_resolution_works_for_a_compiled_query()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();
+        using var _cn = cn; using var ctx = Boot(cn);
+
+        // Norm.CompileQuery generates its own inline materialize loops, separate from the executor's — they
+        // must resolve identity too, else a compiled duplicate-root query returns distinct instances.
+        var compiled = Norm.CompileQuery((DbContext c, int _) =>
+            ((INormQueryable<Item>)c.Query<Item>().Where(i => i.Id <= 2).Concat(c.Query<Item>().Where(i => i.Id >= 2)))
+                .AsNoTrackingWithIdentityResolution());
+
+        var rows = await compiled(ctx, 0);
+        var twos = rows.Where(i => i.Id == 2).ToList();
+
+        Assert.Equal(2, twos.Count);
+        Assert.Same(twos[0], twos[1]);
+    }
+
+    [Fact]
     public void simple_single_table_query_still_works_with_the_new_operator()
     {
         var cn = new SqliteConnection("Data Source=:memory:"); cn.Open();

@@ -78,7 +78,7 @@ namespace nORM.Query
                              !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
             if (trackable)
                 _ctx.GetMapping(plan.ElementType);
-            var (idMap, idMapping) = _executor.CreateIdentityResolutionMap(plan);
+            var (idMap, idMapping) = QueryExecutor.CreateIdentityResolutionMap(_ctx, plan);
             var count = 0;
             await using var reader = await cmd
                 .ExecuteReaderWithInterceptionAsync(

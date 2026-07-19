@@ -561,8 +561,14 @@ namespace nORM.Query
             }
             else
             {
+                var (idMap, idMapping) = QueryExecutor.CreateIdentityResolutionMap(_ctx, plan);
                 while (reader.Read())
-                    list.Add(materializer(reader));
+                {
+                    var entity = materializer(reader);
+                    if (idMap != null)
+                        entity = QueryExecutor.ResolveRootIdentity(entity, idMap, idMapping);
+                    list.Add(entity);
+                }
             }
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
@@ -669,8 +675,14 @@ namespace nORM.Query
                 return Task.FromResult((TResult)HandleSingleResult(plan, list));
             }
 
+            var (idMap, idMapping) = QueryExecutor.CreateIdentityResolutionMap(_ctx, plan);
             while (reader.Read())
-                list.Add(materializer(reader));
+            {
+                var entity = materializer(reader);
+                if (idMap != null)
+                    entity = QueryExecutor.ResolveRootIdentity(entity, idMap, idMapping);
+                list.Add(entity);
+            }
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
             if (plan.PostMaterializeTransform != null) list = plan.PostMaterializeTransform(_ctx, list);
@@ -715,8 +727,14 @@ namespace nORM.Query
             }
             else
             {
+                var (idMap, idMapping) = QueryExecutor.CreateIdentityResolutionMap(_ctx, plan);
                 while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                    list.Add(materializer(reader));
+                {
+                    var entity = materializer(reader);
+                    if (idMap != null)
+                        entity = QueryExecutor.ResolveRootIdentity(entity, idMap, idMapping);
+                    list.Add(entity);
+                }
             }
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
@@ -748,8 +766,14 @@ namespace nORM.Query
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(
                 _ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
 
+            var (idMap, idMapping) = QueryExecutor.CreateIdentityResolutionMap(_ctx, plan);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
-                list.Add(materializer(reader));
+            {
+                var entity = materializer(reader);
+                if (idMap != null)
+                    entity = QueryExecutor.ResolveRootIdentity(entity, idMap, idMapping);
+                list.Add(entity);
+            }
 
             if (plan.PostReverse) QueryExecutor.ReverseListInPlace(list);
             if (plan.PostMaterializeTransform != null)
