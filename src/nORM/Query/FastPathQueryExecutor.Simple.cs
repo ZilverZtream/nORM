@@ -121,8 +121,11 @@ namespace nORM.Query
                 ctx.Options.CommandInterceptors.Count == 0 &&
                 ctx.CurrentTransaction == null)
             {
+                // Key the pooled command by the SQL itself (already computed + cached, unique per shape) so
+                // the hot path allocates no per-call key string. The SQL is 1:1 with its shape cache key, and
+                // structurally distinct from the paging path's SQL, so it cannot collide.
                 var prepared = ctx.GetOrCreateFastPathPreparedCommand(
-                    "simple:" + cacheKey,
+                    sql,
                     sql,
                     timeout,
                     command =>

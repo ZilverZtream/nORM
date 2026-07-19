@@ -170,8 +170,10 @@ namespace nORM.Query
                 ctx.Options.CommandInterceptors.Count == 0 &&
                 ctx.CurrentTransaction == null)
             {
+                // Key by the SQL itself (already computed, unique per shape) to avoid a per-call key-string
+                // allocation on the hot path; the paging SQL is structurally distinct from the simple path's.
                 var prepared = ctx.GetOrCreateFastPathPreparedCommand(
-                    "page:" + cacheKey,
+                    sql,
                     sql,
                     timeout,
                     command => BindFilteredOrderedPageParameters(command, ctx, info));
