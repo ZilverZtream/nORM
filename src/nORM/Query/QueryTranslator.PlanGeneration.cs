@@ -196,6 +196,7 @@ namespace nORM.Query
                     }
                 }
 
+                nORM.Mapping.IValueConverter? scalarResultConverter = null;
                 var isScalar = _t._isAggregate && _t._groupBy.Count == 0;
                 if (isScalar)
                 {
@@ -231,6 +232,32 @@ namespace nORM.Query
                         var underlyingType = Nullable.GetUnderlyingType(scalarReturnType) ?? scalarReturnType;
                         var isNullableReturn = Nullable.GetUnderlyingType(scalarReturnType) != null;
                         var isSum = aggMethodName == "Sum";
+
+                        // Min/Max return an actual stored column value; carry that column's converter on the
+                        // plan so ConvertFromProvider runs on the raw scalar in the scalar-execution path
+                        // (Max(o => o.Score) over a +1000 converter must return the model 9, not 1009).
+                        // Sum/Average aggregate across rows and are left unconverted. Min/Max ordering over a
+                        // non-order-preserving converter is EF-ambiguous either way (the server orders by the
+                        // stored value); this only corrects the RETURNED value.
+                        if (aggMethodName is "Min" or "Max"
+                            && _expression is MethodCallExpression aggCall
+                            && aggCall.Arguments.Count == 2)
+                        {
+                            var selArg = aggCall.Arguments[1];
+                            if (selArg is UnaryExpression { NodeType: ExpressionType.Quote } q)
+                                selArg = q.Operand;
+                            if (selArg is LambdaExpression aggSel)
+                            {
+                                var body = aggSel.Body;
+                                while (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } cu)
+                                    body = cu.Operand;
+                                if (body is MemberExpression aggMember
+                                    && _t._mapping.TryGetColumnForMemberAccess(aggMember, out var aggCol))
+                                {
+                                    scalarResultConverter = aggCol.Converter;
+                                }
+                            }
+                        }
 
                         object ReadScalarValue(object dbValue)
                         {
@@ -582,7 +609,8 @@ namespace nORM.Query
                     CacheTables: cacheTables,
                     AsOfTimestamp: _t._asOfTimestamp,
                     ForceTracking: _t._forceTracking,
-                    IdentityResolution: _t._identityResolution
+                    IdentityResolution: _t._identityResolution,
+                    ScalarResultConverter: scalarResultConverter
                 );
                 // A many-to-many navigation reads the association table, which is a raw
                 // user-owned table with no history — there is no data to reconstruct the

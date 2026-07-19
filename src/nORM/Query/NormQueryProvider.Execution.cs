@@ -445,6 +445,10 @@ namespace nORM.Query
                     return GetZeroOfTargetType<TResult>();
                 return default(TResult)!;
             }
+            // Min/Max over a value-converter column returns the stored provider value; convert it back to
+            // the model representation, matching EF (Sum/Average carry no converter).
+            if (plan.ScalarResultConverter != null)
+                scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
             return ConvertScalarResult<TResult>(scalarResult)!;
         }
 
@@ -463,6 +467,8 @@ namespace nORM.Query
                     return Task.FromResult(GetZeroOfTargetType<TResult>());
                 return Task.FromResult(default(TResult)!);
             }
+            if (plan.ScalarResultConverter != null)
+                scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
             return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
         }
 

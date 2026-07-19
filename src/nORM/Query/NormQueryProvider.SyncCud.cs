@@ -64,6 +64,10 @@ namespace nORM.Query
                             return GetZeroOfTargetType<TResult>();
                         return default(TResult)!;
                     }
+                    // Min/Max over a value-converter column returns the stored provider value; convert it
+                    // back to the model representation (Sum/Average carry no converter).
+                    if (plan.ScalarResultConverter != null)
+                        scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
                     result = ConvertScalarResult<TResult>(scalarResult)!;
                 }
                 else

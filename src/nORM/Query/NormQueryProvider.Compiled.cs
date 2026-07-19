@@ -93,6 +93,8 @@ namespace nORM.Query
                         return GetZeroOfTargetType<TResult>();
                     return default!;
                 }
+                if (plan.ScalarResultConverter != null)
+                    scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
                 result = ConvertScalarResult<TResult>(scalarResult)!;
             }
             else
@@ -654,6 +656,8 @@ namespace nORM.Query
                     return Task.FromResult(default(TResult)!);
                 }
 
+                if (plan.ScalarResultConverter != null)
+                    scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
                 return Task.FromResult(ConvertScalarResult<TResult>(scalarResult)!);
             }
 
@@ -800,6 +804,8 @@ namespace nORM.Query
                     return GetZeroOfTargetType<TResult>();
                 return default(TResult)!;
             }
+            if (plan.ScalarResultConverter != null)
+                scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
             return ConvertScalarResult<TResult>(scalarResult)!;
         }
 
@@ -834,6 +840,8 @@ namespace nORM.Query
                         return GetZeroOfTargetType<TResult>();
                     return default!;
                 }
+                if (plan.ScalarResultConverter != null)
+                    scalarResult = plan.ScalarResultConverter.ConvertFromProvider(scalarResult) ?? scalarResult;
                 result = ConvertScalarResult<TResult>(scalarResult)!;
             }
             else

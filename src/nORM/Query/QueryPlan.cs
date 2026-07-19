@@ -145,7 +145,12 @@ namespace nORM.Query
         // (Concat/UNION ALL, or a self-join/SelectMany/GroupJoin flatten projecting the root) materializes to a
         // single shared instance, matching what the change tracker would do for a tracked query. Inert on the
         // fast/simple paths, which cannot produce a duplicate root key.
-        bool IdentityResolution = false
+        bool IdentityResolution = false,
+        // The value converter for a scalar Min/Max over a value-converter column. Min/Max return an actual
+        // stored column value, so ConvertFromProvider must run on the raw scalar to yield the MODEL value
+        // (Max(o => o.Score) over a +1000 converter returns 9, not 1009). Null for every other query:
+        // Sum/Average aggregate across rows and do not correspond to a single stored value.
+        nORM.Mapping.IValueConverter? ScalarResultConverter = null
     );
 
     internal sealed record BulkCudQueryShape(
