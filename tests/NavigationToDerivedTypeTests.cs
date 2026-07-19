@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
 using nORM.Configuration;
+using nORM.Enterprise;
 using nORM.Mapping;
 using nORM.Navigation;
 using nORM.Providers;
@@ -242,5 +243,68 @@ public class NavigationToDerivedTypeTests
             .Select(o => new { o.Id, Dogs = o.Dogs.ToList() })
             .ToList().Single().Dogs;
         Assert.Equal(new[] { "rex" }, dogs.Select(d => d.PetName));
+    }
+
+    [Table("NtdtOwner")]
+    private class TenantOwner
+    {
+        [Key] public int Id { get; set; }
+        public int TenantId { get; set; }
+        public List<TenantDog> Dogs { get; set; } = new();
+    }
+
+    [DiscriminatorColumn(nameof(Kind))]
+    [Table("NtdtPet")]
+    private class TenantPet
+    {
+        [Key] public int Id { get; set; }
+        public int TenantId { get; set; }
+        public string Kind { get; set; } = "";
+        public string PetName { get; set; } = "";
+        public int OwnerId { get; set; }
+    }
+
+    [DiscriminatorValue("dog")]
+    private class TenantDog : TenantPet { }
+
+    [DiscriminatorValue("cat")]
+    private class TenantCat : TenantPet { }
+
+    private sealed class FixedTenantProvider(int tenantId) : ITenantProvider
+    {
+        public object GetCurrentTenantId() => tenantId;
+    }
+
+    [Fact]
+    public void Tenant_scoped_derived_nav_excludes_cross_tenant_and_other_subtype_rows()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE NtdtOwner (Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL);
+                CREATE TABLE NtdtPet (Id INTEGER PRIMARY KEY, TenantId INTEGER NOT NULL, Kind TEXT NOT NULL, PetName TEXT NOT NULL, OwnerId INTEGER NOT NULL);
+                INSERT INTO NtdtOwner VALUES (1, 1);
+                -- rex: tenant 1 dog (visible); spy: tenant 2 dog FORGED onto owner 1 (must NOT leak); tom: tenant 1 cat (wrong subtype).
+                INSERT INTO NtdtPet VALUES (1, 1, 'dog', 'rex', 1), (2, 2, 'dog', 'spy', 1), (3, 1, 'cat', 'tom', 1);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        DbContextOptions Opts() => new()
+        {
+            TenantColumnName = "TenantId",
+            TenantProvider = new FixedTenantProvider(1),
+            OnModelCreating = mb =>
+            {
+                mb.Entity<TenantOwner>().HasKey(o => o.Id);
+                mb.Entity<TenantPet>().HasKey(p => p.Id);
+            }
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), Opts());
+        var count = ctx.Query<TenantOwner>()
+            .Select(o => new { o.Id, N = o.Dogs.Count() })
+            .ToList().Single().N;
+        Assert.Equal(1, count);   // rex only: spy is another tenant's dog, tom is a cat
     }
 }
