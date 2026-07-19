@@ -193,6 +193,7 @@ namespace nORM.Core
             ChangeTracker.BindContext(this);
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
+            OnModelCreating(_modelBuilder);
             Database = new DatabaseFacade(this);
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)
@@ -202,6 +203,20 @@ namespace nORM.Core
             // _temporalInitLock initialized via field declarations above;
             // initialization happens lazily inside EnsureConnectionSlowAsync when ct is available.
             _cleanupTimer = new Timer(_ => CleanupDisposables(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        }
+
+        /// <summary>
+        /// Override to configure the model with the fluent API (Entity Framework Core parity). Called once
+        /// during construction, after the <see cref="DbContextOptions.OnModelCreating"/> delegate, so a derived
+        /// context can place its mapping in an override instead of an options lambda:
+        /// <code>protected override void OnModelCreating(ModelBuilder modelBuilder)
+        ///     => modelBuilder.Entity&lt;User&gt;().HasKey(u => u.Id);</code>
+        /// The base implementation does nothing. Both the options delegate and this override run, in that order,
+        /// so either or both may be used.
+        /// </summary>
+        /// <param name="modelBuilder">The builder used to configure entity mappings.</param>
+        protected virtual void OnModelCreating(ModelBuilder modelBuilder)
+        {
         }
         /// <summary>
         /// Initializes a new <see cref="DbContext"/> by creating and owning a
