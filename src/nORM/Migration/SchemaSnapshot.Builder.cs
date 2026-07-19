@@ -290,6 +290,11 @@ namespace nORM.Migration
                     var columnConfiguration = ResolveColumnConfiguration(map, col);
                     var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
                     var isNullable = col.IsNullable;
+                    // Fluent Property(x => x.Col).IsRequired(bool) overrides the CLR/attribute-derived
+                    // nullability for schema generation (EnsureCreated / migrations).
+                    if (!col.IsShadow && columnConfiguration != null
+                        && columnConfiguration.RequiredSettings.TryGetValue(col.Prop, out var required))
+                        isNullable = !required;
                     var columnAttr = GetColumnAttribute(col);
                     var (precision, scale) = GetPrecision(col, clrType, columnConfiguration, columnAttr);
                     var storeFacets = ParseStringBinaryFacets(columnAttr?.TypeName, clrType);

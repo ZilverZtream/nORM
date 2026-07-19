@@ -17,6 +17,7 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._parent
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder._property
@@ -353,6 +354,51 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength(Integer)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasMaxLength(Integer)
   name.vb: HasMaxLength(Integer)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+  id: IsRequired(System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: IsRequired(bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsRequired(bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRequired(bool)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsRequired
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 104
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures whether the column is required (non-nullable) in the generated schema
+
+    (EnsureCreated / migrations) — the Entity Framework Core fluent equivalent of a NOT NULL
+
+    constraint. This overrides the CLR/attribute-derived nullability used for schema generation;
+
+    runtime query nullability remains driven by the CLR type.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder IsRequired(bool required = true)
+    parameters:
+    - id: required
+      type: System.Boolean
+      description: True to make the column NOT NULL; false to allow NULL.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function IsRequired(required As Boolean = True) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired(Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired(Boolean)
+  name.vb: IsRequired(Boolean)
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   id: IsUnicode(System.Boolean)
@@ -371,7 +417,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 102
+    startLine: 116
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -413,7 +459,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 114
+    startLine: 128
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -455,7 +501,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 127
+    startLine: 141
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -500,7 +546,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 141
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -548,7 +594,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCollation
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 155
+    startLine: 169
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -595,7 +641,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasComputedColumnSql
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 170
+    startLine: 184
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -645,7 +691,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 182
+    startLine: 196
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -686,7 +732,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 192
+    startLine: 206
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1839,14 +1885,14 @@ references:
   nameWithType.vb: Integer
   fullName.vb: Integer
   name.vb: Integer
-- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
-  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
-  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_
-  name: IsUnicode
-  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode
-  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode
-  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode
-  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRequired_System_Boolean_
+  name: IsRequired
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsRequired
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRequired
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired
 - uid: System.Boolean
   commentId: T:System.Boolean
   parent: System
@@ -1858,6 +1904,14 @@ references:
   nameWithType.vb: Boolean
   fullName.vb: Boolean
   name.vb: Boolean
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_
+  name: IsUnicode
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsUnicode
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsUnicode
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsFixedLength_System_Boolean_

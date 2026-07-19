@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 199
+    startLine: 213
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -43,6 +43,7 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String,System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasMaxLength(System.Int32)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
@@ -84,7 +85,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 210
+    startLine: 224
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -371,6 +372,37 @@ references:
     name: Integer
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRequired_System_Boolean_
+  name: IsRequired(bool)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsRequired(bool)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRequired(bool)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired(Boolean)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRequired(Boolean)
+  name.vb: IsRequired(Boolean)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+    name: IsRequired
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRequired_System_Boolean_
+  - name: (
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+    name: IsRequired
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRequired_System_Boolean_
+  - name: (
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: )
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)

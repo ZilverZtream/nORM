@@ -25,6 +25,7 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.Precisions
   - nORM.Configuration.IEntityTypeConfiguration.PrimaryKeyConstraintName
   - nORM.Configuration.IEntityTypeConfiguration.Relationships
+  - nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
   - nORM.Configuration.IEntityTypeConfiguration.SchemaName
   - nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
   - nORM.Configuration.IEntityTypeConfiguration.TableName
@@ -416,6 +417,40 @@ items:
       type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Int32}
     content.vb: ReadOnly Property MaxLengths As IReadOnlyDictionary(Of PropertyInfo, Integer)
   overload: nORM.Configuration.IEntityTypeConfiguration.MaxLengths*
+- uid: nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
+  id: RequiredSettings
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RequiredSettings
+  nameWithType: IEntityTypeConfiguration.RequiredSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RequiredSettings
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 80
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets the explicit required (non-nullable) settings configured via the fluent API, overriding the
+
+    CLR/attribute-derived nullability when the schema is generated.
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, bool> RequiredSettings { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
+    content.vb: ReadOnly Property RequiredSettings As IReadOnlyDictionary(Of PropertyInfo, Boolean)
+  overload: nORM.Configuration.IEntityTypeConfiguration.RequiredSettings*
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   id: UnicodeSettings
@@ -434,7 +469,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UnicodeSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 79
+    startLine: 85
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -465,7 +500,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FixedLengthSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 84
+    startLine: 90
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -496,7 +531,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precisions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 89
+    startLine: 95
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -527,7 +562,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 95
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -561,7 +596,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 100
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -592,7 +627,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 105
+    startLine: 111
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -623,7 +658,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 110
+    startLine: 116
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -654,7 +689,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 115
+    startLine: 121
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -685,7 +720,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 120
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -716,7 +751,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 125
+    startLine: 131
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -747,7 +782,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 130
+    startLine: 136
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -778,7 +813,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converters
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 133
+    startLine: 139
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -809,7 +844,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 139
+    startLine: 145
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -843,7 +878,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyRelationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 144
+    startLine: 150
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1957,12 +1992,12 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.int32
   - name: )
-- uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings*
-  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
-  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_UnicodeSettings
-  name: UnicodeSettings
-  nameWithType: IEntityTypeConfiguration.UnicodeSettings
-  fullName: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
+- uid: nORM.Configuration.IEntityTypeConfiguration.RequiredSettings*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_RequiredSettings
+  name: RequiredSettings
+  nameWithType: IEntityTypeConfiguration.RequiredSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
 - uid: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
   commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
   parent: System.Collections.Generic
@@ -2010,6 +2045,12 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.boolean
   - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_UnicodeSettings
+  name: UnicodeSettings
+  nameWithType: IEntityTypeConfiguration.UnicodeSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
 - uid: nORM.Configuration.IEntityTypeConfiguration.FixedLengthSettings*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.FixedLengthSettings
   href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_FixedLengthSettings

@@ -25,6 +25,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, string> DefaultValueConstraintNameValues { get; } = new();
             public Dictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptionValues { get; } = new();
             public Dictionary<PropertyInfo, int> MaxLengthValues { get; } = new();
+            public Dictionary<PropertyInfo, bool> RequiredValues { get; } = new();
             public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
             public Dictionary<PropertyInfo, bool> FixedLengthValues { get; } = new();
             public Dictionary<PropertyInfo, PrecisionConfiguration> PrecisionValues { get; } = new();
@@ -48,6 +49,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueConstraintNames => DefaultValueConstraintNameValues;
             IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IEntityTypeConfiguration.IdentityOptions => IdentityOptionValues;
             IReadOnlyDictionary<PropertyInfo, int> IEntityTypeConfiguration.MaxLengths => MaxLengthValues;
+            IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.RequiredSettings => RequiredValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.FixedLengthSettings => FixedLengthValues;
             IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> IEntityTypeConfiguration.Precisions => PrecisionValues;
@@ -189,6 +191,16 @@ namespace nORM.Configuration
                     throw new ArgumentException("Max length can only be configured for string or byte[] properties.", nameof(prop));
 
                 MaxLengthValues[prop] = length;
+            }
+
+            /// <summary>
+            /// Sets whether the column is required (non-nullable) in migration snapshots. Overrides the
+            /// CLR/attribute-derived nullability when the schema is generated (EnsureCreated / migrations).
+            /// </summary>
+            public void SetRequired(PropertyInfo prop, bool required)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                RequiredValues[prop] = required;
             }
 
             /// <summary>

@@ -75,6 +75,12 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, int> MaxLengths { get; }
 
         /// <summary>
+        /// Gets the explicit required (non-nullable) settings configured via the fluent API, overriding the
+        /// CLR/attribute-derived nullability when the schema is generated.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, bool> RequiredSettings { get; }
+
+        /// <summary>
         /// Gets Unicode text metadata configured for string properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, bool> UnicodeSettings { get; }

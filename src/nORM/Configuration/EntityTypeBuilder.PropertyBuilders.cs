@@ -95,6 +95,20 @@ namespace nORM.Configuration
             }
 
             /// <summary>
+            /// Configures whether the column is required (non-nullable) in the generated schema
+            /// (EnsureCreated / migrations) — the Entity Framework Core fluent equivalent of a NOT NULL
+            /// constraint. This overrides the CLR/attribute-derived nullability used for schema generation;
+            /// runtime query nullability remains driven by the CLR type.
+            /// </summary>
+            /// <param name="required">True to make the column NOT NULL; false to allow NULL.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            public PropertyBuilder IsRequired(bool required = true)
+            {
+                _parent._config.SetRequired(_property, required);
+                return this;
+            }
+
+            /// <summary>
             /// Configures whether this string property uses Unicode-capable storage.
             /// </summary>
             /// <param name="unicode">True for Unicode text storage; false for non-Unicode text storage.</param>
