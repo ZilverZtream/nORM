@@ -305,6 +305,11 @@ namespace nORM.Query
     /// owned mapping. Null for relations and many-to-many.</param>
     /// <param name="M2M">Set when the shaped collection is a many-to-many; the fetch runs the two-phase
     /// bridge+related query and correlates by the projected left-key member. Null for relations and owned.</param>
+    /// <param name="OrderingSql">Rendered ORDER BY keys (no keyword) for an ordered / top-N projection; when
+    /// non-null the relation child fetch wraps the filtered set with a ROW_NUMBER window partitioned by the
+    /// FK. Null for an unordered collection.</param>
+    /// <param name="RowCap">Take(n) value — keep rows ranked <c>__rn &lt;= RowSkip + RowCap</c>. Null when there is no Take.</param>
+    /// <param name="RowSkip">Skip(n) value — keep rows ranked <c>__rn &gt; RowSkip</c>. Null when there is no Skip.</param>
     internal sealed record DependentQueryDefinition(
         TableMapping TargetMapping,
         IReadOnlyList<Column> ForeignKeyColumns,
@@ -330,7 +335,16 @@ namespace nORM.Query
         // fetch. Both keep the shared parent-keying/assignment helpers, which resolve the parent key and the
         // target member by NAME against the projected DTO. At most one is non-null; both null = a relation.
         OwnedCollectionMapping? Owned = null,
-        JoinTableMapping? M2M = null
+        JoinTableMapping? M2M = null,
+        // Optional ordering + row cap/skip for an ordered / top-N shaped projection
+        // (Select(o => new { Recent = o.Lines.OrderByDescending(l => l.Date).Take(3).ToList() })). OrderingSql
+        // is the rendered ORDER BY key list (no keyword) against the child table; when non-null the relation
+        // child fetch wraps the (FK + tenant + global + element-filtered) inner query with
+        // ROW_NUMBER() OVER (PARTITION BY fk ORDER BY OrderingSql) and keeps only rows with __rn <= RowCap
+        // (and > RowSkip). Relation collections only (owned/m2m fail loud at plan build).
+        string? OrderingSql = null,
+        int? RowCap = null,
+        int? RowSkip = null
     )
     {
         internal Column ForeignKeyColumn => ForeignKeyColumns[0];

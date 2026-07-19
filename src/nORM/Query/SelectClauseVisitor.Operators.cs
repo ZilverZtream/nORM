@@ -641,7 +641,7 @@ namespace nORM.Query
                 if (node.Bindings[i] is MemberAssignment assignment)
                 {
                     // Check if this is a navigation collection (bare, or shaped as .Where(pred).ToList()).
-                    if (TryMatchDetectedCollection(assignment.Expression, out var navProperty, out var navFilter, out var navProjection))
+                    if (TryMatchDetectedCollection(assignment.Expression, out var navProperty, out var navFilter, out var navProjection, out var navOrdering))
                     {
                         // Track it for later split query processing
                         _detectedCollections.Add(navProperty);
@@ -649,6 +649,8 @@ namespace nORM.Query
                             _detectedCollectionFilters[navProperty] = rendered;
                         if (navProjection != null)
                             _detectedCollectionProjections[navProperty] = navProjection;
+                        if (navOrdering != null && RenderShapedCollectionOrdering(navProperty, navOrdering) is { } renderedOrdering)
+                            _detectedCollectionOrderings[navProperty] = renderedOrdering;
                         // The DTO property may be named differently from the nav; stitch to THIS member.
                         if (assignment.Member is PropertyInfo bindingProp)
                             _detectedCollectionTargetMembers[navProperty] = bindingProp;

@@ -275,6 +275,68 @@ namespace nORM.Query
                    $"AND {asOfParam} < {w}.{p.Escape("__ValidTo")}) AS {map.EscTable}";
         }
 
+        /// <summary>
+        /// Builds the dependent child-fetch SQL: the child columns WHERE the foreign key is in the parent
+        /// batch, scoped by tenant + global + per-element filters. For an ordered / top-N projection the WHOLE
+        /// filter stack lands INSIDE a <c>ROW_NUMBER() OVER (PARTITION BY fk ORDER BY …)</c> subquery and only
+        /// the cap/skip stays in the outer query, so the top-N is computed over the visible, ordered set (a
+        /// naive cap-then-filter would return the wrong rows). Shared by the sync and async child-fetch paths.
+        /// </summary>
+        private string BuildDependentChildSql(
+            System.Data.Common.DbCommand cmd,
+            DependentQueryDefinition depQuery,
+            List<object> parentIds,
+            Dictionary<string, object?>? filterParams,
+            DateTime? asOf)
+        {
+            var fromSource = BuildDependentFromSource(depQuery, cmd, asOf);
+
+            // Row-visibility WHERE stack (FK IN + tenant + global filter + element filter). This whole stack is
+            // the inner query for an ordered projection so ROW_NUMBER numbers the filtered, ordered set.
+            var where = new System.Text.StringBuilder();
+            AppendDependentQueryWhere(cmd, where, depQuery, parentIds);
+            if (_ctx.Options.TenantProvider != null)
+            {
+                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
+                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
+                where.Append($" AND {tenantCol.EscCol}={tenantParam}");
+                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
+            }
+            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
+            if (globalFilterSql != null)
+                where.Append(" AND ").Append(globalFilterSql);
+            AppendDependentFilter(cmd, where, depQuery, filterParams);
+
+            if (depQuery.OrderingSql == null)
+                return "SELECT * FROM " + fromSource + " WHERE " + where;
+
+            // Ordered / top-N: wrap the filtered set with a per-parent ROW_NUMBER window; cap/skip stays outer.
+            var childCols = string.Join(", ", depQuery.TargetMapping.Columns.Select(c => c.EscCol));
+            var partitionBy = string.Join(", ", depQuery.ForeignKeyColumns.Select(c => c.EscCol));
+            var rnCol = _ctx.RawProvider.Escape("__rn");
+            const string capAlias = "__rncap";
+            var capRef = capAlias + "." + rnCol;
+
+            var outer = new System.Text.StringBuilder();
+            outer.Append("SELECT ").Append(childCols)
+                 .Append(" FROM (SELECT ").Append(childCols)
+                 .Append(", ROW_NUMBER() OVER (PARTITION BY ").Append(partitionBy)
+                 .Append(" ORDER BY ").Append(depQuery.OrderingSql).Append(") AS ").Append(rnCol)
+                 .Append(" FROM ").Append(fromSource).Append(" WHERE ").Append(where)
+                 .Append(") AS ").Append(capAlias);
+
+            // Skip(s).Take(t) → rows ranked s+1..s+t. Order by __rn so per-parent order survives the stitch's
+            // FK grouping (each parent's rows keep their window order in the result).
+            int skip = depQuery.RowSkip ?? 0;
+            var conditions = new List<string>(2);
+            if (skip > 0) conditions.Add(capRef + " > " + skip);
+            if (depQuery.RowCap is int cap) conditions.Add(capRef + " <= " + (skip + cap));
+            if (conditions.Count > 0)
+                outer.Append(" WHERE ").Append(string.Join(" AND ", conditions));
+            outer.Append(" ORDER BY ").Append(capRef);
+            return outer.ToString();
+        }
+
         private List<object> FetchChildrenBatch(
             DependentQueryDefinition depQuery,
             List<object> parentIds,
@@ -287,34 +349,7 @@ namespace nORM.Query
             _ctx.EnsureConnection();
             using var cmd = _ctx.CreateCommand();
 
-            var sql = new System.Text.StringBuilder();
-            sql.Append("SELECT * FROM ").Append(BuildDependentFromSource(depQuery, cmd, asOf));
-            sql.Append(" WHERE ");
-            AppendDependentQueryWhere(cmd, sql, depQuery, parentIds);
-
-            // X2: Apply tenant predicate to split-query child loading, matching the filter applied
-            // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
-            // could cause a parent from tenant A to load children belonging to tenant B.
-            if (_ctx.Options.TenantProvider != null)
-            {
-                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
-                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
-                sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
-                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
-            }
-
-            // Apply the general global filters (e.g. soft-delete) to the eager-loaded child too — the
-            // root query is filtered by ApplyGlobalFilters, but this hand-built dependent SQL is not, so
-            // without this a soft-deleted (or cross-tenant) child leaks into the navigation collection.
-            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
-            if (globalFilterSql != null)
-                sql.Append(" AND ").Append(globalFilterSql);
-
-            // Shaped-projection per-element filter (Lines = o.Lines.Where(pred).ToList()): append the
-            // plan-rendered predicate and bind its compiled params from the captured main-command values.
-            AppendDependentFilter(cmd, sql, depQuery, filterParams);
-
-            cmd.CommandText = sql.ToString();
+            cmd.CommandText = BuildDependentChildSql(cmd, depQuery, parentIds, filterParams, asOf);
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
                 cmd.CommandText).TotalSeconds;
@@ -364,36 +399,10 @@ namespace nORM.Query
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
             await using var cmd = _ctx.CreateCommand();
 
-            // Build SQL: SELECT * FROM ChildTable WHERE ForeignKey IN (@p0, @p1, ...). Under AsOf the FROM is
-            // the reconstructed history window aliased AS the table (see BuildDependentFromSource).
-            var sql = new System.Text.StringBuilder();
-            sql.Append("SELECT * FROM ").Append(BuildDependentFromSource(depQuery, cmd, asOf));
-            sql.Append(" WHERE ");
-            AppendDependentQueryWhere(cmd, sql, depQuery, parentIds);
-
-            // X2: Apply tenant predicate to split-query child loading, matching the filter applied
-            // to the parent query by ApplyGlobalFilters. Without this, cross-tenant FK overlaps
-            // could cause a parent from tenant A to load children belonging to tenant B.
-            if (_ctx.Options.TenantProvider != null)
-            {
-                var tenantCol = _ctx.RequireTenantColumn(depQuery.TargetMapping, "split-query child load");
-                var tenantParam = $"{_ctx.RawProvider.ParamPrefix}__tenant_child";
-                sql.Append($" AND {tenantCol.EscCol}={tenantParam}");
-                cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
-            }
-
-            // Apply the general global filters (e.g. soft-delete) to the eager-loaded child too — the
-            // root query is filtered by ApplyGlobalFilters, but this hand-built dependent SQL is not, so
-            // without this a soft-deleted (or cross-tenant) child leaks into the navigation collection.
-            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
-            if (globalFilterSql != null)
-                sql.Append(" AND ").Append(globalFilterSql);
-
-            // Shaped-projection per-element filter (Lines = o.Lines.Where(pred).ToList()): append the
-            // plan-rendered predicate and bind its compiled params from the captured main-command values.
-            AppendDependentFilter(cmd, sql, depQuery, filterParams);
-
-            cmd.CommandText = sql.ToString();
+            // SELECT the child rows WHERE the FK is in the parent batch, scoped by tenant/global/element
+            // filters; ordered / top-N projections wrap the filtered set with a ROW_NUMBER window. Under AsOf
+            // the FROM is the reconstructed history window aliased AS the table (see BuildDependentFromSource).
+            cmd.CommandText = BuildDependentChildSql(cmd, depQuery, parentIds, filterParams, asOf);
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
                 cmd.CommandText).TotalSeconds;

@@ -281,6 +281,41 @@ namespace nORM.Query
                     current = selectCall.Arguments[0];
                 }
 
+                // Peel optional ordering ops in LOCKSTEP with TryMatchDetectedCollection: Take → Skip → ThenBy*
+                // → OrderBy. Take/Skip are peeled ONLY when their count is constant (matching the main peeler);
+                // a non-constant count is left in place there, so peeling it here would falsely exclude a column
+                // that has no split query to fill it (an ordinal crash at materialization).
+                if (current is MethodCallExpression takeCall
+                    && takeCall.Arguments.Count == 2
+                    && (takeCall.Method.DeclaringType == typeof(Enumerable) || takeCall.Method.DeclaringType == typeof(Queryable))
+                    && takeCall.Method.Name == nameof(Enumerable.Take)
+                    && QueryTranslator.TryGetConstantValue(takeCall.Arguments[1], out var tv) && tv is int)
+                {
+                    current = takeCall.Arguments[0];
+                }
+                if (current is MethodCallExpression skipCall
+                    && skipCall.Arguments.Count == 2
+                    && (skipCall.Method.DeclaringType == typeof(Enumerable) || skipCall.Method.DeclaringType == typeof(Queryable))
+                    && skipCall.Method.Name == nameof(Enumerable.Skip)
+                    && QueryTranslator.TryGetConstantValue(skipCall.Arguments[1], out var sv) && sv is int)
+                {
+                    current = skipCall.Arguments[0];
+                }
+                while (current is MethodCallExpression thenCall
+                    && thenCall.Arguments.Count == 2
+                    && (thenCall.Method.DeclaringType == typeof(Enumerable) || thenCall.Method.DeclaringType == typeof(Queryable))
+                    && thenCall.Method.Name is nameof(Enumerable.ThenBy) or nameof(Enumerable.ThenByDescending))
+                {
+                    current = thenCall.Arguments[0];
+                }
+                if (current is MethodCallExpression orderCall
+                    && orderCall.Arguments.Count == 2
+                    && (orderCall.Method.DeclaringType == typeof(Enumerable) || orderCall.Method.DeclaringType == typeof(Queryable))
+                    && orderCall.Method.Name is nameof(Enumerable.OrderBy) or nameof(Enumerable.OrderByDescending))
+                {
+                    current = orderCall.Arguments[0];
+                }
+
                 // Peel an optional single Where(source, predicate).
                 if (current is MethodCallExpression whereCall
                     && whereCall.Arguments.Count == 2

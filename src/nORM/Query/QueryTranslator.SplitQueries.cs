@@ -118,6 +118,16 @@ namespace nORM.Query
                 _detectedCollectionProjections.TryGetValue(collectionProperty, out var elementProjection);
                 var dependentElementType = elementProjection?.ReturnType ?? elementType;
 
+                // An ordered / top-N projection (o.Lines.OrderByDescending(l => l.Date).Take(3).ToList()) captured
+                // a rendered ORDER BY + row cap; the relation child fetch emits a ROW_NUMBER partition window.
+                // Owned and many-to-many collections load through separate loaders without that window, so an
+                // ordered owned/m2m projection fails loud rather than silently returning unordered / uncapped rows.
+                _detectedCollectionOrderings.TryGetValue(collectionProperty, out var ordering);
+                if (ordering.OrderBySql != null && (owned != null || m2m != null))
+                    throw new NormUnsupportedFeatureException(
+                        "Ordered / top-N projection (OrderBy/Take/Skip) is not yet supported for owned or " +
+                        "many-to-many collections — only for relationship navigations. Order after materialization.");
+
                 // A closure-capturing element projection is applied client-side; baking it into a cached
                 // delegate would replay the first execution's captured value. Mark the plan non-cacheable so
                 // it re-translates (a fresh projection with the current capture) on every execution.
@@ -142,7 +152,10 @@ namespace nORM.Query
                     FilterParameters: filter.Parameters,
                     ElementProjection: elementProjection,
                     Owned: owned,
-                    M2M: m2m
+                    M2M: m2m,
+                    OrderingSql: ordering.OrderBySql,
+                    RowCap: ordering.Take,
+                    RowSkip: ordering.Skip
                 );
 
                 dependentQueries.Add(dependentQuery);

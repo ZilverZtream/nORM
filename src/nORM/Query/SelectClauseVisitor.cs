@@ -51,9 +51,31 @@ namespace nORM.Query
         // member is a settable property; otherwise the stitch falls back to the nav property.
         private Dictionary<PropertyInfo, PropertyInfo> _detectedCollectionTargetMembers = new();
 
+        // Per detected collection: the rendered ORDER BY + row cap/skip for an ordered / top-N projection
+        // (`o.Lines.OrderByDescending(l => l.Date).Take(3).ToList()`), emitted as a ROW_NUMBER partition window
+        // in the split-query child fetch. Only ordered collections appear here.
+        private Dictionary<PropertyInfo, RenderedCollectionOrdering> _detectedCollectionOrderings = new();
+
         /// <summary>A shaped collection filter rendered to SQL against the child table, with the names
         /// of the compiled parameters it references (closure captures) for per-execution rebinding.</summary>
         internal readonly record struct RenderedCollectionFilter(string Sql, IReadOnlyList<string> Parameters);
+
+        /// <summary>An ordering key selector (OrderBy/ThenBy) for a shaped collection projection, with its
+        /// sort direction.</summary>
+        internal readonly record struct OrderingKey(LambdaExpression KeySelector, bool Descending);
+
+        /// <summary>Ordering keys ([primary, then, then...]) plus row cap (Take) / skip captured from a shaped
+        /// collection projection binding, before rendering to SQL.</summary>
+        internal sealed class CollectionOrderingSpec
+        {
+            public readonly List<OrderingKey> Keys = new();
+            public int? Take;
+            public int? Skip;
+        }
+
+        /// <summary>A shaped collection ordering rendered to SQL (an ORDER BY key list without the keyword)
+        /// plus its row cap/skip, for the ROW_NUMBER partition window in the split-query child fetch.</summary>
+        internal readonly record struct RenderedCollectionOrdering(string OrderBySql, int? Take, int? Skip);
 
         /// <summary>SQL aggregate function name for COUNT operations.</summary>
         private const string CountFunctionName = "COUNT";
@@ -127,6 +149,13 @@ namespace nORM.Query
         public IReadOnlyDictionary<PropertyInfo, PropertyInfo> DetectedCollectionTargetMembers => _detectedCollectionTargetMembers;
 
         /// <summary>
+        /// Per-detected-collection ordering + row cap captured from an ordered / top-N shaped projection binding
+        /// (`o.Lines.OrderByDescending(l =&gt; l.Date).Take(3).ToList()`), rendered to SQL. Only ordered
+        /// collections appear here; the split-query child fetch emits a ROW_NUMBER partition window.
+        /// </summary>
+        public IReadOnlyDictionary<PropertyInfo, RenderedCollectionOrdering> DetectedCollectionOrderings => _detectedCollectionOrderings;
+
+        /// <summary>
         /// Translates a projection expression into a SQL <c>SELECT</c> column list.
         /// Each call resets detected collections, so the result reflects only the
         /// most recent translation.
@@ -142,6 +171,7 @@ namespace nORM.Query
             _detectedCollectionFilters = new Dictionary<PropertyInfo, RenderedCollectionFilter>();
             _detectedCollectionProjections = new Dictionary<PropertyInfo, LambdaExpression>();
             _detectedCollectionTargetMembers = new Dictionary<PropertyInfo, PropertyInfo>();
+            _detectedCollectionOrderings = new Dictionary<PropertyInfo, RenderedCollectionOrdering>();
 
             var sb = _stringBuilderPool.Get();
             _sb = sb;
@@ -218,7 +248,7 @@ namespace nORM.Query
                 var memberName = node.Members?[i]?.Name ?? $"Item{i + 1}";
 
                 // Check if this is a navigation collection (bare, or shaped as .Where(pred).ToList()).
-                if (TryMatchDetectedCollection(arg, out var navProperty, out var navFilter, out var navProjection))
+                if (TryMatchDetectedCollection(arg, out var navProperty, out var navFilter, out var navProjection, out var navOrdering))
                 {
                     // Track it for later split query processing
                     _detectedCollections.Add(navProperty);
@@ -226,6 +256,8 @@ namespace nORM.Query
                         _detectedCollectionFilters[navProperty] = rendered;
                     if (navProjection != null)
                         _detectedCollectionProjections[navProperty] = navProjection;
+                    if (navOrdering != null && RenderShapedCollectionOrdering(navProperty, navOrdering) is { } renderedOrdering)
+                        _detectedCollectionOrderings[navProperty] = renderedOrdering;
                     // The anonymous/DTO member may be named differently from the nav; stitch to THIS member.
                     if (node.Members?[i] is PropertyInfo bindingProp)
                         _detectedCollectionTargetMembers[navProperty] = bindingProp;

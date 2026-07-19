@@ -188,6 +188,9 @@ namespace nORM.Query
         // DTO binding member each detected collection is assigned to (keyed by nav property) — the stitch
         // target when the projection property is named differently from the navigation.
         private Dictionary<PropertyInfo, PropertyInfo> _detectedCollectionTargetMembers = new();
+        // Rendered ORDER BY + row cap/skip for an ordered/top-N shaped collection projection, keyed by nav
+        // property; consumed by BuildDependentQueryDefinitions to emit a ROW_NUMBER partition window.
+        private Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionOrdering> _detectedCollectionOrderings = new();
         private TimeSpan _estimatedTimeout;
         private bool _isCacheable;
         private TimeSpan? _cacheExpiration;

@@ -131,6 +131,7 @@ namespace nORM.Query
                 _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();
                 _detectedCollectionProjections = new Dictionary<PropertyInfo, System.Linq.Expressions.LambdaExpression>();
                 _detectedCollectionTargetMembers = new Dictionary<PropertyInfo, PropertyInfo>();
+                _detectedCollectionOrderings = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionOrdering>();
                 _complexityMetrics = default;
                 _postMaterializeTransform = null;
                 _postMaterializeOrderPrefixTransform = null;
@@ -195,6 +196,7 @@ namespace nORM.Query
                 _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();
                 _detectedCollectionProjections = new Dictionary<PropertyInfo, System.Linq.Expressions.LambdaExpression>();
                 _detectedCollectionTargetMembers = new Dictionary<PropertyInfo, PropertyInfo>();
+                _detectedCollectionOrderings = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionOrdering>();
                 _complexityMetrics = default;
                 _postMaterializeTransform = null;
                 _postMaterializeOrderPrefixTransform = null;

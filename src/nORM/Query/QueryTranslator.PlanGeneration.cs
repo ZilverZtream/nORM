@@ -407,6 +407,8 @@ namespace nORM.Query
                                 _t._detectedCollectionProjections[kvp.Key] = kvp.Value;
                             foreach (var kvp in selectVisitor.DetectedCollectionTargetMembers)
                                 _t._detectedCollectionTargetMembers[kvp.Key] = kvp.Value;
+                            foreach (var kvp in selectVisitor.DetectedCollectionOrderings)
+                                _t._detectedCollectionOrderings[kvp.Key] = kvp.Value;
 
                             // If we detected collections, ensure primary key is included in SELECT
                             if (_t._detectedCollections.Count > 0 && _t._mapping.KeyColumns.Length > 0)
