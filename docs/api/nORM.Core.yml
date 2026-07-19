@@ -16,6 +16,7 @@ items:
   - nORM.Core.DbContext
   - nORM.Core.DbContextTransaction
   - nORM.Core.EntityEntry
+  - nORM.Core.EntityEntryGraphNode
   - nORM.Core.EntityState
   - nORM.Core.IMemoryMonitor
   - nORM.Core.INormIncludableQueryable`2
@@ -196,6 +197,13 @@ references:
   name: EntityEntry
   nameWithType: EntityEntry
   fullName: nORM.Core.EntityEntry
+- uid: nORM.Core.EntityEntryGraphNode
+  commentId: T:nORM.Core.EntityEntryGraphNode
+  parent: nORM.Core
+  href: nORM.Core.EntityEntryGraphNode.html
+  name: EntityEntryGraphNode
+  nameWithType: EntityEntryGraphNode
+  fullName: nORM.Core.EntityEntryGraphNode
 - uid: nORM.Core.EntityState
   commentId: T:nORM.Core.EntityState
   parent: nORM.Core

@@ -17,7 +17,7 @@ namespace nORM.Core
     /// persisted to the database. The tracker manages identity resolution and
     /// coordinates change detection for entities attached to a <see cref="DbContext"/>.
     /// </summary>
-    public sealed class ChangeTracker
+    public sealed partial class ChangeTracker
     {
         private readonly ConcurrentDictionary<object, EntityEntry> _entriesByReference = new(RefComparer.Instance);
         private readonly ConcurrentDictionary<Type, ConcurrentDictionary<object, EntityEntry>> _entriesByKey = new();

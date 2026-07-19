@@ -165,6 +165,9 @@ items:
   - uid: nORM.Core.EntityEntry
     name: EntityEntry
     type: Class
+  - uid: nORM.Core.EntityEntryGraphNode
+    name: EntityEntryGraphNode
+    type: Class
   - uid: nORM.Core.EntityState
     name: EntityState
     type: Enum

@@ -314,6 +314,7 @@ M:nORM.Core.ChangeTracker.AcceptAllChanges():System.Void
 M:nORM.Core.ChangeTracker.Clear():System.Void
 M:nORM.Core.ChangeTracker.DetectChanges():System.Void
 M:nORM.Core.ChangeTracker.HasChanges():System.Boolean
+M:nORM.Core.ChangeTracker.TrackGraph(System.Object,System.Action{nORM.Core.EntityEntryGraphNode}):System.Void
 M:nORM.Core.ConnectionManager.#ctor(nORM.Core.DatabaseTopology,nORM.Providers.DatabaseProvider,Microsoft.Extensions.Logging.ILogger,System.Nullable{System.TimeSpan})
 M:nORM.Core.ConnectionManager.Dispose():System.Void
 M:nORM.Core.ConnectionManager.GetReadConnectionAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Data.Common.DbConnection}
@@ -1281,6 +1282,9 @@ P:nORM.Core.EntityEntry.Entity:System.Object
 P:nORM.Core.EntityEntry.IsKeySet:System.Boolean
 P:nORM.Core.EntityEntry.OriginalValues:nORM.Core.PropertyValues
 P:nORM.Core.EntityEntry.State:nORM.Core.EntityState
+P:nORM.Core.EntityEntryGraphNode.Entry:nORM.Core.EntityEntry
+P:nORM.Core.EntityEntryGraphNode.InboundNavigation:System.String
+P:nORM.Core.EntityEntryGraphNode.SourceEntry:nORM.Core.EntityEntry
 P:nORM.Core.NavigationEntry.CurrentValue:System.Object
 P:nORM.Core.NavigationEntry.IsLoaded:System.Boolean
 P:nORM.Core.NavigationEntry.Name:System.String
@@ -1656,6 +1660,7 @@ T:nORM.Core.DbConcurrencyException
 T:nORM.Core.DbContext
 T:nORM.Core.DbContextTransaction
 T:nORM.Core.EntityEntry
+T:nORM.Core.EntityEntryGraphNode
 T:nORM.Core.EntityState
 T:nORM.Core.IMemoryMonitor
 T:nORM.Core.INormDbContextFactory{`0}
