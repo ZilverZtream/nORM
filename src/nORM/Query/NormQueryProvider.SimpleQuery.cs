@@ -116,7 +116,7 @@ namespace nORM.Query
                         return false;
                     }
                 }
-                else if (mc.Method.Name == "AsNoTracking" && mc.Arguments.Count >= 1)
+                else if (mc.Method.Name is "AsNoTracking" or "AsNoTrackingWithIdentityResolution" && mc.Arguments.Count >= 1)
                 {
                     // Skip AsNoTracking (nORM-specific method, not on Queryable)
                     current = mc.Arguments[0];

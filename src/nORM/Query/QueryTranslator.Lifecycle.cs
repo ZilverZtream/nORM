@@ -116,6 +116,7 @@ namespace nORM.Query
                 _singleResult = false;
                 _noTracking = false;
                 _forceTracking = false;
+                _identityResolution = false;
                 _trackingDecided = false;
                 _splitQuery = false;
                 _queryTags = null;
@@ -182,6 +183,7 @@ namespace nORM.Query
                 _singleResult = false;
                 _noTracking = false;
                 _forceTracking = false;
+                _identityResolution = false;
                 _trackingDecided = false;
                 _splitQuery = false;
                 _queryTags = null;

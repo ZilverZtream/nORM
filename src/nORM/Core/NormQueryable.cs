@@ -124,6 +124,13 @@ namespace nORM.Core
         INormQueryable<T> AsNoTracking();
 
         /// <summary>
+        /// Disables change tracking but still resolves entity identity: a root entity whose key appears more
+        /// than once in one result set (e.g. from <c>Concat</c> or a self-join/SelectMany flatten) is returned
+        /// as a single shared instance. Matches EF Core's <c>AsNoTrackingWithIdentityResolution</c>.
+        /// </summary>
+        INormQueryable<T> AsNoTrackingWithIdentityResolution();
+
+        /// <summary>
         /// Accepted for EF Core compatibility and has no additional effect:
         /// <see cref="Include{TProperty}"/> always eager-loads its navigation paths
         /// through coordinated follow-up queries.
@@ -218,6 +225,14 @@ namespace nORM.Core
             return new NormQueryableImpl<T>(Provider, expression);
         }
 
+        public INormQueryable<T> AsNoTrackingWithIdentityResolution()
+        {
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTrackingWithIdentityResolution))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
+            return new NormQueryableImpl<T>(Provider, expression);
+        }
+
         /// <summary>
         /// Accepted for EF Core compatibility and has no additional effect: Include
         /// always eager-loads its navigation paths.
@@ -299,6 +314,14 @@ namespace nORM.Core
             return new NormQueryableImplUnconstrained<T>(Provider, expression);
         }
 
+        public INormQueryable<T> AsNoTrackingWithIdentityResolution()
+        {
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTrackingWithIdentityResolution))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
+            return new NormQueryableImplUnconstrained<T>(Provider, expression);
+        }
+
         public INormQueryable<T> AsSplitQuery()
         {
             var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
@@ -352,6 +375,14 @@ namespace nORM.Core
         {
             var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
             var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTracking))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
+            return new NormQueryableImplUnconstrained<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsNoTrackingWithIdentityResolution()
+        {
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTrackingWithIdentityResolution))!;
             var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImplUnconstrained<T>(Provider, expression);
         }
@@ -420,6 +451,14 @@ namespace nORM.Core
         {
             var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
             var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTracking))!;
+            var expression = Expression.Call(Expression.Convert(Expression, normType), method);
+            return new NormQueryableImpl<T>(Provider, expression);
+        }
+
+        public INormQueryable<T> AsNoTrackingWithIdentityResolution()
+        {
+            var normType = typeof(INormQueryable<>).MakeGenericType(typeof(T));
+            var method = normType.GetMethod(nameof(INormQueryable<T>.AsNoTrackingWithIdentityResolution))!;
             var expression = Expression.Call(Expression.Convert(Expression, normType), method);
             return new NormQueryableImpl<T>(Provider, expression);
         }
@@ -534,6 +573,27 @@ namespace nORM.Core
                 "AsNoTracking can only be used with nORM queries. " +
                 "Make sure you started with context.Query<T>() or context.Set<T>(). " +
                 "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking().");
+        }
+
+        /// <summary>
+        /// The <see cref="IQueryable{T}"/> form of <see cref="INormQueryable{T}.AsNoTrackingWithIdentityResolution"/>
+        /// for chains typed as <see cref="IQueryable{T}"/>; when the static type already is
+        /// <see cref="INormQueryable{T}"/> the instance method is preferred by the compiler.
+        /// </summary>
+        /// <typeparam name="T">The entity type of the query.</typeparam>
+        /// <param name="source">A nORM query started with <c>context.Query&lt;T&gt;()</c>/<c>Set&lt;T&gt;()</c>.</param>
+        /// <returns>An untracked query that resolves entity identity.</returns>
+        public static INormQueryable<T> AsNoTrackingWithIdentityResolution<T>(this IQueryable<T> source)
+            where T : class
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            if (source is INormQueryable<T> normQueryable)
+                return normQueryable.AsNoTrackingWithIdentityResolution();
+
+            throw new NormUsageException(
+                "AsNoTrackingWithIdentityResolution can only be used with nORM queries. " +
+                "Make sure you started with context.Query<T>() or context.Set<T>(). " +
+                "For Entity Framework queries, use Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTrackingWithIdentityResolution().");
         }
 
         /// <summary>

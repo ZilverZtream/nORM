@@ -78,6 +78,7 @@ namespace nORM.Query
                              !_ctx.GetMapping(plan.ElementType).IsKeyless;   // keyless = query-only, never tracked
             if (trackable)
                 _ctx.GetMapping(plan.ElementType);
+            var (idMap, idMapping) = _executor.CreateIdentityResolutionMap(plan);
             var count = 0;
             await using var reader = await cmd
                 .ExecuteReaderWithInterceptionAsync(
@@ -94,6 +95,11 @@ namespace nORM.Query
                     var entry = _ctx.ChangeTracker.Track(entity!, EntityState.Unchanged, actualMap);
                     entity = (T)entry.Entity!;
                     NavigationPropertyExtensions.EnableLazyLoading((object)entity!, _ctx);
+                }
+                else if (idMap != null)
+                {
+                    // AsNoTrackingWithIdentityResolution: collapse a repeated root key to one shared instance.
+                    entity = (T)QueryExecutor.ResolveRootIdentity(entity!, idMap, idMapping);
                 }
                 count++;
                 yield return entity;

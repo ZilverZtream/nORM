@@ -48,6 +48,7 @@ namespace nORM.Core
             => Composable().Include(navigationPropertyPath);
 
         public INormQueryable<T> AsNoTracking() => Composable().AsNoTracking();
+        public INormQueryable<T> AsNoTrackingWithIdentityResolution() => Composable().AsNoTrackingWithIdentityResolution();
         public INormQueryable<T> AsSplitQuery() => Composable().AsSplitQuery();
         public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default) => Composable().AsAsyncEnumerable(ct);
         public Task<List<T>> ToListAsync(CancellationToken ct = default) => Composable().ToListAsync(ct);

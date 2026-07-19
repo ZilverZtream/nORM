@@ -555,6 +555,7 @@ namespace nORM.Query
                     case "OrderByDescending":
                     case "ThenBy":
                     case "ThenByDescending":
+                    case "AsNoTrackingWithIdentityResolution":
                     case "AsNoTracking":
                     case "AsSplitQuery":
                         break;

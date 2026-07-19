@@ -81,6 +81,7 @@ namespace nORM.Query
             { "Include", new IncludeTranslator() },
             { "ThenInclude", new ThenIncludeTranslator() },
             { "AsNoTracking", new AsNoTrackingTranslator() },
+            { "AsNoTrackingWithIdentityResolution", new AsNoTrackingWithIdentityResolutionTranslator() },
             { "AsTracking", new AsTrackingTranslator() },
             { "AsSplitQuery", new AsSplitQueryTranslator() },
             { "TagWith", new TagWithTranslator() },

@@ -430,6 +430,7 @@ M:nORM.Core.INormDbContextFactory{`0}.CreateDbContext():`0
 M:nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Boolean}
 M:nORM.Core.INormQueryable{`0}.AsAsyncEnumerable(System.Threading.CancellationToken):System.Collections.Generic.IAsyncEnumerable{`0}
 M:nORM.Core.INormQueryable{`0}.AsNoTracking():nORM.Core.INormQueryable{`0}
+M:nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution():nORM.Core.INormQueryable{`0}
 M:nORM.Core.INormQueryable{`0}.AsSplitQuery():nORM.Core.INormQueryable{`0}
 M:nORM.Core.INormQueryable{`0}.CountAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
 M:nORM.Core.INormQueryable{`0}.ExecuteDeleteAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task{System.Int32}
@@ -489,6 +490,7 @@ M:nORM.Core.NormException.#ctor(System.String,System.String,System.Collections.G
 M:nORM.Core.NormExceptionHandler.#ctor(Microsoft.Extensions.Logging.ILogger)
 M:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandlingSync``1(System.Func{`0},System.String,System.Collections.Generic.Dictionary{System.String,System.Object}):`0
 M:nORM.Core.NormExceptionHandler.ExecuteWithExceptionHandling``1(System.Func{System.Threading.Tasks.Task{`0}},System.String,System.Collections.Generic.Dictionary{System.String,System.Object}):System.Threading.Tasks.Task{`0}
+M:nORM.Core.NormIncludableQueryableExtensions.AsNoTrackingWithIdentityResolution``1(System.Linq.IQueryable{`0}):nORM.Core.INormQueryable{`0}
 M:nORM.Core.NormIncludableQueryableExtensions.AsNoTracking``1(System.Linq.IQueryable{`0}):nORM.Core.INormQueryable{`0}
 M:nORM.Core.NormIncludableQueryableExtensions.AsSplitQuery``1(System.Linq.IQueryable{`0}):nORM.Core.INormQueryable{`0}
 M:nORM.Core.NormIncludableQueryableExtensions.AsTracking``1(System.Linq.IQueryable{`0}):System.Linq.IQueryable{`0}

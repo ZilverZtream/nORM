@@ -317,6 +317,7 @@ namespace nORM.Query
                     case "ThenBy":
                     case "ThenByDescending":
                     case "Distinct":
+                    case "AsNoTrackingWithIdentityResolution":
                     case "AsNoTracking":
                         break;
                     case "Query": // the `ctx.Query<T>()` chain root

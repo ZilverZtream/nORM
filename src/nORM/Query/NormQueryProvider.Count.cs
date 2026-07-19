@@ -54,7 +54,7 @@ namespace nORM.Query
 
             // Unwrap AsNoTracking and similar passthrough methods
             while (source is MethodCallExpression m && m.Arguments.Count == 1 &&
-                   m.Method.Name is "AsNoTracking" or "AsTracking")
+                   m.Method.Name is "AsNoTracking" or "AsNoTrackingWithIdentityResolution" or "AsTracking")
                 source = m.Arguments[0];
 
             if (source is not ConstantExpression constant)

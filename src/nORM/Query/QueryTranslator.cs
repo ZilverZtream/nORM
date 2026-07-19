@@ -141,6 +141,9 @@ namespace nORM.Query
         private DatabaseProvider _provider = null!;
         private bool _singleResult;
         private bool _noTracking;
+        // AsNoTrackingWithIdentityResolution() sets this alongside _noTracking: untracked results, but the
+        // root materialize loop still collapses a repeated root key to one shared instance.
+        private bool _identityResolution;
         // AsTracking() sets this to force tracking ON over a NoTracking context default. _trackingDecided
         // gives AsNoTracking/AsTracking last-wins semantics: the outermost (last-written, first-visited)
         // operator locks the decision so an inner one cannot override it.

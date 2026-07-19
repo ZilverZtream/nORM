@@ -238,6 +238,28 @@ namespace nORM.Query
 
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private sealed class AsNoTrackingWithIdentityResolutionTranslator : IMethodCallTranslator
+        {
+            /// <summary>
+            /// Marks the query untracked (as <c>AsNoTracking</c> does, last-wins with <c>AsTracking</c>) and,
+            /// additionally, flags identity resolution so a root key repeated in one result set collapses to a
+            /// single instance in the materialize loop.
+            /// </summary>
+            public Expression Translate(QueryTranslator t, MethodCallExpression node)
+            {
+                if (!t._trackingDecided)
+                {
+                    t._noTracking = true;
+                    t._identityResolution = true;
+                    t._trackingDecided = true;
+                }
+                var source = node.Object ?? node.Arguments[0];
+                return t.Visit(source);
+            }
+        }
+
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class AsTrackingTranslator : IMethodCallTranslator
         {
             /// <summary>

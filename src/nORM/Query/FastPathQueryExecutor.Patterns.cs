@@ -123,7 +123,7 @@ namespace nORM.Query
 
             while (expr is MethodCallExpression call)
             {
-                if (call.Method.Name is "AsNoTracking" or "AsSplitQuery" && call.Arguments.Count == 1)
+                if (call.Method.Name is "AsNoTracking" or "AsNoTrackingWithIdentityResolution" or "AsSplitQuery" && call.Arguments.Count == 1)
                 {
                     expr = call.Arguments[0];
                     continue;

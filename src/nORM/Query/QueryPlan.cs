@@ -139,7 +139,13 @@ namespace nORM.Query
         // DefaultTrackingBehavior is NoTracking — the per-query override of a no-tracking default.
         // It overrides only the context-default (IsReadOnlyQuery) gate; AsNoTracking/AsOf still win
         // because they set NoTracking=true, which makes the entity untrackable before this is consulted.
-        bool ForceTracking = false
+        bool ForceTracking = false,
+        // AsNoTrackingWithIdentityResolution() sets this: the query is untracked (NoTracking=true) but the
+        // complex materialize loop still resolves identity — a root key seen more than once in one result set
+        // (Concat/UNION ALL, or a self-join/SelectMany/GroupJoin flatten projecting the root) materializes to a
+        // single shared instance, matching what the change tracker would do for a tracked query. Inert on the
+        // fast/simple paths, which cannot produce a duplicate root key.
+        bool IdentityResolution = false
     );
 
     internal sealed record BulkCudQueryShape(
