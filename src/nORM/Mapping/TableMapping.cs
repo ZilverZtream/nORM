@@ -522,6 +522,18 @@ namespace nORM.Mapping
             => sb.Append(value.Length).Append(':').Append(value).Append('|');
 
         /// <summary>
+        /// Matches a mapped column's property against a fluent key / foreign-key selector's property. Reference
+        /// equality first, then <see cref="System.Reflection.MemberInfo.HasSameMetadataDefinitionAs"/> so an
+        /// INHERITED key/FK (declared on a base type, e.g. a TPH root) still resolves: the selector reflects the
+        /// property through the base type (<c>d =&gt; d.OwnerId</c> on a subtype yields the base's PropertyInfo)
+        /// while the dependent's column reflects it through the derived type, so their <c>ReflectedType</c>
+        /// differs and reference equality fails. Same metadata definition means the same property regardless of
+        /// how it was reflected.
+        /// </summary>
+        private static bool PropertyMatches(System.Reflection.PropertyInfo columnProperty, System.Reflection.PropertyInfo selectorProperty)
+            => columnProperty == selectorProperty || columnProperty.HasSameMetadataDefinitionAs(selectorProperty);
+
+        /// <summary>
         /// Inspects the entity type and associated configuration to build the collection of
         /// relationships that describe how this entity links to dependents. Both explicitly
         /// configured relationships and convention-based matches are considered.
@@ -537,10 +549,10 @@ namespace nORM.Mapping
                 {
                     var dependentMap = ctx.GetMapping(rel.DependentType);
                     var principalKeys = rel.PrincipalKeys.Count > 0
-                        ? rel.PrincipalKeys.Select(pk => Columns.FirstOrDefault(c => c.Prop == pk)
+                        ? rel.PrincipalKeys.Select(pk => Columns.FirstOrDefault(c => PropertyMatches(c.Prop, pk))
                             ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Principal key '{pk.Name}' not found on entity {Type.Name}"))).ToArray()
                         : KeyColumns;
-                    var foreignKeys = rel.ForeignKeys.Select(fk => dependentMap.Columns.FirstOrDefault(c => c.Prop == fk)
+                    var foreignKeys = rel.ForeignKeys.Select(fk => dependentMap.Columns.FirstOrDefault(c => PropertyMatches(c.Prop, fk))
                             ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration, $"Foreign key '{fk.Name}' not found on entity {dependentMap.Type.Name}"))).ToArray();
 
                     if (principalKeys.Length == 0 || principalKeys.Length != foreignKeys.Length)

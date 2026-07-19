@@ -43,6 +43,7 @@ public class NavigationToDerivedTypeTests
         public string Kind { get; set; } = "";
         public string PetName { get; set; } = "";
         public int Age { get; set; }
+        public bool Deleted { get; set; }
         public int? OwnerId { get; set; }
         [ForeignKey(nameof(OwnerId))] public Owner? Owner { get; set; }
     }
@@ -62,9 +63,9 @@ public class NavigationToDerivedTypeTests
         {
             cmd.CommandText = """
                 CREATE TABLE NtdOwner (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
-                CREATE TABLE NtdPet (Id INTEGER PRIMARY KEY, Kind TEXT NOT NULL, PetName TEXT NOT NULL, Age INTEGER NOT NULL, OwnerId INTEGER NULL);
+                CREATE TABLE NtdPet (Id INTEGER PRIMARY KEY, Kind TEXT NOT NULL, PetName TEXT NOT NULL, Age INTEGER NOT NULL, Deleted INTEGER NOT NULL, OwnerId INTEGER NULL);
                 INSERT INTO NtdOwner VALUES (1, 'ann'), (2, 'bob');
-                INSERT INTO NtdPet VALUES (1, 'dog', 'rex', 3, 1), (2, 'cat', 'tom', 9, 1), (3, 'dog', 'fido', 5, 1), (4, 'cat', 'sy', 2, 2);
+                INSERT INTO NtdPet VALUES (1, 'dog', 'rex', 3, 0, 1), (2, 'cat', 'tom', 9, 0, 1), (3, 'dog', 'fido', 5, 0, 1), (4, 'cat', 'sy', 2, 0, 2);
                 """;
             cmd.ExecuteNonQuery();
         }
@@ -158,5 +159,88 @@ public class NavigationToDerivedTypeTests
         // Accessing the uninitialized ICollection triggers nORM's lazy proxy → BatchedNavigationLoader.
         Assert.Equal(new[] { "fido", "rex" }, ann.Dogs.Select(d => d.PetName).OrderBy(n => n));
         Assert.All(ann.Dogs, d => Assert.IsType<Dog>(d));
+    }
+
+    // Fluent HasForeignKey where the FK is declared on the base type: the selector d => d.OwnerId reflects
+    // Pet's inherited property, whose PropertyInfo differs by ReflectedType from Dog's mapped column, so a
+    // reference-equality match would fail to configure the relationship at all.
+    private static DbContext FluentCtx(out SqliteConnection cn)
+    {
+        cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE NtdOwner (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                CREATE TABLE NtdPet (Id INTEGER PRIMARY KEY, Kind TEXT NOT NULL, PetName TEXT NOT NULL, Age INTEGER NOT NULL, Deleted INTEGER NOT NULL, OwnerId INTEGER NULL);
+                INSERT INTO NtdOwner VALUES (1, 'ann');
+                INSERT INTO NtdPet VALUES (1, 'dog', 'rex', 3, 0, 1), (2, 'cat', 'tom', 9, 0, 1), (3, 'dog', 'fido', 5, 0, 1);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        return new DbContext(cn, new SqliteProvider(), new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<Owner>().HasKey(o => o.Id)
+                    .HasMany(o => o.Dogs).WithOne().HasForeignKey(d => d.OwnerId!);
+                mb.Entity<Pet>().HasKey(p => p.Id);
+            }
+        });
+    }
+
+    [Fact]
+    public void Fluent_has_foreign_key_on_inherited_property_configures_and_filters_derived_collection()
+    {
+        using var ctx = FluentCtx(out var cn);
+        using var _cn = cn;
+        var count = ctx.Query<Owner>()
+            .Select(o => new { o.Id, DogCount = o.Dogs.Count() })
+            .ToList().Single().DogCount;
+        Assert.Equal(2, count);   // rex + fido, NOT tom
+    }
+
+    // The discriminator is folded into the same GlobalFilterFragment.Combine that renders user global filters,
+    // so a soft-delete filter on the base type must AND with the discriminator: a deleted dog AND a (non-deleted)
+    // cat are both excluded. If the discriminator replaced rather than composed with the filter, one would leak.
+    private static DbContext GlobalFilterCtx(out SqliteConnection cn)
+    {
+        cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE NtdOwner (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);
+                CREATE TABLE NtdPet (Id INTEGER PRIMARY KEY, Kind TEXT NOT NULL, PetName TEXT NOT NULL, Age INTEGER NOT NULL, Deleted INTEGER NOT NULL, OwnerId INTEGER NULL);
+                INSERT INTO NtdOwner VALUES (1, 'ann');
+                INSERT INTO NtdPet VALUES (1, 'dog', 'rex', 3, 0, 1), (2, 'cat', 'tom', 9, 0, 1), (3, 'dog', 'fido', 5, 1, 1);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions();
+        opts.AddGlobalFilter<Pet>(p => !p.Deleted);
+        opts.OnModelCreating = mb =>
+        {
+            mb.Entity<Owner>().HasKey(o => o.Id);
+            mb.Entity<Pet>().HasKey(p => p.Id);
+        };
+        return new DbContext(cn, new SqliteProvider(), opts);
+    }
+
+    [Fact]
+    public void Discriminator_composes_with_a_soft_delete_global_filter()
+    {
+        using var ctx = GlobalFilterCtx(out var cn);
+        using var _cn = cn;
+        // Projection aggregate: discriminator AND !Deleted → rex only (fido deleted, tom is a cat).
+        var count = ctx.Query<Owner>()
+            .Select(o => new { o.Id, N = o.Dogs.Count() })
+            .ToList().Single().N;
+        Assert.Equal(1, count);
+        // Split-query collection load must apply the same combined predicate.
+        var dogs = ctx.Query<Owner>()
+            .Select(o => new { o.Id, Dogs = o.Dogs.ToList() })
+            .ToList().Single().Dogs;
+        Assert.Equal(new[] { "rex" }, dogs.Select(d => d.PetName));
     }
 }
