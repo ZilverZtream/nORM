@@ -278,6 +278,21 @@ namespace nORM.Query
                         && ((Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(string)
                             || (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(char));
 
+                    // If the tested column carries a value converter, the list holds RAW model values but
+                    // the column stores PROVIDER values — bind the converted representation, or the IN
+                    // matches nothing (silent-wrong). Mirrors the scalar `==` path (EmitConvertedValueOperand).
+                    // Restricted to a direct member so detection never emits SQL as a side effect (the
+                    // two-level navigation form of TryGetConverterColumn can lower a scalar subquery).
+                    nORM.Mapping.IValueConverter? inConverter = null;
+                    if (StripConvert(valueExpr) is MemberExpression inMember
+                        && TableMapping.TryGetMemberAccessRoot(inMember, out var inRoot)
+                        && _parameterMappings.TryGetValue(inRoot, out var inInfo)
+                        && inInfo.Mapping.TryGetColumnForMemberAccess(inMember, out var inCol)
+                        && inCol.Converter != null)
+                    {
+                        inConverter = inCol.Converter;
+                    }
+
                     // Emits `col IN (@p…)` (registering the parameters once) and returns the
                     // rendered `(@p…)` list so the ordinal wrap can reference the same names.
                     string EmitInList(IEnumerable<object?> items)
@@ -289,7 +304,8 @@ namespace nORM.Query
                         {
                             if (!first) _sql.Append(", ");
                             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
-                            _sql.AppendParameterizedValue(paramName, item, _paramSink);
+                            var bound = inConverter != null && item != null ? inConverter.ConvertToProvider(item) : item;
+                            _sql.AppendParameterizedValue(paramName, bound, _paramSink);
                             first = false;
                         }
                         _sql.Append(")");
