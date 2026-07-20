@@ -200,6 +200,8 @@ namespace nORM.Core
         /// target must resolve to a single-keyed principal reachable by a discovered foreign key (configured or
         /// the <c>{Nav}Id</c> convention).
         /// </summary>
+        [RequiresDynamicCode("TrackGraph reads navigation properties and resolves mappings via reflection; not NativeAOT-compatible.")]
+        [RequiresUnreferencedCode("TrackGraph reflects over navigation properties; trimming may remove the required members.")]
         private static bool IsMappedReferenceRelationship(DbContext context, TableMapping owner, System.Reflection.PropertyInfo navProp)
         {
             TableMapping principalMap;

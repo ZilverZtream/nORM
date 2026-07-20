@@ -220,6 +220,8 @@ namespace nORM.Query
             return analysis;
         }
 
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class ChildProjectionAnalysis : ExpressionVisitor
         {
             private readonly ParameterExpression _elementParam;

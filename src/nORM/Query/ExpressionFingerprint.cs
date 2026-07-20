@@ -191,6 +191,17 @@ namespace nORM.Query
                 return base.VisitConstant(node);
             }
 
+            // The only reflection/dynamic-code call below (QueryTranslator.TryGetConstantValue) is
+            // short-circuit-guarded by _collectValues, which is enabled solely by
+            // ComputeForPlanCacheWithValues - the runtime query-plan value-collection path, itself
+            // RequiresUnreferencedCode/RequiresDynamicCode via NormQueryProvider. The AOT-relevant
+            // fingerprint-only path (Compute/ComputeForPlanCache) never enables collection, so the
+            // call is unreachable there. VisitMember overrides a non-annotated base, so annotating it
+            // RequiresUnreferencedCode would itself be an IL2046 mismatch; suppress instead.
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026",
+                Justification = "Guarded by _collectValues, enabled only on the RequiresUnreferencedCode value-collection path.")]
+            [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050",
+                Justification = "Guarded by _collectValues, enabled only on the RequiresDynamicCode value-collection path.")]
             protected override Expression VisitMember(MemberExpression node)
             {
                 // Use MetadataToken + declaring type handle instead of MVID (16 bytes).

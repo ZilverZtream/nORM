@@ -25,6 +25,7 @@ namespace nORM.Versioning
         /// <param name="ct">Token used to cancel the initialization. Pre-cancellation causes the
         /// method to throw <see cref="OperationCanceledException"/> before any DDL is executed.</param>
         /// <returns>A task representing the initialization process.</returns>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Temporal initialization walks navigation metadata that reflects over entity members; trimming may remove the required members.")]
         public static async Task InitializeAsync(DbContext context, DbConnection conn, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(context);

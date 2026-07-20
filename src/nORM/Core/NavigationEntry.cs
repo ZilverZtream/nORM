@@ -37,7 +37,11 @@ namespace nORM.Core
         /// </summary>
         public bool IsLoaded
         {
+            [RequiresDynamicCode("Reading navigation-loaded state reflects over the navigation property; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+            [RequiresUnreferencedCode("Reading navigation-loaded state reflects over the navigation property; trimming may remove the required members. See docs/aot-trimming.md.")]
             get => _entry.Entity != null && NavigationPropertyExtensions.IsNavigationLoaded(_entry.Entity, _property);
+            [RequiresDynamicCode("Recording navigation-loaded state reflects over the navigation property; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+            [RequiresUnreferencedCode("Recording navigation-loaded state reflects over the navigation property; trimming may remove the required members. See docs/aot-trimming.md.")]
             set
             {
                 var entity = _entry.Entity;

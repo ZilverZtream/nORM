@@ -285,6 +285,11 @@ namespace nORM.Core
         public NavigationEntry Collection(string navigationName)
             => new NavigationEntry(this, ResolveNavigation(navigationName, requireCollection: true));
 
+        // Looks up a navigation property by name on the mapped entity type. If trimming removed the
+        // property, GetProperty returns null and the method throws a clear ArgumentException rather
+        // than failing silently; entity types used with nORM must be preserved (see docs/aot-trimming.md).
+        [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2075",
+            Justification = "Navigation property is resolved by name and validated; a trimmed member throws instead of silent failure.")]
         private PropertyInfo ResolveNavigation(string navigationName, bool? requireCollection)
         {
             if (string.IsNullOrEmpty(navigationName))
