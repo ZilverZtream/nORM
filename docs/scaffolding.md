@@ -33,7 +33,13 @@ must be reviewed and edited like handwritten model code.
   `Property(...).HasMaxLength(n)`, `Property(...).IsUnicode(...)`,
   `Property(...).IsFixedLength()`, and decimal
   `Property(...).HasPrecision(p, s)`/`Property(...).HasPrecision(p)` feed the
-  same schema snapshot metadata for hand-tuned models.
+  same schema snapshot metadata for hand-tuned models. The EF-parity column verbs
+  `Property(...).IsRequired()`, `HasColumnType(...)`, `HasDefaultValue(...)`/
+  `HasDefaultValueSql(...)`, `HasComment(...)`, `IsRowVersion()`, and
+  `ValueGeneratedOnAdd()`/`ValueGeneratedNever()`/`ValueGeneratedOnAddOrUpdate()`
+  feed the same snapshot so migrations round-trip nullability, store type, defaults,
+  comments, and concurrency/generation metadata (see the README "Fluent model
+  configuration" section).
   SQLite rowid integer primary keys,
   SQL Server identity columns, PostgreSQL identity/serial columns, and MySQL
   `AUTO_INCREMENT` columns are marked with `DatabaseGeneratedOption.Identity`.

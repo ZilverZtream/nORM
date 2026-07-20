@@ -107,11 +107,38 @@ materialization and `SaveChanges` produces a correct conflict detection.
 mid-batch lets the underlying transaction roll back, leaving entity state unchanged in memory
 (snapshots are not updated on a failed write).
 
+## Graph Tracking
+
+`ChangeTracker.TrackGraph(object rootEntity, Action<EntityEntryGraphNode> callback)` walks an
+untracked object graph reachable from `rootEntity` and invokes `callback` once per node, letting
+the application decide each entity's state (EF Core parity for disconnected-graph attach):
+
+- Traversal is depth-first over discovered navigation properties; each already-visited entity is
+  visited once (identity by reference), so cycles terminate.
+- The callback receives an `EntityEntryGraphNode` exposing the node's `Entry`, the `SourceEntry`
+  it was reached from, and the `InboundNavigation` name. A node whose state the callback leaves
+  `Detached` stops traversal into its children, matching EF Core.
+- `TrackGraph<TState>(object rootEntity, TState state, Func<EntityEntryGraphNode<TState>, bool>
+  callback)` threads a caller-supplied `state` value through every node and uses the callback's
+  `bool` return to decide whether to keep descending - the hot-path overload that avoids a
+  closure capture per graph.
+
+## Strongly-typed Entry&lt;TEntity&gt;
+
+`ctx.Entry<TEntity>(entity)` returns an `EntityEntry<TEntity>` - the generic form of
+`ctx.Entry(object)`. It exposes the same surface (`State`, `Entity`, `CurrentValues`,
+`OriginalValues`, `GetDatabaseValues(Async)`, `Reload(Async)`, `Reference`/`Collection`/
+`Navigation`, `Property(name)`) plus a lambda accessor `Property(e => e.Name)` so property
+access is compile-time checked instead of stringly-typed. `Entry` on the generic entry returns
+the underlying non-generic `EntityEntry` when an untyped handle is needed.
+
 ## Tested Contract
 
 `tests/ChangeTrackingSemanticsTests.cs`, `tests/PreciseChangeTrackingTests.cs`,
 `tests/ConstructorBoundEntityTrackingTests.cs`, `tests/ShadowPropertyTests.cs`,
 `tests/OwnedTypesTests.cs`, `tests/PKMutationTests.cs`, `tests/ChangeTrackerNotificationTests.cs`,
+`tests/ChangeTrackerTrackGraphTests.cs`, `tests/ChangeTrackerTrackGraphStateTests.cs`,
+`tests/EntityEntryOfTTests.cs`,
 and the cancellation/concurrency suites mechanically enforce the rules above.
 `ChangeTrackingContractDocTests` asserts this document continues to describe the supported
 v1 behavior.

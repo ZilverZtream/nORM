@@ -343,12 +343,96 @@ public sealed class Worker(INormDbContextFactory<AppDbContext> factory) : Backgr
 }
 ```
 
+### Context pooling
+
+For high-throughput request pipelines, `AddNormPool<TContext>` reuses a bounded set of
+warm contexts instead of building a fresh one per request - the nORM analogue of EF Core's
+`AddDbContextPool`:
+
+```csharp
+builder.Services.AddNormPool<AppDbContext>(sp => new AppDbContext(
+    builder.Configuration.GetConnectionString("Default")!, new SqlServerProvider()),
+    poolSize: 1024); // poolSize defaults to 1024; must be > 0
+```
+
+The pool is registered as a singleton and the context is injected `Scoped`: each scope
+**rents** a warm context and **returns** it when the scope disposes. Renting keeps the
+context's warm per-instance caches (entity mappings, prepared commands, fast-path SQL, the
+query provider) and its connection, which is where the win comes from. On return nORM resets
+all per-request state: it clears the change tracker and identity map, pending relationship
+key fixups, and query-scoped resources. Two safety rules are enforced by construction:
+
+- **Tenant isolation:** the applied native tenant-session key is cleared on return, so the
+  next lease re-applies its *own* tenant session - a pooled context never inherits the
+  previous tenant's row-level-security scope.
+- **Transactions are never pooled:** a context holding a live explicit, context, or ambient
+  `System.Transactions` transaction is disposed instead of returned, so an open transaction
+  can never leak into the next lease.
+
 `AddNorm` and `AddNorm<TContext>` default to `ServiceLifetime.Scoped`; pass a different
 `ServiceLifetime` if you need one. Because nORM builds mappings and materializers by
 reflection, the connection-string `AddNorm` overload is annotated
 `RequiresUnreferencedCode`/`RequiresDynamicCode`; see [AOT & trimming](docs/aot-trimming.md).
 
 ## Advanced Features
+
+### Fluent model configuration
+
+Override `OnModelCreating` on a derived context to configure entities with an EF Core-style
+fluent builder. Property-level verbs mirror EF Core and feed both the runtime model and the
+schema snapshot used by migrations:
+
+```csharp
+public sealed class AppDbContext : DbContext
+{
+    public AppDbContext(string cs, DatabaseProvider p) : base(cs, p) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Product>(e =>
+        {
+            e.Property(p => p.Name).IsRequired().HasMaxLength(200);
+            e.Property(p => p.Sku).HasColumnType("char(12)");          // explicit store type
+            e.Property(p => p.Price).HasPrecision(18, 2);
+            e.Property(p => p.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            e.Property(p => p.Status).HasDefaultValue(ProductStatus.Draft); // literal default
+            e.Property(p => p.Slug).HasComment("URL-safe product identifier");
+            e.Property(p => p.RowVersion).IsRowVersion();               // concurrency token
+            e.Property(p => p.Id).ValueGeneratedOnAdd();               // store-generated on insert
+        });
+    }
+}
+```
+
+| Verb | Effect |
+| --- | --- |
+| `IsRequired(bool = true)` | Marks the column `NOT NULL` (or nullable when `false`). |
+| `HasColumnType(string)` | Pins the exact provider store type, bypassing nORM's default CLR-to-store mapping. |
+| `HasDefaultValue(object)` | Emits a provider-formatted literal `DEFAULT` at snapshot time (value converters are applied). |
+| `HasDefaultValueSql(string)` / `HasDefaultValueSql(string, string)` | Emits a raw SQL `DEFAULT` expression (the two-arg overload supplies a provider-specific variant). |
+| `HasComment(string)` | Emits a native column comment per provider (SQL Server extended property, PostgreSQL/MySQL `COMMENT`, SQLite inline `/* */`). |
+| `IsRowVersion()` | Declares an 8-byte client-managed concurrency token included in `UPDATE`/`DELETE` predicates. |
+| `ValueGeneratedOnAdd()` / `ValueGeneratedNever()` / `ValueGeneratedOnAddOrUpdate()` | Declares whether the store generates the value on insert, never, or on insert and update. |
+
+Reusable, testable configuration classes are supported through
+`IEntityTypeConfiguration<TEntity>`, applied individually or by assembly scan:
+
+```csharp
+public sealed class ProductConfig : IEntityTypeConfiguration<Product>
+{
+    public void Configure(EntityTypeBuilder<Product> builder)
+    {
+        builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
+    }
+}
+
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.ApplyConfiguration(new ProductConfig());
+    // or discover every IEntityTypeConfiguration<T> in an assembly:
+    modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+}
+```
 
 ### Zero-Configuration Database Discovery
 
