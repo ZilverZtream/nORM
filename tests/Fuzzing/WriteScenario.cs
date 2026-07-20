@@ -27,9 +27,9 @@ namespace nORM.Tests.Fuzzing
         public string Describe() => string.Join(".", Ops.Select(o => o.Describe()));
     }
 
-    public enum WriteOpKind { Insert, Update, Delete, Save }
+    public enum WriteOpKind { Insert, Update, Delete, Save, BeginTx, Commit, Rollback }
 
-    /// <summary>One write operation. <see cref="Value"/> is unused for Delete/Save.</summary>
+    /// <summary>One write operation. <see cref="Value"/> is unused for Delete/Save/BeginTx/Commit/Rollback.</summary>
     public sealed record WriteOp
     {
         public required WriteOpKind Kind { get; init; }
@@ -40,6 +40,9 @@ namespace nORM.Tests.Fuzzing
         public static WriteOp Update(int id, int value) => new() { Kind = WriteOpKind.Update, Id = id, Value = value };
         public static WriteOp Delete(int id) => new() { Kind = WriteOpKind.Delete, Id = id };
         public static WriteOp Save() => new() { Kind = WriteOpKind.Save };
+        public static WriteOp BeginTx() => new() { Kind = WriteOpKind.BeginTx };
+        public static WriteOp Commit() => new() { Kind = WriteOpKind.Commit };
+        public static WriteOp Rollback() => new() { Kind = WriteOpKind.Rollback };
 
         public string Describe() => Kind switch
         {
@@ -47,6 +50,9 @@ namespace nORM.Tests.Fuzzing
             WriteOpKind.Update => $"Upd({Id}={Value})",
             WriteOpKind.Delete => $"Del({Id})",
             WriteOpKind.Save => "Save",
+            WriteOpKind.BeginTx => "BeginTx",
+            WriteOpKind.Commit => "Commit",
+            WriteOpKind.Rollback => "Rollback",
             _ => Kind.ToString(),
         };
     }

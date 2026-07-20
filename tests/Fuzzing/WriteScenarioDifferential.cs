@@ -41,9 +41,13 @@ namespace nORM.Tests.Fuzzing
             {
                 using var ctx = new DbContext(cn, new SqliteProvider(), new DbContextOptions(), ownsConnection: false);
                 var tracked = new Dictionary<int, CrudItem>();
+                DbContextTransaction? tx = null;
+                Dictionary<int, int>? snapshot = null;   // reference state captured at BeginTx
+                var lastWasTxClose = false;
 
                 foreach (var op in scenario.Ops)
                 {
+                    lastWasTxClose = op.Kind is WriteOpKind.Rollback or WriteOpKind.Commit;
                     switch (op.Kind)
                     {
                         case WriteOpKind.Insert:
@@ -64,9 +68,35 @@ namespace nORM.Tests.Fuzzing
                         case WriteOpKind.Save:
                             ctx.SaveChangesAsync().GetAwaiter().GetResult();
                             break;
+                        case WriteOpKind.BeginTx:
+                            tx = ctx.Database.BeginTransactionAsync().GetAwaiter().GetResult();
+                            snapshot = new Dictionary<int, int>(model);
+                            break;
+                        case WriteOpKind.Commit:
+                            ctx.SaveChangesAsync().GetAwaiter().GetResult();   // flush pending, then commit durably
+                            tx!.CommitAsync().GetAwaiter().GetResult();
+                            tx = null; snapshot = null;
+                            break;
+                        case WriteOpKind.Rollback:
+                            tx!.RollbackAsync().GetAwaiter().GetResult();
+                            model = snapshot!;                                  // reference reverts to the BeginTx state
+                            tx = null; snapshot = null;
+                            break;
                     }
                 }
-                ctx.SaveChangesAsync().GetAwaiter().GetResult();   // final flush of any pending ops
+
+                // Flush trailing pending changes — but NOT right after a transaction closed: under an explicit
+                // transaction nORM keeps the entities Added (the R2-1 semantics), so a post-commit or
+                // post-rollback flush would re-insert them (a UNIQUE violation for a client-assigned key). The
+                // transaction op already handled persistence; this model stops there. An unclosed transaction is
+                // rolled back and the reference reverted.
+                if (tx == null && !lastWasTxClose)
+                    ctx.SaveChangesAsync().GetAwaiter().GetResult();
+                else if (tx != null)
+                {
+                    tx.RollbackAsync().GetAwaiter().GetResult();
+                    if (snapshot != null) model = snapshot;
+                }
             }
             catch (NormUnsupportedFeatureException nufe)
             {
@@ -121,6 +151,8 @@ namespace nORM.Tests.Fuzzing
             if (kinds.Contains(WriteOpKind.Insert)) f.Add("insert");
             if (kinds.Contains(WriteOpKind.Update)) f.Add("update");
             if (kinds.Contains(WriteOpKind.Delete)) f.Add("delete");
+            if (kinds.Contains(WriteOpKind.Commit)) f.Add("tx-commit");
+            if (kinds.Contains(WriteOpKind.Rollback)) f.Add("tx-rollback");
             if (s.Ops.Count(o => o.Kind == WriteOpKind.Save) >= 2) f.Add("multi-save");
             // An Insert and a Delete of the same id with no Save between = a net no-op batch.
             for (var i = 0; i < s.Ops.Count; i++)
