@@ -1,6 +1,7 @@
 # Provider Packages
 
-nORM v1 uses one runtime package, `nORM`, with a deliberately mixed dependency
+nORM uses one runtime package, published on NuGet as `TheNorm` (the `nORM` id is
+taken; the API namespace is still `nORM`), with a deliberately mixed dependency
 model:
 
 | Provider | nORM type | Driver dependency | Why |
@@ -18,7 +19,7 @@ MySQL transitive dependencies for applications that do not use those providers.
 All applications install the runtime package:
 
 ```bash
-dotnet add package nORM
+dotnet add package TheNorm
 ```
 
 For PostgreSQL, also install Npgsql:
@@ -39,7 +40,7 @@ or:
 dotnet add package MySql.Data
 ```
 
-SQL Server and SQLite do not require additional driver packages beyond `nORM`.
+SQL Server and SQLite do not require additional driver packages beyond `TheNorm`.
 
 ## Missing Driver Behavior
 
