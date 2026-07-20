@@ -667,6 +667,7 @@ namespace nORM.Migration
 
         private static bool ColumnDefinitionChanged(ColumnSchema oldCol, ColumnSchema newCol) =>
             !string.Equals(oldCol.ClrType, newCol.ClrType, StringComparison.Ordinal)
+            || !string.Equals(oldCol.StoreType, newCol.StoreType, StringComparison.OrdinalIgnoreCase)
             || oldCol.MaxLength != newCol.MaxLength
             || oldCol.IsUnicode != newCol.IsUnicode
             || oldCol.IsFixedLength != newCol.IsFixedLength

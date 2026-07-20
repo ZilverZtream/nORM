@@ -92,6 +92,7 @@ namespace nORM.Migration
                     if (!oldColByName.TryGetValue(col.Name, out var oldCol))
                         diff.AddedColumns.Add((newTable, col));
                     else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(oldCol.StoreType, col.StoreType, StringComparison.OrdinalIgnoreCase)  // HasColumnType: an explicit store-type change must re-emit the column type (ALTER/MODIFY already renders GetSqlType, which honors StoreType)
                         || oldCol.MaxLength != col.MaxLength
                         || oldCol.IsUnicode != col.IsUnicode
                         || oldCol.IsFixedLength != col.IsFixedLength
