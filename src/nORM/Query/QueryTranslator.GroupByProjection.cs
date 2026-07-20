@@ -33,11 +33,11 @@ namespace nORM.Query
                 else if (resultSelector.Body is MethodCallExpression methodCall
                          && TranslateGroupAggregateMethod(methodCall, alias, groupBySql) is { } aggregateSql)
                 {
-                    var groupBuilder = PooledStringBuilder.Rent();
-                    groupBuilder.Append(groupBySql).Append(" AS GroupKey");
-                    selectItems.Add(groupBuilder.ToString());
-                    PooledStringBuilder.Return(groupBuilder);
-
+                    // A bare aggregate projection — GroupBy(k).Select(g => g.Count()) / g.Sum(x => x.V) —
+                    // returns the SCALAR aggregate per group, not a (key, value) pair. Emit only the aggregate
+                    // as the single output column; also emitting the group key first made the scalar
+                    // materializer read column 0 (the key) instead of the aggregate, silently returning the
+                    // group keys in place of the counts/sums.
                     var valueBuilder = PooledStringBuilder.Rent();
                     valueBuilder.Append(aggregateSql).Append(" AS ").Append(_provider.Escape("Value"));
                     selectItems.Add(valueBuilder.ToString());
