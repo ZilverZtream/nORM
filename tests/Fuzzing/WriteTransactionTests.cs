@@ -32,8 +32,17 @@ namespace nORM.Tests.Fuzzing
                 S(WriteOp.Insert(1, 10), WriteOp.Save(), WriteOp.BeginTx(), WriteOp.Update(1, 99), WriteOp.Save(), WriteOp.Commit()),
                 // Multiple ops in a committed tx (no mid-tx Save: Delete of a still-pending insert is a net no-op).
                 S(WriteOp.BeginTx(), WriteOp.Insert(1, 10), WriteOp.Insert(2, 20), WriteOp.Delete(1), WriteOp.Commit()),
-                // A rollback then a fresh committed transaction (the second must persist).
+                // A rolled-back tx-only insert.
                 S(WriteOp.BeginTx(), WriteOp.Insert(1, 10), WriteOp.Save(), WriteOp.Rollback()),
+                // Two saves inside one transaction with client-assigned keys: the second must not re-insert
+                // the first entity's still-Added row.
+                S(WriteOp.BeginTx(), WriteOp.Insert(1, 10), WriteOp.Save(), WriteOp.Insert(2, 20), WriteOp.Save(), WriteOp.Commit()),
+                // A mid-tx save followed by more ops, then commit — the trailing save must delete the removed
+                // row and skip re-inserting the surviving still-Added one.
+                S(WriteOp.BeginTx(), WriteOp.Insert(1, 10), WriteOp.Insert(2, 20), WriteOp.Save(), WriteOp.Delete(1), WriteOp.Commit()),
+                // Commit inside a tx, then keep saving outside it — the committed-but-still-Added entity must
+                // not be re-inserted alongside the new one.
+                S(WriteOp.BeginTx(), WriteOp.Insert(1, 10), WriteOp.Save(), WriteOp.Commit(), WriteOp.Insert(2, 20), WriteOp.Save()),
             };
             return cases.Select((c, i) => new object[] { i, c });
         }

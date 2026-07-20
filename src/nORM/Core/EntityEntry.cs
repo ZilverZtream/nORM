@@ -102,6 +102,16 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// True when this Added entity's INSERT has already executed inside the current uncommitted
+        /// caller-owned or enlisted transaction, so a subsequent <c>SaveChanges</c> in the same scope must
+        /// NOT re-insert it (a UNIQUE violation for a client-assigned key, a duplicate row otherwise). It is
+        /// the client-key counterpart of a stamped DB-generated key: set after a successful save that did not
+        /// accept changes, cleared when the entity is accepted or detached, and reset together with the
+        /// DB-generated keys at every rollback site (full, savepoint, ambient-abort). See DbContext.Transactions.
+        /// </summary>
+        internal bool InsertedInUncommittedTransaction { get; set; }
+
+        /// <summary>
         /// Assigns the raw state field with no transition side effects. Used by the change tracker and
         /// the save pipeline, which manage identity-map membership and dirty registration themselves.
         /// </summary>
@@ -1086,6 +1096,8 @@ namespace nORM.Core
             // re-severed on the next save, and a newly added child becomes the baseline.
             RecaptureLoadedCollectionNavSnapshots();
             _state = EntityState.Unchanged;
+            // The entity's row is now committed and the entry clean; the uncommitted-insert marker is spent.
+            InsertedInUncommittedTransaction = false;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.
             var tsCol = _mapping.TimestampColumn;
@@ -1122,6 +1134,7 @@ namespace nORM.Core
         internal void DetachEntity()
         {
             _state = EntityState.Detached;
+            InsertedInUncommittedTransaction = false;
             var entity = Entity;
             if (entity is INotifyPropertyChanged notify)
                 notify.PropertyChanged -= PropertyChangedHandler;

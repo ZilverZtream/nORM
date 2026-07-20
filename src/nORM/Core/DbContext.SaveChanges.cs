@@ -303,16 +303,24 @@ namespace nORM.Core
                     if (state is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                         EnsureWritableMapping(map, $"SaveChanges {state}");
 
-                    // Guard against re-inserting entities whose DB-generated key was already
-                    // assigned by a previous SaveChanges call (e.g. inside a committed external
-                    // transaction where AcceptChanges was not invoked). If the entity is in Added
-                    // state but its DB-generated key is already non-default, the INSERT already
-                    // committed; skip to avoid duplicate rows.
-                    if (state == EntityState.Added && map.KeyColumns.Any(k => k.IsDbGenerated))
+                    // Guard against re-inserting entities whose INSERT already ran in the current
+                    // uncommitted transaction (e.g. a second SaveChanges inside one caller-owned
+                    // transaction, where AcceptChanges is not invoked so the entities stay Added). For a
+                    // DB-generated key the stamped (non-default) key is the signal; for a client-assigned
+                    // key an explicit per-entry flag records it — without which the re-insert is a UNIQUE
+                    // violation no DB-generated-key check would have caught. Both are reset together at
+                    // every rollback site, so a rolled-back insert is correctly re-inserted, not dropped.
+                    if (state == EntityState.Added)
                     {
-                        entries = entries.Where(e => e.Entity is not null && IsDefaultDbGeneratedKey(e.Entity, map)).ToList();
-                        if (entries.Count == 0)
-                            continue;
+                        var hasDbGeneratedKey = map.KeyColumns.Any(k => k.IsDbGenerated);
+                        if (hasDbGeneratedKey || entries.Any(e => e.InsertedInUncommittedTransaction))
+                        {
+                            entries = entries.Where(e => e.Entity is not null
+                                && !e.InsertedInUncommittedTransaction
+                                && (!hasDbGeneratedKey || IsDefaultDbGeneratedKey(e.Entity, map))).ToList();
+                            if (entries.Count == 0)
+                                continue;
+                        }
                     }
 
                     // A self-referential table (Category→Parent, Employee→Manager) is a single
@@ -522,6 +530,17 @@ namespace nORM.Core
 
                 if (deletedInstances != null)
                     RemoveDeletedInstancesFromTrackedNavigations(deletedInstances);
+            }
+            else if (committedSuccessfully)
+            {
+                // Caller-owned or enlisted scope: durability is the caller's, so the entities stay Added
+                // (a later rollback must re-insert them). Record that their INSERTs have now run in the
+                // current uncommitted transaction so a subsequent SaveChanges in the same scope does not
+                // re-insert a still-Added row. The flag is reset together with the DB-generated keys at
+                // every rollback site and cleared when the entity is finally accepted.
+                foreach (var entry in changedEntries)
+                    if (entry.State == EntityState.Added)
+                        entry.InsertedInUncommittedTransaction = true;
             }
 
             // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch

@@ -461,9 +461,13 @@ namespace nORM.Core
             {
                 Interlocked.Exchange(ref _currentTransaction, null);
                 Volatile.Write(ref _currentContextTransaction, null);
-                // Key snapshots are scoped to the transaction that owned them.
+                // Key snapshots are scoped to the transaction that owned them. The inserted-flag snapshots
+                // are discarded too; the flags themselves persist (a committed caller-owned insert stays
+                // Added and must not be re-inserted by a later save) until the entity is accepted.
                 _savepointKeySnapshots?.Clear();
                 _transactionKeySnapshot = null;
+                _savepointInsertedSnapshots?.Clear();
+                _transactionInsertedSnapshot = null;
             }
         }
 

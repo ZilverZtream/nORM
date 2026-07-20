@@ -59,8 +59,19 @@ namespace nORM.Core
         // silent-drop class as the savepoint fix, via a different rollback path).
         private Dictionary<object, object?[]>? _transactionKeySnapshot;
 
+        // Client-key counterpart of the key snapshots: the set of entities whose INSERT had already run
+        // (EntityEntry.InsertedInUncommittedTransaction == true) at snapshot time. Restored alongside the
+        // keys so a rollback leaves entities inserted AFTER the snapshot re-insertable and those inserted
+        // before it untouched — a client-assigned key carries no key value to signal this on its own.
+        private HashSet<object>? _transactionInsertedSnapshot;
+        private Dictionary<string, HashSet<object>>? _savepointInsertedSnapshots;
+        private HashSet<object>? _ambientInsertedSnapshot;
+
         internal void CaptureTransactionKeySnapshot()
-            => _transactionKeySnapshot = SnapshotAddedGeneratedKeys();
+        {
+            _transactionKeySnapshot = SnapshotAddedGeneratedKeys();
+            _transactionInsertedSnapshot = SnapshotInsertedEntities();
+        }
 
         /// <summary>
         /// Resets, after a full transaction rollback, the DB-generated keys stamped during the
@@ -72,6 +83,7 @@ namespace nORM.Core
         {
             if (_transactionKeySnapshot != null)
                 RestoreRolledBackGeneratedKeys(_transactionKeySnapshot);
+            RestoreInsertedFlags(_transactionInsertedSnapshot);
         }
 
         // The ambient System.Transactions.Transaction nORM enlisted in, plus the Added-entity key
@@ -92,6 +104,7 @@ namespace nORM.Core
                 return; // already registered for this scope (a later SaveChanges within it)
             _registeredAmbientTransaction = ambient;
             _ambientKeySnapshot = SnapshotAddedGeneratedKeys();
+            _ambientInsertedSnapshot = SnapshotInsertedEntities();
             ambient.TransactionCompleted += OnAmbientTransactionCompleted;
         }
 
@@ -99,10 +112,11 @@ namespace nORM.Core
         {
             try
             {
-                if (e.Transaction?.TransactionInformation.Status == System.Transactions.TransactionStatus.Aborted
-                    && _ambientKeySnapshot != null)
+                if (e.Transaction?.TransactionInformation.Status == System.Transactions.TransactionStatus.Aborted)
                 {
-                    RestoreRolledBackGeneratedKeys(_ambientKeySnapshot);
+                    if (_ambientKeySnapshot != null)
+                        RestoreRolledBackGeneratedKeys(_ambientKeySnapshot);
+                    RestoreInsertedFlags(_ambientInsertedSnapshot);
                 }
             }
             finally
@@ -111,6 +125,7 @@ namespace nORM.Core
                 {
                     _registeredAmbientTransaction = null;
                     _ambientKeySnapshot = null;
+                    _ambientInsertedSnapshot = null;
                 }
             }
         }
@@ -127,6 +142,8 @@ namespace nORM.Core
             // semantics of re-declaring a savepoint).
             (_savepointKeySnapshots ??= new Dictionary<string, Dictionary<object, object?[]>>(StringComparer.Ordinal))[name]
                 = SnapshotAddedGeneratedKeys();
+            (_savepointInsertedSnapshots ??= new Dictionary<string, HashSet<object>>(StringComparer.Ordinal))[name]
+                = SnapshotInsertedEntities();
         }
 
         /// <summary>
@@ -158,6 +175,11 @@ namespace nORM.Core
             // silently dropped by the "skip already-inserted" guard.
             if (_savepointKeySnapshots != null && _savepointKeySnapshots.TryGetValue(name, out var snapshot))
                 RestoreRolledBackGeneratedKeys(snapshot);
+            // Mirror the key reset for client-assigned keys: an entity inserted after the savepoint has
+            // lost its row, so clearing its flag makes the next SaveChanges re-insert it rather than
+            // silently skip it; one inserted before the savepoint keeps its row and its flag.
+            if (_savepointInsertedSnapshots != null && _savepointInsertedSnapshots.TryGetValue(name, out var insSnapshot))
+                RestoreInsertedFlags(insSnapshot);
         }
 
         /// <summary>
@@ -189,12 +211,46 @@ namespace nORM.Core
             // The released savepoint is no longer a rollback target, so its key snapshot is obsolete; the rows
             // inserted since it are KEPT (unlike a rollback), so their stamped keys stay valid as-is.
             _savepointKeySnapshots?.Remove(name);
+            _savepointInsertedSnapshots?.Remove(name);
         }
 
         /// <summary>
         /// Captures the current DB-generated key values of every Added entity, keyed by entity
         /// reference, so a subsequent rollback can tell which keys were stamped afterwards.
         /// </summary>
+        /// <summary>
+        /// Captures the set of Added entities whose INSERT has already run in the current uncommitted
+        /// transaction (<see cref="EntityEntry.InsertedInUncommittedTransaction"/>), keyed by reference, so a
+        /// later rollback can tell which entities were inserted before the snapshot from those inserted after.
+        /// The client-key counterpart of <see cref="SnapshotAddedGeneratedKeys"/>.
+        /// </summary>
+        private HashSet<object> SnapshotInsertedEntities()
+        {
+            var snapshot = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+                if (entry.State == EntityState.Added && entry.InsertedInUncommittedTransaction && entry.Entity is { } e)
+                    snapshot.Add(e);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// After a rollback that undid inserts, restores the "already inserted" flag on Added entities to the
+        /// supplied snapshot: an entity present in it kept its row through the rollback and stays flagged
+        /// (skipped by the next save); one absent from it was inserted afterwards, its row is gone, so the
+        /// flag is cleared and the next SaveChanges re-inserts it instead of silently dropping it. A null
+        /// snapshot (a rollback with no captured state) clears every flag — a full rollback discards all
+        /// uncommitted inserts, so every one becomes re-insertable.
+        /// </summary>
+        private void RestoreInsertedFlags(HashSet<object>? snapshot)
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State != EntityState.Added || entry.Entity is not { } e)
+                    continue;
+                entry.InsertedInUncommittedTransaction = snapshot != null && snapshot.Contains(e);
+            }
+        }
+
         private Dictionary<object, object?[]> SnapshotAddedGeneratedKeys()
         {
             var snapshot = new Dictionary<object, object?[]>(ReferenceEqualityComparer.Instance);
