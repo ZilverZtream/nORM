@@ -202,6 +202,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasColumnName(System.
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasColumnType(System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter):nORM.Configuration.EntityTypeBuilder{`0}
+M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasDefaultValue(System.Object):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasDefaultValueSql(System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasDefaultValueSql(System.String,System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
@@ -1208,6 +1209,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.ColumnTypes:System.Collections.Gen
 P:nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.ComputedColumnConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.Converters:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Object}
 P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.ExpressionIndexes:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ExpressionIndexConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.FixedLengthSettings:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}

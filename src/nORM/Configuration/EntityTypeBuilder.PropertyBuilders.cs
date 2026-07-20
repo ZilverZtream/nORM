@@ -70,6 +70,22 @@ namespace nORM.Configuration
             }
 
             /// <summary>
+            /// Configures a literal (CLR-value) column default (EF Core's <c>HasDefaultValue</c>). The value is
+            /// formatted to a provider-correct SQL literal when the migration snapshot is built — a bool default
+            /// emits <c>0</c>/<c>1</c> on SQLite/SQL Server/MySQL and <c>FALSE</c>/<c>TRUE</c> on PostgreSQL, and
+            /// string/date/Guid values are quoted. Like <see cref="HasDefaultValueSql(string)"/> this affects
+            /// migration DDL only; it does not mark the property database-generated or omit it from INSERT.
+            /// Mutually exclusive with <see cref="HasDefaultValueSql(string)"/> (the last one called wins).
+            /// </summary>
+            /// <param name="value">The literal default value, or <see langword="null"/> for an explicit <c>DEFAULT NULL</c>.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            public PropertyBuilder HasDefaultValue(object? value)
+            {
+                _parent._config.SetDefaultValue(_property, value);
+                return this;
+            }
+
+            /// <summary>
             /// Configures provider identity seed/increment metadata for migration
             /// generation. Providers without matching identity DDL may ignore or reject
             /// the metadata during migration SQL generation.

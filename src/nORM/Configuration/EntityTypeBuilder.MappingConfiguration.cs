@@ -22,6 +22,7 @@ namespace nORM.Configuration
             public string? PrimaryKeyConstraintName { get; private set; }
             public Dictionary<PropertyInfo, string> ColumnNames { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValues { get; } = new();
+            public Dictionary<PropertyInfo, object?> DefaultValueLiteralValues { get; } = new();
             public Dictionary<PropertyInfo, string> DefaultValueConstraintNameValues { get; } = new();
             public Dictionary<PropertyInfo, IdentityOptionsConfiguration> IdentityOptionValues { get; } = new();
             public Dictionary<PropertyInfo, int> MaxLengthValues { get; } = new();
@@ -49,6 +50,7 @@ namespace nORM.Configuration
             bool IEntityTypeConfiguration.IsKeyless => IsKeyless;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnNames => ColumnNames;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueSql => DefaultValues;
+            IReadOnlyDictionary<PropertyInfo, object?> IEntityTypeConfiguration.DefaultValueLiterals => DefaultValueLiteralValues;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.DefaultValueConstraintNames => DefaultValueConstraintNameValues;
             IReadOnlyDictionary<PropertyInfo, IdentityOptionsConfiguration> IEntityTypeConfiguration.IdentityOptions => IdentityOptionValues;
             IReadOnlyDictionary<PropertyInfo, int> IEntityTypeConfiguration.MaxLengths => MaxLengthValues;
@@ -166,10 +168,27 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(sql))
                     throw new ArgumentException("Default SQL cannot be null or whitespace.", nameof(sql));
                 DefaultValues[prop] = sql.Trim();
+                // EF Core semantics: HasDefaultValueSql and HasDefaultValue are mutually exclusive
+                // (the last one called wins). Clear any prior literal default for this property.
+                DefaultValueLiteralValues.Remove(prop);
                 if (string.IsNullOrWhiteSpace(constraintName))
                     DefaultValueConstraintNameValues.Remove(prop);
                 else
                     DefaultValueConstraintNameValues[prop] = NormalizeConstraintName(constraintName)!;
+            }
+
+            /// <summary>
+            /// Sets a literal (CLR-value) column default (EF Core's HasDefaultValue). The value is formatted to a
+            /// provider-correct SQL literal when the migration snapshot is built, so bool/date/string defaults are
+            /// emitted with the right syntax per provider. Mutually exclusive with <see cref="SetDefaultValueSql(PropertyInfo, string)"/>.
+            /// </summary>
+            public void SetDefaultValue(PropertyInfo prop, object? value)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                DefaultValueLiteralValues[prop] = value;
+                // Last-one-wins with the SQL-expression default (see SetDefaultValueSql).
+                DefaultValues.Remove(prop);
+                DefaultValueConstraintNameValues.Remove(prop);
             }
 
             /// <summary>

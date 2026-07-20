@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using nORM.Configuration;
 using nORM.Core;
 using nORM.Mapping;
+using nORM.Providers;
 using RenameColumnAttr = nORM.Mapping.RenameColumnAttribute;
 
 namespace nORM.Migration
@@ -259,13 +261,13 @@ namespace nORM.Migration
             // unflagged. The Assembly overload cannot see context options and never flags.
             var markTemporal = ctx.Options.IsTemporalVersioningEnabled
                 && ctx.Options.TemporalStorageMode != TemporalStorageMode.ProviderNative;
-            return BuildFromMappings(ctx.GetAllMappings(), markTemporal);
+            return BuildFromMappings(ctx.GetAllMappings(), markTemporal, ctx.Provider);
         }
 
         /// <summary>
         /// Builds a <see cref="SchemaSnapshot"/> from a set of resolved <see cref="TableMapping"/> instances.
         /// </summary>
-        private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings, bool markTemporal = false)
+        private static SchemaSnapshot BuildFromMappings(IEnumerable<TableMapping> mappings, bool markTemporal = false, DatabaseProvider? provider = null)
         {
             ArgumentNullException.ThrowIfNull(mappings);
 
@@ -329,9 +331,7 @@ namespace nORM.Migration
                         ComputedColumnSql = computedColumn?.Sql
                             ?? (dbGenerated == DatabaseGeneratedOption.Computed ? string.Empty : null),
                         IsStoredComputedColumn = computedColumn?.Stored == true,
-                        DefaultValue = columnConfiguration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
-                            ? defaultValue
-                            : null,
+                        DefaultValue = ResolveDefaultValue(columnConfiguration, col.Prop, provider),
                         DefaultConstraintName = columnConfiguration?.DefaultValueConstraintNames.TryGetValue(col.Prop, out var defaultConstraintName) == true
                             ? defaultConstraintName
                             : null,
@@ -415,7 +415,8 @@ namespace nORM.Migration
                             owned.TableName,
                             owned.Configuration,
                             ownedIndexAttributesByProperty,
-                            ownedIndexColumnCounts));
+                            ownedIndexColumnCounts,
+                            provider));
                     }
 
                     AddConfiguredTableMetadata(ownedTable, owned.Configuration);
@@ -526,7 +527,8 @@ namespace nORM.Migration
             string tableName,
             IEntityTypeConfiguration? configuration,
             IReadOnlyDictionary<PropertyInfo, IndexAttribute[]> indexAttributesByProperty,
-            IReadOnlyDictionary<string, int> indexColumnCounts)
+            IReadOnlyDictionary<string, int> indexColumnCounts,
+            DatabaseProvider? provider)
         {
             var clrType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
             var isNullable = col.IsNullable;
@@ -560,9 +562,7 @@ namespace nORM.Migration
                 ComputedColumnSql = computedColumn?.Sql
                     ?? (dbGenerated == DatabaseGeneratedOption.Computed ? string.Empty : null),
                 IsStoredComputedColumn = computedColumn?.Stored == true,
-                DefaultValue = configuration?.DefaultValueSql.TryGetValue(col.Prop, out var defaultValue) == true
-                    ? defaultValue
-                    : null,
+                DefaultValue = ResolveDefaultValue(configuration, col.Prop, provider),
                 DefaultConstraintName = configuration?.DefaultValueConstraintNames.TryGetValue(col.Prop, out var defaultConstraintName) == true
                     ? defaultConstraintName
                     : null,
@@ -570,6 +570,54 @@ namespace nORM.Migration
             };
             ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
             return column;
+        }
+
+        /// <summary>
+        /// Resolves a column's DDL default. A raw SQL default (<c>HasDefaultValueSql</c>) is used verbatim; a
+        /// literal default (<c>HasDefaultValue</c>) is formatted to a provider-correct SQL literal. The two are
+        /// mutually exclusive per property (enforced at configuration time), so at most one is present here.
+        /// </summary>
+        private static string? ResolveDefaultValue(IEntityTypeConfiguration? configuration, PropertyInfo prop, DatabaseProvider? provider)
+        {
+            if (configuration is null)
+                return null;
+            if (configuration.DefaultValueSql.TryGetValue(prop, out var sql))
+                return sql;
+            if (configuration.DefaultValueLiterals.TryGetValue(prop, out var literal))
+                return FormatDefaultLiteral(literal, provider);
+            return null;
+        }
+
+        /// <summary>
+        /// Formats a literal CLR value as a SQL DEFAULT expression. Bool uses the provider's boolean literals
+        /// (so PostgreSQL emits <c>TRUE</c>/<c>FALSE</c> while others emit <c>1</c>/<c>0</c>); numbers are emitted
+        /// invariantly; strings, chars, Guids, and date/time values are single-quoted. All formatting is culture
+        /// invariant so generated DDL is stable across machines.
+        /// </summary>
+        private static string FormatDefaultLiteral(object? value, DatabaseProvider? provider)
+        {
+            if (value is Enum e)
+                value = Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture);
+            return value switch
+            {
+                null => "NULL",
+                bool b => b ? (provider?.BooleanTrueLiteral ?? "1") : (provider?.BooleanFalseLiteral ?? "0"),
+                string s => $"'{s.Replace("'", "''")}'",
+                char c => $"'{(c == '\'' ? "''" : c.ToString())}'",
+                int or long or short or byte or sbyte or uint or ulong or ushort => value.ToString()!,
+                double d => d.ToString(CultureInfo.InvariantCulture),
+                float f => f.ToString(CultureInfo.InvariantCulture),
+                decimal m => m.ToString(CultureInfo.InvariantCulture),
+                DateTime dt => $"'{dt.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture)}'",
+                DateTimeOffset dto => $"'{dto.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture)}'",
+                DateOnly dOnly => $"'{dOnly.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}'",
+                TimeOnly tOnly => $"'{tOnly.ToString("HH:mm:ss.fffffff", CultureInfo.InvariantCulture)}'",
+                TimeSpan ts => $"'{ts.ToString("c", CultureInfo.InvariantCulture)}'",
+                Guid g => $"'{g.ToString("D", CultureInfo.InvariantCulture)}'",
+                _ => throw new NotSupportedException(
+                    $"HasDefaultValue does not support a literal of type '{value.GetType().FullName}'. " +
+                    "Use HasDefaultValueSql to supply the default as a provider SQL expression."),
+            };
         }
 
         private static string GetPrimaryKeyConstraintName(IEntityTypeConfiguration? configuration, string tableName)

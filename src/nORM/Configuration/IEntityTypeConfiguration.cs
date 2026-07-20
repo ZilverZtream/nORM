@@ -59,6 +59,13 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> DefaultValueSql { get; }
 
         /// <summary>
+        /// Gets literal (CLR-value) column defaults configured via <c>HasDefaultValue</c>. Each value is
+        /// formatted to a provider-correct SQL literal when the migration snapshot is built. Mutually
+        /// exclusive with <see cref="DefaultValueSql"/> for a given property (last configured wins).
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, object?> DefaultValueLiterals { get; }
+
+        /// <summary>
         /// Gets optional provider default-constraint names configured for properties.
         /// These names are provider DDL metadata; providers without named defaults may ignore them.
         /// </summary>
