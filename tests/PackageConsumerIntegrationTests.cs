@@ -49,7 +49,17 @@ public class PackageConsumerIntegrationTests
             Assert.Contains("<license type=\"expression\">MIT</license>", nuspec, StringComparison.Ordinal);
             Assert.Contains("<readme>README.md</readme>", nuspec, StringComparison.Ordinal);
             Assert.Contains("<repository type=\"git\" url=\"https://github.com/zilverztream/nORM\"", nuspec, StringComparison.Ordinal);
-            Assert.Contains("<tags>ORM Database LINQ Performance Entity Framework Dapper SQL SQLite PostgreSQL MySQL</tags>", nuspec, StringComparison.Ordinal);
+            // Tags feed NuGet discoverability. Assert the important tags are present without pinning
+            // the exact set or order, so adding a tag (e.g. brand or provider-mobility terms) does not
+            // silently break the metadata contract the way an exact-string match does.
+            var tagsStart = nuspec.IndexOf("<tags>", StringComparison.Ordinal);
+            var tagsEnd = nuspec.IndexOf("</tags>", StringComparison.Ordinal);
+            Assert.True(tagsStart >= 0 && tagsEnd > tagsStart, "TheNorm.nuspec is missing a <tags> element");
+            var tags = nuspec
+                .Substring(tagsStart + "<tags>".Length, tagsEnd - tagsStart - "<tags>".Length)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var required in new[] { "TheNorm", "ORM", "Database", "LINQ", "SQLite", "PostgreSQL", "MySQL", "provider-mobile" })
+                Assert.Contains(required, tags);
             Assert.Contains("<dependency id=\"Microsoft.Data.SqlClient\"", nuspec, StringComparison.Ordinal);
             Assert.Contains("<dependency id=\"Microsoft.Data.Sqlite\"", nuspec, StringComparison.Ordinal);
             Assert.DoesNotContain("<dependency id=\"Npgsql\"", nuspec, StringComparison.Ordinal);
