@@ -18,6 +18,7 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32,System.Int32)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRequired(System.Boolean)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
@@ -514,6 +515,46 @@ items:
   overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate*
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate()
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate()
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+  id: IsRowVersion
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: IsRowVersion()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: IsRowVersion
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 152
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures the property as the entity's row-version / optimistic-concurrency token (EF Core's
+
+    <code>IsRowVersion</code>) — the fluent equivalent of <code>[Timestamp]</code>. nORM manages the token and
+
+    adds it to the UPDATE concurrency check, so a stale write is rejected instead of silently
+
+    overwriting a concurrent change.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder IsRowVersion()
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function IsRowVersion() As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion()
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   id: IsUnicode(System.Boolean)
@@ -532,7 +573,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 151
+    startLine: 164
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -574,7 +615,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 163
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -616,7 +657,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 176
+    startLine: 189
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -661,7 +702,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 190
+    startLine: 203
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -709,7 +750,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCollation
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 204
+    startLine: 217
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -756,7 +797,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasComputedColumnSql
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 219
+    startLine: 232
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -806,7 +847,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 231
+    startLine: 244
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -847,7 +888,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 241
+    startLine: 254
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2043,6 +2084,14 @@ references:
   fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.ValueGeneratedOnAddOrUpdate
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.ValueGeneratedOnAddOrUpdate
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRowVersion
+  name: IsRowVersion
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_

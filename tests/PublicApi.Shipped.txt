@@ -209,6 +209,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasPrecision(System.I
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasPrecision(System.Int32,System.Int32):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsFixedLength(System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsRequired(System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
+M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsRowVersion():nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.IsUnicode(System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.ValueGeneratedNever():nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.ValueGeneratedOnAdd():nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
@@ -1220,6 +1221,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.Precisions:System.Collections.Gene
 P:nORM.Configuration.IEntityTypeConfiguration.PrimaryKeyConstraintName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.Relationships:System.Collections.Generic.IReadOnlyList{nORM.Configuration.RelationshipConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.RequiredSettings:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Boolean}
+P:nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings:System.Collections.Generic.IReadOnlyCollection{System.Reflection.PropertyInfo}
 P:nORM.Configuration.IEntityTypeConfiguration.SchemaName:System.String
 P:nORM.Configuration.IEntityTypeConfiguration.ShadowProperties:System.Collections.Generic.IReadOnlyDictionary{System.String,nORM.Configuration.ShadowPropertyConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.TableName:System.String

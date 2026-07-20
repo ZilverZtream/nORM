@@ -27,6 +27,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, int> MaxLengthValues { get; } = new();
             public Dictionary<PropertyInfo, bool> RequiredValues { get; } = new();
             public Dictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> ValueGeneratedValues { get; } = new();
+            public HashSet<PropertyInfo> RowVersionValues { get; } = new();
             public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
             public Dictionary<PropertyInfo, bool> FixedLengthValues { get; } = new();
             public Dictionary<PropertyInfo, PrecisionConfiguration> PrecisionValues { get; } = new();
@@ -52,6 +53,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, int> IEntityTypeConfiguration.MaxLengths => MaxLengthValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.RequiredSettings => RequiredValues;
             IReadOnlyDictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> IEntityTypeConfiguration.ValueGeneratedSettings => ValueGeneratedValues;
+            IReadOnlyCollection<PropertyInfo> IEntityTypeConfiguration.RowVersionSettings => RowVersionValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.FixedLengthSettings => FixedLengthValues;
             IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> IEntityTypeConfiguration.Precisions => PrecisionValues;
@@ -214,6 +216,17 @@ namespace nORM.Configuration
             {
                 ArgumentNullException.ThrowIfNull(prop);
                 ValueGeneratedValues[prop] = option;
+            }
+
+            /// <summary>
+            /// Marks a property as the entity's row-version / optimistic-concurrency token (EF Core's
+            /// IsRowVersion) — the fluent equivalent of [Timestamp]. nORM manages the token and adds it to the
+            /// UPDATE concurrency check.
+            /// </summary>
+            public void SetRowVersion(PropertyInfo prop)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                RowVersionValues.Add(prop);
             }
 
             /// <summary>

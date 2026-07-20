@@ -87,6 +87,12 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> ValueGeneratedSettings { get; }
 
         /// <summary>
+        /// Gets the properties marked as the entity's row-version / optimistic-concurrency token via the
+        /// fluent API (IsRowVersion), equivalent to the <c>[Timestamp]</c> attribute.
+        /// </summary>
+        IReadOnlyCollection<PropertyInfo> RowVersionSettings { get; }
+
+        /// <summary>
         /// Gets Unicode text metadata configured for string properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, bool> UnicodeSettings { get; }

@@ -83,7 +83,7 @@ namespace nORM.Mapping
             EscCol = IdentifierEscaping.EscapeSingle(p, colName);
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == info.Property) ?? false) || info.IsKey;
-            IsTimestamp = info.IsTimestamp;
+            IsTimestamp = info.IsTimestamp || (fluentConfig?.RowVersionSettings.Contains(info.Property) ?? false);
             IsDbGenerated = ResolveIsDbGenerated(fluentConfig, info.Property, info.IsDbGenerated);
             IsNullable = prefix != null || DetermineIsNullable(info.Property);
             ForeignKeyPrincipalTypeName = info.ForeignKeyName;
@@ -138,7 +138,7 @@ namespace nORM.Mapping
             EscCol = IdentifierEscaping.EscapeSingle(p, colName);
 
             IsKey = (fluentConfig?.KeyProperties.Any(p => p == pi) ?? false) || pi.GetCustomAttribute<KeyAttribute>() != null;
-            IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null;
+            IsTimestamp = pi.GetCustomAttribute<TimestampAttribute>() != null || (fluentConfig?.RowVersionSettings.Contains(pi) ?? false);
             IsDbGenerated = ResolveIsDbGenerated(fluentConfig, pi,
                 pi.GetCustomAttribute<DatabaseGeneratedAttribute>()?.DatabaseGeneratedOption is DatabaseGeneratedOption.Identity or DatabaseGeneratedOption.Computed);
             IsNullable = prefix != null || DetermineIsNullable(pi);

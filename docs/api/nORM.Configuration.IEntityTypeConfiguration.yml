@@ -26,6 +26,7 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.PrimaryKeyConstraintName
   - nORM.Configuration.IEntityTypeConfiguration.Relationships
   - nORM.Configuration.IEntityTypeConfiguration.RequiredSettings
+  - nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings
   - nORM.Configuration.IEntityTypeConfiguration.SchemaName
   - nORM.Configuration.IEntityTypeConfiguration.ShadowProperties
   - nORM.Configuration.IEntityTypeConfiguration.TableName
@@ -486,6 +487,40 @@ items:
       type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption}
     content.vb: ReadOnly Property ValueGeneratedSettings As IReadOnlyDictionary(Of PropertyInfo, DatabaseGeneratedOption)
   overload: nORM.Configuration.IEntityTypeConfiguration.ValueGeneratedSettings*
+- uid: nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings
+  id: RowVersionSettings
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: RowVersionSettings
+  nameWithType: IEntityTypeConfiguration.RowVersionSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: RowVersionSettings
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 92
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets the properties marked as the entity's row-version / optimistic-concurrency token via the
+
+    fluent API (IsRowVersion), equivalent to the <code>[Timestamp]</code> attribute.
+  example: []
+  syntax:
+    content: IReadOnlyCollection<PropertyInfo> RowVersionSettings { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyCollection{System.Reflection.PropertyInfo}
+    content.vb: ReadOnly Property RowVersionSettings As IReadOnlyCollection(Of PropertyInfo)
+  overload: nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings*
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   id: UnicodeSettings
@@ -504,7 +539,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UnicodeSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 91
+    startLine: 97
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -535,7 +570,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FixedLengthSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 96
+    startLine: 102
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -566,7 +601,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precisions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 101
+    startLine: 107
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -597,7 +632,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 107
+    startLine: 113
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -631,7 +666,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 112
+    startLine: 118
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -662,7 +697,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 117
+    startLine: 123
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -693,7 +728,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 122
+    startLine: 128
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -724,7 +759,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 127
+    startLine: 133
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -755,7 +790,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 132
+    startLine: 138
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -786,7 +821,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 137
+    startLine: 143
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -817,7 +852,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 142
+    startLine: 148
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -848,7 +883,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converters
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 145
+    startLine: 151
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -879,7 +914,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 151
+    startLine: 157
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -913,7 +948,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyRelationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 156
+    startLine: 162
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2132,6 +2167,75 @@ references:
     name: DatabaseGeneratedOption
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.componentmodel.dataannotations.schema.databasegeneratedoption
+  - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_RowVersionSettings
+  name: RowVersionSettings
+  nameWithType: IEntityTypeConfiguration.RowVersionSettings
+  fullName: nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings
+- uid: System.Collections.Generic.IReadOnlyCollection{System.Reflection.PropertyInfo}
+  commentId: T:System.Collections.Generic.IReadOnlyCollection{System.Reflection.PropertyInfo}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyCollection`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1
+  name: IReadOnlyCollection<PropertyInfo>
+  nameWithType: IReadOnlyCollection<PropertyInfo>
+  fullName: System.Collections.Generic.IReadOnlyCollection<System.Reflection.PropertyInfo>
+  nameWithType.vb: IReadOnlyCollection(Of PropertyInfo)
+  fullName.vb: System.Collections.Generic.IReadOnlyCollection(Of System.Reflection.PropertyInfo)
+  name.vb: IReadOnlyCollection(Of PropertyInfo)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyCollection`1
+    name: IReadOnlyCollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyCollection`1
+    name: IReadOnlyCollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: )
+- uid: System.Collections.Generic.IReadOnlyCollection`1
+  commentId: T:System.Collections.Generic.IReadOnlyCollection`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1
+  name: IReadOnlyCollection<T>
+  nameWithType: IReadOnlyCollection<T>
+  fullName: System.Collections.Generic.IReadOnlyCollection<T>
+  nameWithType.vb: IReadOnlyCollection(Of T)
+  fullName.vb: System.Collections.Generic.IReadOnlyCollection(Of T)
+  name.vb: IReadOnlyCollection(Of T)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyCollection`1
+    name: IReadOnlyCollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyCollection`1
+    name: IReadOnlyCollection
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
   - name: )
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings

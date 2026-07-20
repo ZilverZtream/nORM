@@ -144,6 +144,19 @@ namespace nORM.Configuration
             }
 
             /// <summary>
+            /// Configures the property as the entity's row-version / optimistic-concurrency token (EF Core's
+            /// <c>IsRowVersion</c>) — the fluent equivalent of <c>[Timestamp]</c>. nORM manages the token and
+            /// adds it to the UPDATE concurrency check, so a stale write is rejected instead of silently
+            /// overwriting a concurrent change.
+            /// </summary>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            public PropertyBuilder IsRowVersion()
+            {
+                _parent._config.SetRowVersion(_property);
+                return this;
+            }
+
+            /// <summary>
             /// Configures whether this string property uses Unicode-capable storage.
             /// </summary>
             /// <param name="unicode">True for Unicode text storage; false for non-Unicode text storage.</param>

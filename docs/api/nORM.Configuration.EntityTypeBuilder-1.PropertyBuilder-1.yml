@@ -20,7 +20,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PropertyBuilder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 248
+    startLine: 261
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -47,6 +47,7 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAdd
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedNever
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsFixedLength(System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasPrecision(System.Int32)
@@ -88,7 +89,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 259
+    startLine: 272
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -468,6 +469,27 @@ references:
   - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.ValueGeneratedOnAddOrUpdate
     name: ValueGeneratedOnAddOrUpdate
     href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_ValueGeneratedOnAddOrUpdate
+  - name: (
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRowVersion
+  name: IsRowVersion()
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion()
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion()
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion()
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion()
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+    name: IsRowVersion
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRowVersion
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion
+    name: IsRowVersion
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsRowVersion
   - name: (
   - name: )
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
