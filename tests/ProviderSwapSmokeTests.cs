@@ -73,13 +73,21 @@ public class ProviderSwapSmokeTests
                 TenantColumnName = "TenantId"
             };
 
+            // Tenant-2 ("foreign") fixture data is seeded through an unscoped admin context (no tenant
+            // provider): under fail-closed tenant validation a tenant-1 context cannot insert another
+            // tenant's rows. These exist only to prove tenant-1 isolation below.
+            await using (var admin = new DbContext(cn!, provider!, new DbContextOptions(), ownsConnection: false))
+            {
+                admin.Add(new PsCustomer { Id = 2, TenantId = 2, Name = "Other", Email = "ops@other.test", IsActive = true });
+                admin.Add(new PsOrder { Id = 20, TenantId = 2, CustomerId = 2, Total = 999m, Label = "foreign" });
+                await admin.SaveChangesAsync();
+            }
+
             await using (var ctx = new DbContext(cn!, provider!, tenantOptions, ownsConnection: false))
             {
                 ctx.Add(new PsCustomer { Id = 1, TenantId = 1, Name = "Acme", Email = "ops@acme.test", IsActive = true });
-                ctx.Add(new PsCustomer { Id = 2, TenantId = 2, Name = "Other", Email = "ops@other.test", IsActive = true });
                 ctx.Add(new PsOrder { Id = 10, TenantId = 1, CustomerId = 1, Total = 25.50m, Label = "seed-a" });
                 ctx.Add(new PsOrder { Id = 11, TenantId = 1, CustomerId = 1, Total = 75.25m, Label = "seed-b" });
-                ctx.Add(new PsOrder { Id = 20, TenantId = 2, CustomerId = 2, Total = 999m, Label = "foreign" });
                 await ctx.SaveChangesAsync();
 
                 var visibleCustomers = ctx.Query<PsCustomer>().OrderBy(x => x.Id).ToList();
