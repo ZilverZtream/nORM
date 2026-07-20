@@ -85,6 +85,7 @@ namespace nORM.Benchmarks
         private SqliteParameter? _adoFirstIdParam;
 
         private SqliteCommand? _adoInsertPrepared;
+        private SqliteCommand? _adoUpdatePrepared;
 
         private SqliteCommand? _adoComplexPrepared;
         private SqliteParameter? _adoComplexAgeParam;
@@ -292,6 +293,21 @@ namespace nORM.Benchmarks
                 _adoInsertPrepared.Parameters.Add(p);
             }
             _adoInsertPrepared.Prepare();
+
+            // Prepared full-row UPDATE reused across calls — the fair floor for nORM's / EF's tracked full-row
+            // update (ctx.Update(entity) + SaveChanges writes every column). Updates a fixed row (Id = 1).
+            _adoUpdatePrepared = _dapperConnection.CreateCommand();
+            _adoUpdatePrepared.CommandText = @"
+                UPDATE BenchmarkUser
+                SET Name=@Name, Email=@Email, CreatedAt=@CreatedAt, IsActive=@IsActive, Age=@Age, City=@City, Department=@Department, Salary=@Salary
+                WHERE Id=@Id;";
+            foreach (var pName in new[] { "@Name", "@Email", "@CreatedAt", "@IsActive", "@Age", "@City", "@Department", "@Salary", "@Id" })
+            {
+                var p = _adoUpdatePrepared.CreateParameter();
+                p.ParameterName = pName;
+                _adoUpdatePrepared.Parameters.Add(p);
+            }
+            _adoUpdatePrepared.Prepare();
         }
 
         // ========== SINGLE INSERT (reuse contexts/connections; no per-op PRAGMAs) ==========
@@ -397,6 +413,81 @@ namespace nORM.Benchmarks
             p[6].Value = "TestDept";
             p[7].Value = 50_000;
             _ = (long)(await _adoInsertPrepared.ExecuteScalarAsync())!;
+        }
+
+        // ========== SINGLE FULL-ROW UPDATE (write path; all columns bound) ==========
+        // Updates a fixed row (Id = 1) with every column set — the write path an app hits when it persists a
+        // modified entity. nORM/EF go through the tracked ctx.Update(entity) + SaveChanges path (change
+        // detection + full-column UPDATE); Dapper/raw ADO issue the equivalent full UPDATE directly. Idempotent
+        // (same values each call). The prepared raw-ADO tier is the fair floor for nORM's prepared/pooled write.
+
+        private static BenchmarkUser UpdateRow(string tag) => new BenchmarkUser
+        {
+            Id = 1, Name = "Upd " + tag, Email = "upd@" + tag + ".com", CreatedAt = DateTime.Now,
+            IsActive = true, Age = 41, City = "UpdCity", Department = "UpdDept", Salary = 61_000
+        };
+
+        [Benchmark]
+        public async Task Update_Full_Single_EfCore()
+        {
+            _efContext!.Users.Update(UpdateRow("ef"));
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
+        }
+
+        [Benchmark]
+        public async Task Update_Full_Single_nORM()
+        {
+            _nOrmContext!.Update(UpdateRow("norm"));
+            await _nOrmContext.SaveChangesAsync();
+            _nOrmContext.ChangeTracker.Clear();
+        }
+
+        [Benchmark]
+        public async Task Update_Full_Single_Dapper()
+        {
+            const string sql = @"
+                UPDATE BenchmarkUser
+                SET Name=@Name, Email=@Email, CreatedAt=@CreatedAt, IsActive=@IsActive, Age=@Age, City=@City, Department=@Department, Salary=@Salary
+                WHERE Id=@Id;";
+            await _dapperConnection!.ExecuteAsync(sql, UpdateRow("dapper"));
+        }
+
+        [Benchmark]
+        public async Task Update_Full_Single_RawAdo()
+        {
+            const string sql = @"
+                UPDATE BenchmarkUser
+                SET Name=@Name, Email=@Email, CreatedAt=@CreatedAt, IsActive=@IsActive, Age=@Age, City=@City, Department=@Department, Salary=@Salary
+                WHERE Id=@Id;";
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("@Name", "Upd ado");
+            command.Parameters.AddWithValue("@Email", "upd@ado.com");
+            command.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("O"));
+            command.Parameters.AddWithValue("@IsActive", 1);
+            command.Parameters.AddWithValue("@Age", 41);
+            command.Parameters.AddWithValue("@City", "UpdCity");
+            command.Parameters.AddWithValue("@Department", "UpdDept");
+            command.Parameters.AddWithValue("@Salary", 61_000);
+            command.Parameters.AddWithValue("@Id", 1);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        [Benchmark(Description = "Update Full Single Raw ADO (Prepared)")]
+        public async Task Update_Full_Single_RawAdo_Prepared()
+        {
+            var p = _adoUpdatePrepared!.Parameters;
+            p[0].Value = "Upd ado";
+            p[1].Value = "upd@ado.com";
+            p[2].Value = DateTime.Now.ToString("O");
+            p[3].Value = 1;
+            p[4].Value = 41;
+            p[5].Value = "UpdCity";
+            p[6].Value = "UpdDept";
+            p[7].Value = 61_000;
+            p[8].Value = 1;
+            await _adoUpdatePrepared.ExecuteNonQueryAsync();
         }
 
         // ========== SIMPLE QUERY (standard) ==========
