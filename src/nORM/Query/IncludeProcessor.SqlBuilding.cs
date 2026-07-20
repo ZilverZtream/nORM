@@ -154,7 +154,7 @@ namespace nORM.Query
             return $"(SELECT {cols} FROM {history} {innerAlias} WHERE {pn} >= {innerAlias}.{validFrom} AND {pn} < {innerAlias}.{validTo})";
         }
 
-        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd, DateTime? asOf = null, IReadOnlyList<IncludeFilter?>? filters = null, Dictionary<string, object?>? filterParams = null)
+        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd, DateTime? asOf = null, IReadOnlyList<IncludeFilter?>? filters = null, Dictionary<string, object?>? filterParams = null, IReadOnlyList<IncludeOrdering?>? orderings = null)
         {
             var tenantActive = _ctx.Options.TenantProvider != null;
             if (tenantActive)
@@ -176,15 +176,19 @@ namespace nORM.Query
 
                     var fromSource = GetFromSource(map, cmd, asOf,
                         _ctx.RawProvider.Escape("__incw" + i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-                    sb.Append("SELECT ").Append(alias).Append(".* FROM ").Append(fromSource).Append(' ').Append(alias)
-                      .Append(" WHERE ");
-                    AppendIncludeLevelPredicate(sb, path, mappings, i, alias, paramNames, paramGroups, tenantActive, cmd, asOf);
+
+                    // Build the row-visibility WHERE (FK predicate + tenant + global filter + filtered-Include
+                    // predicate) into its own buffer. For an ordered / top-N level this whole stack becomes the
+                    // INNER query of a ROW_NUMBER() window so the ranking sees the filtered, ordered set — a
+                    // naive cap-then-filter would keep the wrong rows.
+                    var where = new System.Text.StringBuilder();
+                    AppendIncludeLevelPredicate(where, path, mappings, i, alias, paramNames, paramGroups, tenantActive, cmd, asOf);
 
                     if (tenantActive)
                     {
                         var tenantCol = _ctx.RequireTenantColumn(map, "include path load");
                         var tp = $"{_ctx.RawProvider.ParamPrefix}tkn{i}";
-                        sb.Append(" AND ").Append(alias).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tp);
+                        where.Append(" AND ").Append(alias).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tp);
                     }
 
                     // Apply the general global filters (e.g. soft-delete) to each eager-loaded level.
@@ -192,7 +196,7 @@ namespace nORM.Query
                     // repeat the predicate or a soft-deleted / cross-tenant child leaks into the graph.
                     var globalFilterSql = GlobalFilterFragment.Build(_ctx, map, alias, cmd);
                     if (globalFilterSql != null)
-                        sb.Append(" AND ").Append(globalFilterSql);
+                        where.Append(" AND ").Append(globalFilterSql);
 
                     // Filtered Include (Include(o => o.Lines.Where(pred))): the predicate was rendered to
                     // SQL against this level's alias at plan-build time; AND it on and bind the compiled
@@ -202,7 +206,18 @@ namespace nORM.Query
                     if (includeFilter != null)
                     {
                         BindIncludeFilterParams(cmd, includeFilter, filterParams);
-                        sb.Append(" AND (").Append(includeFilter.Sql).Append(')');
+                        where.Append(" AND (").Append(includeFilter.Sql).Append(')');
+                    }
+
+                    var ordering = orderings != null && i < orderings.Count ? orderings[i] : null;
+                    if (ordering == null)
+                    {
+                        sb.Append("SELECT ").Append(alias).Append(".* FROM ").Append(fromSource).Append(' ').Append(alias)
+                          .Append(" WHERE ").Append(where);
+                    }
+                    else
+                    {
+                        AppendOrderedLevelSql(sb, map, path[i], alias, fromSource, where.ToString(), ordering, i);
                     }
 
                     // Separate multiple result-set statements with semicolons;
@@ -217,6 +232,46 @@ namespace nORM.Query
             {
                 PooledStringBuilder.Return(sb);
             }
+        }
+
+        /// <summary>
+        /// Emits an ordered / top-N eager-load level (<c>Include(b => b.Posts.OrderByDescending(p => p.Date)
+        /// .Take(3))</c>) by wrapping the level's filtered set in a per-parent <c>ROW_NUMBER()</c> window:
+        /// <c>PARTITION BY</c> the child's foreign key so the ranking restarts for each parent, <c>ORDER BY</c>
+        /// the requested keys, and keep only rows ranked <c>&gt; Skip</c> and <c>&lt;= Skip + Cap</c>. The whole
+        /// visibility WHERE (FK/tenant/global/element filters) sits INSIDE the window subquery so the top-N is
+        /// computed over the rows the caller can actually see; only the cap/skip is applied outside. The outer
+        /// SELECT lists the child's mapped columns (not the window column) so the materializer sees the exact
+        /// same shape a plain <c>alias.*</c> level produces, including the TPH discriminator.
+        /// </summary>
+        private void AppendOrderedLevelSql(System.Text.StringBuilder sb, TableMapping map, TableMapping.Relation relation, string alias, string fromSource, string where, IncludeOrdering ordering, int level)
+        {
+            var innerCols = string.Join(", ", map.Columns.Select(c => alias + "." + c.EscCol));
+            var outerCols = string.Join(", ", map.Columns.Select(c => c.EscCol));
+            var partitionBy = string.Join(", ", relation.ForeignKeys.Select(c => alias + "." + c.EscCol));
+            var rnCol = _ctx.RawProvider.Escape("__rn");
+            var capAlias = _ctx.RawProvider.Escape("__rncap" + level.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var capRef = capAlias + "." + rnCol;
+
+            sb.Append("SELECT ").Append(outerCols)
+              .Append(" FROM (SELECT ").Append(innerCols)
+              .Append(", ROW_NUMBER() OVER (PARTITION BY ").Append(partitionBy)
+              .Append(" ORDER BY ").Append(ordering.OrderingSql).Append(") AS ").Append(rnCol)
+              .Append(" FROM ").Append(fromSource).Append(' ').Append(alias)
+              .Append(" WHERE ").Append(where)
+              .Append(") AS ").Append(capAlias);
+
+            // Skip(s).Take(t) → rows ranked s+1..s+t. Order by __rn so per-parent window order survives the
+            // stitch's FK grouping (each parent's rows keep their ranked order in the graph).
+            var skip = ordering.Skip ?? 0;
+            var conditions = new List<string>(2);
+            if (skip > 0)
+                conditions.Add(capRef + " > " + skip.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (ordering.Cap is int cap)
+                conditions.Add(capRef + " <= " + (skip + cap).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (conditions.Count > 0)
+                sb.Append(" WHERE ").Append(string.Join(" AND ", conditions));
+            sb.Append(" ORDER BY ").Append(capRef);
         }
 
         /// <summary>

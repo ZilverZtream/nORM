@@ -168,11 +168,22 @@ namespace nORM.Query
     /// (closure captures) for per-execution rebinding.</summary>
     internal sealed record IncludeFilter(string Sql, IReadOnlyList<string> Parameters);
 
+    /// <summary>An ordered / top-N included collection (from <c>Include(b =&gt; b.Posts.OrderByDescending(p =&gt;
+    /// p.Date).Take(3))</c>), rendered at plan-build time. <paramref name="OrderingSql"/> is the ORDER BY body
+    /// (no keyword) against the level's alias; the child fetch wraps the filtered set in
+    /// <c>ROW_NUMBER() OVER (PARTITION BY fk ORDER BY OrderingSql)</c> and keeps rows with
+    /// <c>__rn &gt; Skip</c> and <c>__rn &lt;= Skip + Cap</c>.</summary>
+    internal sealed record IncludeOrdering(string OrderingSql, int? Cap, int? Skip);
+
     internal sealed record IncludePlan(List<TableMapping.Relation> Path)
     {
         /// <summary>Per-level filter predicates, parallel to <see cref="Path"/> (null where a level has no
         /// filter). Grows alongside Path as ThenInclude extends the chain.</summary>
         public List<IncludeFilter?> Filters { get; } = new();
+
+        /// <summary>Per-level ordering / top-N specs, parallel to <see cref="Path"/> (null where a level has no
+        /// ordering). Grows alongside Path as ThenInclude extends the chain.</summary>
+        public List<IncludeOrdering?> Orderings { get; } = new();
     }
 
     /// <summary>Eager-load plan for a many-to-many navigation property.</summary>

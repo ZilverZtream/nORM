@@ -106,7 +106,7 @@ namespace nORM.Query
                     paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams, include.Orderings);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
@@ -191,7 +191,7 @@ namespace nORM.Query
                     paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams, include.Orderings);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default);

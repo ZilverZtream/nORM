@@ -129,8 +129,9 @@ namespace nORM.Query
 
         /// <summary>Peels the ordering ops of a shaped collection projection (Take → Skip → ThenBy* → OrderBy,
         /// outer→inner) into a spec. The final key list is [OrderBy, ThenBy1, ThenBy2, ...]. Returns null when
-        /// there is no ordering.</summary>
-        private static CollectionOrderingSpec? PeelCollectionOrdering(ref Expression current)
+        /// there is no ordering. Shared with the eager-load Include ordering path (Include(b => b.Posts
+        /// .OrderByDescending(p => p.Date).Take(3))) so the two never diverge in what they peel.</summary>
+        internal static CollectionOrderingSpec? PeelCollectionOrdering(ref Expression current)
         {
             CollectionOrderingSpec? spec = null;
             if (TryPeelConstantCount(ref current, nameof(Enumerable.Take), out var take))
@@ -309,6 +310,18 @@ namespace nORM.Query
             else
                 return null;
 
+            return new RenderedCollectionOrdering(RenderOrderingKeys(spec, childAlias), spec.Take, spec.Skip);
+        }
+
+        /// <summary>
+        /// Renders a collection ordering spec's keys to a comma-separated <c>ORDER BY</c> body (no keyword) against
+        /// <paramref name="alias"/>. Shared by the shaped-projection split-query path and the eager-load Include
+        /// path so both apply the same simple-key / value-converter / order-preserving-coercion rules. Only a
+        /// simple property key on the element parameter is supported; computed/composite keys and value-converter
+        /// columns fail loud (the stored form may not preserve the model order).
+        /// </summary>
+        internal string RenderOrderingKeys(CollectionOrderingSpec spec, string alias)
+        {
             var parts = new List<string>(spec.Keys.Count);
             foreach (var key in spec.Keys)
             {
@@ -317,20 +330,20 @@ namespace nORM.Query
                     body = u.Operand;
                 if (body is not MemberExpression me || me.Expression != key.KeySelector.Parameters[0])
                     throw new NormUnsupportedFeatureException(
-                        "Only a simple property ordering key is supported on a projected collection, e.g. " +
+                        "Only a simple property ordering key is supported on an ordered collection, e.g. " +
                         "'o.Lines.OrderBy(l => l.Date)'. Computed or composite ordering keys are not supported.");
-                if (me.Member.DeclaringType != null
+                if (me.Member.DeclaringType != null && _ctx != null
                     && _ctx.GetMapping(me.Member.DeclaringType).ColumnsByName.TryGetValue(me.Member.Name, out var col)
                     && col.Converter != null)
                     throw new NormUnsupportedFeatureException(
-                        "Ordering a projected collection by a value-converter column is not supported — the stored " +
+                        "Ordering an included collection by a value-converter column is not supported — the stored " +
                         "representation may not preserve the model order. Order after materialization instead.");
 
-                var keySql = RenderFilterSide(body, key.KeySelector.Parameters[0], childAlias);
+                var keySql = RenderFilterSide(body, key.KeySelector.Parameters[0], alias);
                 keySql = CoerceCollectionOrderKeySql(keySql, body.Type);
                 parts.Add(keySql + (key.Descending ? " DESC" : " ASC"));
             }
-            return new RenderedCollectionOrdering(string.Join(", ", parts), spec.Take, spec.Skip);
+            return string.Join(", ", parts);
         }
 
         /// <summary>Applies the provider's order-preserving coercion for types stored as TEXT on SQLite

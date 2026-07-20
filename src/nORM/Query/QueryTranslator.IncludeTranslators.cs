@@ -50,14 +50,39 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Extracts the navigation member from an Include/ThenInclude body, peeling a filtered-Include
-        /// <c>nav.Where(pred)</c> and returning the captured predicate via <paramref name="filter"/>.
+        /// Extracts the navigation member from an Include/ThenInclude body, peeling an ordered / top-N
+        /// <c>nav.OrderBy(k).Take(n)</c> (captured via <paramref name="ordering"/>) and a filtered
+        /// <c>nav.Where(pred)</c> (captured via <paramref name="filter"/>). The ordering ops sit OUTSIDE the
+        /// filter in the idiomatic form (<c>nav.Where(pred).OrderBy(k).Skip(s).Take(t)</c>), so they peel first.
+        /// A Skip/Take with no OrderBy is rejected — it would make the top-N nondeterministic.
         /// </summary>
-        private static MemberExpression PeelIncludeMember(Expression body, out LambdaExpression? filter)
+        private static MemberExpression PeelIncludeMember(Expression body, out LambdaExpression? filter, out SelectClauseVisitor.CollectionOrderingSpec? ordering)
         {
             filter = null;
             if (body is UnaryExpression convert)
                 body = convert.Operand;
+            // Peel an optional trailing materialization (nav.OrderBy(...).Take(n).ToList()) so both the bare and
+            // the ToList/ToArray/AsEnumerable forms are accepted, matching the shaped-projection binding.
+            if (body is MethodCallExpression materialize
+                && (materialize.Method.Name == nameof(Enumerable.ToList)
+                    || materialize.Method.Name == nameof(Enumerable.ToArray)
+                    || materialize.Method.Name == nameof(Enumerable.AsEnumerable))
+                && materialize.Arguments.Count == 1
+                && (materialize.Method.DeclaringType == typeof(Enumerable) || materialize.Method.DeclaringType == typeof(Queryable)))
+            {
+                body = materialize.Arguments[0];
+                if (body is UnaryExpression materializeConvert)
+                    body = materializeConvert.Operand;
+            }
+            // Peel ordering ops (Take → Skip → ThenBy* → OrderBy, outer→inner) using the SAME helper the
+            // shaped-projection path uses, so the two can never diverge in what they accept.
+            ordering = SelectClauseVisitor.PeelCollectionOrdering(ref body);
+            if (ordering != null && ordering.Keys.Count == 0)
+                throw new NormUnsupportedFeatureException(
+                    "Skip/Take on an included collection needs an OrderBy to make the result deterministic, e.g. " +
+                    "Include(b => b.Posts.OrderBy(p => p.Id).Take(3)). A non-constant Take/Skip is also unsupported.");
+            if (body is UnaryExpression orderConvert)
+                body = orderConvert.Operand;
             if (body is MethodCallExpression whereCall
                 && whereCall.Method.Name == nameof(Enumerable.Where)
                 && whereCall.Arguments.Count == 2
@@ -71,10 +96,8 @@ namespace nORM.Query
             }
             if (body is not MemberExpression member)
                 throw new NormUnsupportedFeatureException(
-                    "Include/ThenInclude supports a plain navigation or a filtered navigation ('nav.Where(pred)'). " +
-                    "Ordering or limiting an included collection (e.g. OrderBy/OrderByDescending/Take/Skip inside " +
-                    "Include) is not yet supported. Project the ordered / top-N collection instead, which is " +
-                    "supported: Select(b => new { b.Id, Recent = b.Posts.OrderByDescending(p => p.Date).Take(3).ToList() }).");
+                    "Include/ThenInclude supports a plain navigation, a filtered navigation ('nav.Where(pred)'), " +
+                    "and an ordered / top-N navigation ('nav.OrderBy(k).Take(n)'). This shape is not supported.");
             return member;
         }
 
@@ -101,6 +124,31 @@ namespace nORM.Query
             var alias = t._provider.Escape("__inc" + levelIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
             var rendered = scv.RenderFilterAgainstAlias(filter, alias);
             return new IncludeFilter(rendered.Sql, rendered.Parameters);
+        }
+
+        /// <summary>
+        /// Renders an ordered / top-N Include (<c>Include(b => b.Posts.OrderByDescending(p => p.Date).Take(3))</c>)
+        /// to an <see cref="IncludeOrdering"/>: the ORDER BY keys rendered against this level's <c>__inc{level}</c>
+        /// alias plus the Take/Skip caps. Returns null when there is no ordering. Ordering keys reuse the same
+        /// simple-key / value-converter / order-preserving-coercion rules as shaped-collection projections.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private static IncludeOrdering? RenderIncludeOrdering(QueryTranslator t, TableMapping.Relation relation, SelectClauseVisitor.CollectionOrderingSpec? ordering, int levelIndex)
+        {
+            if (ordering == null || ordering.Keys.Count == 0 || t._ctx == null)
+                return null;
+
+            var childMapping = t._ctx.GetMapping(relation.DependentType);
+            var scv = new SelectClauseVisitor(childMapping, new List<string>(), t._provider, outerAlias: null, ctx: t._ctx)
+            {
+                SharedParams = t._params,
+                SharedCompiledParams = t._compiledParams,
+                SharedParamConverters = t._paramConverters,
+            };
+            var alias = t._provider.Escape("__inc" + levelIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var orderingSql = scv.RenderOrderingKeys(ordering, alias);
+            return new IncludeOrdering(orderingSql, ordering.Take, ordering.Skip);
         }
 
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
@@ -138,12 +186,13 @@ namespace nORM.Query
                     var includeLambda = rawLambda is UnaryExpression qu ? qu.Operand as LambdaExpression : rawLambda as LambdaExpression;
                     if (includeLambda != null)
                     {
-                        var member = PeelIncludeMember(includeLambda.Body, out var includeFilter);
+                        var member = PeelIncludeMember(includeLambda.Body, out var includeFilter, out var includeOrdering);
                         var propName = member.Member.Name;
                         if (t._mapping != null && t._mapping.Relations.TryGetValue(propName, out var relation))
                         {
                             var plan = new IncludePlan(new List<TableMapping.Relation> { relation });
                             plan.Filters.Add(RenderIncludeFilter(t, relation, includeFilter, 0));
+                            plan.Orderings.Add(RenderIncludeOrdering(t, relation, includeOrdering, 0));
                             t._includes.Add(plan);
                             t.TrackMapping(relation.DependentType);
                         }
@@ -157,13 +206,22 @@ namespace nORM.Query
                                     throw new NormUnsupportedFeatureException(
                                         $"A filtered Include on the many-to-many navigation '{propName}' is not supported. " +
                                         "Filter after materialization, or model the relationship as an explicit join entity.");
+                                if (includeOrdering != null)
+                                    throw new NormUnsupportedFeatureException(
+                                        $"An ordered / top-N Include on the many-to-many navigation '{propName}' is not supported. " +
+                                        "Order after materialization instead.");
                                 t._m2mIncludes.Add(new M2MIncludePlan(jtm));
                                 t.TrackMapping(jtm.RightType);
                             }
                             else if (TryBuildReferenceIncludeRelation(t, t._mapping, member.Member) is { } refRelation)
                             {
+                                if (includeOrdering != null)
+                                    throw new NormUnsupportedFeatureException(
+                                        $"OrderBy/Take/Skip on the reference navigation '{propName}' is meaningless (it loads a single " +
+                                        "related entity) and is not supported.");
                                 var plan = new IncludePlan(new List<TableMapping.Relation> { refRelation });
                                 plan.Filters.Add(RenderIncludeFilter(t, refRelation, includeFilter, 0));
+                                plan.Orderings.Add(null);
                                 t._includes.Add(plan);
                             }
                         }
@@ -192,7 +250,7 @@ namespace nORM.Query
                     var thenLambda = StripQuotes(node.Arguments[1]) as LambdaExpression;
                     if (thenLambda != null)
                     {
-                        var member = PeelIncludeMember(thenLambda.Body, out var includeFilter);
+                        var member = PeelIncludeMember(thenLambda.Body, out var includeFilter, out var includeOrdering);
                         var propName = member.Member.Name;
                         if (t._includes.Count > 0)
                         {
@@ -204,12 +262,18 @@ namespace nORM.Query
                             {
                                 lastInclude.Path.Add(relation);
                                 lastInclude.Filters.Add(RenderIncludeFilter(t, relation, includeFilter, levelIndex));
+                                lastInclude.Orderings.Add(RenderIncludeOrdering(t, relation, includeOrdering, levelIndex));
                                 t.TrackMapping(relation.DependentType);
                             }
                             else if (TryBuildReferenceIncludeRelation(t, parentMap, member.Member) is { } refRelation)
                             {
+                                if (includeOrdering != null)
+                                    throw new NormUnsupportedFeatureException(
+                                        $"OrderBy/Take/Skip on the reference navigation '{propName}' is meaningless (it loads a single " +
+                                        "related entity) and is not supported.");
                                 lastInclude.Path.Add(refRelation);
                                 lastInclude.Filters.Add(RenderIncludeFilter(t, refRelation, includeFilter, levelIndex));
+                                lastInclude.Orderings.Add(null);
                             }
                         }
                     }
