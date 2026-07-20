@@ -176,7 +176,12 @@ namespace nORM.Tests.Fuzzing
             IEnumerable<IrRow> rows = ir.Rows;
             foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
                 rows = rows.Where(BuildPredicate(w).Compile());
-            return rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile()).Select(g => g.Count());
+            // Key-aware: encode (key, count) so a wrong-key grouping with matching sizes still diverges. The
+            // key/count domains are tiny here (< 1000), so key*1000+count is collision-free. The encode runs in
+            // memory over the materialized keyed projection, so nORM still translates the keyed group SELECT.
+            return rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile())
+                .Select(g => new { g.Key, C = g.Count() })
+                .Select(x => x.Key * 1000 + x.C);
         }
 
         private static IEnumerable<int> RunNormGrouped(DbContext ctx, QueryIr ir)
@@ -184,7 +189,10 @@ namespace nORM.Tests.Fuzzing
             IQueryable<IrRow> q = ctx.Query<IrRow>();
             foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
                 q = q.Where(BuildPredicate(w));
-            return q.GroupBy(KeySelector(ir.GroupBy!.Key)).Select(g => g.Count()).ToList();
+            return q.GroupBy(KeySelector(ir.GroupBy!.Key))
+                .Select(g => new { g.Key, C = g.Count() })
+                .ToList()
+                .Select(x => x.Key * 1000 + x.C);
         }
 
         private static IEnumerable<int> RunLinqProjected(QueryIr ir)
