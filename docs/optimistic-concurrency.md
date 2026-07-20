@@ -5,6 +5,23 @@ concurrency token. Updates and deletes include the original token value in the
 `WHERE` predicate. A missing match raises `DbConcurrencyException` on normal
 tracked writes and direct writes.
 
+## Token Types
+
+nORM handles a `[Timestamp]` / `IsRowVersion()` token in one of two ways
+depending on its CLR type:
+
+| Token type | Behavior |
+| --- | --- |
+| `byte[]` | Native rowversion on SQL Server (DB-generated); nORM-managed on SQLite / PostgreSQL / MySQL. |
+| `Guid`, `int`, `uint`, `long`, `ulong` | **nORM-managed** on SQLite / PostgreSQL / MySQL: nORM stamps a fresh value (a new `Guid` or an incremented integer) into the `SET` clause on every UPDATE and compares the original snapshot in `WHERE`. Fully automatic — a stale writer is always rejected. |
+| any other type (e.g. `string`) | **Compare-only**: nORM emits the snapshot comparison in `WHERE`, but does not advance the token value itself. The application (or a database trigger) must change the token on every write for the protection to be effective. |
+
+For an nORM-managed token you never assign the token value yourself — nORM owns
+it. For a compare-only token you (or the database) own advancing it; if the value
+never changes, two writers that loaded the same value will not conflict. Prefer a
+`byte[]`, `Guid`, or integer token for automatic, no-discipline-required
+protection.
+
 ## Provider Row-Count Modes
 
 | Provider | Default nORM mode | Guarantee |

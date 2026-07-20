@@ -55,6 +55,16 @@ namespace nORM.Mapping
         /// </summary>
         public bool ClientManagedConcurrencyToken { get; }
 
+        /// <summary>
+        /// True for a concurrency-token CLR type nORM can auto-manage (stamp a fresh value each UPDATE) via
+        /// <see cref="nORM.Core.ConcurrencyTokenGenerator"/> on a provider without a native rowversion. Kept in
+        /// lock-step with that generator's supported types so the two never disagree.
+        /// </summary>
+        private static bool IsAutoManageableTokenType(Type t)
+            => t == typeof(byte[]) || t == typeof(Guid)
+               || t == typeof(long) || t == typeof(ulong)
+               || t == typeof(int) || t == typeof(uint);
+
         /// <summary>Gets the tenant discriminator column, if multi-tenancy is enabled.</summary>
         public Column? TenantColumn { get; }
 
@@ -330,11 +340,16 @@ namespace nORM.Mapping
             // so stale concurrent writes are detected. SQL Server's ROWVERSION is DB-generated and read
             // back from the OUTPUT clause instead. UpdateColumns stays token-free (the token is bound
             // separately) so provider SQL that names params by column don't collide on the token.
-            // Only a byte[] token (the rowversion convention) is nORM-managed; string/int tokens are
-            // application-managed (the caller sets the next value) and must keep the existing behavior
-            // where nORM only compares the snapshot token in the WHERE clause.
+            //
+            // Every auto-manageable rowversion type (byte[], Guid, and the integer widths) is nORM-managed on
+            // a provider without a native rowversion: nORM stamps a fresh value in SET and compares the
+            // ORIGINAL snapshot in WHERE, so a stale writer is rejected. Previously only byte[] was managed,
+            // so a Guid/int/long token was compared in WHERE but never mutated — the stored value stayed
+            // constant and every stale writer matched, a SILENT lost update. A string (or other) token stays
+            // compare-only: nORM emits the snapshot comparison in WHERE, and the application or a database
+            // trigger owns advancing the token value.
             ClientManagedConcurrencyToken = TimestampColumn != null && !p.SupportsNativeRowVersion
-                && (Nullable.GetUnderlyingType(TimestampColumn.Prop.PropertyType) ?? TimestampColumn.Prop.PropertyType) == typeof(byte[]);
+                && IsAutoManageableTokenType(Nullable.GetUnderlyingType(TimestampColumn.Prop.PropertyType) ?? TimestampColumn.Prop.PropertyType);
             UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated).ToArray();
 
             // Compute converter fingerprint for materializer cache differentiation
