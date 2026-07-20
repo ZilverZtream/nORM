@@ -511,7 +511,7 @@ namespace nORM.Query
             {
                 // The post-materialize transform reduced the reshaped rows to a single
                 // boxed aggregate value; unwrap it as the query result. Coerce numeric
-                // mismatches like the server scalar path does â€” nORM's typed aggregate
+                // mismatches like the server scalar path does — nORM's typed aggregate
                 // wrappers can declare a narrower result than the LINQ operator computes
                 // (e.g. AverageAsync over ints declares int while Average yields double).
                 var clientScalar = list[0];

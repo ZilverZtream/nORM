@@ -238,7 +238,7 @@ namespace nORM.Migration
             var down = new List<string>();
             var primaryKeyChanges = SchemaDiffer.GetPrimaryKeyChanges(diff);
 
-            // â”€ UP: correct DDL dependency ordering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ─ UP: correct DDL dependency ordering ──────────────────────────────────
             // FK constraints must be dropped BEFORE the columns/tables they reference
             // are removed. Symmetric rule for DOWN: FK constraints added in UP must be
             // dropped BEFORE the columns/tables added in UP are removed.
@@ -258,7 +258,7 @@ namespace nORM.Migration
             foreach (var table in diff.DroppedTables)
                 up.Add($"DROP TABLE {EscTable(table.Name)}");
 
-            // UP-3: Drop columns (safe â€” FKs on those columns are removed in UP-1).
+            // UP-3: Drop columns (safe — FKs on those columns are removed in UP-1).
             // E: Before dropping a column, find and drop any DEFAULT constraint on it first.
             foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
             {
@@ -278,7 +278,7 @@ namespace nORM.Migration
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
-            // UP-3b: Rename columns BEFORE anything that references the new names â€”
+            // UP-3b: Rename columns BEFORE anything that references the new names —
             // altered-column statements and rebuilt indexes for a renamed column
             // reference the post-rename name, which must exist by then.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
@@ -414,7 +414,7 @@ namespace nORM.Migration
             foreach (var (table, expressionIndex) in diff.AddedExpressionIndexes)
                 throw new NotSupportedException($"SQL Server does not support direct expression index '{expressionIndex.Name}' on table '{table.Name}'. Use a computed column plus a normal index.");
 
-            // â”€ DOWN: reverse of UP, with symmetric FK ordering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ─ DOWN: reverse of UP, with symmetric FK ordering ──────────────────────
 
             // DOWN-1: Drop FK constraints that were added in UP-7 (before touching their columns).
             foreach (var (table, fk) in diff.AddedForeignKeys)
@@ -442,7 +442,7 @@ namespace nORM.Migration
                 down.Add($"DROP TABLE IF EXISTS {EscTable(table.Name)}");
 
             // DOWN-3b: Rename columns back BEFORE anything that references the old
-            // names â€” alteration reverts and restored indexes use pre-rename names.
+            // names — alteration reverts and restored indexes use pre-rename names.
             foreach (var (table, oldColName, newCol) in diff.RenamedColumns)
                 down.Add($"EXEC sp_rename '{EscLiteral(table.Name)}.{EscLiteral(newCol.Name)}', '{EscLiteral(oldColName)}', 'COLUMN'");
 

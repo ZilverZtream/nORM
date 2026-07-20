@@ -197,7 +197,7 @@ namespace nORM.Query
         /// <summary>
         /// Client-materialized query shapes (sequence reshapes, streaming GroupBy,
         /// group-join results, client scalar reductions) exist only after
-        /// materialization â€” no set-based DELETE/UPDATE can honor them. Emitting the
+        /// materialization — no set-based DELETE/UPDATE can honor them. Emitting the
         /// statement for the underlying rows would silently affect rows the reshaped
         /// query never described (an unfiltered Append source deletes the whole table).
         /// </summary>
@@ -241,7 +241,7 @@ namespace nORM.Query
         /// derived table so its ORDER BY + paging clause survives on every provider
         /// (the derived-table materialization also lifts MySQL's update-target and
         /// LIMIT-inside-IN restrictions). A bare trailing ORDER BY re-derived by a
-        /// window wrap is stripped first â€” it is row-set-neutral and invalid inside
+        /// window wrap is stripped first — it is row-set-neutral and invalid inside
         /// a derived table on SQL Server.
         /// </summary>
         private string BuildKeyedSubqueryCudSql(string prefix, string? setSql, string planSql, TableMapping mapping)
@@ -265,7 +265,7 @@ namespace nORM.Query
                     : prefix + " SET " + setSql + " WHERE " + whereIn;
             }
 
-            // SQL Server composite keys: row-tuple IN is unsupported â€” join the keyed
+            // SQL Server composite keys: row-tuple IN is unsupported — join the keyed
             // subquery to the target instead (same form as the joined-CUD path).
             const string tgtAlias = "__nm_tgt";
             var joinOn = string.Join(" AND ", pkCols.Select(pk => tgtAlias + "." + pk + " = __nm_keys." + pk));

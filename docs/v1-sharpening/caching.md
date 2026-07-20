@@ -1,4 +1,4 @@
-﻿# Domain 8 â€” Caching
+﻿# Domain 8 — Caching
 
 **Scope:** bounded cache policy (lifetimes, limits, diagnostics), cache tag correctness, and
 invalidation so a cached read is never stale after a write to any table it depends on.
@@ -6,7 +6,7 @@ invalidation so a cached read is never stale after a write to any table it depen
 ## 1.0 exit criteria
 
 - [ ] A cacheable query tags **every** table it reads (including correlated subqueries), so a
-      write to any of them invalidates the cached result â€” no silent stale reads.
+      write to any of them invalidates the cached result — no silent stale reads.
 - [ ] Cache is bounded (documented max size / eviction); memory cannot grow unbounded.
 - [ ] Cache keys include tenant + relevant discriminators; no cross-tenant or cross-parameter
       bleed.
@@ -17,7 +17,7 @@ invalidation so a cached read is never stale after a write to any table it depen
 Strong. A silent stale-read was closed: a cacheable query with a correlated subquery tagged only
 the root table, so a child write left a stale cached result. Fixed via ambient referenced-table
 scope so `plan.Tables` covers all read tables. Found by an adversarial probe after ~10 passing
-probes â€” a reminder that cache-tag coverage needs adversarial, not happy-path, testing.
+probes — a reminder that cache-tag coverage needs adversarial, not happy-path, testing.
 
 ## Open items
 

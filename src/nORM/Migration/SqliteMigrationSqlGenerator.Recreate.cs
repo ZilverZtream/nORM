@@ -362,7 +362,7 @@ namespace nORM.Migration
         /// <summary>
         /// Emits a single Up table-recreation that applies every recreate-requiring change to a table
         /// at once (altered columns, added/dropped columns, added/dropped FKs and CHECK constraints).
-        /// Doing it once â€” rather than once per change â€” prevents the per-change recreations from
+        /// Doing it once — rather than once per change — prevents the per-change recreations from
         /// clobbering one another (most damagingly on the Down path).
         /// </summary>
         private static void EmitUpRecreate(List<string> up, SchemaDiff diff, string tableName)

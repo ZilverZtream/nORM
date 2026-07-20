@@ -1,4 +1,4 @@
-﻿# Domain 9 â€” Resilience & concurrency
+﻿# Domain 9 — Resilience & concurrency
 
 **Scope:** transient-failure retry, retry-write invariants, and optimistic concurrency control
 (`[Timestamp]`/rowversion) across batched, direct, and bulk writes.
@@ -21,7 +21,7 @@
 ## Current confidence
 
 Strong. `[Timestamp]` OCC was silently losing updates; nORM now client-manages the token across
-all write shapes on all providers â€” fully closed. The OCC oracle itself was corrected to treat
+all write shapes on all providers — fully closed. The OCC oracle itself was corrected to treat
 value-unchanged mutations as non-writes (a version oracle must not count no-ops as conflicts).
 
 ## Open items
@@ -47,4 +47,4 @@ value-unchanged mutations as non-writes (a version oracle must not count no-ops 
 ## Risks
 
 A version/OCC oracle must treat value-unchanged mutations as non-writes, or it manufactures false
-conflicts. Retrying past commit-attempted is silent data loss â€” the invariant is absolute.
+conflicts. Retrying past commit-attempted is silent data loss — the invariant is absolute.

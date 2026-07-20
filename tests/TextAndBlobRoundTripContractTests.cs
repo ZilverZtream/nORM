@@ -33,11 +33,11 @@ public class TextAndBlobRoundTripContractTests
         public byte[] B { get; set; } = Array.Empty<byte>();
     }
 
-    // Unicode escapes keep this file ASCII-safe: é = e-acute, \U0001F600 = grinning face,
-    // \U0001F916 = robot face (both astral, i.e. surrogate pairs in UTF-16), � = replacement char.
-    private static readonly string Emoji = "café \U0001F600 \U0001F916";
+    // Unicode escapes keep this file ASCII-safe: \u00E9 = e-acute, \U0001F600 = grinning face,
+    // \U0001F916 = robot face (both astral, i.e. surrogate pairs in UTF-16), \uFFFD = replacement char.
+    private static readonly string Emoji = "caf\u00E9 \U0001F600 \U0001F916";
     private static readonly string Quoted = "it's a \"test\" with 'quotes'\nand\tnew\r\nlines";
-    private static readonly string Big = new string('x', 100_000) + "é\U0001F600end";
+    private static readonly string Big = new string('x', 100_000) + "\u00E9\U0001F600end";
     private static readonly byte[] BigBlob = CreateBlob();
 
     private static byte[] CreateBlob()
@@ -50,8 +50,8 @@ public class TextAndBlobRoundTripContractTests
     private static readonly (int Id, string S, char C, byte[] B)[] Rows =
     {
         (1, Emoji, 'A', new byte[] { 0, 1, 255, 128 }),
-        (2, "", 'é', Array.Empty<byte>()),
-        (3, "  leading and trailing  ", '�', new byte[] { 42 }),
+        (2, "", '\u00E9', Array.Empty<byte>()),
+        (3, "  leading and trailing  ", '\uFFFD', new byte[] { 42 }),
         (4, Quoted, 'Z', new byte[] { 1 }),
         (5, Big, 'q', BigBlob),
     };

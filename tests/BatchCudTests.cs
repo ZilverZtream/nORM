@@ -107,7 +107,7 @@ public class BatchCudTests
     [Fact]
     public async Task ExecuteUpdateAsync_inline_string_concat_of_captured_locals_rejected_with_actionable_message()
     {
-        // Inline string concat of two captured locals is a BinaryExpression â€” not a literal
+        // Inline string concat of two captured locals is a BinaryExpression — not a literal
         // value and not a lambda. The translator can't reduce it to either form. Callers
         // should pre-compute (assign to a local first) or use the lambda overload.
         using var cn = new SqliteConnection("Data Source=:memory:");
