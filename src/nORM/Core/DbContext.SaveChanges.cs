@@ -208,63 +208,84 @@ namespace nORM.Core
             var totalAffected = 0;
             try
             {
-                var allGroups = changedEntries.GroupBy(e => (e.State, e.Mapping))
-                    .Select(g => (IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>)new SaveChangesEntryGroup(g.Key, g))
-                    .ToList();
-                var addedGroups = allGroups.Where(g => g.Key.State == EntityState.Added).ToList();
-                var modifiedGroups = allGroups.Where(g => g.Key.State == EntityState.Modified).ToList();
-                var deletedGroups = allGroups.Where(g => g.Key.State == EntityState.Deleted).ToList();
-
-                // Replace-in-place: a key that is both Deleted and re-Added in this
-                // batch must DELETE before the insert or the primary key's unique
-                // constraint fires mid-batch (inserts run first globally). Hoist
-                // exactly those deletes into a pre-pass; all other deletes keep
-                // their position after inserts and updates, which the FK-repoint
-                // scenarios rely on.
-                var preDeleteGroups = new List<IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>>();
-                if (deletedGroups.Count > 0 && addedGroups.Count > 0)
+                IEnumerable<IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>> orderedGroups;
+                if (AllSameStateAndMapping(changedEntries))
                 {
-                    for (var gi = 0; gi < deletedGroups.Count; gi++)
+                    // Fast path — the overwhelmingly common save shape: one or more entities of a SINGLE
+                    // type in a SINGLE state. There is nothing to group, topologically sort, or replace
+                    // (cross-type delete-then-insert replacement requires BOTH a Deleted and an Added group,
+                    // which a homogeneous batch cannot have; a lone mapping is its own topological order),
+                    // so the whole GroupBy / Where / TopologicalSortMappings / reconstruction pipeline below
+                    // — the dominant SaveChanges allocation — is skipped. GroupBy preserves source order
+                    // within a group, so the single source-ordered group is byte-identical to what the
+                    // general path would produce; within-group self-referential ordering still runs in the
+                    // loop. See tests/WritePathAllocationProbe.cs.
+                    orderedGroups = new[]
                     {
-                        var delGroup = deletedGroups[gi];
-                        var map = delGroup.Key.Mapping;
-                        if (map.KeyColumns.Length == 0)
-                            continue;
-                        var addedSame = addedGroups.FirstOrDefault(g => g.Key.Mapping == map);
-                        if (addedSame == null)
-                            continue;
-                        var addedKeys = new HashSet<nORM.Query.GroupJoinOuterIdentity>(
-                            addedSame.Select(e => new nORM.Query.GroupJoinOuterIdentity(
-                                Array.ConvertAll(map.KeyColumns, k => k.Getter(e.Entity!)))));
-                        var replaced = delGroup
-                            .Where(e => addedKeys.Contains(new nORM.Query.GroupJoinOuterIdentity(
-                                Array.ConvertAll(map.KeyColumns, k => k.Getter(e.Entity!)))))
-                            .ToList();
-                        if (replaced.Count == 0)
-                            continue;
-                        var remaining = delGroup.Except(replaced).ToList();
-                        preDeleteGroups.Add(new SaveChangesEntryGroup(delGroup.Key, replaced));
-                        deletedGroups[gi] = new SaveChangesEntryGroup(delGroup.Key, remaining);
-                    }
-                    if (preDeleteGroups.Count > 1)
-                    {
-                        // Children-first, matching the regular delete ordering.
-                        var sortedPre = TopologicalSortMappings(preDeleteGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
-                        preDeleteGroups = sortedPre.Select(m => preDeleteGroups.First(g => g.Key.Mapping == m)).ToList();
-                    }
+                        (IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>)
+                            new SaveChangesEntryGroup((changedEntries[0].State, changedEntries[0].Mapping), changedEntries)
+                    };
                 }
+                else
+                {
+                    var allGroups = changedEntries.GroupBy(e => (e.State, e.Mapping))
+                        .Select(g => (IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>)new SaveChangesEntryGroup(g.Key, g))
+                        .ToList();
+                    var addedGroups = allGroups.Where(g => g.Key.State == EntityState.Added).ToList();
+                    var modifiedGroups = allGroups.Where(g => g.Key.State == EntityState.Modified).ToList();
+                    var deletedGroups = allGroups.Where(g => g.Key.State == EntityState.Deleted).ToList();
 
-                var sortedAddedMappings = TopologicalSortMappings(addedGroups.Select(g => g.Key.Mapping)).ToList();
-                // Gate D fix: Apply the same topological sort to modified groups so that FK
-                // constraints do not fire when a dependent row is updated before its principal.
-                // Inserts already follow principal-first order; updates must do the same.
-                var sortedModifiedMappings = TopologicalSortMappings(modifiedGroups.Select(g => g.Key.Mapping)).ToList();
-                var sortedDeletedMappings = TopologicalSortMappings(deletedGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
+                    // Replace-in-place: a key that is both Deleted and re-Added in this
+                    // batch must DELETE before the insert or the primary key's unique
+                    // constraint fires mid-batch (inserts run first globally). Hoist
+                    // exactly those deletes into a pre-pass; all other deletes keep
+                    // their position after inserts and updates, which the FK-repoint
+                    // scenarios rely on.
+                    var preDeleteGroups = new List<IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>>();
+                    if (deletedGroups.Count > 0 && addedGroups.Count > 0)
+                    {
+                        for (var gi = 0; gi < deletedGroups.Count; gi++)
+                        {
+                            var delGroup = deletedGroups[gi];
+                            var map = delGroup.Key.Mapping;
+                            if (map.KeyColumns.Length == 0)
+                                continue;
+                            var addedSame = addedGroups.FirstOrDefault(g => g.Key.Mapping == map);
+                            if (addedSame == null)
+                                continue;
+                            var addedKeys = new HashSet<nORM.Query.GroupJoinOuterIdentity>(
+                                addedSame.Select(e => new nORM.Query.GroupJoinOuterIdentity(
+                                    Array.ConvertAll(map.KeyColumns, k => k.Getter(e.Entity!)))));
+                            var replaced = delGroup
+                                .Where(e => addedKeys.Contains(new nORM.Query.GroupJoinOuterIdentity(
+                                    Array.ConvertAll(map.KeyColumns, k => k.Getter(e.Entity!)))))
+                                .ToList();
+                            if (replaced.Count == 0)
+                                continue;
+                            var remaining = delGroup.Except(replaced).ToList();
+                            preDeleteGroups.Add(new SaveChangesEntryGroup(delGroup.Key, replaced));
+                            deletedGroups[gi] = new SaveChangesEntryGroup(delGroup.Key, remaining);
+                        }
+                        if (preDeleteGroups.Count > 1)
+                        {
+                            // Children-first, matching the regular delete ordering.
+                            var sortedPre = TopologicalSortMappings(preDeleteGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
+                            preDeleteGroups = sortedPre.Select(m => preDeleteGroups.First(g => g.Key.Mapping == m)).ToList();
+                        }
+                    }
 
-                var orderedAddedGroups = sortedAddedMappings.Select(m => addedGroups.First(g => g.Key.Mapping == m));
-                var orderedModifiedGroups = sortedModifiedMappings.Select(m => modifiedGroups.First(g => g.Key.Mapping == m));
-                var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
-                var orderedGroups = preDeleteGroups.Concat(orderedAddedGroups).Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
+                    var sortedAddedMappings = TopologicalSortMappings(addedGroups.Select(g => g.Key.Mapping)).ToList();
+                    // Gate D fix: Apply the same topological sort to modified groups so that FK
+                    // constraints do not fire when a dependent row is updated before its principal.
+                    // Inserts already follow principal-first order; updates must do the same.
+                    var sortedModifiedMappings = TopologicalSortMappings(modifiedGroups.Select(g => g.Key.Mapping)).ToList();
+                    var sortedDeletedMappings = TopologicalSortMappings(deletedGroups.Select(g => g.Key.Mapping)).Reverse().ToList();
+
+                    var orderedAddedGroups = sortedAddedMappings.Select(m => addedGroups.First(g => g.Key.Mapping == m));
+                    var orderedModifiedGroups = sortedModifiedMappings.Select(m => modifiedGroups.First(g => g.Key.Mapping == m));
+                    var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
+                    orderedGroups = preDeleteGroups.Concat(orderedAddedGroups).Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
+                }
 
                 foreach (var group in orderedGroups)
                 {
@@ -756,6 +777,21 @@ namespace nORM.Core
         /// split (replace-in-place delete hoisting) while keeping the IGrouping
         /// pipeline shape.
         /// </summary>
+        /// <summary>
+        /// True when every changed entry shares the same <see cref="EntityEntry.State"/> and mapping — the
+        /// common single-type/single-state save that can skip the grouping/topological-sort/replacement
+        /// pipeline (see SaveChangesAsync). O(n), allocation-free.
+        /// </summary>
+        private static bool AllSameStateAndMapping(List<EntityEntry> entries)
+        {
+            var state = entries[0].State;
+            var mapping = entries[0].Mapping;
+            for (int i = 1; i < entries.Count; i++)
+                if (entries[i].State != state || !ReferenceEquals(entries[i].Mapping, mapping))
+                    return false;
+            return true;
+        }
+
         private sealed class SaveChangesEntryGroup : List<EntityEntry>, IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>
         {
             public SaveChangesEntryGroup((EntityState State, TableMapping Mapping) key, IEnumerable<EntityEntry> entries)

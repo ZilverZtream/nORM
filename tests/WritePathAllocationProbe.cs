@@ -14,9 +14,10 @@ using Xunit.Abstractions;
 
 namespace nORM.Tests;
 
-// Not a gate test — an allocation bisect for the tracked full-row update write path. Prints bytes/op for
-// each phase so the dominant SaveChanges allocator can be found. Trait excludes it from Fast gate runs.
-[Trait("Category", "Diagnostic")]
+// Not a gate test — an allocation harness for the tracked full-row update write path. Prints bytes/op for
+// each phase so write-path optimizations can be measured / guarded against regression. Categorized Stress so
+// it runs outside the Fast gate (it does hundreds of real SaveChanges ops and is a manual measurement tool).
+[Trait("Category", TestCategory.Stress)]
 public class WritePathAllocationProbe
 {
     private readonly ITestOutputHelper _out;
