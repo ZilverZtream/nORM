@@ -53,6 +53,26 @@ namespace nORM.Query
                     return TranslateAfterTakeSkipWindow(t, node);
                 }
 
+                // Distinct after a set operation (Concat -> UNION ALL keeps duplicates): the compound fills
+                // _sql, and the DISTINCT keyword is only rendered when _sql is empty, so a bare `t._isDistinct`
+                // never reaches the SQL and duplicates survive. Wrap the compound as a derived table with
+                // DISTINCT applied on the outer SELECT (mirror of the Where-after-set-op wrap).
+                if (IsSetOperationCall(node.Arguments[0]))
+                {
+                    t.Visit(node.Arguments[0]);
+                    if (t._sql.Length > 0)
+                    {
+                        var innerSetSql = t._sql.ToString();
+                        t._sql.Clear();
+                        var setWrapAlias = t.EscapeAlias("__dset" + t._joinCounter++);
+                        t._sql.AppendFragment("SELECT DISTINCT * FROM (").Append(innerSetSql)
+                              .AppendFragment(") AS ").Append(setWrapAlias);
+                        t._isDistinct = true;
+                        t._orderBy.Clear();
+                        return node.Arguments[0];
+                    }
+                }
+
                 // Set _isDistinct BEFORE visiting the source. JoinBuilder.BuildJoinClauseInto
                 // captures `distinct: _isDistinct` at join-emit time (e97b814), which runs
                 // INSIDE the Visit below — if we set the flag afterward, the join SQL is
@@ -855,6 +875,15 @@ namespace nORM.Query
             }
         }
 
+
+        /// <summary>
+        /// True when <paramref name="e"/> is a set-operation call (Union / Concat / Intersect / Except).
+        /// A set-op fills <c>_sql</c> with the bare compound; a projection or DISTINCT applied after it must
+        /// wrap that compound as a derived table (as Where already does) or its effect is silently lost.
+        /// </summary>
+        private static bool IsSetOperationCall(Expression e)
+            => e is MethodCallExpression m
+               && m.Method.Name is "Union" or "Concat" or "Intersect" or "Except";
 
         /// <summary>
         /// True when a set-operation element type (an anonymous or DTO shape) exposes

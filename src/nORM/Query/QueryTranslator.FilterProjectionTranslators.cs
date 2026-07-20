@@ -369,6 +369,32 @@ namespace nORM.Query
                 {
                     pendingProjection = t.ExpandProjection(pendingProjection);
 
+                    // A reshaping projection after a set operation (Union/Concat/Intersect/Except) must bind
+                    // to the unified compound, not be dropped. The set-op fills _sql with the bare
+                    // `<left> <SETOP> <right>`; Build() then skips SELECT generation, so the projection reaches
+                    // only the materializer, which name-matches against the arms' raw columns and silently
+                    // returns them unprojected. Wrap the compound as a derived table and record its alias so
+                    // the rewrite below emits the projected SELECT list against it (mirror of the Where wrap).
+                    if (t._outerDerivedAlias == null
+                        && t._sql.Length > 0
+                        && IsSetOperationCall(node.Arguments[0]))
+                    {
+                        var innerSetSql = t._sql.ToString();
+                        if (innerSetSql.StartsWith("SELECT ", StringComparison.Ordinal))
+                        {
+                            t._sql.Clear();
+                            var setWrapAlias = t.EscapeAlias("__sset" + t._joinCounter++);
+                            t._sql.AppendFragment("SELECT * FROM (").Append(innerSetSql)
+                                  .AppendFragment(") AS ").Append(setWrapAlias);
+                            t._outerDerivedAlias = setWrapAlias;
+                            // The compound preserves the arms' element (row) columns; resolve the projection
+                            // against that row mapping, not the projected scalar type the outer query carries.
+                            var rowType = pendingProjection.Parameters[0].Type;
+                            if (t._mapping.Type != rowType && !rowType.IsValueType && rowType != typeof(string))
+                                t._mapping = t._ctx.GetMapping(rowType);
+                        }
+                    }
+
                     // A windowed derived-table wrap pre-fills _sql as
                     // `SELECT * FROM (...) AS alias`, and Build() skips SELECT generation
                     // for pre-filled SQL — the projection would never reach the statement
