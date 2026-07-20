@@ -450,7 +450,12 @@ namespace nORM.Query
                     if (i > 0) sql.Append(", ");
                     var paramName = $"{_ctx.RawProvider.ParamPrefix}p{i}";
                     sql.Append(paramName);
-                    cmd.AddParam(paramName, parentIds[i]);
+                    // The parent id is a MODEL value; the child FK column stores the converted (provider)
+                    // representation, so bind through the FK column's converter or the predicate matches nothing.
+                    var fkCol = depQuery.ForeignKeyColumn;
+                    cmd.AddParam(paramName, fkCol.Converter != null && parentIds[i] != null
+                        ? fkCol.Converter.ConvertToProvider(parentIds[i])!
+                        : parentIds[i]);
                 }
                 sql.Append(')');
                 return;
@@ -469,8 +474,11 @@ namespace nORM.Query
                 {
                     if (columnIndex > 0) sql.Append(" AND ");
                     var paramName = $"{_ctx.RawProvider.ParamPrefix}p{keyIndex}_{columnIndex}";
-                    sql.Append(depQuery.ForeignKeyColumns[columnIndex].EscCol).Append(" = ").Append(paramName);
-                    cmd.AddParam(paramName, key.Values[columnIndex]!);
+                    var fkCol = depQuery.ForeignKeyColumns[columnIndex];
+                    sql.Append(fkCol.EscCol).Append(" = ").Append(paramName);
+                    cmd.AddParam(paramName, fkCol.Converter != null && key.Values[columnIndex] != null
+                        ? fkCol.Converter.ConvertToProvider(key.Values[columnIndex])!
+                        : key.Values[columnIndex]!);
                 }
                 sql.Append(')');
             }

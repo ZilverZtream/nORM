@@ -496,7 +496,15 @@ namespace nORM.Navigation
         private string BuildNavigationWhereClause(DbCommand cmd, TableMapping.Relation relation, List<object?> chunk)
         {
             if (!relation.IsComposite)
-                return _context.RawProvider.BuildContainsClause(cmd, relation.ForeignKey.EscCol, chunk);
+            {
+                // Parent keys are MODEL values; the child FK column stores the converted (provider)
+                // representation, so bind through the FK column's converter or the IN(...) matches nothing.
+                var fkCol = relation.ForeignKey;
+                var boundChunk = fkCol.Converter != null
+                    ? chunk.Select(v => v != null ? fkCol.Converter.ConvertToProvider(v) : v).ToList()
+                    : chunk;
+                return _context.RawProvider.BuildContainsClause(cmd, fkCol.EscCol, boundChunk);
+            }
 
             var clauses = new List<string>(chunk.Count);
             for (var keyIndex = 0; keyIndex < chunk.Count; keyIndex++)
@@ -509,8 +517,11 @@ namespace nORM.Navigation
                 for (var columnIndex = 0; columnIndex < relation.ForeignKeys.Count; columnIndex++)
                 {
                     var paramName = $"{_context.RawProvider.ParamPrefix}nav{keyIndex}_{columnIndex}";
-                    cmd.AddParam(paramName, key.Values[columnIndex]!);
-                    parts[columnIndex] = $"{relation.ForeignKeys[columnIndex].EscCol} = {paramName}";
+                    var fkCol = relation.ForeignKeys[columnIndex];
+                    cmd.AddParam(paramName, fkCol.Converter != null && key.Values[columnIndex] != null
+                        ? fkCol.Converter.ConvertToProvider(key.Values[columnIndex])!
+                        : key.Values[columnIndex]!);
+                    parts[columnIndex] = $"{fkCol.EscCol} = {paramName}";
                 }
                 clauses.Add("(" + string.Join(" AND ", parts) + ")");
             }

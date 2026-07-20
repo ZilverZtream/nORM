@@ -98,7 +98,7 @@ namespace nORM.Query
                     for (var j = 0; j < values.Length; j++)
                     {
                         var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}_{j}";
-                        cmd.AddParam(pn, values[j]!);
+                        cmd.AddParam(pn, BindKeyValueToProvider(firstRelation, j, values[j]));
                         group[j] = pn;
                         if (values.Length == 1)
                             paramNames.Add(pn);
@@ -183,7 +183,7 @@ namespace nORM.Query
                     for (var j = 0; j < values.Length; j++)
                     {
                         var pn = $"{_ctx.RawProvider.ParamPrefix}fk{i}_{j}";
-                        cmd.AddParam(pn, values[j]!);
+                        cmd.AddParam(pn, BindKeyValueToProvider(firstRelation, j, values[j]));
                         group[j] = pn;
                         if (values.Length == 1)
                             paramNames.Add(pn);
@@ -317,6 +317,23 @@ namespace nORM.Query
 
         private static object?[] GetKeyValues(object key)
             => key is RelationKey composite ? composite.Values : new object?[] { key };
+
+        /// <summary>
+        /// Binds a principal-key value into the FK predicate in the dependent column's PROVIDER representation.
+        /// The parent was materialized with <c>ConvertFromProvider</c>, so <see cref="GetKeyValues"/> yields the
+        /// MODEL value; the child FK column stores the converted (provider) value, so a raw bind would compare
+        /// model-vs-provider and silently match nothing. The value at <paramref name="index"/> aligns with
+        /// <c>relation.ForeignKeys[index]</c> (the column named in the emitted predicate), so its converter is
+        /// the correct one to reach the stored representation.
+        /// </summary>
+        private static object BindKeyValueToProvider(TableMapping.Relation relation, int index, object? modelValue)
+        {
+            var col = index < relation.ForeignKeys.Count ? relation.ForeignKeys[index] : null;
+            var provider = col?.Converter != null && modelValue != null
+                ? col.Converter.ConvertToProvider(modelValue)
+                : modelValue;
+            return provider!;
+        }
 
         private static object?[]? ReadKeyValues(DbDataReader reader, int offset, int count)
         {
