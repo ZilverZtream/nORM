@@ -29,6 +29,13 @@ namespace nORM.Tests.Fuzzing
         /// <summary>Optional second arm: the left query is combined with a right query (the same rows filtered by <see cref="IrSetOp.RightWheres"/>) via a set operation.</summary>
         public IrSetOp? SetOp { get; init; }
 
+        /// <summary>
+        /// Optional scalar projection applied after the Where/set-op phase (<c>Select(r =&gt; r.Column + Add)</c>).
+        /// A projected query is compared as a multiset of the projected values (projected scalars carry no
+        /// stable order), so the OrderBy/Skip/Take steps are not applied when a projection is present.
+        /// </summary>
+        public IrProjection? Projection { get; init; }
+
         public string ToJson() => JsonSerializer.Serialize(this, FuzzRunManifest.ManifestJsonOptions);
         public static QueryIr FromJson(string json) =>
             JsonSerializer.Deserialize<QueryIr>(json, FuzzRunManifest.ManifestJsonOptions)
@@ -38,11 +45,20 @@ namespace nORM.Tests.Fuzzing
         public string Describe()
         {
             var left = string.Join(".", Steps.Select(s => s.Describe()));
-            if (SetOp == null)
-                return $"rows={Rows.Count} | {left}";
-            var right = string.Join(".", SetOp.RightWheres.Select(s => s.Describe()));
-            return $"rows={Rows.Count} | ({left}).{SetOp.Kind}({right})";
+            var body = SetOp == null
+                ? left
+                : $"({left}).{SetOp.Kind}({string.Join(".", SetOp.RightWheres.Select(s => s.Describe()))})";
+            if (Projection is { } p)
+                body += $".Select({p.Column}+{p.Add})";
+            return $"rows={Rows.Count} | {body}";
         }
+    }
+
+    /// <summary>A scalar projection <c>r =&gt; r.Column + Add</c> producing an int.</summary>
+    public sealed record IrProjection
+    {
+        public required IrColumn Column { get; init; }
+        public int Add { get; init; }
     }
 
     public enum IrSetOpKind { Union, Concat, Intersect, Except }

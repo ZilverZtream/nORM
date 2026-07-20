@@ -46,7 +46,9 @@ namespace nORM.Tests.Fuzzing
             Assert.True(manifest.FeatureFrontier().Count >= 6, "the sweep should exercise several plan features");
             var frontier = manifest.FeatureFrontier();
             Assert.Contains("setop", frontier);
-            Assert.Contains("setop+orderby", frontier);   // the shape that previously produced invalid SQL
+            Assert.Contains("setop+orderby", frontier);       // the shape that previously produced invalid SQL
+            Assert.Contains("projection", frontier);
+            Assert.Contains("setop+projection", frontier);    // the shape whose Distinct previously did not dedup
         }
 
         [Fact]

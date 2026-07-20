@@ -38,7 +38,7 @@ namespace nORM.Tests.Fuzzing
             if (rng.Next(2) == 0)
                 steps.Add(IrStep.Take(rng.Next(0, rowCount + 2)));
 
-            return new QueryIr { Rows = rows, Steps = steps, SetOp = MaybeSetOp(rng) };
+            return new QueryIr { Rows = rows, Steps = steps, SetOp = MaybeSetOp(rng), Projection = MaybeProjection(rng) };
         }
 
         private static IrSetOp? MaybeSetOp(Random rng)
@@ -48,6 +48,12 @@ namespace nORM.Tests.Fuzzing
             for (var i = rng.Next(0, 3); i > 0; i--)
                 rightWheres.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6)));
             return new IrSetOp { Kind = (IrSetOpKind)rng.Next(4), RightWheres = rightWheres };
+        }
+
+        private static IrProjection? MaybeProjection(Random rng)
+        {
+            if (rng.Next(4) != 0) return null;   // ~1/4 of cases project a scalar
+            return new IrProjection { Column = Pick(rng, Columns), Add = rng.Next(3) == 0 ? 0 : rng.Next(-5, 100) };
         }
 
         /// <summary>
@@ -61,7 +67,8 @@ namespace nORM.Tests.Fuzzing
             var steps = ir.Steps.ToList();
             var rows = ir.Rows.ToList();
             var setOp = ir.SetOp;
-            switch (rng.Next(7))
+            var projection = ir.Projection;
+            switch (rng.Next(8))
             {
                 case 0: steps.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6))); break;
                 case 1: if (steps.Count > 0) steps.RemoveAt(rng.Next(steps.Count)); break;
@@ -74,8 +81,13 @@ namespace nORM.Tests.Fuzzing
                         ? new IrSetOp { Kind = (IrSetOpKind)rng.Next(4), RightWheres = new[] { IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6)) } }
                         : (rng.Next(3) == 0 ? null : setOp with { Kind = (IrSetOpKind)rng.Next(4) });
                     break;
+                case 7: // toggle / reshape the scalar projection
+                    projection = projection == null
+                        ? new IrProjection { Column = Pick(rng, Columns), Add = rng.Next(-5, 100) }
+                        : (rng.Next(3) == 0 ? null : projection with { Column = Pick(rng, Columns), Add = rng.Next(-5, 100) });
+                    break;
             }
-            return new QueryIr { Rows = rows, Steps = steps, SetOp = setOp };
+            return new QueryIr { Rows = rows, Steps = steps, SetOp = setOp, Projection = projection };
         }
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];

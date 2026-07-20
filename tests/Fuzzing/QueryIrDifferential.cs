@@ -25,6 +25,9 @@ namespace nORM.Tests.Fuzzing
 
         public static FuzzCaseResult Execute(QueryIr ir, long seed)
         {
+            if (ir.Projection != null)
+                return ExecuteProjected(ir, seed);
+
             var serialized = ir.ToJson();
             List<IrRow> expected;
             try
@@ -108,6 +111,126 @@ namespace nORM.Tests.Fuzzing
                 r => StillFails(afterSteps with { Rows = r.ToList() }));
             return afterSteps with { Rows = rows.ToList() };
         }
+
+        // ─── projected path (scalar Select, multiset comparison) ────────────
+
+        private static FuzzCaseResult ExecuteProjected(QueryIr ir, long seed)
+        {
+            var serialized = ir.ToJson();
+            List<int> expected;
+            try
+            {
+                expected = RunLinqProjected(ir).ToList();
+            }
+            catch (Exception ex)
+            {
+                return Fail(FuzzOutcome.UnexpectedException, $"oracle threw {ex.GetType().Name}", ir, seed, serialized);
+            }
+
+            List<int> actual, actual2;
+            using (var ctx = CreateSeededContext(ir.Rows))
+            {
+                try
+                {
+                    actual = RunNormProjected(ctx, ir).ToList();
+                    actual2 = RunNormProjected(ctx, ir).ToList();
+                }
+                catch (NormUnsupportedFeatureException nufe)
+                {
+                    return new FuzzCaseResult
+                    {
+                        Family = Family, Seed = seed, GeneratorVersion = GeneratorVersion,
+                        Outcome = FuzzOutcome.UnexpectedlyRejected,
+                        ReasonCode = "query-ir/" + FirstUnsupportedToken(nufe.Message),
+                        SerializedCase = serialized, Detail = nufe.Message, Features = ExtractFeatures(ir),
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return Fail(FuzzOutcome.UnexpectedException, $"nORM threw {ex.GetType().Name}: {ex.Message}", ir, seed, serialized);
+                }
+            }
+
+            if (!IntsEqual(actual, actual2))
+                return Fail(FuzzOutcome.NonDeterministic, "two nORM executions of the same projected case disagreed", ir, seed, serialized);
+            if (!IntsEqual(expected, actual))
+                return Fail(FuzzOutcome.WrongResult,
+                    $"oracle=[{string.Join(",", expected.OrderBy(x => x))}] nORM=[{string.Join(",", actual.OrderBy(x => x))}]", ir, seed, serialized);
+
+            return new FuzzCaseResult
+            {
+                Family = Family, Seed = seed, GeneratorVersion = GeneratorVersion,
+                Outcome = FuzzOutcome.Executed, SerializedCase = serialized, Features = ExtractFeatures(ir),
+            };
+        }
+
+        private static IEnumerable<int> RunLinqProjected(QueryIr ir)
+        {
+            IEnumerable<IrRow> left = ir.Rows;
+            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+                left = left.Where(BuildPredicate(w).Compile());
+            IEnumerable<IrRow> rows = left;
+            if (ir.SetOp is { } setOp)
+            {
+                IEnumerable<IrRow> right = ir.Rows;
+                foreach (var w in setOp.RightWheres.Where(s => s.Kind == IrStepKind.Where))
+                    right = right.Where(BuildPredicate(w).Compile());
+                rows = setOp.Kind switch
+                {
+                    IrSetOpKind.Union => left.Union(right, IrRowComparer.Instance),
+                    IrSetOpKind.Concat => left.Concat(right),
+                    IrSetOpKind.Intersect => left.Intersect(right, IrRowComparer.Instance),
+                    IrSetOpKind.Except => left.Except(right, IrRowComparer.Instance),
+                    _ => left,
+                };
+            }
+            var projected = rows.Select(BuildProjection(ir.Projection!).Compile());
+            if (ir.Steps.Any(s => s.Kind == IrStepKind.Distinct))
+                projected = projected.Distinct();
+            return projected;
+        }
+
+        private static IEnumerable<int> RunNormProjected(DbContext ctx, QueryIr ir)
+        {
+            IQueryable<IrRow> Filter(IReadOnlyList<IrStep> steps)
+            {
+                IQueryable<IrRow> s = ctx.Query<IrRow>();
+                foreach (var w in steps.Where(x => x.Kind == IrStepKind.Where))
+                    s = s.Where(BuildPredicate(w));
+                return s;
+            }
+
+            var left = Filter(ir.Steps);
+            IQueryable<IrRow> rows = left;
+            if (ir.SetOp is { } setOp)
+            {
+                var right = Filter(setOp.RightWheres);
+                rows = setOp.Kind switch
+                {
+                    IrSetOpKind.Union => left.Union(right),
+                    IrSetOpKind.Concat => left.Concat(right),
+                    IrSetOpKind.Intersect => left.Intersect(right),
+                    IrSetOpKind.Except => left.Except(right),
+                    _ => left,
+                };
+            }
+            IQueryable<int> projected = rows.Select(BuildProjection(ir.Projection!));
+            if (ir.Steps.Any(s => s.Kind == IrStepKind.Distinct))
+                projected = projected.Distinct();
+            return projected.ToList();
+        }
+
+        private static Expression<Func<IrRow, int>> BuildProjection(IrProjection proj)
+        {
+            var p = Expression.Parameter(typeof(IrRow), "r");
+            Expression body = Expression.Property(p, proj.Column.ToString());
+            if (proj.Add != 0)
+                body = Expression.Add(body, Expression.Constant(proj.Add, typeof(int)));
+            return Expression.Lambda<Func<IrRow, int>>(body, p);
+        }
+
+        private static bool IntsEqual(IReadOnlyList<int> a, IReadOnlyList<int> b)
+            => a.Count == b.Count && a.OrderBy(x => x).SequenceEqual(b.OrderBy(x => x));
 
         // ─── compilation ────────────────────────────────────────────────────
 
@@ -307,6 +430,13 @@ namespace nORM.Tests.Fuzzing
                 if (kinds.Contains(IrStepKind.Distinct)) f.Add("setop+distinct");
                 if (kinds.Contains(IrStepKind.OrderBy)) f.Add("setop+orderby");
                 if (kinds.Contains(IrStepKind.Skip) || kinds.Contains(IrStepKind.Take)) f.Add("setop+paging");
+            }
+            if (ir.Projection is { } proj)
+            {
+                f.Add("projection");
+                if (proj.Add != 0) f.Add("projection-computed");
+                if (ir.SetOp != null) f.Add("setop+projection");
+                if (kinds.Contains(IrStepKind.Distinct)) f.Add("projection+distinct");
             }
             if (ir.Rows.Count == 0) f.Add("empty-table");
             if (ir.Rows.Count == 1) f.Add("single-row");
