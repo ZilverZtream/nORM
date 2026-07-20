@@ -286,7 +286,6 @@ namespace nORM.Core
                     var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
                     orderedGroups = preDeleteGroups.Concat(orderedAddedGroups).Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
                 }
-
                 foreach (var group in orderedGroups)
                 {
                     var entries = group.ToList();
@@ -549,7 +548,11 @@ namespace nORM.Core
             if (_p.MaxParameters != int.MaxValue)
             {
                 var maxParams = Math.Max(1, _p.MaxParameters - ParameterBudgetReserve);
-                batchSize = Math.Max(1, maxParams / Math.Max(1, paramsPerEntity));
+                var capacity = Math.Max(1, maxParams / Math.Max(1, paramsPerEntity));
+                // Cap at the actual entity count — never batch (or size the SQL StringBuilder for) more rows
+                // than exist. Without the Min, a single-row save sized its StringBuilder for the provider's
+                // full parameter capacity (~83 rows on SQLite), allocating tens of KB per write for nothing.
+                batchSize = Math.Min(totalEntries, capacity);
             }
             return batchSize;
         }
