@@ -50,3 +50,12 @@ When a build genuinely clears this bar, `-rc` is used again — and an RC means
 | Pre-1.0 | `0.x.y` | Patch = fixes, minor = features/behaviour changes. Not production-certified. |
 | Candidate | `1.0.0-rc.N` | Only per the bar above. "We intend to ship this." |
 | Release | `1.0.0` | An RC that survived real use with no blocker. |
+
+## The 0.9.x quality bar
+
+The bar above is for `1.0` and blends **quality** (in our control) with **maturity**
+(sustained fuzzer-dry weeks + external validation, which only time and adoption can
+earn). [`docs/production-confidence.md`](docs/production-confidence.md) defines the
+separate, **intrinsic-quality "A+" bar** — the honest standard for when a company can
+run `0.9.x` in production on the merits of the code, tests, build, and docs alone. An
+A+ `0.9.x` plus the maturity gate is what earns `1.0`.
