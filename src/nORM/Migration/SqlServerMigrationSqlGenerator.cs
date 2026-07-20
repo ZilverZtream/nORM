@@ -99,15 +99,33 @@ namespace nORM.Migration
         /// mechanism. Every interpolated value is emitted as an <c>N'...'</c> literal with quotes doubled so
         /// neither the comment text nor the identifiers can break out of the literal.
         /// </summary>
-        private static string BuildColumnCommentSql(TableSchema table, ColumnSchema column)
+        private static string ColumnCommentLevelArgs(TableSchema table, ColumnSchema column)
         {
             var dot = table.Name.IndexOf('.');
             var schema = dot > 0 ? table.Name[..dot] : "dbo";
             var bareTable = dot > 0 ? table.Name[(dot + 1)..] : table.Name;
-            return $"EXEC sp_addextendedproperty @name=N'MS_Description', @value=N'{EscLiteral(column.Comment!)}', " +
-                   $"@level0type=N'SCHEMA', @level0name=N'{EscLiteral(schema)}', " +
+            return $"@level0type=N'SCHEMA', @level0name=N'{EscLiteral(schema)}', " +
                    $"@level1type=N'TABLE', @level1name=N'{EscLiteral(bareTable)}', " +
                    $"@level2type=N'COLUMN', @level2name=N'{EscLiteral(column.Name)}'";
+        }
+
+        private static string BuildColumnCommentSql(TableSchema table, ColumnSchema column)
+            => $"EXEC sp_addextendedproperty @name=N'MS_Description', @value=N'{EscLiteral(column.Comment!)}', {ColumnCommentLevelArgs(table, column)}";
+
+        /// <summary>
+        /// Emits the extended-property statement to move a column's <c>MS_Description</c> from <paramref name="from"/>
+        /// to <paramref name="to"/>: sp_addextendedproperty (none → value), sp_updateextendedproperty (value → value),
+        /// or sp_dropextendedproperty (value → none). Returns null when unchanged.
+        /// </summary>
+        private static string? BuildColumnCommentTransition(TableSchema table, ColumnSchema column, string? from, string? to)
+        {
+            if (string.Equals(from, to, StringComparison.Ordinal))
+                return null;
+            var args = ColumnCommentLevelArgs(table, column);
+            if (to is null)
+                return $"EXEC sp_dropextendedproperty @name=N'MS_Description', {args}";
+            var proc = from is null ? "sp_addextendedproperty" : "sp_updateextendedproperty";
+            return $"EXEC {proc} @name=N'MS_Description', @value=N'{EscLiteral(to)}', {args}";
         }
 
         private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql) ResolveIndex(
@@ -308,6 +326,8 @@ namespace nORM.Migration
                         up.Add(BuildAddDefaultConstraintSql(table, newCol));
                     if (!IsImplicitUniqueColumn(oldCol) && IsImplicitUniqueColumn(newCol))
                         up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, newCol)}");
+                    if (BuildColumnCommentTransition(table, newCol, oldCol.Comment, newCol.Comment) is { } upComment)
+                        up.Add(upComment);
 
                     upAltIdx++;
                 }
@@ -466,6 +486,8 @@ namespace nORM.Migration
                         down.Add(BuildAddDefaultConstraintSql(table, oldCol));
                     if (!IsImplicitUniqueColumn(newCol) && IsImplicitUniqueColumn(oldCol))
                         down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, oldCol)}");
+                    if (BuildColumnCommentTransition(table, oldCol, newCol.Comment, oldCol.Comment) is { } downComment)
+                        down.Add(downComment);
 
                     downAltIdx++;
                 }

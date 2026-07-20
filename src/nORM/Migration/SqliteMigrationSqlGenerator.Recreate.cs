@@ -148,17 +148,10 @@ namespace nORM.Migration
             foreach (var col in cols)
                 recreatedTable.Columns.Add(col);
 
-            var colDefs = cols.Select(c =>
-            {
-                if (IsComputedColumn(c))
-                    return BuildComputedColumnDefinition(c);
-                var defaultPart = !string.IsNullOrEmpty(c.DefaultValue)
-                    ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
-                    : "";
-                if (c.IsIdentity && c.IsPrimaryKey)
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
-                return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
-            }).ToList();
+            // Render each column through the single BuildCreateColumnDefinition source of truth (same as
+            // BuildCreateTableSql) so the recreate path never drifts from the create path — e.g. it must also
+            // carry the inline column comment.
+            var colDefs = cols.Select(BuildCreateColumnDefinition).ToList();
 
             var pkCols = cols.Where(c => c.IsPrimaryKey).ToList();
             if (pkCols.Count > 0 && !pkCols.Any(c => c.IsIdentity))

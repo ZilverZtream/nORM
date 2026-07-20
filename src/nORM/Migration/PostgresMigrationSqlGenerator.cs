@@ -127,7 +127,13 @@ namespace nORM.Migration
         /// backslash non-special, so doubling the quote is sufficient to prevent literal termination.
         /// </summary>
         private static string BuildColumnCommentSql(TableSchema table, ColumnSchema column)
-            => $"COMMENT ON COLUMN {EscTable(table.Name)}.{Esc(column.Name)} IS '{column.Comment!.Replace("'", "''", StringComparison.Ordinal)}'";
+            => BuildColumnCommentSql(table, column, column.Comment);
+
+        /// <summary>Builds a <c>COMMENT ON COLUMN</c> statement; a null <paramref name="comment"/> clears it (<c>IS NULL</c>).</summary>
+        private static string BuildColumnCommentSql(TableSchema table, ColumnSchema column, string? comment)
+            => comment is null
+                ? $"COMMENT ON COLUMN {EscTable(table.Name)}.{Esc(column.Name)} IS NULL"
+                : $"COMMENT ON COLUMN {EscTable(table.Name)}.{Esc(column.Name)} IS '{comment.Replace("'", "''", StringComparison.Ordinal)}'";
 
         private static void ValidateUnsupportedIdentityOperations(SchemaDiff diff)
         {
@@ -245,6 +251,8 @@ namespace nORM.Migration
                         : $"ALTER TABLE {EscTable(table.Name)} ALTER COLUMN {Esc(newCol.Name)} DROP DEFAULT");
                 if (!IsImplicitUniqueColumn(oldCol) && IsImplicitUniqueColumn(newCol))
                     up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, newCol)}");
+                if (!string.Equals(oldCol.Comment, newCol.Comment, StringComparison.Ordinal))
+                    up.Add(BuildColumnCommentSql(table, newCol, newCol.Comment));
             }
             foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, newPkCols)}");
@@ -403,6 +411,8 @@ namespace nORM.Migration
                         : $"ALTER TABLE {EscTable(table.Name)} ALTER COLUMN {Esc(oldCol.Name)} DROP DEFAULT");
                 if (!IsImplicitUniqueColumn(newCol) && IsImplicitUniqueColumn(oldCol))
                     down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, oldCol)}");
+                if (!string.Equals(oldCol.Comment, newCol.Comment, StringComparison.Ordinal))
+                    down.Add(BuildColumnCommentSql(table, oldCol, oldCol.Comment));
             }
             foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, oldPkCols)}");

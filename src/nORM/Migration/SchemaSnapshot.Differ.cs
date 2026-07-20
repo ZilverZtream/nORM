@@ -109,7 +109,8 @@ namespace nORM.Migration
                         || oldCol.IdentitySeed != col.IdentitySeed
                         || oldCol.IdentityIncrement != col.IdentityIncrement
                         || !string.Equals(oldCol.ComputedColumnSql, col.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
-                        || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn)
+                        || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn
+                        || !string.Equals(oldCol.Comment, col.Comment, StringComparison.Ordinal))  // HasComment: comment text is user-facing/case-sensitive; a change must re-emit the provider comment DDL
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 
