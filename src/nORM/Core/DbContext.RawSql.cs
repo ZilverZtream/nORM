@@ -556,7 +556,7 @@ namespace nORM.Core
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, affected);
                 cmd.Parameters.Clear();
                 return affected;
-            }, ct);
+            }, s_nonIdempotentNoRetry, ct);
         }
 
         /// <summary>
@@ -598,7 +598,7 @@ namespace nORM.Core
                 ctx.Options.Logger?.LogQuery(procedureName, paramDict, sw.Elapsed, affected);
                 cmd.Parameters.Clear();
                 return new StoredProcedureNonQueryResult(affected, outputs);
-            }, ct);
+            }, s_nonIdempotentNoRetry, ct);
         }
 
         /// <summary>

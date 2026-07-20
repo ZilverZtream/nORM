@@ -297,7 +297,7 @@ namespace nORM.Core
                     await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, token).ConfigureAwait(false);
                 }
                 return 0;
-            }, ct).ConfigureAwait(false);
+            }, s_nonIdempotentNoRetry, ct).ConfigureAwait(false);
         }
 
         private static IEnumerable<string> SplitDdlBatches(string sql)
@@ -393,7 +393,7 @@ namespace nORM.Core
                 await cmd.ExecuteNonQueryWithInterceptionAsync(ctx, ct).ConfigureAwait(false);
                 cmd.Parameters.Clear();
                 return 0;
-            }, default).ConfigureAwait(false);
+            }, s_nonIdempotentNoRetry, default).ConfigureAwait(false);
         }
 
         /// <summary>

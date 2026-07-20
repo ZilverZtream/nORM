@@ -846,6 +846,15 @@ namespace nORM.Core
         #endregion
 
         #region Bulk Operations
+
+        // Bulk, stored-procedure, and temporal writes are non-idempotent and expose no commit barrier the
+        // retry strategy can observe: their commit happens inside the provider (bulk) or is a single
+        // auto-commit statement (proc/temporal). Passing this as isCommitAttempted makes the retry strategy
+        // treat every failure as possibly-committed and NEVER retry them, so a transient fault at or after
+        // commit cannot re-run the operation and duplicate rows. Idempotent reads and the tracked
+        // single-entity / SaveChanges paths — which thread a real commit-attempted flag — are unaffected.
+        private static readonly Func<bool> s_nonIdempotentNoRetry = static () => true;
+
         /// <summary>
         /// Efficiently inserts a collection of entities using provider specific bulk
         /// techniques. Validation and tenant checks are applied to each entity before
@@ -874,7 +883,7 @@ namespace nORM.Core
                     map.ApplyDiscriminator(entity);
                 }
                 return await _p.BulkInsertAsync(ctx, map, entityList, token).ConfigureAwait(false);
-            }, ct);
+            }, s_nonIdempotentNoRetry, ct);
         }
 
         /// <summary>
@@ -901,7 +910,7 @@ namespace nORM.Core
                     ValidateTenantContext(entity, map, WriteOperation.Update);
                 }
                 return await _p.BulkUpdateAsync(ctx, map, entityList, token).ConfigureAwait(false);
-            }, ct);
+            }, s_nonIdempotentNoRetry, ct);
         }
 
         /// <summary>
@@ -928,7 +937,7 @@ namespace nORM.Core
                     ValidateTenantContext(entity, map, WriteOperation.Delete);
                 }
                 return await _p.BulkDeleteAsync(ctx, map, entityList, token).ConfigureAwait(false);
-            }, ct);
+            }, s_nonIdempotentNoRetry, ct);
         }
         #endregion
     }
