@@ -131,4 +131,33 @@ public class TenantColumnMutationTests
         Assert.Equal(1, affected);
         Assert.Equal(1, CountInTenant(cn, 1, "A"));
     }
+
+    [Fact]
+    public async Task Inserting_via_SaveChanges_with_a_mismatched_tenant_is_rejected()
+    {
+        var (cn, ctx) = Create("A");
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        // Context is tenant A; a tracked insert stamped for tenant B must be rejected (fail-closed),
+        // not silently written into tenant B.
+        ctx.Add(new TcmItem { Id = 1, Name = "n", TenantId = "B" });
+        await Assert.ThrowsAnyAsync<Exception>(() => ctx.SaveChangesAsync());
+
+        Assert.Equal(0, CountInTenant(cn, 1, "A"));
+        Assert.Equal(0, CountInTenant(cn, 1, "B"));
+    }
+
+    [Fact]
+    public async Task Inserting_via_SaveChanges_with_the_matching_tenant_works()
+    {
+        var (cn, ctx) = Create("A");
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        ctx.Add(new TcmItem { Id = 1, Name = "n", TenantId = "A" });
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(1, CountInTenant(cn, 1, "A"));
+    }
 }

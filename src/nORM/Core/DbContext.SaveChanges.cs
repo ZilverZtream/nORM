@@ -372,6 +372,16 @@ namespace nORM.Core
                         }
                     }
 
+                    // Fail-closed tenant validation for tracked inserts: the entity's tenant must match
+                    // the current context, matching the direct InsertAsync and bulk paths, so a tracked
+                    // insert cannot stamp a row into another tenant (cross-tenant injection).
+                    if (state == EntityState.Added && Options.TenantProvider != null && map.TenantColumn != null)
+                    {
+                        foreach (var entry in entries)
+                            if (entry.Entity is { } insertEntity)
+                                ValidateTenantContext(insertEntity, map, WriteOperation.Insert);
+                    }
+
                     for (int start = 0; start < entries.Count; start += batchSize)
                     {
                         var batchCount = Math.Min(batchSize, entries.Count - start);

@@ -429,9 +429,9 @@ public class AdversarialTenantFuzzTests
     [Fact]
     public async Task AMT_CrossTenantRead_AfterInsert_OnlySeesSameTenantRows()
     {
-        // nORM uses the entity's TenantId value for INSERTs (no server-side injection).
-        // The tenant context filter applies to SELECT/UPDATE/DELETE, not INSERT.
-        // Verify: rows inserted with "tenant-C" TenantId are visible only to tenant-C context.
+        // A tracked INSERT is fail-closed on tenant: the entity's TenantId must match the current
+        // context (matching the direct/bulk paths), so a row cannot be stamped into another tenant.
+        // Here it matches (tenant-C), so the insert succeeds and is visible only to tenant-C.
         var (cn, ctx) = SetupAmt("tenant-C");
         await using var _ = ctx; using var __ = cn;
 

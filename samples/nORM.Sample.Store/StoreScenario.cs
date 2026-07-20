@@ -25,7 +25,7 @@ public static class StoreScenario
         await using var setup = new DbContext(connection, provider, optionsA);
 
         await setup.Query<StoreProduct>().CountAsync(cancellationToken);
-        await SeedAsync(setup, cancellationToken);
+        await SeedAsync(setup, connection, provider, cancellationToken);
         await RequireAsync(await setup.Query<StoreProduct>().CountAsync(cancellationToken) == 2,
             "tenant A should only see tenant A products");
 
@@ -62,27 +62,50 @@ public static class StoreScenario
         return options;
     }
 
-    private static async Task SeedAsync(DbContext ctx, CancellationToken cancellationToken)
+    private static async Task SeedAsync(DbContext ctx, DbConnection connection, DatabaseProvider provider, CancellationToken cancellationToken)
     {
+        // Tenant A rows are written through the tenant-A context: their tenant matches the context, so
+        // the fail-closed tenant guard on writes accepts them.
         ctx.Add(new StoreTenant { Id = 1, TenantId = TenantA, Name = "Tenant A" });
-        ctx.Add(new StoreTenant { Id = 2, TenantId = TenantB, Name = "Tenant B" });
-
         ctx.Add(new StoreCustomer { Id = 100, TenantId = TenantA, Name = "Aster Operations", Email = "ops@aster.test", IsActive = true });
-        ctx.Add(new StoreCustomer { Id = 200, TenantId = TenantB, Name = "Boreal Retail", Email = "ops@boreal.test", IsActive = true });
-
         ctx.Add(new StoreProduct { Id = 1000, TenantId = TenantA, Sku = "A-COFFEE", Name = "Coffee", Price = 12.50m, IsActive = true });
         ctx.Add(new StoreProduct { Id = 1001, TenantId = TenantA, Sku = "A-TEA", Name = "Tea", Price = 8.25m, IsActive = true });
-        ctx.Add(new StoreProduct { Id = 2000, TenantId = TenantB, Sku = "B-SECRET", Name = "Tenant B Product", Price = 99m, IsActive = true });
-
         ctx.Add(new StoreOrder { Id = 5000, TenantId = TenantA, CustomerId = 100, Status = "Open", Total = 33.25m });
         ctx.Add(new StoreOrder { Id = 5001, TenantId = TenantA, CustomerId = 100, Status = "Open", Total = 18.50m });
-        ctx.Add(new StoreOrder { Id = 6000, TenantId = TenantB, CustomerId = 200, Status = "Open", Total = 999m });
-
         ctx.Add(new StoreOrderLine { Id = 7000, TenantId = TenantA, OrderId = 5000, ProductId = 1000, Quantity = 2, UnitPrice = 12.50m });
         ctx.Add(new StoreOrderLine { Id = 7001, TenantId = TenantA, OrderId = 5000, ProductId = 1001, Quantity = 1, UnitPrice = 8.25m });
-        ctx.Add(new StoreOrderLine { Id = 8000, TenantId = TenantB, OrderId = 6000, ProductId = 2000, Quantity = 1, UnitPrice = 999m });
-
         await ctx.SaveChangesAsync(cancellationToken);
+
+        // Tenant B fixture data is written directly (a system/admin path). A tenant-A context is
+        // fail-closed against inserting another tenant's rows, so cross-tenant seeding uses a raw write.
+        // These rows exist only to prove the tenant boundary: tenant A must never see or modify them.
+        await InsertRawAsync(connection, provider, "SampleTenant", cancellationToken,
+            ("Id", 2), ("TenantId", TenantB), ("Name", "Tenant B"));
+        await InsertRawAsync(connection, provider, "SampleCustomer", cancellationToken,
+            ("Id", 200), ("TenantId", TenantB), ("Name", "Boreal Retail"), ("Email", "ops@boreal.test"), ("IsActive", true));
+        await InsertRawAsync(connection, provider, "SampleProduct", cancellationToken,
+            ("Id", 2000), ("TenantId", TenantB), ("Sku", "B-SECRET"), ("Name", "Tenant B Product"), ("Price", 99m), ("IsActive", true));
+        await InsertRawAsync(connection, provider, "SampleOrder", cancellationToken,
+            ("Id", 6000), ("TenantId", TenantB), ("CustomerId", 200), ("Status", "Open"), ("Total", 999m));
+        await InsertRawAsync(connection, provider, "SampleOrderLine", cancellationToken,
+            ("Id", 8000), ("TenantId", TenantB), ("OrderId", 6000), ("ProductId", 2000), ("Quantity", 1), ("UnitPrice", 999m));
+    }
+
+    private static async Task InsertRawAsync(DbConnection connection, DatabaseProvider provider, string table,
+        CancellationToken cancellationToken, params (string Column, object Value)[] columns)
+    {
+        await using var command = connection.CreateCommand();
+        var cols = string.Join(", ", columns.Select(c => provider.Escape(c.Column)));
+        var vals = string.Join(", ", columns.Select((_, i) => provider.ParamPrefix + "p" + i));
+        command.CommandText = $"INSERT INTO {provider.Escape(table)} ({cols}) VALUES ({vals})";
+        for (var i = 0; i < columns.Length; i++)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = provider.ParamPrefix + "p" + i;
+            parameter.Value = columns[i].Value;
+            command.Parameters.Add(parameter);
+        }
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task VerifyTenantBoundaryAsync(
