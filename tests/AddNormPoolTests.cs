@@ -128,4 +128,65 @@ public class AddNormPoolTests
         Assert.True(pooled);                        // poolable (no live tx)
         Assert.Null(keyField.GetValue(ctx));        // tenant key cleared → next lease re-applies its own tenant
     }
+
+    private static bool IsDisposed(DbContext ctx)
+        => (bool)typeof(DbContext).GetField("_disposed", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(ctx)!;
+
+    [Fact]
+    public void Concurrent_leases_are_distinct_and_the_pool_is_thread_safe()
+    {
+        using var cn = NewDb();
+        using var sp = BuildPool(cn, poolSize: 64);
+
+        // Lease across many scopes in parallel; every LIVE lease must get its own context (a pooled context
+        // must never be handed to two live leases at once). No queries → no shared-connection contention.
+        const int n = 16;
+        var scopes = new IServiceScope[n];
+        var ctxs = new DbContext[n];
+        System.Threading.Tasks.Parallel.For(0, n, i =>
+        {
+            scopes[i] = sp.CreateScope();
+            ctxs[i] = scopes[i].ServiceProvider.GetRequiredService<DbContext>();
+        });
+        Assert.Equal(n, ctxs.Distinct().Count());
+
+        // Return them all concurrently (stresses Rent/Return thread-safety), then a fresh lease reuses one.
+        System.Threading.Tasks.Parallel.For(0, n, i => scopes[i].Dispose());
+        using var scope = sp.CreateScope();
+        Assert.Contains(scope.ServiceProvider.GetRequiredService<DbContext>(), ctxs);
+    }
+
+    [Fact]
+    public void Pool_respects_max_size_and_disposes_the_overflow()
+    {
+        using var cn = NewDb();
+        using var sp = BuildPool(cn, poolSize: 1);
+
+        var scope1 = sp.CreateScope(); var a = scope1.ServiceProvider.GetRequiredService<DbContext>();
+        var scope2 = sp.CreateScope(); var b = scope2.ServiceProvider.GetRequiredService<DbContext>();
+        Assert.NotSame(a, b);
+
+        scope1.Dispose();   // a → reset + pooled (count 1)
+        scope2.Dispose();   // b → pool already full → disposed rather than pooled
+
+        Assert.False(IsDisposed(a));   // a is pooled and alive
+        Assert.True(IsDisposed(b));    // b overflowed the bound → disposed
+        using var scope3 = sp.CreateScope();
+        Assert.Same(a, scope3.ServiceProvider.GetRequiredService<DbContext>());   // the pooled one is reused
+    }
+
+    [Fact]
+    public void Disposing_the_provider_disposes_pooled_contexts()
+    {
+        using var cn = NewDb();
+        var sp = BuildPool(cn);
+
+        DbContext ctx;
+        using (var scope = sp.CreateScope())
+            ctx = scope.ServiceProvider.GetRequiredService<DbContext>();   // returned to the pool at scope end
+
+        Assert.False(IsDisposed(ctx));
+        sp.Dispose();                   // disposes the singleton pool, which disposes every pooled context
+        Assert.True(IsDisposed(ctx));   // no leaked pooled context (and, with owned connections, no leaked connection)
+    }
 }
