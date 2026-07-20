@@ -289,6 +289,15 @@ namespace nORM.Query
                 if (!mapping.TryGetColumnForMemberAccess(member, out var targetColumn))
                     throw new NormQueryException(
                         $"Property path '{member}' on type '{mapping.Type.Name}' is not mapped to a database column.");
+                // The tenant column is identity-defining: setting it via ExecuteUpdate would move the
+                // matched rows into another tenant (the WHERE clause scopes to the current tenant, but
+                // the SET rewrites the tenant), silently removing them from the current tenant's data.
+                // Reject it, mirroring the tracked/direct write paths.
+                if (_ctx.Options.TenantProvider != null && mapping.TenantColumn != null
+                    && string.Equals(targetColumn.Name, mapping.TenantColumn.Name, StringComparison.Ordinal))
+                    throw new NormQueryException(
+                        $"Cannot set the tenant column '{targetColumn.Name}' via ExecuteUpdate: it would move " +
+                        "the matched rows into another tenant. A row's tenant is immutable under tenant isolation.");
                 var column = targetColumn.EscCol;
 
                 var valueArg = StripQuotes(call.Arguments[1]);

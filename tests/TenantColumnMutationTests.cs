@@ -97,4 +97,38 @@ public class TenantColumnMutationTests
         Assert.Equal("updated", (string)cmd.ExecuteScalar()!);
         Assert.Equal(1, CountInTenant(cn, 1, "A"));
     }
+
+    [Fact]
+    public async Task Setting_the_tenant_column_via_ExecuteUpdate_is_rejected_and_does_not_move_the_row()
+    {
+        var (cn, ctx) = Create("A");
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        await ctx.InsertAsync(new TcmItem { Id = 1, Name = "n", TenantId = "A" });
+
+        // A set-based update that rewrites the tenant column must be rejected, not executed.
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            ctx.Query<TcmItem>().Where(i => i.Id == 1)
+               .ExecuteUpdateAsync(s => s.SetProperty(i => i.TenantId, "B")));
+
+        Assert.Equal(1, CountInTenant(cn, 1, "A"));
+        Assert.Equal(0, CountInTenant(cn, 1, "B"));
+    }
+
+    [Fact]
+    public async Task Setting_a_non_tenant_column_via_ExecuteUpdate_still_works()
+    {
+        var (cn, ctx) = Create("A");
+        using var _cn = cn;
+        using var _ctx = ctx;
+
+        await ctx.InsertAsync(new TcmItem { Id = 1, Name = "n", TenantId = "A" });
+
+        var affected = await ctx.Query<TcmItem>().Where(i => i.Id == 1)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.Name, "updated"));
+
+        Assert.Equal(1, affected);
+        Assert.Equal(1, CountInTenant(cn, 1, "A"));
+    }
 }
