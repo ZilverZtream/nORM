@@ -202,6 +202,29 @@ namespace nORM.Migration
             {
                 warnings.Add($"Alter column '{column}' changes computed column SQL; stored computed values may be rebuilt.");
             }
+
+            // A Unicode -> non-Unicode change (e.g. NVARCHAR -> VARCHAR) is a lossy code-page conversion:
+            // on SQL Server, characters not representable in the target code page are silently replaced
+            // with '?', with no length overflow and no truncation error to signal it. The prior classifier
+            // ignored this, so such an alter shipped without the --force gate.
+            if (newColumn.IsUnicode == false && oldColumn.IsUnicode != false)
+            {
+                warnings.Add($"Alter column '{column}' changes from Unicode to non-Unicode storage and may silently replace characters that are not representable in the target code page.");
+            }
+
+            if (oldColumn.IsFixedLength != newColumn.IsFixedLength)
+            {
+                warnings.Add($"Alter column '{column}' changes fixed-length storage from '{oldColumn.IsFixedLength}' to '{newColumn.IsFixedLength}' and may pad or truncate existing values.");
+            }
+
+            // An explicit store-type (HasColumnType) change is an opaque raw override the schema model
+            // cannot prove is widening; a narrowing such as nvarchar(200) -> varchar(50) or decimal(18,4)
+            // -> decimal(5,2) truncates, clamps, or converts existing data lossily. Warn so it requires
+            // an explicit review/--force rather than shipping silently.
+            if (!string.Equals(oldColumn.StoreType, newColumn.StoreType, StringComparison.OrdinalIgnoreCase))
+            {
+                warnings.Add($"Alter column '{column}' changes the explicit store type from '{oldColumn.StoreType ?? "(default)"}' to '{newColumn.StoreType ?? "(default)"}' and may truncate or convert existing data lossily.");
+            }
         }
 
         private static bool NarrowsPrecisionOrScale(ColumnSchema oldColumn, ColumnSchema newColumn)
