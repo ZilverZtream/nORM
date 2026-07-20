@@ -71,6 +71,11 @@ namespace nORM.Query
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int take))
                 {
                     take = Math.Max(0, take);
+                    // Chained literal Take composes as the minimum: Take(a).Take(b) returns the first b of
+                    // the first a rows. Previously the second overwrote the first, so Take(2).Take(5)
+                    // wrongly returned 5. (Parameterized-take chains keep their existing handling.)
+                    if (t._take.HasValue && t._takeParam == null)
+                        take = Math.Min(t._take.Value, take);
                     // Inline literal Take values directly in SQL instead of parameterizing.
                     // Parameterized LIMIT (@p0) prevents SQLite's planner from using ANALYZE statistics
                     // to estimate result cardinality. Literal LIMIT (20) lets the planner optimize.
@@ -111,7 +116,9 @@ namespace nORM.Query
                     skipForLiteral = Math.Max(0, skipForLiteral);
                     var originalTake = t._take.Value;
                     t._take = Math.Max(0, originalTake - skipForLiteral);
-                    t._skip = skipForLiteral;
+                    // Preserve any literal offset an earlier Skip already set — Skip(a).Take(n).Skip(b) skips
+                    // a+b — rather than replacing it, which dropped the earlier offset.
+                    t._skip = (t._skipParam == null ? (t._skip ?? 0) : 0) + skipForLiteral;
                     t._skipParam = null;
                     return source;
                 }
@@ -155,8 +162,14 @@ namespace nORM.Query
                 }
                 else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skip))
                 {
+                    skip = Math.Max(0, skip);
+                    // Chained literal Skip composes additively: Skip(a).Skip(b) skips a+b. Add to any offset an
+                    // earlier Skip already set rather than overwriting it, which silently dropped the first
+                    // offset (so Skip(5).Skip(0) wrongly returned the unskipped rows).
+                    if (t._skip.HasValue && t._skipParam == null)
+                        skip += t._skip.Value;
                     // Inline literal Skip values directly in SQL (same rationale as Take).
-                    t._skip = Math.Max(0, skip);
+                    t._skip = skip;
                     t._skipParam = null;
                 }
                 return source;
