@@ -573,6 +573,30 @@ namespace nORM.Query
         private sealed class OrderByTranslator : IMethodCallTranslator
         {
             /// <summary>
+            /// True when the source, walked through any OrderBy/ThenBy chain, bottoms out at a set operation.
+            /// The order keys of a set-op result must reference unqualified result columns, and a ThenBy after
+            /// <c>OrderBy(&lt;setop&gt;)</c> is still ordering that compound.
+            /// </summary>
+            private static bool SourceChainIsSetOp(Expression source)
+            {
+                var current = source;
+                while (current is MethodCallExpression m)
+                {
+                    if (m.Method.Name is "Union" or "Concat" or "Intersect" or "Except")
+                        return true;
+                    if (m.Arguments.Count > 0
+                        && m.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                                         or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending))
+                    {
+                        current = m.Arguments[0];
+                        continue;
+                    }
+                    return false;
+                }
+                return false;
+            }
+
+            /// <summary>
             /// Windowed-source branch — wraps the source as a derived table and emits
             /// the new OrderBy against the wrap alias. Replaces a throw-pin with the
             /// LINQ-correct behaviour: outer OrderBy resorts only the windowed rows.
@@ -649,8 +673,12 @@ namespace nORM.Query
                 // "Member 'V' is not supported in this context". The correct SQL just
                 // references the projection's aliased column name, e.g.
                 // `SELECT V FROM Left UNION SELECT V FROM Right ORDER BY V`.
-                bool sourceIsSetOp = node.Arguments[0] is MethodCallExpression sourceMce
-                    && sourceMce.Method.Name is "Union" or "Concat" or "Intersect" or "Except";
+                // Walk through any OrderBy/ThenBy chain: a ThenBy after `OrderBy(<setop>)` still orders the
+                // compound, so its key must be an unqualified result column too. Detecting only a DIRECT set-op
+                // source ordered the first key correctly but let a trailing ThenBy fall through to the path that
+                // table-qualifies the term, which a compound SELECT rejects ("Nth ORDER BY term does not match
+                // any column in the result set").
+                bool sourceIsSetOp = SourceChainIsSetOp(node.Arguments[0]);
                 var source = t.Visit(node.Arguments[0]);
                 if (sourceIsSetOp
                     && QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression setOpKeySel
