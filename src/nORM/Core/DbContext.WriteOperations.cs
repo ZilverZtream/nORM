@@ -557,6 +557,12 @@ namespace nORM.Core
         private static IEnumerable<TableMapping> TopologicalSortMappings(IEnumerable<TableMapping> mappings)
         {
             var all = mappings.ToList();
+            // Zero or one mapping has no inter-type ordering constraint, so it IS its own topological order.
+            // Short-circuit before building the dependency dictionaries + sort structures — this is the common
+            // single-entity / single-type SaveChanges shape and the sort machinery is pure allocation there
+            // (the method runs three times per save: added, modified, deleted mappings).
+            if (all.Count <= 1)
+                return all;
             var hardDeps = all.ToDictionary(
                 m => m,
                 // A self-referential type (Category→Parent, Employee→Manager) is never its own
