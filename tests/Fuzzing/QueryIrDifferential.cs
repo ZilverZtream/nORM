@@ -79,6 +79,36 @@ namespace nORM.Tests.Fuzzing
             };
         }
 
+        /// <summary>
+        /// Minimizes a failing IR to a compact regression: first delta-debugs the step list, then the rows,
+        /// each reduction adopted only while it reproduces the SAME failure signature. The result is the
+        /// smallest query + data that still diverges — "these rows through these steps disagree", not the whole
+        /// generated case. <paramref name="execute"/> defaults to the real differential; a synthetic executor
+        /// can be supplied to test the reducer.
+        /// </summary>
+        public static QueryIr ShrinkPreservingFailure(QueryIr failing, Func<QueryIr, FuzzCaseResult>? execute = null)
+        {
+            execute ??= ir => Execute(ir, seed: 0);
+            var target = execute(failing);
+            if (!target.Outcome.IsFailure())
+                throw new ArgumentException("The case to shrink must reproduce a failure.", nameof(failing));
+            var signature = target.FailureSignature();
+
+            bool StillFails(QueryIr candidate)
+            {
+                var r = execute(candidate);
+                return r.Outcome.IsFailure() && r.FailureSignature() == signature;
+            }
+
+            var steps = Shrinker.MinimizeSequence(failing.Steps,
+                s => StillFails(failing with { Steps = s.ToList() }));
+            var afterSteps = failing with { Steps = steps.ToList() };
+
+            var rows = Shrinker.MinimizeSequence(afterSteps.Rows,
+                r => StillFails(afterSteps with { Rows = r.ToList() }));
+            return afterSteps with { Rows = rows.ToList() };
+        }
+
         // ─── compilation ────────────────────────────────────────────────────
 
         private static IEnumerable<IrRow> RunLinq(QueryIr ir)
