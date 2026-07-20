@@ -150,7 +150,11 @@ namespace nORM.Providers
 
             var sw = Stopwatch.StartNew();
             var tempTableName = $"`BulkUpdate_{Guid.NewGuid():N}`";
-            var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
+            // Build the SET from UpdateColumns (non-key, non-timestamp, non-db-generated), NOT every
+            // non-key column. DB-generated non-key columns are created in the temp table but never
+            // staged (StageForBulkUpdateAsync excludes them), so SETting them here would overwrite the
+            // committed live value with the staged NULL.
+            var nonKeyCols = m.UpdateColumns.ToList();
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetStagingSqlType(c, m)}"));
 
             var tempCreated = false;

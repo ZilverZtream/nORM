@@ -98,7 +98,11 @@ namespace nORM.Providers
             if (ctx.Options.UseBatchedBulkOps) return await base.BatchedUpdateAsync(ctx, m, entities, ct).ConfigureAwait(false);
 
             var sw = Stopwatch.StartNew();
-            var nonKeyCols = m.Columns.Where(c => !c.IsKey).ToList();
+            // Build the SET from UpdateColumns (non-key, non-timestamp, non-db-generated), NOT every
+            // non-key column. DB-generated non-key columns are created in the temp table but never
+            // staged (BulkInsertInternalAsync excludes them), so SETting them here would overwrite the
+            // committed live value with the staged NULL. The rowversion is likewise DB-managed.
+            var nonKeyCols = m.UpdateColumns.ToList();
             if (nonKeyCols.Count == 0) return 0;
             var tempTableName = $"#BulkUpdate_{Guid.NewGuid():N}";
             var colDefs = string.Join(", ", m.Columns.Select(c => $"{c.EscCol} {GetStagingSqlType(c, m)}"));
