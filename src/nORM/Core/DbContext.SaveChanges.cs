@@ -697,6 +697,18 @@ namespace nORM.Core
                                     {
                                         if (navProp.PropertyType != principalEntry.Mapping.Type)
                                             continue;
+                                        // Only the navigation that actually BACKS this cascade relation
+                                        // (its foreign key is one of relation.ForeignKeys) may pull the
+                                        // dependent in. A second, unrelated navigation to the same
+                                        // principal CLR type — e.g. a non-cascading Editor alongside the
+                                        // cascading Author — must not: honoring it would silently delete a
+                                        // dependent that belongs to a DIFFERENT, surviving principal via
+                                        // its cascade foreign key.
+                                        var navFk = nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(
+                                            dependentEntry.Mapping, navProp.Name, navProp.PropertyType, principalEntry.Mapping);
+                                        if (navFk == null ||
+                                            !relation.ForeignKeys.Any(fk => string.Equals(fk.Name, navFk.Name, StringComparison.Ordinal)))
+                                            continue;
                                         object? navValue;
                                         try { navValue = navProp.GetValue(dependent); }
                                         catch { continue; }
