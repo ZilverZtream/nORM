@@ -291,6 +291,21 @@ namespace nORM.Core
                             "Detach the entity, modify the key, then re-attach.");
                 }
 
+                // A tenant column is identity-defining: changing it on a tracked entity would move the
+                // row into a different tenant, silently removing it from the current tenant's data (the
+                // UPDATE matches the current tenant in its WHERE clause but the SET rewrites the tenant
+                // value). Like a primary-key mutation, reject it loudly rather than perform a silent
+                // cross-tenant move. The direct and bulk write paths already enforce this via
+                // ValidateTenantContext; the batched SaveChanges path did not.
+                if (Options.TenantProvider != null && map.TenantColumn != null
+                    && entry.HasColumnValueChanged(map.TenantColumn))
+                {
+                    throw new InvalidOperationException(
+                        $"Tenant column mutation detected on entity '{map.Type.Name}'. " +
+                        "The tenant of a tracked entity cannot be changed by an update, because it would " +
+                        "move the row out of the current tenant. Detach the entity to migrate it deliberately.");
+                }
+
                 // Partial-column UPDATE: the SAME setCols array feeds both the SQL builder and the parameter
                 // binder, keeping the positional @pN parameters aligned. See ComputeUpdateSetColumns.
                 var setCols = ComputeUpdateSetColumns(entry, map, updateColSet);
