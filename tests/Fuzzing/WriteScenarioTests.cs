@@ -64,6 +64,36 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public void Coverage_guided_write_sweep_persists_the_model()
+        {
+            var manifest = new FuzzRunManifest(new FuzzRunEnvironment
+            {
+                RunId = "crud-sweep", CommitSha = "local", Runtime = ".NET 8", Os = "test", TimestampUtc = "2020-01-01T00:00:00Z",
+            });
+            var seen = new HashSet<string>(System.StringComparer.Ordinal);
+            var corpus = new List<WriteScenario>();
+
+            for (var seed = 0; seed < 400; seed++)
+            {
+                var s = WriteScenarioGenerator.Generate(seed);
+                var r = WriteScenarioDifferential.Execute(s, seed);
+                manifest.Record(r);
+                if (r.Features.Any(f => seen.Add(f)))
+                    corpus.Add(s);
+            }
+
+            var failures = manifest.DedupedFailures();
+            Assert.True(failures.Count == 0,
+                "write-path sweep found a divergence between nORM and the reference model:\n" +
+                string.Join("\n", failures.Select(f => $"  {f.Outcome}: {f.Detail}\n  case: {f.SerializedCase}")));
+            Assert.True(corpus.Count >= 3, $"corpus should capture diverse write coverage, got {corpus.Count}");
+            var frontier = manifest.FeatureFrontier();
+            Assert.Contains("insert", frontier);
+            Assert.Contains("update", frontier);
+            Assert.Contains("delete", frontier);
+        }
+
+        [Fact]
         public void Scenario_round_trips_through_json()
         {
             var s = S(WriteOp.Insert(1, 10), WriteOp.Update(1, 15), WriteOp.Save(), WriteOp.Delete(1), WriteOp.Save());
