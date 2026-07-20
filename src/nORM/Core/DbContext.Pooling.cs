@@ -16,15 +16,15 @@ namespace nORM.Core
         internal void SetPoolReturnHook(Func<bool>? hook) => _poolReturnHook = hook;
 
         // Invoked at the start of Dispose/DisposeAsync. Returns true when the context was returned to its pool
-        // (the caller must skip teardown). The hook is cleared before invoking so a re-entrant dispose during
-        // reset cannot loop; the pool re-sets it when the context is leased again.
+        // (the caller must skip teardown). The hook is taken ATOMICALLY so two concurrent Dispose calls cannot
+        // both observe it non-null and both return the context — which would re-pool it twice and hand the same
+        // instance to two leases at once. The pool re-sets the hook when the context is leased again.
         private bool TryReturnToPoolOnDispose()
         {
-            var hook = _poolReturnHook;
-            if (hook == null || _disposed)
+            if (_disposed)
                 return false;
-            _poolReturnHook = null;
-            return hook();
+            var hook = System.Threading.Interlocked.Exchange(ref _poolReturnHook, null);
+            return hook != null && hook();
         }
 
         /// <summary>
