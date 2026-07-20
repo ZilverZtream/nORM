@@ -576,7 +576,9 @@ namespace nORM.Core
                     var sb = new System.Text.StringBuilder();
                     foreach (var col in ocm.Columns)
                     {
-                        sb.Append(col.Getter(item)?.ToString() ?? "\0");
+                        var raw = col.Getter(item);
+                        var provider = col.Converter != null && raw != null ? col.Converter.ConvertToProvider(raw) : raw;
+                        sb.Append(FormatValueForSignature(provider));
                         sb.Append('\x1f');
                     }
                     signatures.Add(sb.ToString());
@@ -585,6 +587,26 @@ namespace nORM.Core
             signatures.Sort(StringComparer.Ordinal); // multiset compare, order-insensitive
             return signatures;
         }
+
+        /// <summary>
+        /// Renders an owned column value into a change-detection signature fragment that DISTINGUISHES
+        /// different values. A plain ToString() is blind to several column kinds — a byte[] renders as
+        /// "System.Byte[]" for every value, a sub-second DateTime/DateTimeOffset drops its fractional part,
+        /// and a custom value object renders as its type name — so an edit to such a column would leave the
+        /// signature unchanged, the owner Unchanged, and the owned-collection sync would never run, silently
+        /// dropping the edit. The value is taken post-converter (a custom type becomes its provider primitive)
+        /// and encoded round-trippably per type.
+        /// </summary>
+        private static string FormatValueForSignature(object? value) => value switch
+        {
+            null => "\0",
+            byte[] bytes => Convert.ToBase64String(bytes),
+            DateTime dt => dt.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            DateTimeOffset dto => dto.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            TimeSpan ts => ts.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? "\0"
+        };
 
         /// <summary>
         /// Compares each owned collection's current content signature multiset against
