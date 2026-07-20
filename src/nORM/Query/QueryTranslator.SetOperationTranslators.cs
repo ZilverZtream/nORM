@@ -83,6 +83,21 @@ namespace nORM.Query
                 // duplicates.
                 t._isDistinct = true;
                 var source = t.Visit(node.Arguments[0]);
+                // When the source already emitted a full SELECT into _sql — a projection or Where over a set op
+                // wraps the compound as `SELECT ... FROM (compound) AS alias` — Build() skips SELECT generation,
+                // so the DISTINCT carried only in _isDistinct never reaches the SQL and duplicates survive
+                // (e.g. `setop(...).Select(x => x.A + k).Distinct()`). Inject the keyword into the pre-filled
+                // projection; Build won't double it because it only renders DISTINCT for an empty buffer.
+                if (t._sql.Length > 0)
+                {
+                    var pre = t._sql.ToString();
+                    if (pre.StartsWith("SELECT ", StringComparison.Ordinal)
+                        && !pre.StartsWith("SELECT DISTINCT ", StringComparison.Ordinal))
+                    {
+                        t._sql.Clear();
+                        t._sql.Append("SELECT DISTINCT ").Append(pre.AsSpan("SELECT ".Length));
+                    }
+                }
                 // LINQ Distinct does not preserve the source ordering, and a surviving
                 // ORDER BY over non-projected columns is invalid SQL under DISTINCT on
                 // MySQL/Postgres ("ORDER BY not in SELECT list"). Any OrderBy applied
