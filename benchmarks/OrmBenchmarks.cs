@@ -86,6 +86,11 @@ namespace nORM.Benchmarks
 
         private SqliteCommand? _adoInsertPrepared;
         private SqliteCommand? _adoUpdatePrepared;
+        private SqliteCommand? _adoDeletePrepared;
+
+        // A throwaway row (outside the 1000-row seed, IsActive=0 so it never matches the read
+        // benchmarks' predicates) that the Delete benchmarks target; re-inserted before each iteration.
+        private const int DeleteRowId = 999_001;
 
         private SqliteCommand? _adoComplexPrepared;
         private SqliteParameter? _adoComplexAgeParam;
@@ -308,6 +313,32 @@ namespace nORM.Benchmarks
                 _adoUpdatePrepared.Parameters.Add(p);
             }
             _adoUpdatePrepared.Prepare();
+
+            // Prepared DELETE reused across calls — the fair floor for nORM's / EF's tracked delete.
+            _adoDeletePrepared = _dapperConnection.CreateCommand();
+            _adoDeletePrepared.CommandText = "DELETE FROM BenchmarkUser WHERE Id=@Id;";
+            var delIdParam = _adoDeletePrepared.CreateParameter();
+            delIdParam.ParameterName = "@Id";
+            _adoDeletePrepared.Parameters.Add(delIdParam);
+            _adoDeletePrepared.Prepare();
+        }
+
+        // Re-create the throwaway delete target before each Delete iteration (INSERT OR REPLACE keeps the
+        // single shared benchmark.db in a known state). Runs outside the measured region.
+        [IterationSetup(Targets = new[]
+        {
+            nameof(Delete_Single_EfCore), nameof(Delete_Single_nORM), nameof(Delete_Single_Dapper),
+            nameof(Delete_Single_RawAdo), nameof(Delete_Single_RawAdo_Prepared)
+        })]
+        public void EnsureDeleteRow()
+        {
+            using var cmd = _dapperConnection!.CreateCommand();
+            cmd.CommandText = "INSERT OR REPLACE INTO BenchmarkUser (Id, Name, Email, CreatedAt, IsActive, Age, City, Department, Salary) " +
+                              "VALUES (@Id, 'Del', 'del@x.com', '2024-01-01', 0, 41, 'DelCity', 'DelDept', 61000);";
+            var p = cmd.CreateParameter(); p.ParameterName = "@Id"; p.Value = DeleteRowId; cmd.Parameters.Add(p);
+            cmd.ExecuteNonQuery();
+            _efContext?.ChangeTracker.Clear();
+            _nOrmContext?.ChangeTracker.Clear();
         }
 
         // ========== SINGLE INSERT (reuse contexts/connections; no per-op PRAGMAs) ==========
@@ -488,6 +519,48 @@ namespace nORM.Benchmarks
             p[7].Value = 61_000;
             p[8].Value = 1;
             await _adoUpdatePrepared.ExecuteNonQueryAsync();
+        }
+
+        // ========== SINGLE DELETE (write path) ==========
+        // Deletes a fixed throwaway row by key. nORM/EF go through the tracked Remove(stub) + SaveChanges
+        // path (the same batched write path the StringBuilder-sizing fix touched); Dapper/raw ADO issue the
+        // DELETE directly. The prepared raw-ADO tier is the fair floor. EnsureDeleteRow re-creates the row
+        // before each iteration.
+
+        [Benchmark]
+        public async Task Delete_Single_EfCore()
+        {
+            _efContext!.Users.Remove(new BenchmarkUser { Id = DeleteRowId });
+            await _efContext.SaveChangesAsync();
+            _efContext.ChangeTracker.Clear();
+        }
+
+        [Benchmark]
+        public async Task Delete_Single_nORM()
+        {
+            _nOrmContext!.Remove(new BenchmarkUser { Id = DeleteRowId });
+            await _nOrmContext.SaveChangesAsync();
+            _nOrmContext.ChangeTracker.Clear();
+        }
+
+        [Benchmark]
+        public async Task Delete_Single_Dapper()
+            => await _dapperConnection!.ExecuteAsync("DELETE FROM BenchmarkUser WHERE Id=@Id;", new { Id = DeleteRowId });
+
+        [Benchmark]
+        public async Task Delete_Single_RawAdo()
+        {
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = "DELETE FROM BenchmarkUser WHERE Id=@Id;";
+            command.Parameters.AddWithValue("@Id", DeleteRowId);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        [Benchmark(Description = "Delete Single Raw ADO (Prepared)")]
+        public async Task Delete_Single_RawAdo_Prepared()
+        {
+            _adoDeletePrepared!.Parameters[0].Value = DeleteRowId;
+            await _adoDeletePrepared.ExecuteNonQueryAsync();
         }
 
         // ========== SIMPLE QUERY (standard) ==========
