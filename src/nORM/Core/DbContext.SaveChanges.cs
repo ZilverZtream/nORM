@@ -206,6 +206,7 @@ namespace nORM.Core
             var transaction = transactionManager.Transaction;
 
             var totalAffected = 0;
+            var committedSuccessfully = false;
             try
             {
                 IEnumerable<IGrouping<(EntityState State, TableMapping Mapping), EntityEntry>> orderedGroups;
@@ -419,39 +420,10 @@ namespace nORM.Core
                 }
                 onCommitAttempted?.Invoke();
                 await transactionManager.CommitAsync().ConfigureAwait(false);
-
-                // X1 fix: accept tracker state whenever writes committed independently.
-                // This covers: owned tx (OwnsTransaction=true), ambient Ignore policy (enlistment
-                // intentionally skipped), and ambient BestEffort where enlistment failed (writes
-                // committed outside scope). For external explicit transactions or successfully-enlisted
-                // ambient scopes, ShouldAcceptChanges=false and the caller controls durability.
-                if (transactionManager.ShouldAcceptChanges)
-                {
-                    // Capture the deleted instances BEFORE detaching them — Remove
-                    // resets the entry state, and the navigation cleanup below needs
-                    // to know which instances just left the database.
-                    List<object>? deletedInstances = null;
-                    foreach (var entry in changedEntries)
-                    {
-                        if (entry.State == EntityState.Deleted)
-                        {
-                            // Remove deleted entities from the ChangeTracker
-                            if (entry.Entity is { } entityToRemove)
-                            {
-                                (deletedInstances ??= new List<object>()).Add(entityToRemove);
-                                ChangeTracker.Remove(entityToRemove, true);
-                            }
-                        }
-                        else
-                        {
-                            // Mark Added/Modified entities as Unchanged
-                            entry.AcceptChanges();
-                        }
-                    }
-
-                    if (deletedInstances != null)
-                        RemoveDeletedInstancesFromTrackedNavigations(deletedInstances);
-                }
+                // The write is now durably committed. Everything after this point (tracker accept,
+                // navigation cleanup) is hoisted OUT of the try below so a throw there cannot reach the
+                // rollback/key-reset catch and undo a committed transaction.
+                committedSuccessfully = true;
             }
             catch (Exception originalEx)
             {
@@ -495,6 +467,40 @@ namespace nORM.Core
 
                 System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(originalEx).Throw();
                 throw; // unreachable - satisfies compiler
+            }
+
+            // Accept tracker state AFTER the commit and OUTSIDE the try/catch. A throw here — a faulting
+            // entity getter during snapshot capture, a lazy navigation load that faults during cleanup —
+            // must NOT reach the catch above: doing so would roll back the already-committed transaction
+            // and reset the committed DB-generated keys, corrupting the tracker into re-inserting the
+            // committed rows on the next save while reporting the save as failed. Mirrors the interceptor
+            // hoist below. Covers owned tx, ambient Ignore, and ambient BestEffort where enlistment failed;
+            // ShouldAcceptChanges is false for external/enlisted scopes (the caller controls durability).
+            if (committedSuccessfully && transactionManager.ShouldAcceptChanges)
+            {
+                // Capture the deleted instances BEFORE detaching them — Remove resets the entry state,
+                // and the navigation cleanup below needs to know which instances just left the database.
+                List<object>? deletedInstances = null;
+                foreach (var entry in changedEntries)
+                {
+                    if (entry.State == EntityState.Deleted)
+                    {
+                        // Remove deleted entities from the ChangeTracker
+                        if (entry.Entity is { } entityToRemove)
+                        {
+                            (deletedInstances ??= new List<object>()).Add(entityToRemove);
+                            ChangeTracker.Remove(entityToRemove, true);
+                        }
+                    }
+                    else
+                    {
+                        // Mark Added/Modified entities as Unchanged
+                        entry.AcceptChanges();
+                    }
+                }
+
+                if (deletedInstances != null)
+                    RemoveDeletedInstancesFromTrackedNavigations(deletedInstances);
             }
 
             // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch
