@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using nORM.Configuration;
 using nORM.Core;
+using nORM.DependencyInjection;
 using nORM.Providers;
 
 #nullable enable
@@ -113,6 +114,41 @@ namespace Microsoft.Extensions.DependencyInjection
 
             services.TryAddSingleton<INormDbContextFactory<TContext>>(
                 sp => new NormDbContextFactory<TContext>(sp, contextFactory));
+            return services;
+        }
+
+        /// <summary>
+        /// Registers <typeparamref name="TContext"/> as a POOLED scoped service — the Entity Framework Core
+        /// <c>AddDbContextPool</c> analogue. A bounded pool of warm contexts is reused across DI scopes,
+        /// avoiding the per-context reflection, prepared-command and fast-path SQL cache warm-up on every
+        /// request (the dominant cost of the ASP.NET new-context-per-request pattern). When a scope ends the
+        /// context is reset — change tracker and identity map cleared, native tenant session key cleared so
+        /// the next lease re-applies its own tenant — and returned to the pool; a context holding a live
+        /// transaction is disposed rather than pooled. The factory runs against the ROOT service provider, so
+        /// pooled contexts (and their connections, pooled as a unit) must not depend on scoped services.
+        /// </summary>
+        /// <param name="services">The service collection to add the registration to.</param>
+        /// <param name="contextFactory">Factory that builds a context from the root service provider.</param>
+        /// <param name="poolSize">Maximum number of contexts retained in the pool. Defaults to 1024.</param>
+        /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="services"/> or <paramref name="contextFactory"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="poolSize"/> is not positive.</exception>
+        public static IServiceCollection AddNormPool<TContext>(
+            this IServiceCollection services,
+            Func<IServiceProvider, TContext> contextFactory,
+            int poolSize = 1024)
+            where TContext : DbContext
+        {
+            ArgumentNullException.ThrowIfNull(services);
+            ArgumentNullException.ThrowIfNull(contextFactory);
+            if (poolSize <= 0)
+                throw new ArgumentOutOfRangeException(nameof(poolSize), "Pool size must be greater than zero.");
+
+            services.TryAddSingleton(sp => new NormDbContextPool<TContext>(() => contextFactory(sp), poolSize));
+            services.Add(new ServiceDescriptor(
+                typeof(TContext),
+                sp => sp.GetRequiredService<NormDbContextPool<TContext>>().Rent(),
+                ServiceLifetime.Scoped));
             return services;
         }
 

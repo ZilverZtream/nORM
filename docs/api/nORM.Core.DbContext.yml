@@ -1049,7 +1049,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RegisterForDisposal
     path: src/nORM/Core/DbContext.Disposal.cs
-    startLine: 151
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1081,7 +1081,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContext.Disposal.cs
-    startLine: 185
+    startLine: 189
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1111,7 +1111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContext.Disposal.cs
-    startLine: 195
+    startLine: 199
   assemblies:
   - nORM
   namespace: nORM.Core

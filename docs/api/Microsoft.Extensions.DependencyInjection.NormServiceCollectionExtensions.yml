@@ -7,6 +7,7 @@ items:
   children:
   - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.String,System.Func{nORM.Providers.DatabaseProvider},System.Action{nORM.Configuration.DbContextOptions},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
   - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0})
+  - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},System.Int32)
   - Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNorm``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},Microsoft.Extensions.DependencyInjection.ServiceLifetime)
   langs:
   - csharp
@@ -22,7 +23,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormServiceCollectionExtensions
     path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
-    startLine: 19
+    startLine: 20
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.DependencyInjection
@@ -73,7 +74,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddNorm
     path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
-    startLine: 48
+    startLine: 49
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.DependencyInjection
@@ -160,7 +161,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddNorm
     path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
-    startLine: 80
+    startLine: 81
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.DependencyInjection
@@ -214,7 +215,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddNormFactory
     path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
-    startLine: 105
+    startLine: 106
   assemblies:
   - nORM
   namespace: Microsoft.Extensions.DependencyInjection
@@ -248,6 +249,75 @@ items:
   nameWithType.vb: NormServiceCollectionExtensions.AddNormFactory(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext))
   fullName.vb: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory(Of TContext)(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func(Of System.IServiceProvider, TContext))
   name.vb: AddNormFactory(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext))
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},System.Int32)
+  commentId: M:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},System.Int32)
+  id: AddNormPool``1(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Func{System.IServiceProvider,``0},System.Int32)
+  isExtensionMethod: true
+  parent: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions
+  langs:
+  - csharp
+  - vb
+  name: AddNormPool<TContext>(IServiceCollection, Func<IServiceProvider, TContext>, int)
+  nameWithType: NormServiceCollectionExtensions.AddNormPool<TContext>(IServiceCollection, Func<IServiceProvider, TContext>, int)
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool<TContext>(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func<System.IServiceProvider, TContext>, int)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AddNormPool
+    path: src/nORM/DependencyInjection/NormServiceCollectionExtensions.cs
+    startLine: 135
+  assemblies:
+  - nORM
+  namespace: Microsoft.Extensions.DependencyInjection
+  summary: >-
+    Registers <code class="typeparamref">TContext</code> as a POOLED scoped service — the Entity Framework Core
+
+    <code>AddDbContextPool</code> analogue. A bounded pool of warm contexts is reused across DI scopes,
+
+    avoiding the per-context reflection, prepared-command and fast-path SQL cache warm-up on every
+
+    request (the dominant cost of the ASP.NET new-context-per-request pattern). When a scope ends the
+
+    context is reset — change tracker and identity map cleared, native tenant session key cleared so
+
+    the next lease re-applies its own tenant — and returned to the pool; a context holding a live
+
+    transaction is disposed rather than pooled. The factory runs against the ROOT service provider, so
+
+    pooled contexts (and their connections, pooled as a unit) must not depend on scoped services.
+  example: []
+  syntax:
+    content: 'public static IServiceCollection AddNormPool<TContext>(this IServiceCollection services, Func<IServiceProvider, TContext> contextFactory, int poolSize = 1024) where TContext : DbContext'
+    parameters:
+    - id: services
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The service collection to add the registration to.
+    - id: contextFactory
+      type: System.Func{System.IServiceProvider,{TContext}}
+      description: Factory that builds a context from the root service provider.
+    - id: poolSize
+      type: System.Int32
+      description: Maximum number of contexts retained in the pool. Defaults to 1024.
+    typeParameters:
+    - id: TContext
+    return:
+      type: Microsoft.Extensions.DependencyInjection.IServiceCollection
+      description: The same <code class="paramref">services</code> instance for chaining.
+    content.vb: Public Shared Function AddNormPool(Of TContext As DbContext)(services As IServiceCollection, contextFactory As Func(Of IServiceProvider, TContext), poolSize As Integer = 1024) As IServiceCollection
+  overload: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool*
+  exceptions:
+  - type: System.ArgumentNullException
+    commentId: T:System.ArgumentNullException
+    description: Thrown when <code class="paramref">services</code> or <code class="paramref">contextFactory</code> is null.
+  - type: System.ArgumentOutOfRangeException
+    commentId: T:System.ArgumentOutOfRangeException
+    description: Thrown when <code class="paramref">poolSize</code> is not positive.
+  nameWithType.vb: NormServiceCollectionExtensions.AddNormPool(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext), Integer)
+  fullName.vb: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool(Of TContext)(Microsoft.Extensions.DependencyInjection.IServiceCollection, System.Func(Of System.IServiceProvider, TContext), Integer)
+  name.vb: AddNormPool(Of TContext)(IServiceCollection, Func(Of IServiceProvider, TContext), Integer)
 references:
 - uid: Microsoft.Extensions.DependencyInjection.IServiceCollection
   commentId: T:Microsoft.Extensions.DependencyInjection.IServiceCollection
@@ -878,3 +948,34 @@ references:
   name: AddNormFactory
   nameWithType: NormServiceCollectionExtensions.AddNormFactory
   fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormFactory
+- uid: System.ArgumentNullException
+  commentId: T:System.ArgumentNullException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentnullexception
+  name: ArgumentNullException
+  nameWithType: ArgumentNullException
+  fullName: System.ArgumentNullException
+- uid: System.ArgumentOutOfRangeException
+  commentId: T:System.ArgumentOutOfRangeException
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception
+  name: ArgumentOutOfRangeException
+  nameWithType: ArgumentOutOfRangeException
+  fullName: System.ArgumentOutOfRangeException
+- uid: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool*
+  commentId: Overload:Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool
+  href: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.html#Microsoft_Extensions_DependencyInjection_NormServiceCollectionExtensions_AddNormPool__1_Microsoft_Extensions_DependencyInjection_IServiceCollection_System_Func_System_IServiceProvider___0__System_Int32_
+  name: AddNormPool
+  nameWithType: NormServiceCollectionExtensions.AddNormPool
+  fullName: Microsoft.Extensions.DependencyInjection.NormServiceCollectionExtensions.AddNormPool
+- uid: System.Int32
+  commentId: T:System.Int32
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.int32
+  name: int
+  nameWithType: int
+  fullName: int
+  nameWithType.vb: Integer
+  fullName.vb: Integer
+  name.vb: Integer

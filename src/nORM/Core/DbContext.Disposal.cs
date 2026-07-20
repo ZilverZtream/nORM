@@ -39,6 +39,10 @@ namespace nORM.Core
         /// <param name="disposing">Indicates whether the method was invoked from <see cref="Dispose()"/>.</param>
         protected virtual void Dispose(bool disposing)
         {
+            // A context leased from a pool (AddNormPool) returns itself instead of tearing down; only fall
+            // through to full disposal when it is not pooled (hook null) or is not poolable (live tx, etc.).
+            if (disposing && TryReturnToPoolOnDispose())
+                return;
             if (!_disposed && disposing)
             {
                 // Use Dispose(WaitHandle) to ensure timer callbacks complete before proceeding.
@@ -195,6 +199,9 @@ namespace nORM.Core
         /// <returns>A task representing the asynchronous dispose operation.</returns>
         public async ValueTask DisposeAsync()
         {
+            // A context leased from a pool returns itself instead of tearing down (see Dispose(bool)).
+            if (TryReturnToPoolOnDispose())
+                return;
             if (!_disposed)
             {
                 // Use WaitHandle pattern to safely stop the timer, preventing a race condition
