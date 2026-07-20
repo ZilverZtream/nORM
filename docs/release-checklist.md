@@ -59,6 +59,9 @@ Rules:
 
 ## Publishing
 
+See [publishing.md](publishing.md) for the step-by-step NuGet push runbook (used
+for both `0.9.x` validation previews and the eventual stable release).
+
 - Tag points at the validated commit.
 - CI artifacts are retained for the release.
 - RC artifact manifest commit matches the tag target.
