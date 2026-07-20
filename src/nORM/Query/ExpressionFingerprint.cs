@@ -30,6 +30,34 @@ namespace nORM.Query
         public static ExpressionFingerprint ComputeForPlanCache(Expression expression)
             => ComputeCore(expression, includeClosureCollectionValues: true);
 
+        /// <summary>
+        /// Computes the plan-cache fingerprint AND collects the closure-captured parameter values in a SINGLE
+        /// tree walk. The fingerprint bytes are identical to <see cref="ComputeForPlanCache"/> (value collection
+        /// only appends to a list, never to the hash), and the collected values are identical in count and order
+        /// to a separate <c>ParameterValueExtractor</c> walk — so the caller can skip that second traversal on
+        /// the hot path. <paramref name="collectedValues"/> is owned by the caller (the pooled visitor is reset).
+        /// </summary>
+        public static ExpressionFingerprint ComputeForPlanCacheWithValues(Expression expression, out List<object?>? collectedValues)
+        {
+            var visitor = _visitorPool.Get();
+            try
+            {
+                visitor.IncludeClosureCollectionValues = true;
+                visitor.EnableValueCollection();
+                visitor.Visit(expression);
+                Span<byte> hash = stackalloc byte[16];
+                visitor.GetCurrentHash(hash);
+                var low = BinaryPrimitives.ReadUInt64LittleEndian(hash[..8]);
+                var high = BinaryPrimitives.ReadUInt64LittleEndian(hash[8..]);
+                collectedValues = visitor.CollectedValues; // captured before Return() resets the visitor
+                return new ExpressionFingerprint(low, high);
+            }
+            finally
+            {
+                _visitorPool.Return(visitor);
+            }
+        }
+
         private static ExpressionFingerprint ComputeCore(Expression expression, bool includeClosureCollectionValues)
         {
             var visitor = _visitorPool.Get();
@@ -96,13 +124,29 @@ namespace nORM.Query
 
             public bool IncludeClosureCollectionValues { get; set; }
 
+            // Optional single-pass closure-value collection: when non-null, VisitMember records the same
+            // closure-captured values (in the same document order) that the separate ParameterValueExtractor
+            // walk would, so the plan-cache path can fingerprint AND collect parameter values in ONE tree walk.
+            // The HASHING is untouched (identical bytes → identical fingerprint → zero collision risk); only
+            // an extra list append is added. _suppressCollectionDepth replicates the extractor's early-return:
+            // once a closure member is collected, nested member accesses under it are hashed but NOT collected.
+            private bool _collectValues;
+            private List<object?>? _collectedValues;   // lazily allocated on first collected value
+            private int _suppressCollectionDepth;
+
             public void GetCurrentHash(Span<byte> destination) => _hasher.GetCurrentHash(destination);
+
+            public void EnableValueCollection() => _collectValues = true;
+            public List<object?>? CollectedValues => _collectedValues;
 
             public void Reset()
             {
                 _hasher.Reset();
                 _parameters.Clear();
                 IncludeClosureCollectionValues = false;
+                _collectValues = false;
+                _collectedValues = null;
+                _suppressCollectionDepth = 0;
             }
 
             public override Expression? Visit(Expression? node)
@@ -171,7 +215,24 @@ namespace nORM.Query
                     }
                 }
 
-                return base.VisitMember(node);
+                // Single-pass parameter-value collection (opt-in). Mirrors ParameterValueExtractor.VisitMember
+                // EXACTLY: collect on QueryTranslator.TryGetConstantValue success, then suppress collection
+                // (not hashing) for the descent so nested closure members under a collected one are not
+                // double-counted (the extractor early-returns; we keep descending to hash but stop collecting).
+                var collectedHere = false;
+                if (_collectValues && _suppressCollectionDepth == 0
+                    && QueryTranslator.TryGetConstantValue(node, out var collectValue))
+                {
+                    (_collectedValues ??= new List<object?>()).Add(collectValue ?? DBNull.Value);
+                    collectedHere = true;
+                }
+
+                if (collectedHere)
+                    _suppressCollectionDepth++;
+                var result = base.VisitMember(node);
+                if (collectedHere)
+                    _suppressCollectionDepth--;
+                return result;
             }
 
             private static bool TryGetClosureValue(MemberExpression node, out object? value)

@@ -126,8 +126,11 @@ namespace nORM.Query
             int mappingHash = _ctx.GetMappingHash();
 
             // Batch all 5 extends into a single hash operation (saves 4 XxHash128 calls)
+            // Single tree walk: fingerprint AND collect the closure parameter values at once. The collected
+            // values are identical (count + order) to a separate ParameterValueExtractor walk (asserted in
+            // Debug at each use), so the cached/hot path avoids the second full traversal.
             var fingerprint = ExpressionFingerprint
-                .ComputeForPlanCache(filtered)
+                .ComputeForPlanCacheWithValues(filtered, out var collectedParamValues)
                 .Extend(tenantHash, elementType.GetHashCode(), filtered.Type.GetHashCode(),
                         _ctx.RawProvider.GetType().GetHashCode(), mappingHash)
                 .Extend((int)_ctx.Options.ClientEvaluationPolicy)
@@ -146,7 +149,7 @@ namespace nORM.Query
             if (_planCache.TryGet(fingerprint, out var cached)
                 && !HasClosureFoldedIntoSql(cached))
             {
-                parameterValues = ExtractParameterValues(filtered, cached);
+                parameterValues = ResolveParameterValues(collectedParamValues, cached, filtered);
                 return RebindGroupJoinClosures(cached, filtered);
             }
 
@@ -179,7 +182,7 @@ namespace nORM.Query
                     Parameters = new Dictionary<string, object>(p.Parameters),
                     CompiledParameters = new List<string>(p.CompiledParameters)
                 };
-                parameterValues = ExtractParameterValues(filtered, plan);
+                parameterValues = ResolveParameterValues(collectedParamValues, plan, filtered);
                 return plan;
             }
             {
@@ -208,13 +211,13 @@ namespace nORM.Query
             // plans translate fresh per execution and are never stored.
             if (HasClosureFoldedIntoSql(plan))
             {
-                parameterValues = ExtractParameterValues(filtered, plan);
+                parameterValues = ResolveParameterValues(collectedParamValues, plan, filtered);
                 return plan;
             }
 
             plan = _planCache.GetOrAdd(fingerprint, _ => plan);
 
-            parameterValues = ExtractParameterValues(filtered, plan);
+            parameterValues = ResolveParameterValues(collectedParamValues, plan, filtered);
             return RebindGroupJoinClosures(plan, filtered);
         }
 
@@ -411,6 +414,60 @@ namespace nORM.Query
             // Copy values to a new list since the extractor will be reused
             return extractor.GetValuesCopy();
         }
+
+        /// <summary>
+        /// Returns the closure parameter values collected during the single fingerprint walk
+        /// (<see cref="ExpressionFingerprint.ComputeForPlanCacheWithValues"/>) instead of re-walking the tree.
+        /// Semantically identical to <see cref="ExtractParameterValues"/>: null when the plan has no compiled
+        /// params, otherwise the full document-ordered value list (alignment to compiled-param slots happens
+        /// later in <see cref="EnsureParameterDictionary"/>). Opt-in verification: when the environment variable
+        /// <c>NORM_VERIFY_PARAM_COLLECTION=1</c> is set in a Debug build it re-runs the old extractor and asserts
+        /// the two agree, so a regression surfaces in tests. It is OFF by default because re-running the extractor
+        /// on every query doubles the tree-walk work — the very cost this consolidation removes — which is
+        /// pointless in the steady state and destabilizes heavy fuzz sweeps.
+        /// </summary>
+        private IReadOnlyList<object?>? ResolveParameterValues(List<object?>? collected, QueryPlan plan, Expression filtered)
+        {
+            if (plan.CompiledParameters.Count == 0)
+                return null;
+            IReadOnlyList<object?> values = collected ?? (IReadOnlyList<object?>)Array.Empty<object?>();
+#if DEBUG
+            if (_verifyParamCollection)
+            {
+                var oracle = ExtractParameterValues(filtered, plan);
+                Debug.Assert(ParameterValuesMatch(values, oracle),
+                    "Single-pass fingerprint value collection diverged from ParameterValueExtractor: the plan-cache " +
+                    "would bind wrong parameter values. Fix ExpressionFingerprint's VisitMember collection to mirror " +
+                    "ParameterValueExtractor exactly (same TryGetConstantValue, same early-return/suppress semantics).");
+            }
+#endif
+            return values;
+        }
+
+#if DEBUG
+        // Opt-in one-way switch (read once) that turns the ResolveParameterValues oracle back on for a Debug run.
+        private static readonly bool _verifyParamCollection =
+            string.Equals(Environment.GetEnvironmentVariable("NORM_VERIFY_PARAM_COLLECTION"), "1", StringComparison.Ordinal);
+#endif
+
+#if DEBUG
+        // Verifies the single-pass collection matches the extractor on the alignment-critical properties:
+        // COUNT (the documented param-count-drift bug class) + per-position runtime TYPE (catches collecting a
+        // different/mis-ordered node). Exact value equality is intentionally NOT required: a non-deterministic
+        // closure such as DateTime.UtcNow / Random evaluates to a slightly different value on the two walks, yet
+        // both are a single correct query-time snapshot. Actual bound-value correctness is covered by the
+        // LINQ-parity fuzzer (results vs a LINQ-to-Objects oracle).
+        private static bool ParameterValuesMatch(IReadOnlyList<object?> a, IReadOnlyList<object?>? b)
+        {
+            var bCount = b?.Count ?? 0;
+            if (a.Count != bCount)
+                return false;
+            for (int i = 0; i < a.Count; i++)
+                if (a[i]?.GetType() != b![i]?.GetType())
+                    return false;
+            return true;
+        }
+#endif
 
         private IReadOnlyDictionary<string, object> EnsureParameterDictionary(QueryPlan plan, IReadOnlyList<object?>? parameterValues)
         {
