@@ -77,6 +77,18 @@ namespace nORM.Core
                 }
             }
 
+            // Detach the lazy-load navigation context bound to each tracked entity BEFORE clearing. Entities
+            // read through this context are registered in the process-wide _navigationContexts table pointing
+            // back at THIS instance; ChangeTracker.Clear() alone drops the tracker's dictionaries but leaves
+            // those registrations, so an entity that escaped the request scope (cached, handed to a
+            // fire-and-forget task, serialized lazily) would still resolve to this context after it is reset
+            // and re-leased — a later navigation load would then read the NEXT lease's tenant and race its
+            // connection. CleanupNavigationContext only removes the registration and clears the nav context's
+            // loaded-property set; it does not dispose the (reused) context.
+            foreach (var entry in ChangeTracker.Entries)
+                if (entry.Entity is { } trackedEntity)
+                    nORM.Navigation.NavigationPropertyExtensions.CleanupNavigationContext(trackedEntity);
+
             // Clear all tracked entities, the identity map, and any pending relationship key fixups.
             ChangeTracker.Clear();
             ChangeTracker.ClearPendingReferenceKeyFixups();
