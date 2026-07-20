@@ -287,6 +287,12 @@ namespace nORM.Core
                     var orderedDeletedGroups = sortedDeletedMappings.Select(m => deletedGroups.First(g => g.Key.Mapping == m));
                     orderedGroups = preDeleteGroups.Concat(orderedAddedGroups).Concat(orderedModifiedGroups).Concat(orderedDeletedGroups);
                 }
+                // Many-to-many join sync for Added/Modified owners is deferred until every entity group has
+                // been inserted. A right entity's DB-generated key is only assigned when its own group runs, so
+                // a left owner's inline sync could read a still-default (0) key and write a broken join row that
+                // SQLite (foreign keys off at runtime) accepts silently — losing the association. Collected
+                // here, flushed after the loop and still inside the transaction.
+                List<(object Entity, EntityEntry Entry)>? deferredM2MSync = null;
                 foreach (var group in orderedGroups)
                 {
                     var entries = group.ToList();
@@ -423,11 +429,16 @@ namespace nORM.Core
                                     && (state == EntityState.Added || entry.HasOwnedCollectionChanges()))
                                     await SaveOwnedCollectionsAsync(entry.Entity, map, state, transaction, ct).ConfigureAwait(false);
                                 if (map.ManyToManyJoins.Count > 0)
-                                    await ExecuteJoinTableSyncAsync(entry.Entity, entry, transaction, ct).ConfigureAwait(false);
+                                    (deferredM2MSync ??= new()).Add((entry.Entity, entry));
                             }
                         }
                     }
                 }
+                // Flush the deferred many-to-many join sync now that every entity on both sides of each
+                // association has its final key. Still inside the transaction, so it commits atomically.
+                if (deferredM2MSync != null)
+                    foreach (var (m2mEntity, m2mEntry) in deferredM2MSync)
+                        await ExecuteJoinTableSyncAsync(m2mEntity, m2mEntry, transaction, ct).ConfigureAwait(false);
                 onCommitAttempted?.Invoke();
                 await transactionManager.CommitAsync().ConfigureAwait(false);
                 // The write is now durably committed. Everything after this point (tracker accept,
