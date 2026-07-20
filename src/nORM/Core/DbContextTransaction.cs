@@ -185,7 +185,10 @@ namespace nORM.Core
         public void Dispose()
         {
             if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
+            {
+                ResetGeneratedKeysIfOwnedRollback();
                 DisposeTransactionAndClear();
+            }
         }
 
         /// <summary>
@@ -196,7 +199,25 @@ namespace nORM.Core
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.CompareExchange(ref _completed, 1, 0) == 0)
+            {
+                ResetGeneratedKeysIfOwnedRollback();
                 await DisposeTransactionAndClearAsync().ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Reaching Dispose with <c>_completed == 0</c> means the transaction was neither committed nor
+        /// explicitly rolled back. An owned transaction rolls back on dispose (ADO.NET contract), so — before
+        /// <see cref="DbContext.ClearTransaction"/> discards the key snapshot — reset the DB-generated keys
+        /// stamped during it, exactly as <see cref="Rollback"/>/<see cref="RollbackAsync"/> do; otherwise the
+        /// still-Added entities are silently dropped by the skip-already-inserted guard on the next
+        /// SaveChanges. A caller-owned handle (<c>Database.UseTransaction</c>) is not disposed here and its
+        /// lifetime belongs to the caller, so its keys are left untouched.
+        /// </summary>
+        private void ResetGeneratedKeysIfOwnedRollback()
+        {
+            if (_ownsTransaction && _transaction != null)
+                _context.ResetGeneratedKeysAfterFullRollback();
         }
 
         private void EnsureUsable()
