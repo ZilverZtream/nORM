@@ -25,6 +25,8 @@ namespace nORM.Tests.Fuzzing
 
         public static FuzzCaseResult Execute(QueryIr ir, long seed)
         {
+            if (ir.GroupBy != null)
+                return ExecuteScalar(ir, seed, RunLinqGrouped, RunNormGrouped);
             if (ir.Projection != null)
                 return ExecuteProjected(ir, seed);
 
@@ -115,12 +117,17 @@ namespace nORM.Tests.Fuzzing
         // ─── projected path (scalar Select, multiset comparison) ────────────
 
         private static FuzzCaseResult ExecuteProjected(QueryIr ir, long seed)
+            => ExecuteScalar(ir, seed, RunLinqProjected, RunNormProjected);
+
+        // Shared int-multiset differential for the scalar-producing shapes (scalar projection, grouped Count).
+        private static FuzzCaseResult ExecuteScalar(QueryIr ir, long seed,
+            Func<QueryIr, IEnumerable<int>> runLinq, Func<DbContext, QueryIr, IEnumerable<int>> runNorm)
         {
             var serialized = ir.ToJson();
             List<int> expected;
             try
             {
-                expected = RunLinqProjected(ir).ToList();
+                expected = runLinq(ir).ToList();
             }
             catch (Exception ex)
             {
@@ -132,8 +139,8 @@ namespace nORM.Tests.Fuzzing
             {
                 try
                 {
-                    actual = RunNormProjected(ctx, ir).ToList();
-                    actual2 = RunNormProjected(ctx, ir).ToList();
+                    actual = runNorm(ctx, ir).ToList();
+                    actual2 = runNorm(ctx, ir).ToList();
                 }
                 catch (NormUnsupportedFeatureException nufe)
                 {
@@ -152,7 +159,7 @@ namespace nORM.Tests.Fuzzing
             }
 
             if (!IntsEqual(actual, actual2))
-                return Fail(FuzzOutcome.NonDeterministic, "two nORM executions of the same projected case disagreed", ir, seed, serialized);
+                return Fail(FuzzOutcome.NonDeterministic, "two nORM executions of the same case disagreed", ir, seed, serialized);
             if (!IntsEqual(expected, actual))
                 return Fail(FuzzOutcome.WrongResult,
                     $"oracle=[{string.Join(",", expected.OrderBy(x => x))}] nORM=[{string.Join(",", actual.OrderBy(x => x))}]", ir, seed, serialized);
@@ -162,6 +169,22 @@ namespace nORM.Tests.Fuzzing
                 Family = Family, Seed = seed, GeneratorVersion = GeneratorVersion,
                 Outcome = FuzzOutcome.Executed, SerializedCase = serialized, Features = ExtractFeatures(ir),
             };
+        }
+
+        private static IEnumerable<int> RunLinqGrouped(QueryIr ir)
+        {
+            IEnumerable<IrRow> rows = ir.Rows;
+            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+                rows = rows.Where(BuildPredicate(w).Compile());
+            return rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile()).Select(g => g.Count());
+        }
+
+        private static IEnumerable<int> RunNormGrouped(DbContext ctx, QueryIr ir)
+        {
+            IQueryable<IrRow> q = ctx.Query<IrRow>();
+            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+                q = q.Where(BuildPredicate(w));
+            return q.GroupBy(KeySelector(ir.GroupBy!.Key)).Select(g => g.Count()).ToList();
         }
 
         private static IEnumerable<int> RunLinqProjected(QueryIr ir)
@@ -437,6 +460,11 @@ namespace nORM.Tests.Fuzzing
                 if (proj.Add != 0) f.Add("projection-computed");
                 if (ir.SetOp != null) f.Add("setop+projection");
                 if (kinds.Contains(IrStepKind.Distinct)) f.Add("projection+distinct");
+            }
+            if (ir.GroupBy != null)
+            {
+                f.Add("groupby");
+                if (kinds.Contains(IrStepKind.Where)) f.Add("groupby+where");
             }
             if (ir.Rows.Count == 0) f.Add("empty-table");
             if (ir.Rows.Count == 1) f.Add("single-row");

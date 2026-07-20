@@ -38,8 +38,21 @@ namespace nORM.Tests.Fuzzing
             if (rng.Next(2) == 0)
                 steps.Add(IrStep.Take(rng.Next(0, rowCount + 2)));
 
-            return new QueryIr { Rows = rows, Steps = steps, SetOp = MaybeSetOp(rng), Projection = MaybeProjection(rng) };
+            // GroupBy is its own terminal shape (it takes precedence in the differential), so make it exclusive
+            // with the set-op/projection phases to avoid generating a case whose set-op/projection is ignored.
+            var groupBy = MaybeGroupBy(rng);
+            return new QueryIr
+            {
+                Rows = rows,
+                Steps = steps,
+                SetOp = groupBy == null ? MaybeSetOp(rng) : null,
+                Projection = groupBy == null ? MaybeProjection(rng) : null,
+                GroupBy = groupBy,
+            };
         }
+
+        private static IrGroupBy? MaybeGroupBy(Random rng)
+            => rng.Next(5) == 0 ? new IrGroupBy { Key = Pick(rng, Columns) } : null;
 
         private static IrSetOp? MaybeSetOp(Random rng)
         {
@@ -68,7 +81,8 @@ namespace nORM.Tests.Fuzzing
             var rows = ir.Rows.ToList();
             var setOp = ir.SetOp;
             var projection = ir.Projection;
-            switch (rng.Next(8))
+            var groupBy = ir.GroupBy;
+            switch (rng.Next(9))
             {
                 case 0: steps.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6))); break;
                 case 1: if (steps.Count > 0) steps.RemoveAt(rng.Next(steps.Count)); break;
@@ -86,8 +100,20 @@ namespace nORM.Tests.Fuzzing
                         ? new IrProjection { Column = Pick(rng, Columns), Add = rng.Next(-5, 100) }
                         : (rng.Next(3) == 0 ? null : projection with { Column = Pick(rng, Columns), Add = rng.Next(-5, 100) });
                     break;
+                case 8: // toggle / reshape the grouping
+                    groupBy = groupBy == null
+                        ? new IrGroupBy { Key = Pick(rng, Columns) }
+                        : (rng.Next(3) == 0 ? null : groupBy with { Key = Pick(rng, Columns) });
+                    break;
             }
-            return new QueryIr { Rows = rows, Steps = steps, SetOp = setOp, Projection = projection };
+            // Grouping is exclusive with the set-op/projection phases (it takes precedence in the differential).
+            return new QueryIr
+            {
+                Rows = rows, Steps = steps,
+                SetOp = groupBy == null ? setOp : null,
+                Projection = groupBy == null ? projection : null,
+                GroupBy = groupBy,
+            };
         }
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];

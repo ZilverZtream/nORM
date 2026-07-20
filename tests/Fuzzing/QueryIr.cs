@@ -36,6 +36,13 @@ namespace nORM.Tests.Fuzzing
         /// </summary>
         public IrProjection? Projection { get; init; }
 
+        /// <summary>
+        /// Optional grouping applied to the filtered rows (<c>Where* .GroupBy(r =&gt; r.Key).Select(g =&gt;
+        /// g.Count())</c>). Compared as a multiset of group sizes. Takes precedence over the set-op/projection
+        /// phases (grouping is its own terminal shape here).
+        /// </summary>
+        public IrGroupBy? GroupBy { get; init; }
+
         public string ToJson() => JsonSerializer.Serialize(this, FuzzRunManifest.ManifestJsonOptions);
         public static QueryIr FromJson(string json) =>
             JsonSerializer.Deserialize<QueryIr>(json, FuzzRunManifest.ManifestJsonOptions)
@@ -45,6 +52,8 @@ namespace nORM.Tests.Fuzzing
         public string Describe()
         {
             var left = string.Join(".", Steps.Select(s => s.Describe()));
+            if (GroupBy is { } gb)
+                return $"rows={Rows.Count} | {left}.GroupBy({gb.Key}).Count()";
             var body = SetOp == null
                 ? left
                 : $"({left}).{SetOp.Kind}({string.Join(".", SetOp.RightWheres.Select(s => s.Describe()))})";
@@ -59,6 +68,12 @@ namespace nORM.Tests.Fuzzing
     {
         public required IrColumn Column { get; init; }
         public int Add { get; init; }
+    }
+
+    /// <summary>A grouping <c>GroupBy(r =&gt; r.Key).Select(g =&gt; g.Count())</c>.</summary>
+    public sealed record IrGroupBy
+    {
+        public required IrColumn Key { get; init; }
     }
 
     public enum IrSetOpKind { Union, Concat, Intersect, Except }

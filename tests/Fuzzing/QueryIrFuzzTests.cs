@@ -49,6 +49,7 @@ namespace nORM.Tests.Fuzzing
             Assert.Contains("setop+orderby", frontier);       // the shape that previously produced invalid SQL
             Assert.Contains("projection", frontier);
             Assert.Contains("setop+projection", frontier);    // the shape whose Distinct previously did not dedup
+            Assert.Contains("groupby", frontier);             // the shape whose bare aggregate returned the key
         }
 
         [Fact]
