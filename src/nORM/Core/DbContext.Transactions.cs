@@ -67,10 +67,18 @@ namespace nORM.Core
         private Dictionary<string, HashSet<object>>? _savepointInsertedSnapshots;
         private HashSet<object>? _ambientInsertedSnapshot;
 
+        // Snapshot of each tracked OCC entity's original concurrency token when a caller-owned transaction
+        // begins. A save inside the transaction advances the token snapshot (so a second update matches the
+        // uncommitted row), so a full rollback must restore the pre-transaction token — otherwise re-updating
+        // the same tracked entity after the rollback compares an advanced token against the reverted row and
+        // false-conflicts.
+        private Dictionary<object, object?>? _transactionTokenSnapshot;
+
         internal void CaptureTransactionKeySnapshot()
         {
             _transactionKeySnapshot = SnapshotAddedGeneratedKeys();
             _transactionInsertedSnapshot = SnapshotInsertedEntities();
+            _transactionTokenSnapshot = SnapshotOccOriginalTokens();
         }
 
         /// <summary>
@@ -84,6 +92,8 @@ namespace nORM.Core
             if (_transactionKeySnapshot != null)
                 RestoreRolledBackGeneratedKeys(_transactionKeySnapshot);
             RestoreInsertedFlags(_transactionInsertedSnapshot);
+            if (_transactionTokenSnapshot != null)
+                RestoreOccOriginalTokens(_transactionTokenSnapshot);
         }
 
         // The ambient System.Transactions.Transaction nORM enlisted in, plus the Added-entity key
@@ -248,6 +258,45 @@ namespace nORM.Core
                 if (entry.State != EntityState.Added || entry.Entity is not { } e)
                     continue;
                 entry.InsertedInUncommittedTransaction = snapshot != null && snapshot.Contains(e);
+            }
+        }
+
+        /// <summary>
+        /// Captures the original concurrency token of every already-persisted tracked OCC entity (a
+        /// [Timestamp]/rowversion column, entities not in the <see cref="EntityState.Added"/> state), keyed by
+        /// reference. A save inside the transaction advances this snapshot (<c>ExecuteUpdateBatch</c>), so a
+        /// full rollback restores it, keeping a re-update of the same tracked entity after the rollback
+        /// comparing against the token the reverted row actually carries.
+        /// </summary>
+        private Dictionary<object, object?> SnapshotOccOriginalTokens()
+        {
+            var snapshot = new Dictionary<object, object?>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State == EntityState.Added || entry.Entity is not { } e || entry.Mapping.TimestampColumn == null)
+                    continue;
+                var tok = entry.OriginalToken;
+                snapshot[e] = tok is byte[] bytes ? bytes.Clone() : tok;
+            }
+            return snapshot;
+        }
+
+        /// <summary>
+        /// After a full rollback, restores each tracked OCC entity's original-token snapshot (and the entity's
+        /// own token value, so it matches the reverted row) to the value captured before the transaction, undoing
+        /// any advance a save inside the transaction made. Mirrors <see cref="RestoreRolledBackGeneratedKeys"/>.
+        /// </summary>
+        private void RestoreOccOriginalTokens(Dictionary<object, object?> snapshot)
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.Entity is not { } e || entry.Mapping.TimestampColumn == null)
+                    continue;
+                if (!snapshot.TryGetValue(e, out var original))
+                    continue;
+                var restored = original is byte[] bytes ? bytes.Clone() : original;
+                entry.OriginalToken = restored;
+                entry.Mapping.TimestampColumn.Setter(e, restored);
             }
         }
 

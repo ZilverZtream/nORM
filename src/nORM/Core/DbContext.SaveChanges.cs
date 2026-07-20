@@ -425,7 +425,8 @@ namespace nORM.Core
                                 break;
                             case EntityState.Modified:
                                 if (!isColumnlessModified)
-                                    totalAffected += await ExecuteUpdateBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);
+                                    totalAffected += await ExecuteUpdateBatch(cmd, map, batch, sql, 0, ct,
+                                        deferAccept: !transactionManager.ShouldAcceptChanges).ConfigureAwait(false);
                                 break;
                             case EntityState.Deleted:
                                 totalAffected += await ExecuteDeleteBatch(cmd, map, batch, sql, 0, ct).ConfigureAwait(false);

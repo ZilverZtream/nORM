@@ -228,8 +228,12 @@ namespace nORM.Core
         /// <param name="sql">Reusable <see cref="StringBuilder"/> for composing the SQL batch.</param>
         /// <param name="paramIndex">Starting parameter index for parameter naming.</param>
         /// <param name="ct">Token used to cancel the asynchronous operation.</param>
+        /// <param name="deferAccept">True when the save runs under a caller-owned/enlisted transaction, so
+        /// AcceptChanges is deferred and each entry's original-token snapshot must be advanced here for a later
+        /// write of the same entity in the transaction to match. False on the retryable owned-transaction path,
+        /// where post-commit AcceptChanges does this instead and advancing early would break a retry.</param>
         /// <returns>The number of rows affected by the batch.</returns>
-        private async Task<int> ExecuteUpdateBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct)
+        private async Task<int> ExecuteUpdateBatch(DbCommand cmd, TableMapping map, List<EntityEntry> batch, StringBuilder sql, int paramIndex, CancellationToken ct, bool deferAccept = false)
         {
             // S1 enforcement: warn or throw when the provider uses affected-row semantics with OCC tokens.
             // Affected-row semantics (MySQL default) cannot detect OCC conflicts where the concurrent
@@ -363,6 +367,25 @@ namespace nORM.Core
                     await VerifyUpdateOccAsync(cmd, map, batch, ct).ConfigureAwait(false);
                 else
                     throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
+            }
+            // The UPDATE stamped a fresh token (native OUTPUT hydrated above, client-managed stamped in the
+            // parameter binder). Under a caller-owned/enlisted transaction AcceptChanges is deferred, so align
+            // each tracked entry's original-token snapshot with the value the row now carries — otherwise a
+            // second UPDATE or a DELETE of the same tracked entity inside one transaction compares the
+            // pre-update token and false-conflicts. Only when accept is deferred: an owned-transaction save
+            // accepts post-commit (which does this), and it is the retryable path — advancing the snapshot on
+            // an attempt that later rolls back would make the retry compare against the reverted row. A
+            // caller-owned transaction never retries (SaveChangesWithRetryAsync runs it exactly once) and its
+            // rollback restores the snapshot (DbContext.Transactions). Mirrors RefreshTrackedOriginalToken.
+            if (deferAccept && map.TimestampColumn != null)
+            {
+                var tc = map.TimestampColumn;
+                foreach (var entry in batch)
+                    if (entry.Entity is { } e)
+                    {
+                        var current = tc.Getter(e);
+                        entry.OriginalToken = current is byte[] bytes ? bytes.Clone() : current;
+                    }
             }
             // AcceptChanges is intentionally deferred until after the transaction commits.
             return updated;
