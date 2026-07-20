@@ -915,6 +915,39 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Captures the current non-key column values as the baseline used to detect a later modification of
+        /// an entity that was inserted inside an open transaction (and therefore kept <see cref="EntityState.Added"/>
+        /// so a rollback can re-insert it). State-neutral — it only refreshes the change-tracking snapshot,
+        /// leaving the entry Added. Paired with <see cref="HasChangedSinceInsertedBaseline"/>.
+        /// </summary>
+        internal void CaptureInsertedBaseline()
+        {
+            UpgradeToFullTracking();
+            if (Entity is null)
+                return;
+            CaptureOriginalValues();
+        }
+
+        /// <summary>
+        /// True when a non-key column of this already-inserted Added entity differs from the baseline captured
+        /// by <see cref="CaptureInsertedBaseline"/> — i.e. it was modified after being inserted within the
+        /// current transaction. Because nORM keeps such an entity Added (for rollback re-insert),
+        /// <see cref="DetectChanges"/> does not flag it Modified, so the save path uses this to fail loudly
+        /// rather than silently drop the UPDATE the Added path cannot emit.
+        /// </summary>
+        internal bool HasChangedSinceInsertedBaseline()
+        {
+            UpgradeToFullTracking();
+            var entity = Entity;
+            if (entity is null || _nonKeyColumns is null || _originalValues is null || _getValues is null)
+                return false;
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
+                if (!ValuesEqual(_getValues[i](entity), _originalValues[i]))
+                    return true;
+            return false;
+        }
+
+        /// <summary>
         /// True when the given column's current entity value differs from the value
         /// captured when the entity was attached. Relationship fixup uses this to give a
         /// deliberately edited FK scalar precedence over a stale navigation reference.

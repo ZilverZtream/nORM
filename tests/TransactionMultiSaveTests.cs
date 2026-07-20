@@ -162,6 +162,39 @@ public class TransactionMultiSaveTests
     }
 
     [Fact]
+    public async Task ModifyAfterInsertInTransaction_ClientKey_FailsLoudRatherThanLosingTheUpdate()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        var e = new ClientKeyItem { Id = 1, Value = 10 };
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();          // inserted; entity stays Added under the transaction
+        e.Value = 20;                          // modify the already-inserted entity
+
+        // The Added path cannot emit an UPDATE; nORM must reject this loudly, never silently keep Value=10.
+        await Assert.ThrowsAsync<NormUsageException>(() => ctx.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task ModifyAfterInsertInTransaction_DbGeneratedKey_FailsLoudRatherThanLosingTheUpdate()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        var e = new GenKeyItem { Value = 10 };
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+        e.Value = 20;
+
+        await Assert.ThrowsAsync<NormUsageException>(() => ctx.SaveChangesAsync());
+    }
+
+    [Fact]
     public async Task RollbackToSavepointThenSave_ClientKey_ReinsertsPostSavepointRow()
     {
         var (cn, ctx) = Build();

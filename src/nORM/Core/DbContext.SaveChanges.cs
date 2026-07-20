@@ -312,6 +312,20 @@ namespace nORM.Core
                     // every rollback site, so a rolled-back insert is correctly re-inserted, not dropped.
                     if (state == EntityState.Added)
                     {
+                        // An entity inserted earlier in this same transaction stays Added, so DetectChanges
+                        // never flags a later modification of it (see EntityEntry.DetectChanges) and the Added
+                        // path cannot emit an UPDATE. Rather than silently drop that modification, reject it —
+                        // the caller must apply changes before the first save or use a separate transaction.
+                        foreach (var e in entries)
+                            if (e.InsertedInUncommittedTransaction && e.Entity is not null && e.HasChangedSinceInsertedBaseline())
+                                throw new NormUsageException(
+                                    $"Entity '{map.Type.Name}' was modified after it was inserted within the current " +
+                                    "transaction and then saved again. nORM keeps an entity inserted inside an open " +
+                                    "transaction in the Added state so a rollback can re-insert it, so a later SaveChanges " +
+                                    "cannot emit an UPDATE for the modification — persisting it would silently lose the change. " +
+                                    "Apply all changes to the entity before its first SaveChanges, or perform the update in a " +
+                                    "separate transaction.");
+
                         var hasDbGeneratedKey = map.KeyColumns.Any(k => k.IsDbGenerated);
                         if (hasDbGeneratedKey || entries.Any(e => e.InsertedInUncommittedTransaction))
                         {
@@ -540,7 +554,12 @@ namespace nORM.Core
                 // every rollback site and cleared when the entity is finally accepted.
                 foreach (var entry in changedEntries)
                     if (entry.State == EntityState.Added)
+                    {
                         entry.InsertedInUncommittedTransaction = true;
+                        // Baseline the just-inserted values so a subsequent modification of this still-Added
+                        // entity is detected (and rejected loudly) rather than silently dropped on the next save.
+                        entry.CaptureInsertedBaseline();
+                    }
             }
 
             // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch
