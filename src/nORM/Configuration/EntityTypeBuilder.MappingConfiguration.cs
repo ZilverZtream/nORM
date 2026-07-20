@@ -30,6 +30,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> ValueGeneratedValues { get; } = new();
             public HashSet<PropertyInfo> RowVersionValues { get; } = new();
             public Dictionary<PropertyInfo, string> ColumnTypeValues { get; } = new();
+            public Dictionary<PropertyInfo, string> CommentValues { get; } = new();
             public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
             public Dictionary<PropertyInfo, bool> FixedLengthValues { get; } = new();
             public Dictionary<PropertyInfo, PrecisionConfiguration> PrecisionValues { get; } = new();
@@ -58,6 +59,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> IEntityTypeConfiguration.ValueGeneratedSettings => ValueGeneratedValues;
             IReadOnlyCollection<PropertyInfo> IEntityTypeConfiguration.RowVersionSettings => RowVersionValues;
             IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnTypes => ColumnTypeValues;
+            IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.Comments => CommentValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.FixedLengthSettings => FixedLengthValues;
             IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> IEntityTypeConfiguration.Precisions => PrecisionValues;
@@ -260,6 +262,19 @@ namespace nORM.Configuration
                 if (string.IsNullOrWhiteSpace(columnType))
                     throw new ArgumentException("Column type cannot be null or whitespace.", nameof(columnType));
                 ColumnTypeValues[prop] = columnType.Trim();
+            }
+
+            /// <summary>
+            /// Sets a human-readable comment on the column (EF Core's HasComment). Each provider's migration
+            /// generator emits it with its native mechanism (inline block comment, COMMENT clause,
+            /// COMMENT ON COLUMN, or sp_addextendedproperty).
+            /// </summary>
+            public void SetComment(PropertyInfo prop, string comment)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (string.IsNullOrWhiteSpace(comment))
+                    throw new ArgumentException("Comment cannot be null or whitespace.", nameof(comment));
+                CommentValues[prop] = comment.Trim();
             }
 
             /// <summary>

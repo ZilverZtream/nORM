@@ -121,6 +121,14 @@ namespace nORM.Migration
         private static string BuildUniqueConstraintSql(TableSchema table, ColumnSchema column)
             => $"CONSTRAINT {Esc(GetUniqueConstraintName(table, column))} UNIQUE ({Esc(column.Name)})";
 
+        /// <summary>
+        /// Builds a PostgreSQL <c>COMMENT ON COLUMN</c> statement. The comment text is a single-quoted string
+        /// literal with embedded quotes doubled; PostgreSQL's default standard_conforming_strings makes the
+        /// backslash non-special, so doubling the quote is sufficient to prevent literal termination.
+        /// </summary>
+        private static string BuildColumnCommentSql(TableSchema table, ColumnSchema column)
+            => $"COMMENT ON COLUMN {EscTable(table.Name)}.{Esc(column.Name)} IS '{column.Comment!.Replace("'", "''", StringComparison.Ordinal)}'";
+
         private static void ValidateUnsupportedIdentityOperations(SchemaDiff diff)
         {
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
@@ -277,6 +285,9 @@ namespace nORM.Migration
                 }
                 foreach (var expressionIndex in table.ExpressionIndexes)
                     up.Add(BuildExpressionIndexSql(table, expressionIndex));
+
+                foreach (var c in table.Columns.Where(static c => !string.IsNullOrWhiteSpace(c.Comment)))
+                    up.Add(BuildColumnCommentSql(table, c));
             }
 
             // UP-6: Add columns to existing tables.
@@ -304,6 +315,8 @@ namespace nORM.Migration
                     : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
+                if (!string.IsNullOrWhiteSpace(column.Comment))
+                    up.Add(BuildColumnCommentSql(table, column));
             }
             foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
             {

@@ -231,7 +231,7 @@ namespace nORM.Migration
                         ? $" DEFAULT {FormatDefaultValue(c)}"
                         : "";
                     var identityPart = c.IsIdentity ? " AUTO_INCREMENT" : "";
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}{FormatColumnComment(c.Comment)}";
                 }).ToList();
 
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
@@ -282,7 +282,7 @@ namespace nORM.Migration
                 var nullPart = column.IsNullable
                     ? (!string.IsNullOrEmpty(column.DefaultValue) ? $"NULL DEFAULT {FormatDefaultValue(column)}" : "NULL")
                     : $"NOT NULL DEFAULT {FormatDefaultValue(column)}";
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}";
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}{FormatColumnComment(column.Comment)}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
             }
             foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
@@ -401,7 +401,7 @@ namespace nORM.Migration
                         ? $" DEFAULT {FormatDefaultValue(c)}"
                         : "";
                     var identityPart = c.IsIdentity ? " AUTO_INCREMENT" : "";
-                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
+                    return $"{Esc(c.Name)} {GetSqlType(c)}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}{FormatColumnComment(c.Comment)}";
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
                 if (pkCols.Count > 0)
@@ -560,6 +560,21 @@ namespace nORM.Migration
                 "CURRENT_TIMESTAMP" or "NOW" or "LOCALTIME" or "LOCALTIMESTAMP" => $"{name}(6)",
                 _ => validated,
             };
+        }
+
+        /// <summary>
+        /// Formats an inline MySQL <c>COMMENT</c> clause for a column. The comment text is emitted as a
+        /// single-quoted string literal with quotes doubled and backslashes escaped so it cannot terminate
+        /// the literal or inject DDL.
+        /// </summary>
+        private static string FormatColumnComment(string? comment)
+        {
+            if (string.IsNullOrWhiteSpace(comment))
+                return "";
+            var escaped = comment
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("'", "''", StringComparison.Ordinal);
+            return $" COMMENT '{escaped}'";
         }
 
         private static bool IsComputedColumn(ColumnSchema column) => column.ComputedColumnSql is not null;

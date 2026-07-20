@@ -93,6 +93,23 @@ namespace nORM.Migration
             return s.Replace("'", "''");
         }
 
+        /// <summary>
+        /// Builds a SQL Server column comment as an <c>sp_addextendedproperty</c> call registering an
+        /// <c>MS_Description</c> at the SCHEMA/TABLE/COLUMN levels — SQL Server's native column comment
+        /// mechanism. Every interpolated value is emitted as an <c>N'...'</c> literal with quotes doubled so
+        /// neither the comment text nor the identifiers can break out of the literal.
+        /// </summary>
+        private static string BuildColumnCommentSql(TableSchema table, ColumnSchema column)
+        {
+            var dot = table.Name.IndexOf('.');
+            var schema = dot > 0 ? table.Name[..dot] : "dbo";
+            var bareTable = dot > 0 ? table.Name[(dot + 1)..] : table.Name;
+            return $"EXEC sp_addextendedproperty @name=N'MS_Description', @value=N'{EscLiteral(column.Comment!)}', " +
+                   $"@level0type=N'SCHEMA', @level0name=N'{EscLiteral(schema)}', " +
+                   $"@level1type=N'TABLE', @level1name=N'{EscLiteral(bareTable)}', " +
+                   $"@level2type=N'COLUMN', @level2name=N'{EscLiteral(column.Name)}'";
+        }
+
         private static (string IndexName, bool IsUnique, string[] ColumnNames, bool[] Descending, IndexNullSortOrder[] NullSortOrders, string[] IncludedColumnNames, bool NullsNotDistinct, string? FilterSql) ResolveIndex(
             TableSchema table,
             string indexName,
@@ -332,6 +349,9 @@ namespace nORM.Migration
                     EnsureNoNullSortOrders(index.NullSortOrders, index.IndexName);
                     up.Add($"CREATE {unique}INDEX {Esc(index.IndexName)} ON {EscTable(table.Name)} ({FormatIndexColumns(index.ColumnNames, index.Descending, index.NullSortOrders)}){FormatIncludedColumns(index.IncludedColumnNames)}{FormatFilter(index.FilterSql)}");
                 }
+
+                foreach (var c in table.Columns.Where(static c => !string.IsNullOrWhiteSpace(c.Comment)))
+                    up.Add(BuildColumnCommentSql(table, c));
             }
 
             // UP-6: Add columns to existing tables.
@@ -351,6 +371,8 @@ namespace nORM.Migration
                 var nullPart = column.IsNullable ? "NULL" : "NOT NULL";
                 var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}{FormatInlineDefaultClause(table, column)}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {colDef}");
+                if (!string.IsNullOrWhiteSpace(column.Comment))
+                    up.Add(BuildColumnCommentSql(table, column));
             }
             foreach (var group in diff.AddedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
             {

@@ -200,6 +200,7 @@ M:nORM.Configuration.EntityTypeBuilder{`0}.Property(System.Linq.Expressions.Expr
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasCollation(System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasColumnName(System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasColumnType(System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
+M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasComment(System.String):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter):nORM.Configuration.EntityTypeBuilder{`0}
 M:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.HasDefaultValue(System.Object):nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder
@@ -1206,6 +1207,7 @@ P:nORM.Configuration.IEntityTypeConfiguration.CheckConstraints:System.Collection
 P:nORM.Configuration.IEntityTypeConfiguration.Collations:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.ColumnNames:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.ColumnTypes:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+P:nORM.Configuration.IEntityTypeConfiguration.Comments:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
 P:nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,nORM.Configuration.ComputedColumnConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.Converters:System.Collections.Generic.IReadOnlyList{nORM.Configuration.ConverterConfiguration}
 P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
@@ -1505,6 +1507,7 @@ P:nORM.Migration.ColumnIndexSchema.NullsNotDistinct:System.Boolean
 P:nORM.Migration.ColumnIndexSchema.Order:System.Nullable{System.Int32}
 P:nORM.Migration.ColumnSchema.ClrType:System.String
 P:nORM.Migration.ColumnSchema.Collation:System.String
+P:nORM.Migration.ColumnSchema.Comment:System.String
 P:nORM.Migration.ColumnSchema.ComputedColumnSql:System.String
 P:nORM.Migration.ColumnSchema.DefaultConstraintName:System.String
 P:nORM.Migration.ColumnSchema.DefaultValue:System.String

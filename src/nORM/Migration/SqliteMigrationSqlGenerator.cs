@@ -155,11 +155,29 @@ namespace nORM.Migration
             var defaultPart = !string.IsNullOrEmpty(column.DefaultValue)
                 ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
                 : "";
+            var commentPart = FormatInlineComment(column.Comment);
 
             if (column.IsIdentity && column.IsPrimaryKey)
-                return $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}";
+                return $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} NOT NULL PRIMARY KEY AUTOINCREMENT{defaultPart}{commentPart}";
 
-            return $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}";
+            return $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{defaultPart}{commentPart}";
+        }
+
+        /// <summary>
+        /// SQLite has no column-comment DDL, but it preserves the verbatim text of a CREATE statement in
+        /// <c>sqlite_master.sql</c>, so a trailing block comment is a genuine, inspectable column comment.
+        /// The closing <c>*/</c> sequence is neutralized (and newlines collapsed) so the comment cannot
+        /// terminate early or inject following SQL.
+        /// </summary>
+        private static string FormatInlineComment(string? comment)
+        {
+            if (string.IsNullOrWhiteSpace(comment))
+                return "";
+            var sanitized = comment
+                .Replace("\r", " ", StringComparison.Ordinal)
+                .Replace("\n", " ", StringComparison.Ordinal)
+                .Replace("*/", "* /", StringComparison.Ordinal);
+            return $" /* {sanitized} */";
         }
 
         private static string BuildCreateTableSql(TableSchema table)
@@ -276,7 +294,7 @@ namespace nORM.Migration
                             ? $"NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
                             : "NULL")
                         : $"NOT NULL DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}";
-                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}");
+                    up.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {nullPart}{FormatInlineComment(column.Comment)}");
                 }
                 foreach (var (_, column) in group.Where(g => IsImplicitUniqueColumn(g.Column)))
                     up.Add(BuildImplicitUniqueIndexSql(table, column));

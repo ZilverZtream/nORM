@@ -106,6 +106,12 @@ namespace nORM.Configuration
         IReadOnlyDictionary<PropertyInfo, string> ColumnTypes { get; }
 
         /// <summary>
+        /// Gets human-readable column comments configured via the fluent API (HasComment). Each provider's
+        /// migration generator emits them using its native comment mechanism.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, string> Comments { get; }
+
+        /// <summary>
         /// Gets Unicode text metadata configured for string properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, bool> UnicodeSettings { get; }

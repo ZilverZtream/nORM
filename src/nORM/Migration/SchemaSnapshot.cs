@@ -191,6 +191,14 @@ namespace nORM.Migration
         public bool IsStoredComputedColumn { get; set; }
 
         /// <summary>
+        /// Optional human-readable column comment (EF Core's <c>HasComment</c>). Emitted by each provider's
+        /// migration generator using its native mechanism: an inline block comment (SQLite), an inline
+        /// <c>COMMENT</c> clause (MySQL), a <c>COMMENT ON COLUMN</c> statement (PostgreSQL), or
+        /// <c>sp_addextendedproperty</c> (SQL Server). Null means no comment.
+        /// </summary>
+        public string? Comment { get; set; }
+
+        /// <summary>
         /// Shallow copy of this column. Used when a table recreation needs the same column under a
         /// different <see cref="Name"/> (e.g. reverting a renamed column on the Down path).
         /// </summary>

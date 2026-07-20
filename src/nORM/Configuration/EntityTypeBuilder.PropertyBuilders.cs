@@ -188,6 +188,22 @@ namespace nORM.Configuration
             }
 
             /// <summary>
+            /// Configures a human-readable comment for the column (EF Core's <c>HasComment</c>). Each provider's
+            /// migration generator emits it with its native mechanism: an inline block comment (SQLite), an inline
+            /// <c>COMMENT</c> clause (MySQL), a <c>COMMENT ON COLUMN</c> statement (PostgreSQL), or
+            /// <c>sp_addextendedproperty</c> (SQL Server). The comment is schema metadata only and does not affect
+            /// runtime insert/update/query behavior.
+            /// </summary>
+            /// <param name="comment">The column comment.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="comment"/> is null or whitespace.</exception>
+            public PropertyBuilder HasComment(string comment)
+            {
+                _parent._config.SetComment(_property, comment);
+                return this;
+            }
+
+            /// <summary>
             /// Configures whether this string property uses Unicode-capable storage.
             /// </summary>
             /// <param name="unicode">True for Unicode text storage; false for non-Unicode text storage.</param>

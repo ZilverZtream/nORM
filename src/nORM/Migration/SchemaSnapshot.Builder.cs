@@ -339,6 +339,9 @@ namespace nORM.Migration
                         StoreType = columnConfiguration?.ColumnTypes.TryGetValue(col.Prop, out var storeType) == true
                             ? storeType
                             : null,
+                        Comment = columnConfiguration?.Comments.TryGetValue(col.Prop, out var comment) == true
+                            ? comment
+                            : null,
                     };
                     ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
                     table.Columns.Add(column);
@@ -566,7 +569,10 @@ namespace nORM.Migration
                 DefaultConstraintName = configuration?.DefaultValueConstraintNames.TryGetValue(col.Prop, out var defaultConstraintName) == true
                     ? defaultConstraintName
                     : null,
-                Collation = collation
+                Collation = collation,
+                Comment = configuration?.Comments.TryGetValue(col.Prop, out var comment) == true
+                    ? comment
+                    : null
             };
             ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
             return column;
