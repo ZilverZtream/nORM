@@ -113,9 +113,26 @@ namespace nORM.Tests.Fuzzing
 
         private static IEnumerable<IrRow> RunLinq(QueryIr ir)
         {
-            IEnumerable<IrRow> q = ir.Rows;
+            IEnumerable<IrRow> left = ir.Rows;
             foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
-                q = q.Where(BuildPredicate(w).Compile());
+                left = left.Where(BuildPredicate(w).Compile());
+
+            IEnumerable<IrRow> q = left;
+            if (ir.SetOp is { } setOp)
+            {
+                IEnumerable<IrRow> right = ir.Rows;
+                foreach (var w in setOp.RightWheres.Where(s => s.Kind == IrStepKind.Where))
+                    right = right.Where(BuildPredicate(w).Compile());
+                q = setOp.Kind switch
+                {
+                    IrSetOpKind.Union => left.Union(right, IrRowComparer.Instance),
+                    IrSetOpKind.Concat => left.Concat(right),
+                    IrSetOpKind.Intersect => left.Intersect(right, IrRowComparer.Instance),
+                    IrSetOpKind.Except => left.Except(right, IrRowComparer.Instance),
+                    _ => left,
+                };
+            }
+
             if (ir.Steps.Any(s => s.Kind == IrStepKind.Distinct))
                 q = q.Distinct(IrRowComparer.Instance);
             q = ApplyOrdering(q, ir);
@@ -126,9 +143,29 @@ namespace nORM.Tests.Fuzzing
 
         private static IEnumerable<IrRow> RunNorm(DbContext ctx, QueryIr ir)
         {
-            IQueryable<IrRow> q = ctx.Query<IrRow>();
-            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
-                q = q.Where(BuildPredicate(w));
+            IQueryable<IrRow> Filter(IReadOnlyList<IrStep> steps)
+            {
+                IQueryable<IrRow> s = ctx.Query<IrRow>();
+                foreach (var w in steps.Where(x => x.Kind == IrStepKind.Where))
+                    s = s.Where(BuildPredicate(w));
+                return s;
+            }
+
+            var left = Filter(ir.Steps);
+            IQueryable<IrRow> q = left;
+            if (ir.SetOp is { } setOp)
+            {
+                var right = Filter(setOp.RightWheres);
+                q = setOp.Kind switch
+                {
+                    IrSetOpKind.Union => left.Union(right),
+                    IrSetOpKind.Concat => left.Concat(right),
+                    IrSetOpKind.Intersect => left.Intersect(right),
+                    IrSetOpKind.Except => left.Except(right),
+                    _ => left,
+                };
+            }
+
             if (ir.Steps.Any(s => s.Kind == IrStepKind.Distinct))
                 q = q.Distinct();
             q = ApplyOrderingQueryable(q, ir);
@@ -263,6 +300,14 @@ namespace nORM.Tests.Fuzzing
             if (ir.Steps.Count(s => s.Kind == IrStepKind.Where) >= 2) f.Add("where-multi");
             if (kinds.Contains(IrStepKind.OrderBy) && (kinds.Contains(IrStepKind.Skip) || kinds.Contains(IrStepKind.Take))) f.Add("orderby+paging");
             if (kinds.Contains(IrStepKind.Where) && kinds.Contains(IrStepKind.OrderBy)) f.Add("where+orderby");
+            if (ir.SetOp is { } setOp)
+            {
+                f.Add("setop");
+                f.Add("setop-" + setOp.Kind.ToString().ToLowerInvariant());
+                if (kinds.Contains(IrStepKind.Distinct)) f.Add("setop+distinct");
+                if (kinds.Contains(IrStepKind.OrderBy)) f.Add("setop+orderby");
+                if (kinds.Contains(IrStepKind.Skip) || kinds.Contains(IrStepKind.Take)) f.Add("setop+paging");
+            }
             if (ir.Rows.Count == 0) f.Add("empty-table");
             if (ir.Rows.Count == 1) f.Add("single-row");
             return f.ToArray();

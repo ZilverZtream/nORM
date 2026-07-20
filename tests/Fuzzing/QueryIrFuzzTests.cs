@@ -44,6 +44,9 @@ namespace nORM.Tests.Fuzzing
 
             Assert.True(corpus.Count >= 4, $"corpus should capture diverse coverage, got {corpus.Count}");
             Assert.True(manifest.FeatureFrontier().Count >= 6, "the sweep should exercise several plan features");
+            var frontier = manifest.FeatureFrontier();
+            Assert.Contains("setop", frontier);
+            Assert.Contains("setop+orderby", frontier);   // the shape that previously produced invalid SQL
         }
 
         [Fact]

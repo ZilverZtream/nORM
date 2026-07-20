@@ -38,7 +38,16 @@ namespace nORM.Tests.Fuzzing
             if (rng.Next(2) == 0)
                 steps.Add(IrStep.Take(rng.Next(0, rowCount + 2)));
 
-            return new QueryIr { Rows = rows, Steps = steps };
+            return new QueryIr { Rows = rows, Steps = steps, SetOp = MaybeSetOp(rng) };
+        }
+
+        private static IrSetOp? MaybeSetOp(Random rng)
+        {
+            if (rng.Next(3) != 0) return null;   // ~1/3 of cases carry a set operation
+            var rightWheres = new List<IrStep>();
+            for (var i = rng.Next(0, 3); i > 0; i--)
+                rightWheres.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6)));
+            return new IrSetOp { Kind = (IrSetOpKind)rng.Next(4), RightWheres = rightWheres };
         }
 
         /// <summary>
@@ -51,7 +60,8 @@ namespace nORM.Tests.Fuzzing
             var rng = new Random(seed);
             var steps = ir.Steps.ToList();
             var rows = ir.Rows.ToList();
-            switch (rng.Next(6))
+            var setOp = ir.SetOp;
+            switch (rng.Next(7))
             {
                 case 0: steps.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6))); break;
                 case 1: if (steps.Count > 0) steps.RemoveAt(rng.Next(steps.Count)); break;
@@ -59,8 +69,13 @@ namespace nORM.Tests.Fuzzing
                 case 3: steps.Add(rng.Next(2) == 0 ? IrStep.Skip(rng.Next(0, rows.Count + 2)) : IrStep.Take(rng.Next(0, rows.Count + 2))); break;
                 case 4: rows.Add(new IrRow { Id = (rows.Count == 0 ? 1 : rows.Max(r => r.Id) + 1), A = rng.Next(0, 6), B = rng.Next(0, 6), Name = ((char)('a' + rng.Next(0, 4))).ToString() }); break;
                 case 5: if (rows.Count > 0) rows.RemoveAt(rng.Next(rows.Count)); break;
+                case 6: // toggle / reshape the set operation
+                    setOp = setOp == null
+                        ? new IrSetOp { Kind = (IrSetOpKind)rng.Next(4), RightWheres = new[] { IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6)) } }
+                        : (rng.Next(3) == 0 ? null : setOp with { Kind = (IrSetOpKind)rng.Next(4) });
+                    break;
             }
-            return new QueryIr { Rows = rows, Steps = steps };
+            return new QueryIr { Rows = rows, Steps = steps, SetOp = setOp };
         }
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];

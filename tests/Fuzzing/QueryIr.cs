@@ -19,7 +19,15 @@ namespace nORM.Tests.Fuzzing
     public sealed record QueryIr
     {
         public required IReadOnlyList<IrRow> Rows { get; init; }
+
+        /// <summary>
+        /// The query steps. When <see cref="SetOp"/> is null they form the whole query; when it is set, the
+        /// Where steps filter the LEFT arm and the OrderBy/Skip/Take/Distinct steps apply to the combined result.
+        /// </summary>
         public required IReadOnlyList<IrStep> Steps { get; init; }
+
+        /// <summary>Optional second arm: the left query is combined with a right query (the same rows filtered by <see cref="IrSetOp.RightWheres"/>) via a set operation.</summary>
+        public IrSetOp? SetOp { get; init; }
 
         public string ToJson() => JsonSerializer.Serialize(this, FuzzRunManifest.ManifestJsonOptions);
         public static QueryIr FromJson(string json) =>
@@ -27,8 +35,23 @@ namespace nORM.Tests.Fuzzing
             ?? throw new InvalidOperationException("Empty QueryIr JSON.");
 
         /// <summary>A compact one-line description for labels and failure signatures.</summary>
-        public string Describe() =>
-            $"rows={Rows.Count} | " + string.Join(".", Steps.Select(s => s.Describe()));
+        public string Describe()
+        {
+            var left = string.Join(".", Steps.Select(s => s.Describe()));
+            if (SetOp == null)
+                return $"rows={Rows.Count} | {left}";
+            var right = string.Join(".", SetOp.RightWheres.Select(s => s.Describe()));
+            return $"rows={Rows.Count} | ({left}).{SetOp.Kind}({right})";
+        }
+    }
+
+    public enum IrSetOpKind { Union, Concat, Intersect, Except }
+
+    /// <summary>The right arm of a set operation: the same rows filtered by <see cref="RightWheres"/>, combined with the left query via <see cref="Kind"/>.</summary>
+    public sealed record IrSetOp
+    {
+        public required IrSetOpKind Kind { get; init; }
+        public required IReadOnlyList<IrStep> RightWheres { get; init; }
     }
 
     /// <summary>The fixed entity schema the query IR operates over. Small, with an int key, two numeric columns, and a string.</summary>
