@@ -41,8 +41,16 @@ Run the release gate, which restores, builds, tests, packs both packages, and
 asserts the produced `.nupkg`/`.snupkg` match `NormVersion` exactly:
 
 ```powershell
-pwsh eng/v1-release-gate.ps1 -Mode full
+# PowerShell 7 (pwsh) or Windows PowerShell 5.1 (powershell) both work - the gate
+# scripts are 5.1-compatible. -MinLiveProviders 3 makes the live providers required
+# (all of SQL Server, PostgreSQL, MySQL must connect) rather than silently skipped.
+powershell -File eng/v1-release-gate.ps1 -Mode full -MinLiveProviders 3
 ```
+
+An early **encoding scan** step fails the gate if any tracked source file contains
+double-encoded UTF-8 (mojibake) or U+FFFD replacement characters; run
+`eng/scripts/check-encoding.ps1 -Fix` for repairable double-encoding and replace
+U+FFFD manually (prefer C# `\uXXXX` escapes in source so the file stays ASCII-safe).
 
 For a fast local check of just the package outputs (no full gate), the
 package-consumer suite packs the runtime project and verifies a real consumer can
