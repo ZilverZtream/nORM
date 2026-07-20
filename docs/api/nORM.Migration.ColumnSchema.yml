@@ -27,6 +27,7 @@ items:
   - nORM.Migration.ColumnSchema.Precision
   - nORM.Migration.ColumnSchema.PreviousName
   - nORM.Migration.ColumnSchema.Scale
+  - nORM.Migration.ColumnSchema.StoreType
   langs:
   - csharp
   - vb
@@ -176,6 +177,42 @@ items:
       type: System.String
     content.vb: Public Property ClrType As String
   overload: nORM.Migration.ColumnSchema.ClrType*
+- uid: nORM.Migration.ColumnSchema.StoreType
+  commentId: P:nORM.Migration.ColumnSchema.StoreType
+  id: StoreType
+  parent: nORM.Migration.ColumnSchema
+  langs:
+  - csharp
+  - vb
+  name: StoreType
+  nameWithType: ColumnSchema.StoreType
+  fullName: nORM.Migration.ColumnSchema.StoreType
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Migration/SchemaSnapshot.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: StoreType
+    path: src/nORM/Migration/SchemaSnapshot.cs
+    startLine: 149
+  assemblies:
+  - nORM
+  namespace: nORM.Migration
+  summary: >-
+    Optional explicit provider store type (EF Core's <code>HasColumnType</code>, e.g. <code>decimal(18,2)</code>,
+
+    <code>nvarchar(max)</code>, <code>jsonb</code>). When set, the SQL generators emit it verbatim instead of
+
+    deriving the type from <xref href="nORM.Migration.ColumnSchema.ClrType" data-throw-if-not-resolved="false"></xref> and the length/precision facets.
+  example: []
+  syntax:
+    content: public string? StoreType { get; set; }
+    parameters: []
+    return:
+      type: System.String
+    content.vb: Public Property StoreType As String
+  overload: nORM.Migration.ColumnSchema.StoreType*
 - uid: nORM.Migration.ColumnSchema.MaxLength
   commentId: P:nORM.Migration.ColumnSchema.MaxLength
   id: MaxLength
@@ -194,7 +231,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxLength
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 145
+    startLine: 151
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -225,7 +262,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 150
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -259,7 +296,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 152
+    startLine: 158
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -290,7 +327,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precision
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 154
+    startLine: 160
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -321,7 +358,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Scale
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 156
+    startLine: 162
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -352,7 +389,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 158
+    startLine: 164
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -383,7 +420,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsPrimaryKey
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 160
+    startLine: 166
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -414,7 +451,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 162
+    startLine: 168
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -445,7 +482,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 164
+    startLine: 170
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -476,7 +513,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IndexOrder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 166
+    startLine: 172
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -507,7 +544,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Indexes
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 168
+    startLine: 174
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -538,7 +575,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValue
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 170
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -569,7 +606,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultConstraintName
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 172
+    startLine: 178
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -600,7 +637,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collation
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 174
+    startLine: 180
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -631,7 +668,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsIdentity
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 176
+    startLine: 182
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -662,7 +699,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentitySeed
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 178
+    startLine: 184
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -693,7 +730,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentityIncrement
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 180
+    startLine: 186
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -724,7 +761,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 182
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -755,7 +792,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsStoredComputedColumn
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 184
+    startLine: 190
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -1779,6 +1816,18 @@ references:
   name: ClrType
   nameWithType: ColumnSchema.ClrType
   fullName: nORM.Migration.ColumnSchema.ClrType
+- uid: nORM.Migration.ColumnSchema.ClrType
+  commentId: P:nORM.Migration.ColumnSchema.ClrType
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_ClrType
+  name: ClrType
+  nameWithType: ColumnSchema.ClrType
+  fullName: nORM.Migration.ColumnSchema.ClrType
+- uid: nORM.Migration.ColumnSchema.StoreType*
+  commentId: Overload:nORM.Migration.ColumnSchema.StoreType
+  href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_StoreType
+  name: StoreType
+  nameWithType: ColumnSchema.StoreType
+  fullName: nORM.Migration.ColumnSchema.StoreType
 - uid: nORM.Migration.ColumnSchema.MaxLength*
   commentId: Overload:nORM.Migration.ColumnSchema.MaxLength
   href: nORM.Migration.ColumnSchema.html#nORM_Migration_ColumnSchema_MaxLength

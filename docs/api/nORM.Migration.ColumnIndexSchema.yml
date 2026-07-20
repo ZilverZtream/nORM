@@ -27,7 +27,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnIndexSchema
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 196
+    startLine: 202
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -69,7 +69,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Name
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 199
+    startLine: 205
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -100,7 +100,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnique
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 201
+    startLine: 207
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -131,7 +131,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Order
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 203
+    startLine: 209
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -162,7 +162,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsDescending
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 205
+    startLine: 211
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -193,7 +193,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsIncluded
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 207
+    startLine: 213
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -224,7 +224,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NullsNotDistinct
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 209
+    startLine: 215
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -255,7 +255,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NullSortOrder
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 211
+    startLine: 217
   assemblies:
   - nORM
   namespace: nORM.Migration
@@ -286,7 +286,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FilterSql
     path: src/nORM/Migration/SchemaSnapshot.cs
-    startLine: 213
+    startLine: 219
   assemblies:
   - nORM
   namespace: nORM.Migration

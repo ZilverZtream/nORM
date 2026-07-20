@@ -464,6 +464,10 @@ namespace nORM.Migration
         {
             ArgumentNullException.ThrowIfNull(column);
 
+            // An explicit HasColumnType (StoreType) overrides the CLR-derived type entirely.
+            if (!string.IsNullOrEmpty(column.StoreType))
+                return column.StoreType;
+
             if (TryGetDecimalWithPrecisionType(column, out var decimalSql))
                 return decimalSql;
 

@@ -157,6 +157,21 @@ namespace nORM.Configuration
             }
 
             /// <summary>
+            /// Configures the explicit provider store type for the column (EF Core's <c>HasColumnType</c>,
+            /// e.g. <c>"decimal(18,2)"</c>, <c>"nvarchar(max)"</c>, <c>"jsonb"</c>). The migration SQL
+            /// generators (EnsureCreated / migrations) emit it verbatim instead of deriving the type from the
+            /// CLR type and the length/precision facets.
+            /// </summary>
+            /// <param name="typeName">The provider store type to use.</param>
+            /// <returns>This <see cref="PropertyBuilder"/> instance for further chaining.</returns>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="typeName"/> is null or whitespace.</exception>
+            public PropertyBuilder HasColumnType(string typeName)
+            {
+                _parent._config.SetColumnType(_property, typeName);
+                return this;
+            }
+
+            /// <summary>
             /// Configures whether this string property uses Unicode-capable storage.
             /// </summary>
             /// <param name="unicode">True for Unicode text storage; false for non-Unicode text storage.</param>

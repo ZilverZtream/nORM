@@ -93,6 +93,12 @@ namespace nORM.Configuration
         IReadOnlyCollection<PropertyInfo> RowVersionSettings { get; }
 
         /// <summary>
+        /// Gets the explicit provider store types configured via the fluent API (HasColumnType), emitted
+        /// verbatim by the migration SQL generators instead of the CLR-derived type.
+        /// </summary>
+        IReadOnlyDictionary<PropertyInfo, string> ColumnTypes { get; }
+
+        /// <summary>
         /// Gets Unicode text metadata configured for string properties.
         /// </summary>
         IReadOnlyDictionary<PropertyInfo, bool> UnicodeSettings { get; }

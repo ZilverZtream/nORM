@@ -8,6 +8,7 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.Builder
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
@@ -555,6 +556,55 @@ items:
   overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsRowVersion*
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion()
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion()
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType(System.String)
+  id: HasColumnType(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasColumnType(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasColumnType(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasColumnType(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasColumnType
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 167
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures the explicit provider store type for the column (EF Core's <code>HasColumnType</code>,
+
+    e.g. <code>"decimal(18,2)"</code>, <code>"nvarchar(max)"</code>, <code>"jsonb"</code>). The migration SQL
+
+    generators (EnsureCreated / migrations) emit it verbatim instead of deriving the type from the
+
+    CLR type and the length/precision facets.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasColumnType(string typeName)
+    parameters:
+    - id: typeName
+      type: System.String
+      description: The provider store type to use.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasColumnType(typeName As String) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">typeName</code> is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType(String)
+  name.vb: HasColumnType(String)
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   id: IsUnicode(System.Boolean)
@@ -573,7 +623,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 164
+    startLine: 179
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -615,7 +665,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 176
+    startLine: 191
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -657,7 +707,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 189
+    startLine: 204
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -702,7 +752,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 203
+    startLine: 218
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -750,7 +800,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCollation
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 217
+    startLine: 232
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -797,7 +847,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasComputedColumnSql
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 232
+    startLine: 247
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -847,7 +897,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 244
+    startLine: 259
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -888,7 +938,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 254
+    startLine: 269
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2092,6 +2142,14 @@ references:
   fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.IsRowVersion
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.IsRowVersion
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasColumnType_System_String_
+  name: HasColumnType
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasColumnType
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasColumnType
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_

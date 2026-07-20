@@ -142,6 +142,12 @@ namespace nORM.Migration
         // comparisons in SchemaDiffer.Diff do not require extra null guards. If ClrType is empty
         // on a ColumnSchema produced by external code, treat it as a configuration concern.
         public string ClrType { get; set; } = string.Empty;
+        /// <summary>
+        /// Optional explicit provider store type (EF Core's <c>HasColumnType</c>, e.g. <c>decimal(18,2)</c>,
+        /// <c>nvarchar(max)</c>, <c>jsonb</c>). When set, the SQL generators emit it verbatim instead of
+        /// deriving the type from <see cref="ClrType"/> and the length/precision facets.
+        /// </summary>
+        public string? StoreType { get; set; }
         /// <summary>Optional maximum length for bounded text or binary columns.</summary>
         public int? MaxLength { get; set; }
         /// <summary>

@@ -28,6 +28,7 @@ namespace nORM.Configuration
             public Dictionary<PropertyInfo, bool> RequiredValues { get; } = new();
             public Dictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> ValueGeneratedValues { get; } = new();
             public HashSet<PropertyInfo> RowVersionValues { get; } = new();
+            public Dictionary<PropertyInfo, string> ColumnTypeValues { get; } = new();
             public Dictionary<PropertyInfo, bool> UnicodeValues { get; } = new();
             public Dictionary<PropertyInfo, bool> FixedLengthValues { get; } = new();
             public Dictionary<PropertyInfo, PrecisionConfiguration> PrecisionValues { get; } = new();
@@ -54,6 +55,7 @@ namespace nORM.Configuration
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.RequiredSettings => RequiredValues;
             IReadOnlyDictionary<PropertyInfo, System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption> IEntityTypeConfiguration.ValueGeneratedSettings => ValueGeneratedValues;
             IReadOnlyCollection<PropertyInfo> IEntityTypeConfiguration.RowVersionSettings => RowVersionValues;
+            IReadOnlyDictionary<PropertyInfo, string> IEntityTypeConfiguration.ColumnTypes => ColumnTypeValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.UnicodeSettings => UnicodeValues;
             IReadOnlyDictionary<PropertyInfo, bool> IEntityTypeConfiguration.FixedLengthSettings => FixedLengthValues;
             IReadOnlyDictionary<PropertyInfo, PrecisionConfiguration> IEntityTypeConfiguration.Precisions => PrecisionValues;
@@ -227,6 +229,18 @@ namespace nORM.Configuration
             {
                 ArgumentNullException.ThrowIfNull(prop);
                 RowVersionValues.Add(prop);
+            }
+
+            /// <summary>
+            /// Sets an explicit provider store type for the column (EF Core's HasColumnType), emitted verbatim
+            /// by the migration SQL generators instead of the CLR-derived type.
+            /// </summary>
+            public void SetColumnType(PropertyInfo prop, string columnType)
+            {
+                ArgumentNullException.ThrowIfNull(prop);
+                if (string.IsNullOrWhiteSpace(columnType))
+                    throw new ArgumentException("Column type cannot be null or whitespace.", nameof(columnType));
+                ColumnTypeValues[prop] = columnType.Trim();
             }
 
             /// <summary>

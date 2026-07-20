@@ -336,6 +336,9 @@ namespace nORM.Migration
                             ? defaultConstraintName
                             : null,
                         Collation = collation,
+                        StoreType = columnConfiguration?.ColumnTypes.TryGetValue(col.Prop, out var storeType) == true
+                            ? storeType
+                            : null,
                     };
                     ApplyIndexAttributes(column, indexAttributesByProperty, indexColumnCounts, col.Prop);
                     table.Columns.Add(column);

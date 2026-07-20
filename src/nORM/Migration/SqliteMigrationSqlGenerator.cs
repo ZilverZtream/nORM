@@ -515,6 +515,10 @@ namespace nORM.Migration
         {
             ArgumentNullException.ThrowIfNull(column);
 
+            // An explicit HasColumnType (StoreType) overrides the CLR-derived type entirely.
+            if (!string.IsNullOrEmpty(column.StoreType))
+                return column.StoreType;
+
             // X2: handle enum types by mapping to their underlying integral type
             if (!TypeMap.TryGetValue(column.ClrType, out var sql))
             {

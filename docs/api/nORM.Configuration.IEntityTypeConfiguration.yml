@@ -8,6 +8,7 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.CheckConstraints
   - nORM.Configuration.IEntityTypeConfiguration.Collations
   - nORM.Configuration.IEntityTypeConfiguration.ColumnNames
+  - nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
   - nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql
   - nORM.Configuration.IEntityTypeConfiguration.Converters
   - nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
@@ -521,6 +522,40 @@ items:
       type: System.Collections.Generic.IReadOnlyCollection{System.Reflection.PropertyInfo}
     content.vb: ReadOnly Property RowVersionSettings As IReadOnlyCollection(Of PropertyInfo)
   overload: nORM.Configuration.IEntityTypeConfiguration.RowVersionSettings*
+- uid: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
+  id: ColumnTypes
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: ColumnTypes
+  nameWithType: IEntityTypeConfiguration.ColumnTypes
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ColumnTypes
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 98
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets the explicit provider store types configured via the fluent API (HasColumnType), emitted
+
+    verbatim by the migration SQL generators instead of the CLR-derived type.
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, string> ColumnTypes { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+    content.vb: ReadOnly Property ColumnTypes As IReadOnlyDictionary(Of PropertyInfo, String)
+  overload: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes*
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   id: UnicodeSettings
@@ -539,7 +574,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UnicodeSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 97
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -570,7 +605,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FixedLengthSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 102
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -601,7 +636,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precisions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 107
+    startLine: 113
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -632,7 +667,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 113
+    startLine: 119
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -666,7 +701,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 118
+    startLine: 124
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -697,7 +732,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 123
+    startLine: 129
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -728,7 +763,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 128
+    startLine: 134
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -759,7 +794,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 133
+    startLine: 139
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -790,7 +825,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 138
+    startLine: 144
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -821,7 +856,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 143
+    startLine: 149
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -852,7 +887,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 148
+    startLine: 154
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -883,7 +918,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converters
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 151
+    startLine: 157
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -914,7 +949,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 157
+    startLine: 163
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -948,7 +983,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyRelationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 162
+    startLine: 168
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2237,6 +2272,12 @@ references:
   - name: " "
   - name: T
   - name: )
+- uid: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_ColumnTypes
+  name: ColumnTypes
+  nameWithType: IEntityTypeConfiguration.ColumnTypes
+  fullName: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_UnicodeSettings
