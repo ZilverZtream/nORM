@@ -13,6 +13,7 @@ using nORM.Core;
 using nORM.Providers;
 using EfDbContext = Microsoft.EntityFrameworkCore.DbContext;
 using EfQueryableExtensions = Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions;
+using EfRelationalExtensions = Microsoft.EntityFrameworkCore.RelationalQueryableExtensions;
 using NormAsyncExtensions = nORM.Core.NormAsyncExtensions;
 using static Microsoft.EntityFrameworkCore.EF;
 
@@ -328,7 +329,9 @@ namespace nORM.Benchmarks
         [IterationSetup(Targets = new[]
         {
             nameof(Delete_Single_EfCore), nameof(Delete_Single_nORM), nameof(Delete_Single_Dapper),
-            nameof(Delete_Single_RawAdo), nameof(Delete_Single_RawAdo_Prepared)
+            nameof(Delete_Single_RawAdo), nameof(Delete_Single_RawAdo_Prepared),
+            nameof(ExecuteDelete_Set_EfCore), nameof(ExecuteDelete_Set_nORM),
+            nameof(ExecuteDelete_Set_Dapper), nameof(ExecuteDelete_Set_RawAdo)
         })]
         public void EnsureDeleteRow()
         {
@@ -561,6 +564,51 @@ namespace nORM.Benchmarks
         {
             _adoDeletePrepared!.Parameters[0].Value = DeleteRowId;
             await _adoDeletePrepared.ExecuteNonQueryAsync();
+        }
+
+        // ========== SET-BASED ExecuteUpdate / ExecuteDelete (no tracking) ==========
+        // EF Core 7+ / nORM set-based bulk-style single-statement update/delete — no load, no change
+        // tracking. Compares the ORM's LINQ->SQL translation + dispatch against a raw statement.
+
+        [Benchmark]
+        public Task ExecuteUpdate_Set_EfCore()
+            => EfRelationalExtensions.ExecuteUpdateAsync(_efContext!.Users.Where(u => u.Id == 1), s => s.SetProperty(p => p.Age, 30));
+
+        [Benchmark]
+        public Task ExecuteUpdate_Set_nORM()
+            => NormAsyncExtensions.ExecuteUpdateAsync(_nOrmContext!.Query<BenchmarkUser>().Where(u => u.Id == 1), s => s.SetProperty(p => p.Age, 30));
+
+        [Benchmark]
+        public Task ExecuteUpdate_Set_Dapper()
+            => _dapperConnection!.ExecuteAsync("UPDATE BenchmarkUser SET Age=30 WHERE Id=1;");
+
+        [Benchmark]
+        public async Task ExecuteUpdate_Set_RawAdo()
+        {
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = "UPDATE BenchmarkUser SET Age=30 WHERE Id=1;";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        [Benchmark]
+        public Task ExecuteDelete_Set_EfCore()
+            => EfRelationalExtensions.ExecuteDeleteAsync(_efContext!.Users.Where(u => u.Id == DeleteRowId));
+
+        [Benchmark]
+        public Task ExecuteDelete_Set_nORM()
+            => NormAsyncExtensions.ExecuteDeleteAsync(_nOrmContext!.Query<BenchmarkUser>().Where(u => u.Id == DeleteRowId));
+
+        [Benchmark]
+        public Task ExecuteDelete_Set_Dapper()
+            => _dapperConnection!.ExecuteAsync("DELETE FROM BenchmarkUser WHERE Id=@Id;", new { Id = DeleteRowId });
+
+        [Benchmark]
+        public async Task ExecuteDelete_Set_RawAdo()
+        {
+            using var command = _dapperConnection!.CreateCommand();
+            command.CommandText = "DELETE FROM BenchmarkUser WHERE Id=@Id;";
+            command.Parameters.AddWithValue("@Id", DeleteRowId);
+            await command.ExecuteNonQueryAsync();
         }
 
         // ========== SIMPLE QUERY (standard) ==========
