@@ -68,6 +68,9 @@ namespace nORM.Query
                         t._sql.AppendFragment("SELECT DISTINCT * FROM (").Append(innerSetSql)
                               .AppendFragment(") AS ").Append(setWrapAlias);
                         t._isDistinct = true;
+                        // Record the wrap alias so a trailing OrderBy/paging resolves its key columns against
+                        // the derived table (e.g. __dset0.A) instead of a phantom T1 that isn't in the SQL.
+                        t._outerDerivedAlias = setWrapAlias;
                         t._orderBy.Clear();
                         return node.Arguments[0];
                     }
