@@ -135,6 +135,7 @@ namespace nORM.Core
             }
         }
 
+
         /// <summary>
         /// Persists all tracked entity changes to the database within a single transaction.
         /// </summary>
@@ -157,9 +158,7 @@ namespace nORM.Core
                 CascadeMarkDeletedDependents();
                 ChangeTracker.DetectAllChanges();
             }
-            var changedEntries = ChangeTracker.Entries
-                .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-                .ToList();
+            var changedEntries = ChangeTracker.CollectChangedEntriesSorted();
             if (changedEntries.Count == 0)
                 return 0;
 
@@ -175,9 +174,7 @@ namespace nORM.Core
                 // Also re-run DetectAllChanges so that property-level mutations made to previously-Unchanged
                 // entities (e.g. audit stamping) are picked up even if entries were not explicitly marked Modified.
                 ChangeTracker.DetectAllChanges();
-                changedEntries = ChangeTracker.Entries
-                    .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-                    .ToList();
+                changedEntries = ChangeTracker.CollectChangedEntriesSorted();
                 if (changedEntries.Count == 0)
                     return 0;
             }

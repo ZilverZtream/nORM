@@ -503,6 +503,28 @@ namespace nORM.Core
         public IEnumerable<EntityEntry> Entries => _entriesByReference.Values.OrderBy(e => e.AttachSequence);
 
         /// <summary>
+        /// Collects the Added/Modified/Deleted entries in attach-sequence order for SaveChanges. Filters BEFORE
+        /// sorting and enumerates the identity map directly, so a context tracking many unchanged entities while
+        /// saving a few changes sorts (and allocates for) only the changed subset — not a full ordered snapshot
+        /// of every tracked entity, which <see cref="Entries"/> would build. Returns an empty list when nothing
+        /// is dirty. Run <see cref="DetectAllChanges"/> first so entity states are current.
+        /// </summary>
+        internal List<EntityEntry> CollectChangedEntriesSorted()
+        {
+            var changed = new List<EntityEntry>();
+            // Enumerate the identity map directly (not .Values, which copies every value into a new array).
+            foreach (var kv in _entriesByReference)
+            {
+                var entry = kv.Value;
+                if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                    changed.Add(entry);
+            }
+            if (changed.Count > 1)
+                changed.Sort(static (a, b) => a.AttachSequence.CompareTo(b.AttachSequence));
+            return changed;
+        }
+
+        /// <summary>
         /// A human-readable snapshot of the tracked entities for debugging (EF Core
         /// <c>ChangeTracker.DebugView</c> parity): <c>DebugView.ShortView</c> lists one line per entity
         /// (type, key, state) and <c>DebugView.LongView</c> adds each property's value. Reflects the tracker's
