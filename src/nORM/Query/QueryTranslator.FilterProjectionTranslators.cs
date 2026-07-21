@@ -700,6 +700,21 @@ namespace nORM.Query
                     t._orderBy.Add((setOpOrderCol, ascendingSet));
                     return source;
                 }
+                // Identity order key over a set op: `.Select(r => r.Scalar).Union(...).OrderBy(x => x)`.
+                // Identity ordering (`x => x`) only compiles for a comparable SCALAR element, so the
+                // compound query has exactly ONE result column (the projected scalar). Order by its
+                // ordinal position — an ordinal ORDER BY is valid in a compound SELECT on all four
+                // providers and, unlike a table-qualified term, is accepted against the UNION result
+                // set (the member-key branch above table-/name-qualifies, which a compound rejects).
+                if (sourceIsSetOp
+                    && QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression setOpIdentitySel
+                    && setOpIdentitySel.Body is ParameterExpression setOpIdentityParam
+                    && setOpIdentityParam == setOpIdentitySel.Parameters[0])
+                {
+                    var ascendingIdentity = !node.Method.Name.Contains("Descending");
+                    t._orderBy.Add(("1", ascendingIdentity));
+                    return source;
+                }
                 // Detect OrderBy applied AFTER a Take/Skip — LINQ semantics
                 // (`OrderBy(a).Take(n).OrderBy(b)`) require the outer OrderBy to resort
                 // the limited window, which SQL can only express via a subquery wrap.
