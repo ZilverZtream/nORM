@@ -27,26 +27,34 @@ namespace nORM.Query
                 return node;
             }
 
-            // string.Trim / TrimStart / TrimEnd with explicit char[] -- the
-            // generic provider route would expand the char[] as multiple
-            // SQL args and SQLite TRIM accepts only (s) or (s, trim_chars_str)
-            // -> 'wrong number of arguments to function TRIM()'. Detect the
-            // params-char[] overload, evaluate the array at translation time,
-            // and emit TRIM(s, 'concatenated_chars').
+            // string.Trim / TrimStart / TrimEnd with an explicit trim set -- both the
+            // params char[] overload and the single-char overload (TrimEnd('x'), added
+            // in .NET Core). The generic provider route would emit the method name
+            // (TRIMEND) or expand the char[] as multiple SQL args -> SQLite TRIM accepts
+            // only (s) or (s, trim_chars_str). Evaluate the trim set at translation time
+            // and emit TRIM/LTRIM/RTRIM(s, 'concatenated_chars').
             if ((node.Method.Name == nameof(string.Trim)
                     || node.Method.Name == nameof(string.TrimStart)
                     || node.Method.Name == nameof(string.TrimEnd))
                 && node.Method.DeclaringType == typeof(string)
                 && node.Object != null
                 && node.Arguments.Count == 1
-                && node.Arguments[0].Type == typeof(char[]))
+                && (node.Arguments[0].Type == typeof(char[]) || node.Arguments[0].Type == typeof(char)))
             {
-                // Extract the char[] manually. TryGetConstantValue refuses
+                // Extract the trim chars manually. TryGetConstantValue refuses
                 // NewArrayInit / MethodCall (security-restricted to prevent
-                // RCE), so walk NewArrayInit elements ourselves; for foldable
-                // MemberExpression we re-use TryGetConstantValue.
+                // RCE), so walk NewArrayInit elements ourselves; for a foldable
+                // MemberExpression / single char we re-use TryGetConstantValue.
                 char[]? chars = null;
-                if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
+                if (node.Arguments[0].Type == typeof(char))
+                {
+                    // Single-char overload: TrimEnd('x').
+                    if (node.Arguments[0] is ConstantExpression singleConst && singleConst.Value is char singleCh)
+                        chars = new[] { singleCh };
+                    else if (QueryTranslator.TryGetConstantValue(node.Arguments[0], out var singleVal) && singleVal is char capturedCh)
+                        chars = new[] { capturedCh };
+                }
+                else if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
                 {
                     var arr = new char[nae.Expressions.Count];
                     bool allConst = true;

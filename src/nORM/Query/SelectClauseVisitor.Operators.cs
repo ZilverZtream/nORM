@@ -74,6 +74,12 @@ namespace nORM.Query
                 case string s:
                     sb.Append('\'').Append(s.Replace("'", "''")).Append('\'');
                     break;
+                case char c:
+                    // A char literal inlines as a single-character string literal ('.'), not a
+                    // bare token — the default ToString path emits an unquoted `.` (e.g. as a
+                    // PadRight pad-char arg), producing invalid SQL ("near \".\": syntax error").
+                    sb.Append('\'').Append(new string(c, 1).Replace("'", "''")).Append('\'');
+                    break;
                 case bool b:
                     sb.Append(b ? _provider.BooleanTrueLiteral : "0");
                     break;

@@ -20,20 +20,33 @@ namespace nORM.Query
                 return null;
             }
 
-            // string.Trim / TrimStart / TrimEnd(char[]) -- the generic provider
-            // route would expand the params char[] as multiple SQL args
-            // crashing SQLite TRIM. Mirror be14020's SCV branch: walk
-            // NewArrayInit or fold MemberExpression to extract chars at
-            // translation time, then emit TRIM/LTRIM/RTRIM(s, 'chars').
+            // string.Trim / TrimStart / TrimEnd with an explicit trim set -- both the
+            // params char[] overload and the single-char overload (TrimEnd('x'), added
+            // in .NET Core). The generic provider route would emit the method name
+            // (TRIMEND) or expand the array as multiple SQL args, crashing the DB.
+            // Mirror be14020's SCV branch: walk NewArrayInit / a single char constant /
+            // fold a closure, then emit TRIM/LTRIM/RTRIM(s, 'chars').
             if ((node.Method.Name == nameof(string.Trim)
                     || node.Method.Name == nameof(string.TrimStart)
                     || node.Method.Name == nameof(string.TrimEnd))
                 && node.Object != null
                 && node.Arguments.Count == 1
-                && node.Arguments[0].Type == typeof(char[]))
+                && (node.Arguments[0].Type == typeof(char[]) || node.Arguments[0].Type == typeof(char)))
             {
                 char[]? chars = null;
-                if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
+                var charsFromClosure = false;
+                if (node.Arguments[0].Type == typeof(char))
+                {
+                    // Single-char overload: TrimEnd('x').
+                    if (node.Arguments[0] is ConstantExpression singleConst && singleConst.Value is char singleCh)
+                        chars = new[] { singleCh };
+                    else if (TryGetConstantValue(node.Arguments[0], out var singleVal) && singleVal is char capturedCh)
+                    {
+                        chars = new[] { capturedCh };
+                        charsFromClosure = true;
+                    }
+                }
+                else if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
                 {
                     var arr = new char[nae.Expressions.Count];
                     bool allConst = true;
@@ -45,7 +58,6 @@ namespace nORM.Query
                     }
                     if (allConst) chars = arr;
                 }
-                var charsFromClosure = false;
                 if (chars == null
                     && TryGetConstantValue(node.Arguments[0], out var arrVal) && arrVal is char[] capturedChars)
                 {
