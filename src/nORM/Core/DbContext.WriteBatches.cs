@@ -105,7 +105,8 @@ namespace nORM.Core
 
             foreach (var entry in batch)
             {
-                sql.Append(BuildInsertBatch(map, paramIndex)).Append(';');
+                AppendInsertBatch(sql, map, paramIndex);
+                sql.Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
                     WriteOperation.Insert, paramIndex);
@@ -592,7 +593,23 @@ namespace nORM.Core
                 throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
         }
 
+        // String form of AppendInsertBatch, kept for insert template-length estimation (SaveChanges
+        // batch sizing). Both share the same builder logic, so they can never diverge.
         private string BuildInsertBatch(TableMapping map, int startParamIndex)
+        {
+            var sb = new StringBuilder();
+            AppendInsertBatch(sb, map, startParamIndex);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Appends one entity's batched INSERT directly into <paramref name="sql"/>. Output is
+        /// byte-identical to the former interpolation; this form skips the two <c>Select</c>+<c>string.Join</c>
+        /// passes (column and parameter name lists) and the return-string allocation, per entity per save.
+        /// The parameter numbering (<c>startParamIndex + i</c> over the provider's insert columns)
+        /// matches <see cref="AddParametersBatched"/>.
+        /// </summary>
+        private void AppendInsertBatch(StringBuilder sql, TableMapping map, int startParamIndex)
         {
             // INS-1: Only append identity retrieval when at least one key column is DB-generated.
             // For natural-key entities the fragment is wasteful and potentially wrong across providers.
@@ -611,10 +628,24 @@ namespace nORM.Core
                 : string.Empty;
             var cols = _p.GetInsertColumns(map);
             if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable}{identityPrefix}{tokenPrefix} {_p.DefaultValuesInsertClause}{identityFragment}";
-            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-            var paramNames = string.Join(", ", cols.Select((c, i) => $"{_p.ParamPrefix}p{startParamIndex + i}"));
-            return $"INSERT INTO {map.EscTable} ({colNames}){identityPrefix}{tokenPrefix} VALUES ({paramNames}){identityFragment}";
+            {
+                sql.Append("INSERT INTO ").Append(map.EscTable).Append(identityPrefix).Append(tokenPrefix)
+                   .Append(' ').Append(_p.DefaultValuesInsertClause).Append(identityFragment);
+                return;
+            }
+            sql.Append("INSERT INTO ").Append(map.EscTable).Append(" (");
+            for (int i = 0; i < cols.Length; i++)
+            {
+                if (i > 0) sql.Append(", ");
+                sql.Append(cols[i].EscCol);
+            }
+            sql.Append(')').Append(identityPrefix).Append(tokenPrefix).Append(" VALUES (");
+            for (int i = 0; i < cols.Length; i++)
+            {
+                if (i > 0) sql.Append(", ");
+                sql.Append(_p.ParamPrefix).Append('p').Append(startParamIndex + i);
+            }
+            sql.Append(')').Append(identityFragment);
         }
 
         // Full-column overload (used for template-length estimation): updates every mutable column.
