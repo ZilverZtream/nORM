@@ -44,8 +44,17 @@ public class CrudStateMachineFuzzTests
 
     /// <summary>
     /// Environment-directed seed sweep for building the release dry window: set
-    /// NORM_CRUD_FUZZ_SWEEP to "start:count" to run that seed range through all three
-    /// state machines. Unset, this fact is a no-op so the fixed seeds stay the baseline.
+    /// NORM_CRUD_FUZZ_SWEEP to "start:count" (optionally "start:count:dop") to run that
+    /// seed range through all three state machines. Unset, this fact is a no-op so the
+    /// fixed seeds stay the baseline.
+    ///
+    /// Each seed runs against its own uniquely-named shared-cache in-memory database
+    /// (<c>mutfuzz_{seed}_{Guid}</c>) and keeps its committed/working/tracked model in
+    /// local dictionaries, so seeds share no mutable state and the sweep is embarrassingly
+    /// parallel. It fans out across all cores via Parallel.ForEachAsync instead of running
+    /// one seed at a time; a failing seed still surfaces (its assertion propagates out of
+    /// the parallel loop). Override the degree of parallelism with the optional third field
+    /// (default = <see cref="Environment.ProcessorCount"/>; ":1" restores serial for A/B timing).
     /// </summary>
     [Fact]
     public async Task Environment_directed_seed_sweep()
@@ -55,12 +64,19 @@ public class CrudStateMachineFuzzTests
         var parts = spec.Split(':');
         var start = int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
         var count = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-        for (var s = start; s < start + count; s++)
-        {
-            await Random_mutation_sequences_match_the_committed_model(s);
-            await Random_mutation_sequences_with_generated_keys_match_the_committed_model(s);
-            await Random_relationship_mutations_match_the_committed_model(s);
-        }
+        var dop = parts.Length > 2
+            ? int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture)
+            : Environment.ProcessorCount;
+
+        var options = new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, dop) };
+        await System.Threading.Tasks.Parallel.ForEachAsync(
+            Enumerable.Range(start, count), options,
+            async (s, _) =>
+            {
+                await Random_mutation_sequences_match_the_committed_model(s);
+                await Random_mutation_sequences_with_generated_keys_match_the_committed_model(s);
+                await Random_relationship_mutations_match_the_committed_model(s);
+            });
     }
 
     [Theory]
