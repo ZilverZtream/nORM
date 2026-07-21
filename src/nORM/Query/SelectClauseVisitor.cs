@@ -313,6 +313,25 @@ namespace nORM.Query
                 }
                 return node;
             }
+            // A member access on a FREE parameter that is not the projection row parameter is a member of
+            // Norm.CompileQuery's tuple value parameter (e.g. p.add where p is the compiled query TParam)
+            // used directly in the projection. Emit a __qm<Member>-marked compiled slot so the compiled
+            // pipeline binds that member's live value by name across cached-plan re-runs. Without this the
+            // access mis-resolves as a row column ("Member 'Item1' is not mapped"). The predicate path
+            // (ExpressionToSqlVisitor.VisitMember) already does this. Scoped to a known free parameter so
+            // ordinary projections and the row parameter are unaffected; the main projection visitor only
+            // walks the direct projection body (nested-lambda params route through sub-translators).
+            if (node.Expression is ParameterExpression qp
+                && SharedParams != null && SharedCompiledParams != null
+                && OuterRowParameters != null && !OuterRowParameters.Contains(qp)
+                && !typeof(DbContext).IsAssignableFrom(qp.Type))
+            {
+                var qmName = $"{_provider.ParamPrefix}p{SharedParams.Count}__qm{node.Member.Name}";
+                SharedParams[qmName] = DBNull.Value;
+                SharedCompiledParams.Add(qmName);
+                sb.Append(qmName);
+                return node;
+            }
 
             // dtoCol.LocalDateTime — wall clock at the local machine's offset.
             // The local offset isn't known to the SQL engine, so capture it at
