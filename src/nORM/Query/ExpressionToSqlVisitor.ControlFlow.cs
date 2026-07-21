@@ -127,6 +127,15 @@ namespace nORM.Query
                         _sql.Append(_provider.GetRealCastSql(floatCastSql));
                         return node;
                     }
+                    // A char->integer cast ((int)s[0]) is the CODE POINT in C#. nORM represents a
+                    // char as a single-character string (s[0] -> SUBSTR(col, i+1, 1)), so a plain
+                    // pass-through would leave the substr text and the materializer would CAST it
+                    // to 0. Emit the provider's char-code function instead.
+                    if (operandUnderlying == typeof(char) && IsIntegralTargetType(targetUnderlying))
+                    {
+                        _sql.Append(_provider.GetCharCodeSql(GetSql(node.Operand)));
+                        return node;
+                    }
                     Visit(node.Operand);
                     return node;
                 }

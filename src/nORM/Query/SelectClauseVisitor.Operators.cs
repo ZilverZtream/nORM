@@ -617,6 +617,22 @@ namespace nORM.Query
                     sbF.Append(_provider.GetRealCastSql(fSql));
                     return node;
                 }
+                // A char->integer cast ((int)s[0]) is the CODE POINT in C#. A char is represented
+                // as a single-character string (s[0] -> SUBSTR), so a pass-through would leave the
+                // substr text and the materializer would CAST it to 0. Emit the char-code function.
+                if (castSrc == typeof(char)
+                    && (castDst == typeof(int) || castDst == typeof(long) || castDst == typeof(short)
+                        || castDst == typeof(byte) || castDst == typeof(sbyte) || castDst == typeof(uint)
+                        || castDst == typeof(ulong) || castDst == typeof(ushort)))
+                {
+                    var sbC = EnsureBuilder();
+                    var cStart = sbC.Length;
+                    Visit(node.Operand);
+                    var cSql = sbC.ToString(cStart, sbC.Length - cStart);
+                    sbC.Length = cStart;
+                    sbC.Append(_provider.GetCharCodeSql(cSql));
+                    return node;
+                }
                 Visit(node.Operand);
                 return node;
             }
