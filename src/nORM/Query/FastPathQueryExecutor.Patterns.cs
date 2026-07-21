@@ -112,14 +112,20 @@ namespace nORM.Query
             int? skipCount = null;
             int? takeCount = null;
             var sawPagingOrOrdering = false;
-            // The walk goes top-down (outer-most LINQ call first). If we see paging/Take/Skip
-            // BEFORE the Where or OrderBy at the outer level, the chain is actually
-            // `.Take(n).Where(p)` / `.Take(n).OrderBy(k)` - LINQ semantics demand the Where /
-            // OrderBy operate on the windowed result, which requires a subquery wrap that
-            // this fast path can't emit. Surrender to the slow translator so its bca0523 /
-            // sister pin can throw with the workaround hint instead of silently filtering
-            // the full table. Tracked via `sawPaging` - true once Take/Skip is seen.
-            bool sawPaging = false;
+            // The walk goes top-down (outer-most LINQ call first), i.e. it visits operators in
+            // REVERSE fluent order. A query flattens to ONE
+            // `SELECT .. WHERE p ORDER BY k LIMIT t OFFSET s` statement iff its fluent order applies
+            // paging LAST: filter and order (which commute) first, then Skip, then Take. In the
+            // outer-first walk that is the NON-DECREASING rank order Take(0) ≤ Skip(1) ≤
+            // {OrderBy, Where}(2). A rank that DECREASES means a filter/order — or an earlier page —
+            // was applied to an already-paged result (e.g. `.Where().Take().Skip()`, `.Take().Where()`,
+            // `.Take().OrderBy()`, `.Where().Skip().OrderBy()`): LINQ evaluates that over the window,
+            // which needs a derived-table wrap the flat builder cannot emit. Surrender those to the
+            // slow translator (it pages correctly / its pin fails loud with the workaround hint)
+            // rather than emitting flat SQL that would silently return the wrong rows. `Where` and
+            // `OrderBy` share rank 2 because filter and sort commute, so `.OrderBy().Where()` stays
+            // fast too; duplicate operators are rejected by the per-case guards below.
+            var lastRank = -1;
 
             while (expr is MethodCallExpression call)
             {
@@ -132,36 +138,33 @@ namespace nORM.Query
                 if (call.Method.DeclaringType != typeof(Queryable))
                     return false;
 
+                var rank = call.Method.Name switch
+                {
+                    nameof(Queryable.Take) => 0,
+                    nameof(Queryable.Skip) => 1,
+                    nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending) => 2,
+                    nameof(Queryable.Where) => 2,
+                    _ => -1
+                };
+                if (rank < 0 || rank < lastRank)
+                    return false;
+                lastRank = rank;
+
                 switch (call.Method.Name)
                 {
                     case nameof(Queryable.Take):
                         if (takeCount.HasValue || call.Arguments[1] is not ConstantExpression takeConst || takeConst.Value is not int take || take < 0)
                             return false;
-                        // A Where/OrderBy already collected (visited OUTER to this Take in the
-                        // top-down walk) means the chain is `.Take(n).Where(p)` / `.Take(n).OrderBy(k)`:
-                        // LINQ pages FIRST then filters/orders, which needs a derived-table wrap the
-                        // flat SQL can't express. Surrender to the slow translator instead of emitting
-                        // `WHERE p LIMIT n` (wrong rows).
-                        if (predicates.Count > 0 || orderProperty != null)
-                            return false;
                         takeCount = take;
                         sawPagingOrOrdering = true;
-                        sawPaging = true;
                         expr = call.Arguments[0];
                         break;
 
                     case nameof(Queryable.Skip):
                         if (skipCount.HasValue || call.Arguments[1] is not ConstantExpression skipConst || skipConst.Value is not int skip || skip < 0)
                             return false;
-                        // Same rule as Take: a filter/order outer to this Skip is `.Skip(n).Where(p)`,
-                        // which pages first then filters. Beyond wrong rows, the flat builder would emit
-                        // a bare OFFSET with no LIMIT (invalid SQL on SQLite/MySQL) — the slow path
-                        // handles the skip-only shape correctly, so defer to it.
-                        if (predicates.Count > 0 || orderProperty != null)
-                            return false;
                         skipCount = skip;
                         sawPagingOrOrdering = true;
-                        sawPaging = true;
                         expr = call.Arguments[0];
                         break;
 
@@ -169,9 +172,6 @@ namespace nORM.Query
                     case nameof(Queryable.OrderByDescending):
                         if (orderProperty != null)
                             return false;
-                        // OrderBy applied AFTER Take/Skip (i.e. outer-most call) - see comment
-                        // above. Reject so the slow translator's bca0523 pin fires.
-                        if (sawPaging) return false;
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression orderLambda ||
                             orderLambda.Body is not MemberExpression orderMember)
                             return false;
@@ -185,9 +185,6 @@ namespace nORM.Query
                     case nameof(Queryable.Where):
                         if (predicates.Count > 0)
                             return false;
-                        // Where applied AFTER Take/Skip - silent-wrongness vector. Reject so
-                        // the slow translator's sister pin throws with the workaround hint.
-                        if (sawPaging) return false;
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression whereLambda ||
                             !TryCollectPredicates(whereLambda.Body, predicates))
                             return false;
@@ -201,6 +198,12 @@ namespace nORM.Query
 
             expr = Unwrap(expr);
             if (expr is not ConstantExpression || predicates.Count == 0 || !sawPagingOrOrdering)
+                return false;
+
+            // Skip WITHOUT Take would emit a bare `OFFSET n` (no LIMIT), which is invalid SQL on
+            // SQLite/MySQL. The slow translator emits each provider's correct no-limit form, so
+            // defer skip-only paging to it.
+            if (skipCount.HasValue && !takeCount.HasValue)
                 return false;
 
             info = new ComplexQueryInfo(predicates.ToArray(), orderProperty, orderDescending, skipCount, takeCount);

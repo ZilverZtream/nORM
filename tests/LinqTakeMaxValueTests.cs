@@ -109,6 +109,17 @@ public class LinqTakeMaxValueTests : IAsyncLifetime
         Assert.Equal(new[] { 2, 3, 4, 5 }, rows.Select(r => r.Id).ToArray());
     }
 
+    [Fact]
+    public async Task Take_int_maxvalue_after_simple_equality_where_returns_matching_row()
+    {
+        // .Where(col == val).Take(int.MaxValue) hits the simple-where fast path. Pre-sizing the
+        // result list to int.MaxValue would OOM ("Array dimensions exceeded supported range");
+        // pin that the capacity hint is clamped and the single matching row comes back.
+        var rows = await _ctx.Query<TmvItem>().Where(i => i.V == 300).Take(int.MaxValue).ToListAsync();
+        Assert.Single(rows);
+        Assert.Equal(3, rows[0].Id);
+    }
+
     [Table("TmvItem")]
     public sealed class TmvItem
     {

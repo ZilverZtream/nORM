@@ -170,7 +170,7 @@ namespace nORM.Query
                 if (!isNull && !isBoolTrue && !isBoolFalse)
                     ParameterAssign.AssignValue(cmd.Parameters[0], info.Value);
 
-                var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+                var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
                 var materializer = GetSyncMaterializer<T>(ctx);
                 if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 {
@@ -206,7 +206,7 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             if (!isNull && !isBoolTrue && !isBoolFalse)
                 cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
-            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -223,7 +223,7 @@ namespace nORM.Query
         /// <summary>Materializes WHERE results and loads owned collections (sync read + async owned-collection load).</summary>
         private static async Task<object> ExecuteSimpleWhereMaterializeWithOwnedAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, bool track, CancellationToken ct, bool sync) where T : class, new()
         {
-            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             if (sync)
             {
@@ -260,7 +260,7 @@ namespace nORM.Query
 
         private static async Task<object> ExecuteSimpleWhereMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
-            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var command = cmd;
             await using var reader = await command.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
@@ -286,7 +286,7 @@ namespace nORM.Query
             if (!isNull && !isBoolTrue && !isBoolFalse)
                 cmd.AddOptimizedParam(ctx.RawProvider.ParamPrefix + "p0", info.Value!);
 
-            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -301,7 +301,7 @@ namespace nORM.Query
 
         private static async Task<List<T>> ExecuteSimpleWhereListMaterializeAsync<T>(System.Data.Common.DbCommand cmd, DbContext ctx, int? takeCount, TableMapping map, bool track, CancellationToken ct, bool sync) where T : class, new()
         {
-            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             if (sync)
             {
@@ -371,7 +371,7 @@ namespace nORM.Query
             await using var cmd = ctx.CreateCommand();
             cmd.CommandText = sql;
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
-            var results = new List<T>(takeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(takeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))

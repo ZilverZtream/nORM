@@ -201,7 +201,7 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             BindFilteredOrderedPageParameters(cmd, ctx, info);
 
-            var results = new List<T>(info.TakeCount ?? QueryExecutor.DefaultListCapacity);
+            var results = new List<T>(QueryExecutor.ClampTakeCapacity(info.TakeCount));
             var materializer = GetSyncMaterializer<T>(ctx);
             await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(ctx, CommandBehavior.SingleResult, ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -222,7 +222,7 @@ namespace nORM.Query
                 var cmd = prepared.Command;
                 UpdateFilteredOrderedPageParameters(cmd, ctx, info);
 
-                var results = new List<T>(info.TakeCount ?? QueryExecutor.DefaultListCapacity);
+                var results = new List<T>(QueryExecutor.ClampTakeCapacity(info.TakeCount));
                 var materializer = GetSyncMaterializer<T>(ctx);
                 if (ctx.RawProvider.PrefersSyncFastPathExecution)
                 {
