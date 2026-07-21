@@ -721,9 +721,17 @@ namespace nORM.Query
         /// </summary>
         private string TranslateGroupPredicateBody(LambdaExpression predicate, string alias)
         {
-            if (!_correlatedParams.ContainsKey(predicate.Parameters[0]))
-                _correlatedParams[predicate.Parameters[0]] = (_mapping, alias);
-            var vctx = new VisitorContext(_ctx, _mapping, _provider, predicate.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+            // Expand the predicate through a join/transparent-identifier or Select projection so a
+            // filtered aggregate over a JOINED member (g.Count(x => x.innerMember > k), and HAVING
+            // / Any / All predicates) rewrites x.innerMember to the join's inner param; then prefer
+            // the correlated per-side alias. Mirrors the aggregate-selector / group-key fixes; no-op
+            // for single-table grouping.
+            predicate = ExpandProjection(predicate);
+            var predParam = predicate.Parameters[0];
+            if (!_correlatedParams.ContainsKey(predParam))
+                _correlatedParams[predParam] = (_mapping, alias);
+            var (predMapping, predAlias) = _correlatedParams.TryGetValue(predParam, out var predCorr) ? predCorr : (_mapping, alias);
+            var vctx = new VisitorContext(_ctx, predMapping, _provider, predParam, predAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx);
             var sql = visitor.Translate(predicate.Body);
             foreach (var kvp in visitor.GetParameters())

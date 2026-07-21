@@ -92,6 +92,39 @@ public sealed class JoinGroupByKeyTests
     }
 
     [Fact]
+    public void Join_groupby_inner_key_and_filtered_aggregate_match_linq()
+    {
+        // Inner-table member as the GROUP key, plus a filtered aggregate Count(pred) over an
+        // inner member and a Sum over the outer member — all previously declined.
+        var expected = Parents.Join(Children, p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, c.ChildVal })
+            .GroupBy(x => x.ChildVal)
+            .Select(g => new { g.Key, N = g.Count(x => x.PVal >= 10), OuterSum = g.Sum(x => x.PVal) })
+            .OrderBy(r => r.Key).ToList();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Parent>().Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, c.ChildVal })
+            .GroupBy(x => x.ChildVal)
+            .Select(g => new { g.Key, N = g.Count(x => x.PVal >= 10), OuterSum = g.Sum(x => x.PVal) })
+            .OrderBy(r => r.Key).ToList();
+        Assert.Equal(expected.Select(r => (r.Key, r.N, r.OuterSum)), actual.Select(r => (r.Key, r.N, r.OuterSum)));
+    }
+
+    [Fact]
+    public void Join_groupby_having_count_with_inner_sum_matches_linq()
+    {
+        // HAVING on Count() (no member) + Sum over an inner member in the SELECT. (HAVING that
+        // aggregates a JOINED member — Where(g => g.Sum(x => x.inner) > k) — is a separate open
+        // gap: the join projection context is gone by HAVING-translation time.)
+        var expected = Parents.Join(Children, p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, c.ChildVal })
+            .GroupBy(x => x.PVal).Where(g => g.Count() > 1)
+            .Select(g => new { g.Key, S = g.Sum(x => x.ChildVal) }).OrderBy(r => r.Key).ToList();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Parent>().Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, c.ChildVal })
+            .GroupBy(x => x.PVal).Where(g => g.Count() > 1)
+            .Select(g => new { g.Key, S = g.Sum(x => x.ChildVal) }).OrderBy(r => r.Key).ToList();
+        Assert.Equal(expected.Select(r => (r.Key, r.S)), actual.Select(r => (r.Key, r.S)));
+    }
+
+    [Fact]
     public void Join_groupby_composite_outer_key_count_matches_linq()
     {
         var expected = Parents.Join(Children, p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, p.Region, c.ChildVal })
