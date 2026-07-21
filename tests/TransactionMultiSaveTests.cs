@@ -239,7 +239,7 @@ public class TransactionMultiSaveTests
     }
 
     [Fact]
-    public async Task ModifyAfterInsertInTransaction_ClientKey_FailsLoudRatherThanLosingTheUpdate()
+    public async Task ModifyAfterInsertInTransaction_ClientKey_UpdatesInPlace()
     {
         var (cn, ctx) = Build();
         using var _ = cn;
@@ -250,13 +250,15 @@ public class TransactionMultiSaveTests
         ctx.Add(e);
         await ctx.SaveChangesAsync();          // inserted; entity stays Added under the transaction
         e.Value = 20;                          // modify the already-inserted entity
+        await ctx.SaveChangesAsync();          // must UPDATE in place — not re-insert, not throw, not lose it
+        await tx.CommitAsync();
 
-        // The Added path cannot emit an UPDATE; nORM must reject this loudly, never silently keep Value=10.
-        await Assert.ThrowsAsync<NormUsageException>(() => ctx.SaveChangesAsync());
+        Assert.Equal(new[] { 1 }, RawIds(cn, "ClientKeyItem"));
+        Assert.Equal(20, RawValue(cn, "ClientKeyItem", 1));
     }
 
     [Fact]
-    public async Task ModifyAfterInsertInTransaction_DbGeneratedKey_FailsLoudRatherThanLosingTheUpdate()
+    public async Task ModifyAfterInsertInTransaction_DbGeneratedKey_UpdatesInPlace()
     {
         var (cn, ctx) = Build();
         using var _ = cn;
@@ -267,8 +269,57 @@ public class TransactionMultiSaveTests
         ctx.Add(e);
         await ctx.SaveChangesAsync();
         e.Value = 20;
+        await ctx.SaveChangesAsync();
+        await tx.CommitAsync();
 
-        await Assert.ThrowsAsync<NormUsageException>(() => ctx.SaveChangesAsync());
+        Assert.Equal(1, RawCount(cn, "GenKeyItem"));
+        Assert.Equal(20, RawValue(cn, "GenKeyItem", e.Id));
+    }
+
+    [Fact]
+    public async Task InsertThenModifyThenCommit_ClientKey_PersistsTheModification()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        // The "insert to get the key, then set a computed field, commit" pattern in one transaction.
+        var e = new ClientKeyItem { Id = 1, Value = 10 };
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        ctx.Add(e);
+        await ctx.SaveChangesAsync();
+        e.Value = 20;
+        await ctx.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        // After commit the entity is updatable again as a normal committed row.
+        e.Value = 30;
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(30, RawValue(cn, "ClientKeyItem", 1));
+    }
+
+    [Fact]
+    public async Task ModifyInsertedRowInTransactionThenRollback_ReinsertsWithModifiedValue()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        var e = new ClientKeyItem { Id = 1, Value = 10 };
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            ctx.Add(e);
+            await ctx.SaveChangesAsync();
+            e.Value = 20;
+            await ctx.SaveChangesAsync();   // in-place UPDATE, entity stays Added
+            await tx.RollbackAsync();       // row discarded; entity re-insertable with its current value
+        }
+        Assert.Empty(RawIds(cn, "ClientKeyItem"));
+
+        await ctx.SaveChangesAsync();       // re-inserts with the modified value (20), not the original
+        Assert.Equal(new[] { 1 }, RawIds(cn, "ClientKeyItem"));
+        Assert.Equal(20, RawValue(cn, "ClientKeyItem", 1));
     }
 
     [Fact]

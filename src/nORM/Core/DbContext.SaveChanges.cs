@@ -312,19 +312,24 @@ namespace nORM.Core
                     // every rollback site, so a rolled-back insert is correctly re-inserted, not dropped.
                     if (state == EntityState.Added)
                     {
-                        // An entity inserted earlier in this same transaction stays Added, so DetectChanges
-                        // never flags a later modification of it (see EntityEntry.DetectChanges) and the Added
-                        // path cannot emit an UPDATE. Rather than silently drop that modification, reject it —
-                        // the caller must apply changes before the first save or use a separate transaction.
-                        foreach (var e in entries)
-                            if (e.InsertedInUncommittedTransaction && e.Entity is not null && e.HasChangedSinceInsertedBaseline())
-                                throw new NormUsageException(
-                                    $"Entity '{map.Type.Name}' was modified after it was inserted within the current " +
-                                    "transaction and then saved again. nORM keeps an entity inserted inside an open " +
-                                    "transaction in the Added state so a rollback can re-insert it, so a later SaveChanges " +
-                                    "cannot emit an UPDATE for the modification — persisting it would silently lose the change. " +
-                                    "Apply all changes to the entity before its first SaveChanges, or perform the update in a " +
-                                    "separate transaction.");
+                        // An entity inserted earlier in this same transaction stays Added (so a rollback can
+                        // re-insert it), and DetectChanges never flags a later modification of it. Emit an
+                        // UPDATE for any such modified entity IN PLACE — keeping it Added, so a rollback still
+                        // re-inserts it with the current values — rather than re-inserting (a duplicate) or
+                        // silently dropping the change. After the UPDATE its baseline is refreshed so it is
+                        // clean again, and the skip filter below leaves it out of the INSERT batch.
+                        var dirtyInserted = entries.Where(e => e.InsertedInUncommittedTransaction
+                            && e.Entity is not null && e.ComputeChangedColumnsSinceInsertedBaseline()).ToList();
+                        if (dirtyInserted.Count > 0)
+                        {
+                            await using var updScope = new CommandScope(RawConnection, transaction);
+                            await using var updCmd = updScope.CreateCommand();
+                            var updSql = new StringBuilder(EstimateTemplateLength(EntityState.Modified, map) * dirtyInserted.Count);
+                            await ExecuteUpdateBatch(updCmd, map, dirtyInserted, updSql, 0, ct,
+                                deferAccept: !transactionManager.ShouldAcceptChanges).ConfigureAwait(false);
+                            foreach (var e in dirtyInserted)
+                                e.CaptureInsertedBaseline();
+                        }
 
                         var hasDbGeneratedKey = map.KeyColumns.Any(k => k.IsDbGenerated);
                         if (hasDbGeneratedKey || entries.Any(e => e.InsertedInUncommittedTransaction))

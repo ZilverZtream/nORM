@@ -926,6 +926,9 @@ namespace nORM.Core
             if (Entity is null)
                 return;
             CaptureOriginalValues();
+            // The INSERT may have stamped a DB-generated key; record it as the original so a later in-place
+            // UPDATE of this still-Added row does not read the pre-insert default key as a primary-key mutation.
+            OriginalKey = CaptureKey(Entity, _mapping);
         }
 
         /// <summary>
@@ -971,6 +974,29 @@ namespace nORM.Core
                 if (!ValuesEqual(_getValues[i](entity), _originalValues[i]))
                     return true;
             return false;
+        }
+
+        /// <summary>
+        /// Sets the per-column change flags (<c>_changedProperties</c>) to the columns that differ from the
+        /// inserted baseline and returns whether any differ. Lets the save path emit a partial UPDATE for an
+        /// entity that was inserted inside the current transaction and modified since, without changing its
+        /// (still-Added) state — the row is corrected in place while a rollback still re-inserts it with the
+        /// current values. Companion to <see cref="HasChangedSinceInsertedBaseline"/>.
+        /// </summary>
+        internal bool ComputeChangedColumnsSinceInsertedBaseline()
+        {
+            UpgradeToFullTracking();
+            var entity = Entity;
+            if (entity is null || _nonKeyColumns is null || _originalValues is null || _getValues is null || _changedProperties is null)
+                return false;
+            var any = false;
+            for (int i = 0; i < _nonKeyColumns.Length; i++)
+            {
+                var changed = !ValuesEqual(_getValues[i](entity), _originalValues[i]);
+                _changedProperties[i] = changed;
+                any |= changed;
+            }
+            return any;
         }
 
         /// <summary>
