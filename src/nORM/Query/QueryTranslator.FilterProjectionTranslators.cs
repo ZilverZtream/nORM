@@ -278,6 +278,37 @@ namespace nORM.Query
                     return t.Visit(collapsed);
                 }
 
+                // Same collapse, but with an INTERMEDIATE OrderBy/ThenBy chain between the two Selects:
+                // `Select(OrderBy(Select(GroupBy, g => new {...}), x => x.Key), x => outerBody)`. The chain
+                // orders the grouped {Key, N} projection; without this the outer Select over the ordering
+                // is silently dropped (it returned just the inner projection's first column). Compose the
+                // outer projection AND each order key through the inner GroupBy projection, then rebuild as
+                // `Select(OrderBy(GroupBy, g => key'), g => outerBody')` — the single-GroupBy ordered-then-
+                // computed shape the paths below already handle.
+                if (originalProjection != null
+                    && originalProjection.Parameters.Count == 1
+                    && node.Arguments[0] is MethodCallExpression orderedGroupSel
+                    && IsQueryableOrdering(orderedGroupSel)
+                    && TryUnwrapOrderedGroupSelect(orderedGroupSel, out var groupOrderings, out var groupInnerProj, out var groupInnerGb)
+                    && originalProjection.Parameters[0].Type == groupInnerProj.Body.Type)
+                {
+                    var grpParam = groupInnerProj.Parameters[0];
+                    Expression rebuilt = groupInnerGb;
+                    // Orderings are collected inner-first; re-apply each with its key composed through the
+                    // inner projection (so x.Key -> g.Key, x.N -> g.Count() against the grouping param).
+                    foreach (var (orderMethod, orderKey) in groupOrderings)
+                    {
+                        var composedKeyBody = new ProjectionMemberReplacer().Visit(
+                            new nORM.Internal.ParameterReplacer(orderKey.Parameters[0], groupInnerProj.Body).Visit(orderKey.Body)!)!;
+                        var composedKey = Expression.Lambda(composedKeyBody, grpParam);
+                        rebuilt = BuildQueryableOrdering(orderMethod, rebuilt, composedKey, grpParam.Type, composedKeyBody.Type);
+                    }
+                    var composedOuterBody = new ProjectionMemberReplacer().Visit(
+                        new nORM.Internal.ParameterReplacer(originalProjection.Parameters[0], groupInnerProj.Body).Visit(originalProjection.Body)!)!;
+                    rebuilt = BuildGroupingSelect(rebuilt, Expression.Lambda(composedOuterBody, grpParam), grpParam.Type, composedOuterBody.Type);
+                    return t.Visit(rebuilt);
+                }
+
                 // Rewrite `Select(GroupBy(s, k), g => proj)` (2-arg GroupBy + Select-over-IGrouping)
                 // as `GroupBy(s, k, (key, group) => proj')` so the existing 3-arg HandleGroupBy
                 // path can build the SELECT — otherwise the projection sees an IGrouping parameter
@@ -539,6 +570,83 @@ namespace nORM.Query
                     groupByCall.Arguments[0],
                     groupByCall.Arguments[1],
                     Expression.Quote(resultSelector));
+            }
+
+            private static bool IsQueryableOrdering(Expression e)
+                => e is MethodCallExpression m
+                   && m.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                                    or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending);
+
+            /// <summary>
+            /// Walks an OrderBy/ThenBy chain down to its <c>Select(GroupBy(...), g =&gt; new {...})</c>
+            /// source. On success returns the orderings INNER-FIRST (ready to re-apply onto the GroupBy),
+            /// the inner IGrouping projection lambda, and the GroupBy call. Any non-conforming link fails.
+            /// </summary>
+            [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+            [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+            private static bool TryUnwrapOrderedGroupSelect(
+                MethodCallExpression orderChain,
+                out List<(string Method, LambdaExpression Key)> orderings,
+                out LambdaExpression innerProjection,
+                out MethodCallExpression groupByCall)
+            {
+                orderings = new List<(string, LambdaExpression)>();
+                innerProjection = null!;
+                groupByCall = null!;
+
+                Expression current = orderChain;
+                while (current is MethodCallExpression m && IsQueryableOrdering(m))
+                {
+                    if (m.Arguments.Count != 2
+                        || QueryTranslator.StripQuotes(m.Arguments[1]) is not LambdaExpression keyLambda)
+                        return false;
+                    orderings.Add((m.Method.Name, keyLambda));
+                    current = m.Arguments[0];
+                }
+
+                if (current is not MethodCallExpression sel
+                    || sel.Method.Name != nameof(Queryable.Select)
+                    || sel.Arguments.Count != 2
+                    || QueryTranslator.StripQuotes(sel.Arguments[1]) is not LambdaExpression proj
+                    || proj.Body is not NewExpression
+                    || proj.Parameters.Count != 1
+                    || !proj.Parameters[0].Type.IsGenericType
+                    || proj.Parameters[0].Type.GetGenericTypeDefinition() != typeof(IGrouping<,>)
+                    || sel.Arguments[0] is not MethodCallExpression gb
+                    || gb.Method.Name != nameof(Queryable.GroupBy))
+                    return false;
+
+                innerProjection = proj;
+                groupByCall = gb;
+                // Collected outer-first while walking down; reverse so OrderBy precedes its ThenBy.
+                orderings.Reverse();
+                return true;
+            }
+
+            [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+            [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+            private static MethodCallExpression BuildQueryableOrdering(
+                string methodName, Expression source, LambdaExpression keyLambda, Type sourceType, Type keyType)
+            {
+                var method = typeof(Queryable).GetMethods()
+                    .First(m => m.Name == methodName && m.IsGenericMethodDefinition && m.GetParameters().Length == 2)
+                    .MakeGenericMethod(sourceType, keyType);
+                return Expression.Call(method, source, Expression.Quote(keyLambda));
+            }
+
+            [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+            [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+            private static MethodCallExpression BuildGroupingSelect(
+                Expression source, LambdaExpression lambda, Type groupingType, Type resultType)
+            {
+                var selectMethod = typeof(Queryable).GetMethods()
+                    .First(m => m.Name == nameof(Queryable.Select)
+                                && m.IsGenericMethodDefinition
+                                && m.GetParameters().Length == 2
+                                && m.GetParameters()[1].ParameterType.IsGenericType
+                                && m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments().Length == 2)
+                    .MakeGenericMethod(groupingType, resultType);
+                return Expression.Call(selectMethod, source, Expression.Quote(lambda));
             }
 
             [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
