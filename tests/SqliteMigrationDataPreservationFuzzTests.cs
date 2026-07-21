@@ -68,8 +68,12 @@ public class SqliteMigrationDataPreservationFuzzTests
         var parts = spec.Split(':');
         var start = int.Parse(parts[0], CultureInfo.InvariantCulture);
         var count = int.Parse(parts[1], CultureInfo.InvariantCulture);
-        for (var s = start; s < start + count; s++)
-            Random_migrations_preserve_data_up_and_down(s);
+        var dop = parts.Length > 2 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : Environment.ProcessorCount;
+        // Each case runs against its own private :memory: connection with all-local state (no shared
+        // mutable statics, no assembly generation), so seeds are isolated — fan out across cores.
+        // Sync sweep -> Parallel.For (not ForEachAsync). Optional ":dop" third field; ":1" = serial.
+        var options = new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, dop) };
+        System.Threading.Tasks.Parallel.For(start, start + count, options, s => Random_migrations_preserve_data_up_and_down(s));
     }
 
     [Theory]
