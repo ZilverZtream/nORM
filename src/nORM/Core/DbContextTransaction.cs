@@ -54,7 +54,13 @@ namespace nORM.Core
             if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
                 return;
 
-            try { _transaction?.Commit(); }
+            try
+            {
+                _transaction?.Commit();
+                // The transaction is durable; accept the rows it inserted so a later update of one emits a
+                // normal UPDATE instead of being rejected for still being Added (matches EF Core).
+                _context.AcceptSavedInsertsAfterCommit();
+            }
             finally { DisposeTransactionAndClear(); }
         }
 
@@ -80,6 +86,9 @@ namespace nORM.Core
                     // to distinguish a cancelled-before-commit from an ambiguous partial-commit.
                     // This mirrors the behaviour of RollbackAsync and internal TransactionManager.CommitAsync.
                     await _transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                // The transaction is durable; accept the rows it inserted so a later update of one emits a
+                // normal UPDATE instead of being rejected for still being Added (matches EF Core).
+                _context.AcceptSavedInsertsAfterCommit();
             }
             finally
             {

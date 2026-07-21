@@ -102,6 +102,32 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// After a caller-owned transaction commits DURABLY, accept the entities it inserted and left in the
+        /// <see cref="EntityState.Added"/> state so they become <see cref="EntityState.Unchanged"/> — matching
+        /// EF Core, where an entity is updatable once its transaction commits. Without this an entity inserted
+        /// inside a caller transaction stays Added after commit, so a later update of it cannot emit an UPDATE
+        /// (the modify-after-insert guard rejects it). Only entities PROVEN saved in this transaction (the
+        /// <see cref="EntityEntry.InsertedInUncommittedTransaction"/> flag) AND unmodified since their insert are
+        /// accepted: a still-dirty inserted entity is left Added because AcceptChanges would capture its unsaved
+        /// edit as the baseline over the committed row (silent loss), and a pending never-saved entity carries no
+        /// flag and is untouched. Modified and Deleted entities keep their existing post-commit handling. Called
+        /// only on the success path of commit, so a rollback never accepts.
+        /// </summary>
+        internal void AcceptSavedInsertsAfterCommit()
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State == EntityState.Added
+                    && entry.InsertedInUncommittedTransaction
+                    && entry.Entity is not null
+                    && !entry.HasChangedSinceInsertedBaseline())
+                {
+                    entry.AcceptChanges();
+                }
+            }
+        }
+
+        /// <summary>
         /// Resets, after a full transaction rollback, the DB-generated keys stamped during the
         /// transaction so the still-Added entities are re-inserted on the next SaveChanges instead of
         /// being silently dropped by the "skip already-inserted" guard. Invoked by

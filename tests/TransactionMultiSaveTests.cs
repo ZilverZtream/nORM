@@ -66,6 +66,83 @@ public class TransactionMultiSaveTests
         return ids;
     }
 
+    private static int RawValue(SqliteConnection cn, string table, int id)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = $"SELECT Value FROM {table} WHERE Id = {id}";
+        return (int)(long)cmd.ExecuteScalar()!;
+    }
+
+    [Fact]
+    public async Task InsertInTransaction_ThenUpdateAfterCommit_ClientKey_EmitsUpdate()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        var e = new ClientKeyItem { Id = 1, Value = 10 };
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            ctx.Add(e);
+            await ctx.SaveChangesAsync();
+            await tx.CommitAsync();   // accept-on-commit: e becomes Unchanged, updatable
+        }
+
+        // Updating the committed entity must emit an UPDATE — not throw, not re-insert.
+        e.Value = 20;
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(new[] { 1 }, RawIds(cn, "ClientKeyItem"));
+        Assert.Equal(20, RawValue(cn, "ClientKeyItem", 1));
+    }
+
+    [Fact]
+    public async Task InsertInTransaction_ThenUpdateAfterCommit_DbGeneratedKey_EmitsUpdate()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        var e = new GenKeyItem { Value = 10 };
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            ctx.Add(e);
+            await ctx.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        e.Value = 20;
+        await ctx.SaveChangesAsync();
+
+        Assert.Equal(1, RawCount(cn, "GenKeyItem"));
+        Assert.Equal(20, RawValue(cn, "GenKeyItem", e.Id));
+    }
+
+    [Fact]
+    public async Task InsertAndUpdateInSameTransaction_ThenCommit_ClientKey_UpdateAppliesAfterCommit()
+    {
+        var (cn, ctx) = Build();
+        using var _ = cn;
+        await using var __ = ctx;
+
+        // Insert in tx, commit, then update+commit in a SECOND transaction — the second update must apply.
+        var e = new ClientKeyItem { Id = 1, Value = 10 };
+        await using (var tx1 = await ctx.Database.BeginTransactionAsync())
+        {
+            ctx.Add(e);
+            await ctx.SaveChangesAsync();
+            await tx1.CommitAsync();
+        }
+        await using (var tx2 = await ctx.Database.BeginTransactionAsync())
+        {
+            e.Value = 20;
+            await ctx.SaveChangesAsync();
+            await tx2.CommitAsync();
+        }
+
+        Assert.Equal(20, RawValue(cn, "ClientKeyItem", 1));
+    }
+
     [Fact]
     public async Task SecondSaveInOneTransaction_ClientKey_DoesNotReinsertAndPersistsAll()
     {
