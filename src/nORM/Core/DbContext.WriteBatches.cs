@@ -314,7 +314,8 @@ namespace nORM.Core
                 // binder, keeping the positional @pN parameters aligned. See ComputeUpdateSetColumns.
                 var setCols = ComputeUpdateSetColumns(entry, map, updateColSet);
 
-                sql.Append(BuildUpdateBatch(map, setCols, paramIndex)).Append(';');
+                AppendUpdateBatch(sql, map, setCols, paramIndex);
+                sql.Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
                     entity,
                     WriteOperation.Update, paramIndex, entry.OriginalToken, setCols);
@@ -620,13 +621,29 @@ namespace nORM.Core
             => BuildUpdateBatch(map, map.UpdateColumns, startParamIndex);
 
         /// <summary>
-        /// Builds one entity's batched UPDATE, writing only <paramref name="setColumns"/> in the SET clause
-        /// (a subset of <see cref="TableMapping.UpdateColumns"/> — the changed columns for a partial update, or
-        /// all of them for a forced/full update). The concurrency-token SET slot, key/token/tenant WHERE
-        /// predicates, and positional parameter order are identical to the full-column form, so
-        /// <see cref="AddParametersBatched"/> MUST bind the SAME <paramref name="setColumns"/> in the same order.
+        /// String form of <see cref="AppendUpdateBatch"/>, kept for template-length estimation (batch
+        /// sizing). The hot save path calls <see cref="AppendUpdateBatch"/> directly to write into the
+        /// shared batch builder without the intermediate string/List/Join/return-string allocations.
+        /// Both share the same builder, so they can never diverge.
         /// </summary>
         private string BuildUpdateBatch(TableMapping map, IReadOnlyList<Column> setColumns, int startParamIndex)
+        {
+            var sb = new StringBuilder();
+            AppendUpdateBatch(sb, map, setColumns, startParamIndex);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Appends one entity's batched UPDATE directly into <paramref name="sql"/>, writing only
+        /// <paramref name="setColumns"/> in the SET clause (a subset of <see cref="TableMapping.UpdateColumns"/>
+        /// — the changed columns for a partial update, or all of them for a forced/full update). The
+        /// concurrency-token SET slot, key/token/tenant WHERE predicates, and positional parameter order are
+        /// identical to the full-column form, so <see cref="AddParametersBatched"/> MUST bind the SAME
+        /// <paramref name="setColumns"/> in the same order. Output is byte-identical to the former
+        /// <c>$"UPDATE {EscTable} SET {setSb}{tokenOutput} WHERE {where}"</c> interpolation; this form just
+        /// skips the per-entity <c>List</c>/<c>string.Join</c>/interpolation/return-string allocations.
+        /// </summary>
+        private void AppendUpdateBatch(StringBuilder sql, TableMapping map, IReadOnlyList<Column> setColumns, int startParamIndex)
         {
             if (map.KeyColumns.Length == 0)
                 throw new NormConfigurationException(string.Format(
@@ -643,52 +660,54 @@ namespace nORM.Core
                     "Use [NotMapped] for computed properties or add at least one mutable property " +
                     "that is not a key or concurrency token.");
 
-            var setSb = new StringBuilder();
+            sql.Append("UPDATE ").Append(map.EscTable).Append(" SET ");
             var idx = startParamIndex;
+            var wroteSet = false;
             for (int i = 0; i < setColumns.Count; i++)
             {
-                if (i > 0) setSb.Append(", ");
-                setSb.Append(setColumns[i].EscCol)
-                    .Append('=')
-                    .Append(_p.ParamPrefix).Append('p').Append(idx++);
+                if (i > 0) sql.Append(", ");
+                sql.Append(setColumns[i].EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx++);
+                wroteSet = true;
             }
             // Client-managed concurrency token: write a fresh value in the SET clause so a stale
             // concurrent UPDATE (whose WHERE still carries the old token) affects zero rows. The
             // parameter binder generates the new value and binds this slot; the old token is compared
-            // separately in the WHERE below.
+            // separately in the WHERE below. The leading ", " mirrors the former "setSb.Length > 0" check.
             if (map.ClientManagedConcurrencyToken)
             {
-                if (setSb.Length > 0) setSb.Append(", ");
-                setSb.Append(map.TimestampColumn!.EscCol)
-                    .Append('=')
-                    .Append(_p.ParamPrefix).Append('p').Append(idx++);
+                if (wroteSet) sql.Append(", ");
+                sql.Append(map.TimestampColumn!.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx++);
             }
-            var whereParts = new List<string>();
+            // Server-generated tokens (ROWVERSION) regenerate on every UPDATE; the provider's OUTPUT
+            // clause reads the fresh value back so the tracked instance can save again. Emitted between
+            // the SET list and " WHERE ", exactly as the former "{setSb}{tokenOutput} WHERE" interpolation.
+            if (map.TimestampColumn != null && _p.SupportsNativeRowVersion)
+                sql.Append(_p.GetUpdateTokenOutputClause(map));
+            sql.Append(" WHERE ");
+            var wroteWhere = false;
             foreach (var col in map.KeyColumns)
-                whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
+            {
+                if (wroteWhere) sql.Append(" AND ");
+                sql.Append(col.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx++);
+                wroteWhere = true;
+            }
             if (map.TimestampColumn != null)
             {
+                if (wroteWhere) sql.Append(" AND ");
                 var tc = map.TimestampColumn;
                 // Null-safe equality: handles the case where the concurrency token is a nullable column.
-                // Optimization opportunity: when the column is known non-nullable at mapping time,
-                // the OR branch is unreachable and could be elided to produce simpler SQL. Currently
-                // we always emit the full null-safe form for correctness across all column definitions.
-                whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
+                sql.Append('(').Append(tc.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx)
+                   .Append(" OR (").Append(tc.EscCol).Append(" IS NULL AND ").Append(_p.ParamPrefix).Append('p').Append(idx).Append(" IS NULL))");
                 idx++;
+                wroteWhere = true;
             }
             if (Options.TenantProvider != null)
             {
+                if (wroteWhere) sql.Append(" AND ");
                 var tenantCol = RequireTenantColumn(map, "update batch");
-                whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
+                sql.Append(tenantCol.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx++);
+                wroteWhere = true;
             }
-            var where = string.Join(" AND ", whereParts);
-            // Server-generated tokens (ROWVERSION) regenerate on every UPDATE; the
-            // provider's OUTPUT clause reads the fresh value back so the tracked
-            // instance can save again (see ExecuteUpdateBatch's reader path).
-            var tokenOutput = map.TimestampColumn != null && _p.SupportsNativeRowVersion
-                ? _p.GetUpdateTokenOutputClause(map)
-                : string.Empty;
-            return $"UPDATE {map.EscTable} SET {setSb}{tokenOutput} WHERE {where}";
         }
 
         private string BuildDeleteBatch(TableMapping map, int startParamIndex)
