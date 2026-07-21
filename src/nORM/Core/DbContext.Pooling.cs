@@ -106,6 +106,7 @@ namespace nORM.Core
             _transactionInsertedSnapshot = null;
             _ambientInsertedSnapshot = null;
             _transactionTokenSnapshot = null;
+            _transactionValuesSnapshot = null;
 
             return true;
         }

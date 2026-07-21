@@ -929,6 +929,32 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Returns a copy of the current change-tracking baseline (original non-key values), or <c>null</c> if
+        /// tracking has not been initialized. Used to capture the pre-transaction baseline before a caller-owned
+        /// transaction save advances it, so a full rollback can restore it (see DbContext.Transactions).
+        /// </summary>
+        internal object?[]? SnapshotOriginalValues()
+            => _originalValues is null ? null : (object?[])_originalValues.Clone();
+
+        /// <summary>
+        /// Restores the change-tracking baseline (original non-key values, and their hashes) from a snapshot
+        /// taken by <see cref="SnapshotOriginalValues"/>, undoing a baseline advance a rolled-back transaction
+        /// save made — so a still-pending edit is detected and re-applied by the next save after the rollback.
+        /// </summary>
+        internal void RestoreOriginalValues(object?[] snapshot)
+        {
+            UpgradeToFullTracking();
+            if (_originalValues is null || _originalHashes is null)
+                return;
+            var n = Math.Min(snapshot.Length, _originalValues.Length);
+            for (int i = 0; i < n; i++)
+            {
+                _originalValues[i] = snapshot[i];
+                _originalHashes[i] = ContentHashCode(snapshot[i]);
+            }
+        }
+
+        /// <summary>
         /// True when a non-key column of this already-inserted Added entity differs from the baseline captured
         /// by <see cref="CaptureInsertedBaseline"/> — i.e. it was modified after being inserted within the
         /// current transaction. Because nORM keeps such an entity Added (for rollback re-insert),

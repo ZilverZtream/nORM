@@ -74,6 +74,26 @@ namespace nORM.Core
         // false-conflicts.
         private Dictionary<object, object?>? _transactionTokenSnapshot;
 
+        // Pre-transaction change-tracking baseline (original non-key values) of each Modified entity that a
+        // caller-owned-transaction save advances, captured lazily on the FIRST such advance. A full rollback
+        // restores it so a still-pending edit re-applies on the next save instead of being lost — the advanced
+        // baseline would otherwise equal the reverted-but-still-edited entity and read as "no change".
+        private Dictionary<object, object?[]>? _transactionValuesSnapshot;
+
+        /// <summary>
+        /// Records the pre-advance baseline of a Modified entity the first time a caller-owned-transaction save
+        /// advances it, so a full rollback can restore it. Idempotent per entity within a transaction.
+        /// </summary>
+        internal void RememberPreTransactionValuesBaseline(object entity, EntityEntry entry)
+        {
+            _transactionValuesSnapshot ??= new Dictionary<object, object?[]>(ReferenceEqualityComparer.Instance);
+            if (_transactionValuesSnapshot.ContainsKey(entity))
+                return;
+            var snap = entry.SnapshotOriginalValues();
+            if (snap != null)
+                _transactionValuesSnapshot[entity] = snap;
+        }
+
         internal void CaptureTransactionKeySnapshot()
         {
             _transactionKeySnapshot = SnapshotAddedGeneratedKeys();
@@ -94,6 +114,16 @@ namespace nORM.Core
             RestoreInsertedFlags(_transactionInsertedSnapshot);
             if (_transactionTokenSnapshot != null)
                 RestoreOccOriginalTokens(_transactionTokenSnapshot);
+            if (_transactionValuesSnapshot != null)
+            {
+                foreach (var (entity, values) in _transactionValuesSnapshot)
+                {
+                    var entry = ChangeTracker.GetEntryOrDefault(entity);
+                    if (entry != null && ReferenceEquals(entry.Entity, entity))
+                        entry.RestoreOriginalValues(values);
+                }
+                _transactionValuesSnapshot.Clear();
+            }
         }
 
         // The ambient System.Transactions.Transaction nORM enlisted in, plus the Added-entity key

@@ -554,6 +554,7 @@ namespace nORM.Core
                 // re-insert a still-Added row. The flag is reset together with the DB-generated keys at
                 // every rollback site and cleared when the entity is finally accepted.
                 foreach (var entry in changedEntries)
+                {
                     if (entry.State == EntityState.Added)
                     {
                         entry.InsertedInUncommittedTransaction = true;
@@ -561,6 +562,18 @@ namespace nORM.Core
                         // entity is detected (and rejected loudly) rather than silently dropped on the next save.
                         entry.CaptureInsertedBaseline();
                     }
+                    else if (entry.State == EntityState.Modified && entry.Entity is { } modifiedEntity)
+                    {
+                        // Advance the change-tracking baseline to the values just written. AcceptChanges is
+                        // deferred under a caller-owned transaction, so without this the next DetectChanges
+                        // compares a later edit against the STALE pre-transaction baseline: an A -> B (save)
+                        // -> A (save) sequence in one transaction would leave the second save seeing "equal to
+                        // baseline", skip the write, and silently strand the row at B. Remember the pre-advance
+                        // baseline first so a full rollback restores it and a still-pending edit re-applies.
+                        RememberPreTransactionValuesBaseline(modifiedEntity, entry);
+                        entry.CaptureInsertedBaseline();
+                    }
+                }
             }
 
             // Fire SavedChangesAsync AFTER CommitAsync and AcceptChanges, and OUTSIDE the try/catch
