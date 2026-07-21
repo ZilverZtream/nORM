@@ -360,6 +360,42 @@ namespace nORM.Query
                 }
                 throw new NormUnsupportedFeatureException("string.Replace(old, new, StringComparison) is not supported by this provider.");
             }
+            // string.Remove / string.Insert -- no single SQL primitive, but both compose from
+            // Substring + concatenation. Remove(i) = s[..i]; Remove(i,c) = s[..i] + s[i+c..];
+            // Insert(i, v) = s[..i] + v + s[i..]. Substring goes through the provider's 0-based
+            // shape (it adds +1) and pieces join via the null-safe concat hook.
+            if (node.Object != null && node.Method.DeclaringType == typeof(string)
+                && (node.Method.Name == nameof(string.Remove) || node.Method.Name == nameof(string.Insert)))
+            {
+                var recv = GetSql(node.Object);
+                if (node.Method.Name == nameof(string.Remove))
+                {
+                    var startSql = GetSql(node.Arguments[0]);
+                    var head = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, "0", startSql);
+                    if (node.Arguments.Count == 1)
+                    {
+                        if (head != null) { _sql.Append(head); return node; }
+                    }
+                    else
+                    {
+                        var countSql = GetSql(node.Arguments[1]);
+                        var tail = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, $"(({startSql}) + ({countSql}))");
+                        if (head != null && tail != null) { _sql.Append(_provider.GetNullSafeConcatSql(head, tail)); return node; }
+                    }
+                }
+                else // Insert(startIndex, value)
+                {
+                    var startSql = GetSql(node.Arguments[0]);
+                    var valueSql = GetSql(node.Arguments[1]);
+                    var head = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, "0", startSql);
+                    var tail = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, startSql);
+                    if (head != null && tail != null)
+                    {
+                        _sql.Append(_provider.GetNullSafeConcatSql(_provider.GetNullSafeConcatSql(head, valueSql), tail));
+                        return node;
+                    }
+                }
+            }
             var strArgs = new List<string>();
             if (node.Object != null)
                 strArgs.Add(GetSql(node.Object));

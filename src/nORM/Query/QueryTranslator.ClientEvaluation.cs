@@ -421,6 +421,8 @@ namespace nORM.Query
                 nameof(string.IndexOf),
                 nameof(string.PadLeft),
                 nameof(string.PadRight),
+                nameof(string.Remove),
+                nameof(string.Insert),
                 "get_Chars",
                 nameof(char.IsDigit),
                 nameof(char.IsLetter),

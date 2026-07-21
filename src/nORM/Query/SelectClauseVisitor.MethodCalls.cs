@@ -483,6 +483,42 @@ namespace nORM.Query
             // throws "Expected a lambda expression as argument 1 of 'Min'".
             // Enumerable/Queryable are excluded so the aggregate path still handles
             // grouping-aggregate calls.
+            // string.Remove / string.Insert -- compose from Substring + concatenation
+            // (mirror of the ExpressionToSqlVisitor branch). Remove(i) = s[..i];
+            // Remove(i,c) = s[..i] + s[i+c..]; Insert(i, v) = s[..i] + v + s[i..].
+            if (node.Object != null && node.Method.DeclaringType == typeof(string)
+                && (node.Method.Name == nameof(string.Remove) || node.Method.Name == nameof(string.Insert)))
+            {
+                var recv = TranslateProjectionArg(node.Object);
+                if (node.Method.Name == nameof(string.Remove))
+                {
+                    var startSql = TranslateProjectionArg(node.Arguments[0]);
+                    var head = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, "0", startSql);
+                    if (node.Arguments.Count == 1)
+                    {
+                        if (head != null) { sb.Append(head); return node; }
+                    }
+                    else
+                    {
+                        var countSql = TranslateProjectionArg(node.Arguments[1]);
+                        var tail = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, $"(({startSql}) + ({countSql}))");
+                        if (head != null && tail != null) { sb.Append(_provider.GetNullSafeConcatSql(head, tail)); return node; }
+                    }
+                }
+                else // Insert(startIndex, value)
+                {
+                    var startSql = TranslateProjectionArg(node.Arguments[0]);
+                    var valueSql = TranslateProjectionArg(node.Arguments[1]);
+                    var head = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, "0", startSql);
+                    var tail = _provider.TranslateFunction(nameof(string.Substring), typeof(string), recv, startSql);
+                    if (head != null && tail != null)
+                    {
+                        sb.Append(_provider.GetNullSafeConcatSql(_provider.GetNullSafeConcatSql(head, valueSql), tail));
+                        return node;
+                    }
+                }
+            }
+
             var declType = node.Method.DeclaringType;
             if (declType != null && declType != typeof(Enumerable) && declType != typeof(Queryable))
             {
