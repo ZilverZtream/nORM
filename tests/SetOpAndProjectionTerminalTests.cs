@@ -63,6 +63,53 @@ public sealed class SetOpAndProjectionTerminalTests
     }
 
     [Fact]
+    public void Union_scalar_sum_matches_linq()
+    {
+        var expected = Rows.Where(r => r.A >= 2).Select(r => r.A)
+            .Union(Rows.Where(r => r.B >= 4).Select(r => r.B)).Sum();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().Where(r => r.A >= 2).Select(r => r.A)
+            .Union(ctx.Query<Row>().Where(r => r.B >= 4).Select(r => r.B)).Sum();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Union_scalar_max_and_min_match_linq()
+    {
+        using var ctx = Ctx();
+        Assert.Equal(
+            Rows.Where(r => r.A >= 2).Select(r => r.A).Union(Rows.Where(r => r.B >= 4).Select(r => r.B)).Max(),
+            ctx.Query<Row>().Where(r => r.A >= 2).Select(r => r.A).Union(ctx.Query<Row>().Where(r => r.B >= 4).Select(r => r.B)).Max());
+        Assert.Equal(
+            Rows.Select(r => r.A).Union(Rows.Select(r => r.B)).Min(),
+            ctx.Query<Row>().Select(r => r.A).Union(ctx.Query<Row>().Select(r => r.B)).Min());
+    }
+
+    [Fact]
+    public void Concat_scalar_sum_matches_linq()
+    {
+        // Concat = UNION ALL (keeps duplicates), so the sum includes duplicates.
+        var expected = Rows.Where(r => r.A >= 2).Select(r => r.A)
+            .Concat(Rows.Where(r => r.B >= 4).Select(r => r.B)).Sum();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().Where(r => r.A >= 2).Select(r => r.A)
+            .Concat(ctx.Query<Row>().Where(r => r.B >= 4).Select(r => r.B)).Sum();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Union_computed_scalar_sum_and_average_match_linq()
+    {
+        using var ctx = Ctx();
+        Assert.Equal(
+            Rows.Select(r => r.A - r.B).Union(Rows.Select(r => r.A + r.B)).Sum(),
+            ctx.Query<Row>().Select(r => r.A - r.B).Union(ctx.Query<Row>().Select(r => r.A + r.B)).Sum());
+        Assert.Equal(
+            Rows.Select(r => r.A * 2).Union(Rows.Select(r => r.B * 3)).Average(),
+            ctx.Query<Row>().Select(r => r.A * 2).Union(ctx.Query<Row>().Select(r => r.B * 3)).Average(), 6);
+    }
+
+    [Fact]
     public void Concat_scalar_count_matches_linq()
     {
         // Concat preserves duplicates; Count must count the multiset.

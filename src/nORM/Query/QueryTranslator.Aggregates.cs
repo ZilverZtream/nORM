@@ -343,6 +343,44 @@ namespace nORM.Query
             return false;
         }
 
+        /// <summary>
+        /// Forces <c>AS aliasName</c> onto the single-column select list of the first arm of a compound
+        /// SELECT (the arm whose column name the compound adopts), so a derived-table wrap can aggregate
+        /// a known column name. Returns null when the shape isn't a single unaliased scalar column
+        /// (multi-column, already aliased, or <c>SELECT *</c>) — the caller then leaves the aggregate to
+        /// its existing path rather than emit wrong SQL. Mirrors AliasNamelessScalarSelect's paren-aware
+        /// top-level FROM scan but always aliases (that helper deliberately skips bare identifiers).
+        /// </summary>
+        private string? ForceFirstArmColumnAlias(string sql, string aliasName)
+        {
+            if (!sql.StartsWith("SELECT ", StringComparison.Ordinal)) return null;
+            var depth = 0;
+            var fromIdx = -1;
+            for (var i = 7; i < sql.Length - 6; i++)
+            {
+                var ch = sql[i];
+                if (ch == '(') depth++;
+                else if (ch == ')') depth--;
+                else if (depth == 0 && ch == ' ' && string.CompareOrdinal(sql, i, " FROM ", 0, 6) == 0)
+                {
+                    fromIdx = i;
+                    break;
+                }
+            }
+            if (fromIdx < 0) return null;
+            var list = sql[7..fromIdx];
+            if (list.Trim() == "*") return null; // SELECT * (e.g. windowed derived-table arm) — can't alias
+            var listDepth = 0;
+            foreach (var ch in list)
+            {
+                if (ch == '(') listDepth++;
+                else if (ch == ')') listDepth--;
+                else if (ch == ',' && listDepth == 0) return null; // multi-column: not a scalar set-op
+            }
+            if (list.Contains(" AS ", StringComparison.OrdinalIgnoreCase)) return null; // already aliased (name unknown)
+            return string.Concat(sql.AsSpan(0, fromIdx), " AS ", _provider.Escape(aliasName), sql.AsSpan(fromIdx));
+        }
+
         private Expression HandleDirectAggregate(MethodCallExpression node)
         {
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
@@ -380,6 +418,51 @@ namespace nORM.Query
                 {
                     sourceQuery = selInner;
                     directSelector = selSel;
+                }
+            }
+
+            // Parameterless aggregate over a SET OPERATION (Union/Concat/Except/Intersect):
+            // `q1.Union(q2).Sum()/Max()/Min()/Average()`. The aggregate is over the compound's single
+            // scalar column, not a table, so wrap it: SELECT AGG(col) FROM (<set-op>) AS sub. Without
+            // this the aggregate is dropped, the compound materialises a List<T>, and the scalar-result
+            // path casts List<T> -> T and throws InvalidCastException.
+            if (directSelector == null
+                && StripQuotes(sourceQuery) is MethodCallExpression setOpAggSource
+                && setOpAggSource.Method.Name is "Union" or "Concat" or "Intersect" or "Except")
+            {
+                var subPlanSet = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapSet);
+                _mapping = subMapSet;
+                MergeSubPlanParameters(subPlanSet);
+                // The compound takes its first arm's column name; force a known alias on that arm so
+                // the wrap can aggregate it uniformly (bare-member arms are otherwise self-named,
+                // computed arms unnamed). Null => not a single-column scalar set-op; fall through.
+                var aliasedSetSql = ForceFirstArmColumnAlias(subPlanSet.Sql, "__set_val");
+                if (aliasedSetSql != null)
+                {
+                    if (!AggregateFunctionMap.TryGetValue(node.Method.Name, out var setAggFn))
+                        setAggFn = node.Method.Name.ToUpperInvariant();
+                    var setElemType = sourceQuery.Type.IsGenericType ? sourceQuery.Type.GetGenericArguments()[0] : node.Type;
+                    var setElemUnderlying = Nullable.GetUnderlyingType(setElemType) ?? setElemType;
+                    var setCol = _provider.Escape("__set_val");
+                    string setAggExpr;
+                    if (setElemUnderlying == typeof(decimal))
+                    {
+                        setAggExpr = _provider.DecimalAggregateSql(setAggFn, setCol);
+                    }
+                    else
+                    {
+                        if (setAggFn == "AVG") setCol = _provider.AverageAggregateOperand(setCol, setElemType);
+                        setAggExpr = $"{setAggFn}({setCol})";
+                    }
+                    var setAggAlias = EscapeAlias("__saggu" + _joinCounter++);
+                    _isAggregate = true;
+                    _methodName = node.Method.Name;
+                    _projection = null;
+                    _orderBy.Clear();
+                    _sql.Clear();
+                    _sql.Append("SELECT ").Append(setAggExpr).Append(" FROM (")
+                        .Append(aliasedSetSql).AppendFragment(") AS ").Append(setAggAlias);
+                    return node;
                 }
             }
 
