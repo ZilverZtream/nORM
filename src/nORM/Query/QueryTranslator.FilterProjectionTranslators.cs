@@ -244,6 +244,40 @@ namespace nORM.Query
             {
                 var originalProjection = QueryTranslator.StripQuotes(node.Arguments[1]) as LambdaExpression;
 
+                // Collapse `Select(Select(GroupBy(s,k), g => new {...}), x => outerBody)` by composing the
+                // OUTER projection through the inner GroupBy projection, so the combined
+                // `g => outerBody[with inner members inlined]` dispatches through the single GroupBy+Select
+                // path below. Without this the second Select over the grouped {Key, N} result was silently
+                // dropped (it returned just the inner projection's first column).
+                if (originalProjection != null
+                    && originalProjection.Parameters.Count == 1
+                    && node.Arguments[0] is MethodCallExpression innerSel
+                    && innerSel.Method.Name == nameof(Queryable.Select)
+                    && innerSel.Arguments.Count == 2
+                    && QueryTranslator.StripQuotes(innerSel.Arguments[1]) is LambdaExpression innerProj
+                    && innerProj.Body is NewExpression
+                    && innerProj.Parameters.Count == 1
+                    && innerProj.Parameters[0].Type.IsGenericType
+                    && innerProj.Parameters[0].Type.GetGenericTypeDefinition() == typeof(IGrouping<,>)
+                    && innerSel.Arguments[0] is MethodCallExpression innerGb
+                    && innerGb.Method.Name == nameof(Queryable.GroupBy)
+                    && originalProjection.Parameters[0].Type == innerProj.Body.Type)
+                {
+                    var composedBody = new nORM.Internal.ParameterReplacer(originalProjection.Parameters[0], innerProj.Body).Visit(originalProjection.Body)!;
+                    composedBody = new ProjectionMemberReplacer().Visit(composedBody)!;
+                    var composedLambda = Expression.Lambda(composedBody, innerProj.Parameters[0]);
+                    var groupingType = innerProj.Parameters[0].Type;
+                    var selectMethod = typeof(Queryable).GetMethods()
+                        .First(m => m.Name == nameof(Queryable.Select)
+                                    && m.IsGenericMethodDefinition
+                                    && m.GetParameters().Length == 2
+                                    && m.GetParameters()[1].ParameterType.IsGenericType
+                                    && m.GetParameters()[1].ParameterType.GetGenericArguments()[0].GetGenericArguments().Length == 2)
+                        .MakeGenericMethod(groupingType, composedBody.Type);
+                    var collapsed = Expression.Call(selectMethod, innerSel.Arguments[0], Expression.Quote(composedLambda));
+                    return t.Visit(collapsed);
+                }
+
                 // Rewrite `Select(GroupBy(s, k), g => proj)` (2-arg GroupBy + Select-over-IGrouping)
                 // as `GroupBy(s, k, (key, group) => proj')` so the existing 3-arg HandleGroupBy
                 // path can build the SELECT — otherwise the projection sees an IGrouping parameter

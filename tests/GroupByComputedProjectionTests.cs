@@ -73,4 +73,18 @@ public sealed class GroupByComputedProjectionTests
         var actual = ctx.Query<Row>().GroupBy(r => r.Cat).OrderBy(g => g.Key).Select(g => g.Count() * 10).ToList();
         Assert.Equal(expected, actual);
     }
+
+    [Fact]
+    public void Double_select_over_grouped_result_matches_linq()
+    {
+        // GroupBy -> project {Key, N} -> second Select combining them. A second projection over the
+        // grouped result; must apply the outer Select, not drop it. (Ordered client-side so no
+        // intermediate OrderBy sits between the two Selects.)
+        var expected = Rows.GroupBy(r => r.Cat).Select(g => new { g.Key, N = g.Count() })
+            .Select(x => x.Key + ":" + x.N).OrderBy(s => s).ToList();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().GroupBy(r => r.Cat).Select(g => new { g.Key, N = g.Count() })
+            .Select(x => x.Key + ":" + x.N).ToList().OrderBy(s => s).ToList();
+        Assert.Equal(expected, actual);
+    }
 }
