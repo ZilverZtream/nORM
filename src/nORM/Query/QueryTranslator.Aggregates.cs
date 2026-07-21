@@ -315,6 +315,34 @@ namespace nORM.Query
 
             return node;
         }
+        /// <summary>
+        /// Peels a scalar <c>Select(x =&gt; scalarProj)</c> into its inner source + selector, so a
+        /// following parameterless aggregate can fold the projection into the aggregate operand.
+        /// Only a genuinely scalar projection (value type or string) is peeled — an entity or
+        /// anonymous Select (which a parameterless aggregate can't compile against) is left alone.
+        /// </summary>
+        private bool TryPeelScalarSelect(Expression expr, out Expression innerSource, out LambdaExpression? selector)
+        {
+            innerSource = expr;
+            selector = null;
+            if (expr is MethodCallExpression sc
+                && sc.Method.DeclaringType == typeof(Queryable)
+                && sc.Method.Name == nameof(Queryable.Select)
+                && sc.Arguments.Count == 2
+                && StripQuotes(sc.Arguments[1]) is LambdaExpression sel
+                && sel.Parameters.Count == 1)
+            {
+                var bt = Nullable.GetUnderlyingType(sel.Body.Type) ?? sel.Body.Type;
+                if (bt.IsValueType || bt == typeof(string))
+                {
+                    innerSource = sc.Arguments[0];
+                    selector = sel;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private Expression HandleDirectAggregate(MethodCallExpression node)
         {
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
@@ -330,19 +358,28 @@ namespace nORM.Query
             LambdaExpression? directSelector = node.Arguments.Count > 1
                 ? StripQuotes(node.Arguments[1]) as LambdaExpression
                 : null;
-            if (directSelector == null
-                && StripQuotes(sourceQuery) is MethodCallExpression selectSourceCall
-                && selectSourceCall.Method.DeclaringType == typeof(Queryable)
-                && selectSourceCall.Method.Name == nameof(Queryable.Select)
-                && selectSourceCall.Arguments.Count == 2
-                && StripQuotes(selectSourceCall.Arguments[1]) is LambdaExpression peeledSelector
-                && peeledSelector.Parameters.Count == 1)
+            // aggregateDistinct: `Select(x => scalar).Distinct().Sum()/Max()/Min()/Average()` sums the
+            // DISTINCT projected values -> AGG(DISTINCT proj). Peel an optional Distinct wrapping a scalar
+            // Select, then the Select itself. (Distinct over an entity/anonymous shape is left alone; only
+            // a scalar projection can be a distinct aggregate operand.)
+            bool aggregateDistinct = false;
+            if (directSelector == null)
             {
-                var peeledBodyType = Nullable.GetUnderlyingType(peeledSelector.Body.Type) ?? peeledSelector.Body.Type;
-                if (peeledBodyType.IsValueType || peeledBodyType == typeof(string))
+                var peelTarget = StripQuotes(sourceQuery);
+                if (peelTarget is MethodCallExpression distinctCall
+                    && distinctCall.Method.DeclaringType == typeof(Queryable)
+                    && distinctCall.Method.Name == nameof(Queryable.Distinct)
+                    && distinctCall.Arguments.Count == 1
+                    && TryPeelScalarSelect(StripQuotes(distinctCall.Arguments[0]), out var distinctInner, out var distinctSel))
                 {
-                    sourceQuery = selectSourceCall.Arguments[0];
-                    directSelector = peeledSelector;
+                    aggregateDistinct = true;
+                    sourceQuery = distinctInner;
+                    directSelector = distinctSel;
+                }
+                else if (TryPeelScalarSelect(peelTarget, out var selInner, out var selSel))
+                {
+                    sourceQuery = selInner;
+                    directSelector = selSel;
                 }
             }
 
@@ -446,15 +483,19 @@ namespace nORM.Query
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
                 if (selBodyType == typeof(decimal))
                 {
-                    _sql.Append(_provider.DecimalAggregateSql(sqlFunction, columnSql));
+                    // DISTINCT (if any) goes inside the aggregate: SUM(DISTINCT expr). SQLite's
+                    // registered decimal aggregates and the other providers all accept it.
+                    _sql.Append(_provider.DecimalAggregateSql(sqlFunction, aggregateDistinct ? "DISTINCT " + columnSql : columnSql));
                 }
                 else
                 {
                     // C# Average over ints is a double; SQL Server's AVG(int) truncates to int, so
-                    // its provider hook casts integral operands to FLOAT (identity elsewhere).
+                    // its provider hook casts integral operands to FLOAT (identity elsewhere). The
+                    // DISTINCT modifier must wrap the already-cast operand (AVG(DISTINCT CAST(..))),
+                    // not sit inside the CAST, so apply it after AverageAggregateOperand.
                     if (sqlFunction == "AVG")
                         columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
-                    _sql.AppendAggregateFunction(sqlFunction, columnSql);
+                    _sql.AppendAggregateFunction(sqlFunction, aggregateDistinct ? "DISTINCT " + columnSql : columnSql);
                 }
                 _sql.AppendFragment(" FROM ").Append(RootTableSource()).Append(' ').Append(alias);
             }
