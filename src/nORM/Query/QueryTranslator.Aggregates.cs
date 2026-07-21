@@ -177,7 +177,10 @@ namespace nORM.Query
                 var parts = new List<string>(compositeKey.Arguments.Count);
                 for (int i = 0; i < compositeKey.Arguments.Count; i++)
                 {
-                    var vctxPart = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    // Same correlated-mapping preference as the single-key path below: a join key
+                    // member (p.A / c.B) must resolve against its own join alias, not the forced one.
+                    var (partMapping, partAlias) = _correlatedParams.TryGetValue(param, out var partCorr) ? partCorr : (_mapping, alias);
+                    var vctxPart = new VisitorContext(_ctx, partMapping, _provider, param, partAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                     var partVisitor = FastExpressionVisitorPool.Get(in vctxPart);
                     var partSql = partVisitor.Translate(compositeKey.Arguments[i]);
                     foreach (var kvp in partVisitor.GetParameters())
@@ -240,7 +243,15 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                    // For a join/projection source the (expanded) key param is already correctly
+                    // mapped in _correlatedParams (e.g. p -> (Parent, T0)). The VisitorContext
+                    // unconditionally sets _parameterMappings[param] = (Mapping, TableAlias), so
+                    // forcing (_mapping, alias) here would override that with the inner join alias,
+                    // mis-qualifying the key column (GROUP BY T1."PVal" for a Parent column). Prefer
+                    // the correlated mapping when present; single-table groupings aren't in it and
+                    // keep (_mapping, alias).
+                    var (keyMapping, keyAlias) = _correlatedParams.TryGetValue(param, out var keyCorr) ? keyCorr : (_mapping, alias);
+                    var vctx2 = new VisitorContext(_ctx, keyMapping, _provider, param, keyAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                     var visitor = FastExpressionVisitorPool.Get(in vctx2);
                     groupBySql = visitor.Translate(keySelectorLambda.Body);
                     // Use AddLiteralParameter (not AddParameter) so the inline-constant `@p0` from
