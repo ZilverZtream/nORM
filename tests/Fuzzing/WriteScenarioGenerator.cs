@@ -63,17 +63,18 @@ namespace nORM.Tests.Fuzzing
         public static WriteScenario GenerateTransactional(int seed)
         {
             var rng = new Random(seed);
-            var live = new List<int>();               // all existing ids (delete targets), mirrors the differential's tracked set
-            var safe = new HashSet<int>();            // ids safe to UPDATE: inserted outside a transaction and saved (Unchanged)
-            var insertedOutsideTx = new List<int>();  // ids inserted outside a transaction, awaiting an outside-tx save to become safe
+            var live = new List<int>();          // all existing ids (delete targets), mirrors the differential's tracked set
+            var safe = new HashSet<int>();       // ids safe to UPDATE: inserted and saved (updatable in place, even inside a tx)
+            var pendingInserts = new List<int>(); // inserted ids awaiting a save to become updatable
             var ops = new List<WriteOp>();
             var nextId = 1;
             var inTx = false;
             var opCount = rng.Next(4, 22);
 
-            // A row inserted inside a caller transaction stays Added after commit (R2-1), so nORM rejects a
-            // later update of it — that is the deliberate modify-after-insert guard, not a silent bug. The
-            // generator therefore only ever updates rows proven safe: inserted OUTSIDE a transaction and saved.
+            // A row inserted then saved is updatable, including inside a caller transaction: the save path emits
+            // an in-place UPDATE for a modified transaction-inserted row (it stays Added so a rollback re-inserts
+            // it with the current values). The generator updates only rows already saved, so the update is a
+            // real UPDATE rather than an edit to a not-yet-inserted pending row.
             for (var i = 0; i < opCount; i++)
             {
                 var nearEnd = i >= opCount - 2;
@@ -88,7 +89,7 @@ namespace nORM.Tests.Fuzzing
 
                 if (!inTx && !nearEnd && live.Count > 0 && rng.Next(4) == 0)
                 {
-                    SaveOutsideTx();               // flush pending so the begin snapshot equals the committed db
+                    EmitSave();                    // flush pending so the begin snapshot equals the committed db
                     ops.Add(WriteOp.BeginTx());
                     inTx = true;
                     continue;
@@ -114,11 +115,11 @@ namespace nORM.Tests.Fuzzing
                         ops.Add(WriteOp.Delete(id));
                         live.RemoveAt(idx);
                         safe.Remove(id);
-                        insertedOutsideTx.Remove(id);
+                        pendingInserts.Remove(id);
                         break;
                     }
                     default:                           // save boundary
-                        if (inTx) ops.Add(WriteOp.Save()); else SaveOutsideTx();
+                        EmitSave();
                         break;
                 }
             }
@@ -133,15 +134,15 @@ namespace nORM.Tests.Fuzzing
                 var id = nextId++;
                 ops.Add(WriteOp.Insert(id, rng.Next(0, 100)));
                 live.Add(id);
-                if (!inTx) insertedOutsideTx.Add(id);
+                pendingInserts.Add(id);
             }
 
-            void SaveOutsideTx()
+            void EmitSave()
             {
                 ops.Add(WriteOp.Save());
-                // Rows inserted outside a transaction are accepted by this save and become safe to update.
-                foreach (var id in insertedOutsideTx) safe.Add(id);
-                insertedOutsideTx.Clear();
+                // Once saved, a row is persisted and updatable in place (even a transaction-inserted one).
+                foreach (var id in pendingInserts) safe.Add(id);
+                pendingInserts.Clear();
             }
         }
     }
