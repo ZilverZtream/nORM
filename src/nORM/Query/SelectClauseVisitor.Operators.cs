@@ -39,6 +39,28 @@ namespace nORM.Query
             return node;
         }
 
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            // A parameter used directly in a projection that is NOT the projection's row parameter is a
+            // compiled-query VALUE parameter (Norm.CompileQuery's TParam), e.g. Select(r => r.A - k).
+            // Emit a __qv-marked compiled slot so the compiled pipeline binds the live value by name;
+            // without this the parameter renders as nothing and corrupts the SQL ("(A - )" syntax error).
+            // The predicate path (ExpressionToSqlVisitor.VisitParameter) already does this. Scoped to when
+            // OuterRowParameters is known (the row param excluded) and the param is not the DbContext
+            // receiver, so ordinary projections are unaffected.
+            if (SharedParams != null && SharedCompiledParams != null
+                && OuterRowParameters != null && !OuterRowParameters.Contains(node)
+                && !typeof(DbContext).IsAssignableFrom(node.Type))
+            {
+                var paramName = $"{_provider.ParamPrefix}p{SharedParams.Count}__qv";
+                SharedParams[paramName] = DBNull.Value;
+                SharedCompiledParams.Add(paramName);
+                EnsureBuilder().Append(paramName);
+                return node;
+            }
+            return base.VisitParameter(node);
+        }
+
         protected override Expression VisitConstant(ConstantExpression node)
         {
             var sb = EnsureBuilder();
