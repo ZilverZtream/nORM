@@ -77,12 +77,25 @@ public sealed class DistinctScalarTerminalTests
     [Fact]
     public void Filtered_distinct_scalar_sum_matches_linq()
     {
-        // Pre-Distinct Where must be inside the distinct set: sum the distinct A values among rows
-        // with B >= 3. (The Count() form of this shape is a separate open bug in the Count path.)
+        // Pre-Distinct Where must be inside the distinct set: sum the distinct A values among rows with B >= 3.
         var expected = Rows.Where(r => r.B >= 3).Select(r => r.A).Distinct().Sum();
         using var ctx = Ctx();
         var actual = ctx.Query<Row>().Where(r => r.B >= 3).Select(r => r.A).Distinct().Sum();
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Filtered_distinct_scalar_count_matches_linq()
+    {
+        // Count/LongCount over a filtered distinct set: the pre-Distinct WHERE must sit inside the
+        // distinct subquery (it filters base rows, which have B; the distinct set only exposes A).
+        var expected = (C: Rows.Where(r => r.B >= 3).Select(r => r.A).Distinct().Count(),
+                        L: Rows.Where(r => r.B >= 3).Select(r => r.A).Distinct().LongCount());
+        using var ctx = Ctx();
+        var actualC = ctx.Query<Row>().Where(r => r.B >= 3).Select(r => r.A).Distinct().Count();
+        var actualL = ctx.Query<Row>().Where(r => r.B >= 3).Select(r => r.A).Distinct().LongCount();
+        Assert.Equal(expected.C, actualC);
+        Assert.Equal(expected.L, actualL);
     }
 
     [Fact]

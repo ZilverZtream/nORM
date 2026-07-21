@@ -412,6 +412,17 @@ namespace nORM.Query
                                 prefix.Append("SELECT COUNT(*) FROM (SELECT DISTINCT ").Append(projSelect).Append(" FROM ").Append(fromClause);
                                 if (alias != null) prefix.Append(' ').Append(alias);
                                 _t._sql.Insert(0, prefix.ToString());
+                                // A pre-Distinct WHERE (e.g. Where(pred).Select(proj).Distinct().Count())
+                                // filters the BASE rows, which expose every column, not the distinct
+                                // projection, which exposes only the projected columns. Emit it INSIDE the
+                                // derived table and clear it, so Build() doesn't re-append it outside the
+                                // wrap — where a filtered column not in the projection (e.g. T0.B when the
+                                // projection selected only A) does not exist ("no such column").
+                                if (_t._where.Length > 0)
+                                {
+                                    _t._sql.Append(" WHERE ").Append(_t._where.ToSqlString());
+                                    _t._where.Clear();
+                                }
                                 _t._sql.Append(") AS ").Append(subqueryAlias);
                             }
                             else
