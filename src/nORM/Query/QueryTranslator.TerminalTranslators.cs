@@ -186,26 +186,35 @@ namespace nORM.Query
                     t._singleResult = t._methodName == "First" || t._methodName == "Single";
                     return node;
                 }
-                if (node.Arguments.Count > 1)
+                // Visit the source FIRST (preserving the terminal method name, which visiting child
+                // operators overwrites with e.g. "Where"), so _projection / _mapping are established
+                // before the predicate is translated — mirrors HandleAllOperation. Translating the
+                // predicate before the source was visited left a predicate over a scalar projection
+                // (Select(x => proj).First(a => a OP ...)) with an unmapped parameter, rendering `a` as
+                // an empty operand (`WHERE (( >= @p0))`).
+                var terminalMethod = t._methodName;
+                var result = t.Visit(node.Arguments[0]);
+                t._methodName = terminalMethod;
+
+                if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression predicate)
                 {
-                    var predicate = StripQuotes(node.Arguments[1]) as LambdaExpression;
-                    if (predicate != null)
-                    {
-                        var param = predicate.Parameters[0];
-                        var alias = t.EscapeAlias("T" + t._joinCounter);
-                        if (!t._correlatedParams.ContainsKey(param))
-                            t._correlatedParams[param] = (t._mapping, alias);
-                        var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
-                        var visitor = FastExpressionVisitorPool.Get(in vctxFS);
-                        var sql = visitor.Translate(predicate.Body);
-                        if (t._where.Length > 0) t._where.Append(" AND ");
-                        t._where.Append($"({sql})");
-                        foreach (var kvp in visitor.GetParameters())
-                            t._params[kvp.Key] = kvp.Value;
-                        if (t._params.Count > t._parameterManager.Index)
-                            t._parameterManager.Index = t._params.Count;
-                        FastExpressionVisitorPool.Return(visitor);
-                    }
+                    // Resolve a predicate over a scalar projection through the projection (no-op for a
+                    // plain entity predicate), then translate it against the now-established context.
+                    predicate = t.ExpandProjection(predicate);
+                    var param = predicate.Parameters[0];
+                    var alias = t.EscapeAlias("T" + t._joinCounter);
+                    if (!t._correlatedParams.ContainsKey(param))
+                        t._correlatedParams[param] = (t._mapping, alias);
+                    var vctxFS = new VisitorContext(t._ctx, t._mapping, t._provider, param, alias, t._correlatedParams, t._compiledParams, t._paramConverters, t._paramMap, t._recursionDepth, t._params.Count);
+                    var visitor = FastExpressionVisitorPool.Get(in vctxFS);
+                    var sql = visitor.Translate(predicate.Body);
+                    if (t._where.Length > 0) t._where.Append(" AND ");
+                    t._where.Append($"({sql})");
+                    foreach (var kvp in visitor.GetParameters())
+                        t._params[kvp.Key] = kvp.Value;
+                    if (t._params.Count > t._parameterManager.Index)
+                        t._parameterManager.Index = t._params.Count;
+                    FastExpressionVisitorPool.Return(visitor);
                 }
                 // Single/SingleOrDefault must fetch 2 rows so the caller can detect duplicates.
                 // First/FirstOrDefault only need 1 row.
@@ -219,11 +228,6 @@ namespace nORM.Query
                 // pins fire on `_take.HasValue && !_takeSetByTerminal`).
                 t._takeSetByTerminal = true;
                 t._singleResult = t._methodName == "First" || t._methodName == "Single";
-                // Preserve the terminal method name because visiting source arguments will
-                // overwrite _methodName with child operator names (e.g., "Where").
-                var terminalMethod = t._methodName;
-                var result = t.Visit(node.Arguments[0]);
-                t._methodName = terminalMethod;
                 return result;
             }
         }

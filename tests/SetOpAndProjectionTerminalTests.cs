@@ -131,6 +131,34 @@ public sealed class SetOpAndProjectionTerminalTests
     }
 
     [Fact]
+    public void Projected_scalar_first_with_predicate_matches_linq()
+    {
+        var expected = Rows.OrderBy(r => r.Id).Select(r => r.A).First(a => a >= 3);
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => r.A).First(a => a >= 3);
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Projected_computed_scalar_firstordefault_with_predicate_matches_linq()
+    {
+        var expected = Rows.OrderBy(r => r.Id).Select(r => r.A * 10 + r.B).FirstOrDefault(v => v > 40);
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => r.A * 10 + r.B).FirstOrDefault(v => v > 40);
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Entity_first_with_predicate_still_matches_linq()
+    {
+        // Regression guard for the visit-order reorder: plain entity First(pred) must still work.
+        var expected = Rows.OrderBy(r => r.Id).First(r => r.A >= 3).Id;
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().OrderBy(r => r.Id).First(r => r.A >= 3).Id;
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
     public void Projected_scalar_any_and_all_match_linq()
     {
         using var ctx = Ctx();
