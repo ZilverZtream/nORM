@@ -44,6 +44,38 @@ namespace nORM.Core
         internal long AttachSequence { get; } = System.Threading.Interlocked.Increment(ref _attachCounter);
 
         private readonly TableMapping _mapping;
+
+        /// <summary>
+        /// The mapping-derived, entity-instance-independent change-tracking shape: the tracked (non-key,
+        /// non-timestamp) columns, their value and content-hash getters, and a name→index map. Built once per
+        /// mapping and shared across every <see cref="EntityEntry"/> of that type so tracking an entity does not
+        /// re-allocate the arrays, per-column hash closures, and dictionary on every entry.
+        /// </summary>
+        private sealed class TrackingShape
+        {
+            public readonly Column[] NonKeyColumns;
+            public readonly Func<object, object?>[] Getters;
+            public readonly Func<object, int>[] HashGetters;
+            public readonly Dictionary<string, int> PropertyIndex;
+
+            public TrackingShape(TableMapping mapping)
+            {
+                NonKeyColumns = mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
+                Getters = new Func<object, object?>[NonKeyColumns.Length];
+                HashGetters = new Func<object, int>[NonKeyColumns.Length];
+                PropertyIndex = new Dictionary<string, int>(NonKeyColumns.Length, StringComparer.Ordinal);
+                for (int i = 0; i < NonKeyColumns.Length; i++)
+                {
+                    var getter = NonKeyColumns[i].Getter;
+                    Getters[i] = getter;
+                    HashGetters[i] = e => ContentHashCode(getter(e));
+                    PropertyIndex[NonKeyColumns[i].Prop.Name] = i;
+                }
+            }
+        }
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<TableMapping, TrackingShape> _trackingShapeCache = new();
+
         // PERFORMANCE: Use null instead of Array.Empty to truly defer allocation
         private Column[]? _nonKeyColumns;
         private int[]? _originalHashes;
@@ -790,23 +822,21 @@ namespace nORM.Core
             if (_isInitialized)
                 return;
 
-            _nonKeyColumns = _mapping.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToArray();
+            // The column set, value getters, hash getters, and property index depend only on the mapping, so
+            // share one immutable shape across every tracked entity of this type instead of rebuilding it (an
+            // array, two delegate arrays, N hash closures, and a dictionary) per entry. Only the per-instance
+            // snapshot state below is allocated per entry.
+            var shape = _trackingShapeCache.GetOrAdd(_mapping, static m => new TrackingShape(m));
+            _nonKeyColumns = shape.NonKeyColumns;
+            _getValues = shape.Getters;
+            _getHashCodes = shape.HashGetters;
+            _propertyIndex = shape.PropertyIndex;
 
             // Capture original timestamp value so UPDATE/DELETE can use the snapshot value
             // rather than the potentially-mutated current value of the entity property.
             var tsCol = _mapping.TimestampColumn;
             if (tsCol != null && Entity != null)
                 OriginalToken = SnapshotValue(tsCol.Getter(Entity));
-            _getHashCodes = new Func<object, int>[_nonKeyColumns.Length];
-            _getValues = new Func<object, object?>[_nonKeyColumns.Length];
-            _propertyIndex = new Dictionary<string, int>(StringComparer.Ordinal);
-            for (int i = 0; i < _nonKeyColumns.Length; i++)
-            {
-                var getter = _nonKeyColumns[i].Getter;
-                _getValues[i] = getter;
-                _getHashCodes[i] = e => ContentHashCode(getter(e));
-                _propertyIndex[_nonKeyColumns[i].Prop.Name] = i;
-            }
             _originalHashes = new int[_nonKeyColumns.Length];
             _originalValues = new object?[_nonKeyColumns.Length];
             _changedProperties = new BitArray(_nonKeyColumns.Length);
