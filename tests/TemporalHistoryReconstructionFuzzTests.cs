@@ -317,11 +317,18 @@ public class TemporalHistoryReconstructionFuzzTests
         var parts = spec.Split(':');
         var start = int.Parse(parts[0], CultureInfo.InvariantCulture);
         var count = int.Parse(parts[1], CultureInfo.InvariantCulture);
-        for (var s = start; s < start + count; s++)
-        {
-            await AsOf_reconstructs_every_checkpoint_state(s);
-            await AsOf_reconstructs_relational_graph_at_every_checkpoint(s);
-        }
+        var dop = parts.Length > 2 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : Environment.ProcessorCount;
+        // Seeds are isolated (own :memory: connection + per-context options; temporal config sets
+        // instance fields only). Their deliberate clock-gap DELAYS make parallelism especially
+        // valuable — the waits overlap across cores. Optional ":dop" third field.
+        var options = new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, dop) };
+        await System.Threading.Tasks.Parallel.ForEachAsync(
+            System.Linq.Enumerable.Range(start, count), options,
+            async (s, _) =>
+            {
+                await AsOf_reconstructs_every_checkpoint_state(s);
+                await AsOf_reconstructs_relational_graph_at_every_checkpoint(s);
+            });
     }
 
     [Theory]
