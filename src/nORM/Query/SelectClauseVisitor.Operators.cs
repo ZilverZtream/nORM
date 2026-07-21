@@ -96,6 +96,15 @@ namespace nORM.Query
         protected override Expression VisitBinary(BinaryExpression node)
         {
             var sb = EnsureBuilder();
+            // A constant array-index like `arr[2]` (captured array + constant index, no row
+            // reference) is a BinaryExpression of type ArrayIndex with no SQL operator — fold it
+            // to its value and emit as a constant (mirror of the ExpressionToSqlVisitor branch).
+            if (node.NodeType == ExpressionType.ArrayIndex
+                && QueryTranslator.TryGetConstantValue(node, out var arrayIndexValue))
+            {
+                Visit(Expression.Constant(arrayIndexValue, node.Type));
+                return node;
+            }
             // A boolean binary in a VALUE position (a projected member like
             // `Big = r.Score > 5`, `IsOrphan = r.Dept == null`, or a && chain) must
             // render as a selectable value: T-SQL rejects a bare predicate in the

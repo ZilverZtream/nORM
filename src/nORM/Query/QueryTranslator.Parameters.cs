@@ -51,6 +51,19 @@ namespace nORM.Query
                         return true;
                     }
                     break;
+                // Constant array element access `arr[i]` (a captured array indexed by a constant).
+                // Safe to evaluate — plain element read, no arbitrary code execution (unlike a
+                // MethodCall). Fold to the element so `col == arr[2]` binds the value as a parameter
+                // instead of reaching the operator emitter (ArrayIndex has no SQL operator).
+                case BinaryExpression be when be.NodeType == ExpressionType.ArrayIndex:
+                    if (TryGetConstantValue(be.Left, out var arrObj) && arrObj is Array arr
+                        && TryGetConstantValue(be.Right, out var idxObj) && idxObj is int idx
+                        && idx >= 0 && idx < arr.Length)
+                    {
+                        value = arr.GetValue(idx);
+                        return true;
+                    }
+                    break;
                 // MethodCallExpression handling was intentionally removed to prevent RCE.
                 // Method calls are translated to SQL (e.g., string.Contains) or throw NotSupportedException.
                 // Executing arbitrary user code via Invoke() would be a critical security vulnerability.

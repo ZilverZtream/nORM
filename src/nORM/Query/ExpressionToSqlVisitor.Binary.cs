@@ -18,6 +18,15 @@ namespace nORM.Query
     {
         protected override Expression VisitBinary(BinaryExpression node)
         {
+            // A constant array-index like `arr[2]` (a captured array + constant index, no row
+            // reference) is a BinaryExpression of type ArrayIndex — it has no SQL operator, so it
+            // would fall through to the operator switch and throw. Fold it to its value and bind
+            // as a parameter (the same treatment a plain captured constant gets).
+            if (node.NodeType == ExpressionType.ArrayIndex && TryGetConstantValue(node, out var arrayIndexValue))
+            {
+                AppendConstant(arrayIndexValue, node.Type);
+                return node;
+            }
             // C# lifts char comparisons to int — `r.Name[0] == 'A'` becomes
             // `Equal(Convert(get_Chars(...), int), Constant(65, int))`. If we let the
             // generic comparison path emit it, the int parameter (65) would never match
