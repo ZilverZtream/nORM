@@ -914,11 +914,21 @@ namespace nORM.Query
                 return null;
             }
             selector = ExpandGroupElementSelector(selector);
+            // Also expand through a join / transparent-identifier or Select projection so an
+            // aggregate over a JOINED member (g.Sum(x => x.innerMember)) rewrites x.innerMember
+            // back to the join's inner param — which _correlatedParams maps to the inner alias.
+            // No-op when neither is set (single-table grouping) or the types don't match.
+            selector = ExpandProjection(selector);
 
-            if (!_correlatedParams.ContainsKey(selector.Parameters[0]))
-                _correlatedParams[selector.Parameters[0]] = (_mapping, alias);
+            var selParam = selector.Parameters[0];
+            if (!_correlatedParams.ContainsKey(selParam))
+                _correlatedParams[selParam] = (_mapping, alias);
+            // Same correlated-mapping preference as the group-key path (QueryTranslator.Aggregates.cs):
+            // for a join/projection source the (expanded) selector param is already mapped to its own
+            // side's alias; forcing (_mapping, alias) would override it with the inner alias.
+            var (selMapping, selAlias) = _correlatedParams.TryGetValue(selParam, out var selCorr) ? selCorr : (_mapping, alias);
 
-            var vctxSel = new VisitorContext(_ctx, _mapping, _provider, selector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+            var vctxSel = new VisitorContext(_ctx, selMapping, _provider, selParam, selAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
             var columnSql = visitor.Translate(selector.Body);
             foreach (var kvp in visitor.GetParameters())

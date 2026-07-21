@@ -76,6 +76,22 @@ public sealed class JoinGroupByKeyTests
     }
 
     [Fact]
+    public void Join_groupby_aggregates_over_joined_member_match_linq()
+    {
+        var expected = Parents.Join(Children, p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, c.ChildVal })
+            .GroupBy(x => x.PVal)
+            .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.ChildVal), Mn = g.Min(x => x.ChildVal), Mx = g.Max(x => x.ChildVal) })
+            .OrderBy(r => r.Key).ToList();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Parent>().Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, c.ChildVal })
+            .GroupBy(x => x.PVal)
+            .Select(g => new { g.Key, C = g.Count(), S = g.Sum(x => x.ChildVal), Mn = g.Min(x => x.ChildVal), Mx = g.Max(x => x.ChildVal) })
+            .OrderBy(r => r.Key).ToList();
+        Assert.Equal(expected.Select(r => (r.Key, r.C, r.S, r.Mn, r.Mx)),
+                     actual.Select(r => (r.Key, r.C, r.S, r.Mn, r.Mx)));
+    }
+
+    [Fact]
     public void Join_groupby_composite_outer_key_count_matches_linq()
     {
         var expected = Parents.Join(Children, p => p.Id, c => c.ParentId, (p, c) => new { p.PVal, p.Region, c.ChildVal })
