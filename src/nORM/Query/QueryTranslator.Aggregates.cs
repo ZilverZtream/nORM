@@ -320,6 +320,32 @@ namespace nORM.Query
             // Handle direct aggregate calls like query.Sum(x => x.Amount)
             var sourceQuery = node.Arguments[0];
 
+            // Fold `source.Select(x => scalarProj).Sum()/Max()/Min()/Average()` into the selector
+            // form `source.Sum(x => scalarProj)`. Without this, the parameterless terminal over a
+            // scalar Select skips the aggregate-emit block below (which is gated on a selector arg),
+            // leaving `SELECT scalarProj FROM ...` with no aggregate — the query then materialises a
+            // List<T> and the scalar-result path casts List<T> -> T and throws InvalidCastException.
+            // Only a genuinely scalar projection (value type or string) is peeled, so an entity /
+            // anonymous Select (which .Max() couldn't compile against anyway) is left untouched.
+            LambdaExpression? directSelector = node.Arguments.Count > 1
+                ? StripQuotes(node.Arguments[1]) as LambdaExpression
+                : null;
+            if (directSelector == null
+                && StripQuotes(sourceQuery) is MethodCallExpression selectSourceCall
+                && selectSourceCall.Method.DeclaringType == typeof(Queryable)
+                && selectSourceCall.Method.Name == nameof(Queryable.Select)
+                && selectSourceCall.Arguments.Count == 2
+                && StripQuotes(selectSourceCall.Arguments[1]) is LambdaExpression peeledSelector
+                && peeledSelector.Parameters.Count == 1)
+            {
+                var peeledBodyType = Nullable.GetUnderlyingType(peeledSelector.Body.Type) ?? peeledSelector.Body.Type;
+                if (peeledBodyType.IsValueType || peeledBodyType == typeof(string))
+                {
+                    sourceQuery = selectSourceCall.Arguments[0];
+                    directSelector = peeledSelector;
+                }
+            }
+
             // A reshape anywhere in the spine (including below a Take/Skip window)
             // must divert to in-memory evaluation before the windowed derived-table
             // wrap builds aggregate SQL against pre-reshape rows.
@@ -344,8 +370,7 @@ namespace nORM.Query
                 _isAggregate = true;
                 _methodName = node.Method.Name;
                 _sql.Clear();
-                if (node.Arguments.Count > 1
-                    && StripQuotes(node.Arguments[1]) is LambdaExpression selA)
+                if (directSelector is LambdaExpression selA)
                 {
                     var sp = selA.Parameters[0];
                     _correlatedParams[sp] = (subMapA, winAliasA);
@@ -389,7 +414,7 @@ namespace nORM.Query
             // SQL on Postgres (42803: column must appear in GROUP BY or aggregate).
             _orderBy.Clear();
 
-            if (node.Arguments.Count > 1 && StripQuotes(node.Arguments[1]) is LambdaExpression selector)
+            if (directSelector is LambdaExpression selector)
             {
                 var param = selector.Parameters[0];
                 var alias = EscapeAlias("T" + _joinCounter);
