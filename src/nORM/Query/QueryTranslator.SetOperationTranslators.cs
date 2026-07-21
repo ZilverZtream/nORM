@@ -432,6 +432,86 @@ namespace nORM.Query
             return source;
         }
 
+        /// <summary>
+        /// Evaluates a Union / Concat / Intersect / Except whose OTHER arm is a local in-memory
+        /// sequence: translates the DB arm as the row plan and combines it with the local values
+        /// after materialization using LINQ-to-Objects. Value equality on boxed scalars and
+        /// anonymous types is ordinal and value-based — the same semantics C# set operators use
+        /// (and the semantics nORM's server-side set ops are wrapped to match), so no server SQL
+        /// for the combination is needed. A trailing OrderBy/Take composes via the standard
+        /// post-materialize tail (the element type flows through).
+        /// </summary>
+        private static Expression TranslateClientSetOperation(
+            QueryTranslator t, MethodCallExpression node, Expression dbArm,
+            System.Collections.IEnumerable localSequence, bool localIsLeft, Type elementType)
+        {
+            var localItems = new List<object?>();
+            foreach (var item in localSequence)
+                localItems.Add(item);
+
+            var source = t.Visit(dbArm);
+            var op = node.Method.Name;
+
+            t.AppendPostMaterializeTransform((ctx, rows) =>
+            {
+                var dbSeq = rows.Cast<object?>();
+                var first = localIsLeft ? localItems.AsEnumerable() : dbSeq;
+                var second = localIsLeft ? dbSeq : localItems.AsEnumerable();
+                // EqualityComparer<object>.Default => object.Equals: value equality for boxed
+                // scalars, structural equality for anonymous types. Exactly LINQ set semantics.
+                var combined = op switch
+                {
+                    nameof(Queryable.Union) => first.Union(second),
+                    nameof(Queryable.Concat) => first.Concat(second),
+                    nameof(Queryable.Intersect) => first.Intersect(second),
+                    nameof(Queryable.Except) => first.Except(second),
+                    _ => throw new NormUnsupportedFeatureException(
+                        string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
+                };
+                var output = CreateRuntimeList(elementType, rows.Count + localItems.Count);
+                foreach (var value in combined)
+                    output.Add(value);
+                return output;
+            }, elementType);
+            return source;
+        }
+
+        /// <summary>
+        /// True when a set-operation element type has value-based equality suitable for
+        /// client-side dedup that matches C# (and nORM's ordinal target): scalars (incl.
+        /// nullable) and anonymous types. Entity / general reference types are excluded —
+        /// their CLR reference equality would silently diverge from SQL value dedup.
+        /// </summary>
+        private static bool IsClientSetEvaluableElement(Type type)
+        {
+            var u = Nullable.GetUnderlyingType(type) ?? type;
+            if (u.IsPrimitive || u.IsEnum) return true;
+            if (u == typeof(string) || u == typeof(decimal) || u == typeof(Guid)
+                || u == typeof(DateTime) || u == typeof(DateTimeOffset) || u == typeof(TimeSpan)
+                || u == typeof(DateOnly) || u == typeof(TimeOnly))
+                return true;
+            // Anonymous types override Equals/GetHashCode with structural (value) semantics.
+            return u.Namespace == null && u.Name.Contains("AnonymousType", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Recognises a set-operation arm that is a LOCAL in-memory sequence — a raw
+        /// IEnumerable or a LINQ <c>EnumerableQuery</c> from <c>AsQueryable()</c> — as opposed
+        /// to a provider (nORM) queryable rooted in a table. Returns the enumerable when local.
+        /// </summary>
+        private static bool TryGetLocalSequence(Expression arm, out System.Collections.IEnumerable sequence)
+        {
+            sequence = System.Array.Empty<object>();
+            if (!TryGetConstantValue(arm, out var val) || val is not System.Collections.IEnumerable en)
+                return false;
+            // A nORM (provider) queryable is IQueryable but not a local EnumerableQuery; only
+            // an EnumerableQuery or a plain in-memory IEnumerable is local.
+            if (val is System.Linq.IQueryable && val is not System.Linq.EnumerableQuery)
+                return false;
+            sequence = en;
+            return true;
+        }
+
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
         private sealed class SetOperationTranslator : IMethodCallTranslator
@@ -465,6 +545,29 @@ namespace nORM.Query
                             $"(e.g. ToListAsync) and use LINQ-to-Objects {node.Method.Name}.");
                     }
                     return TranslateClientConcat(t, node);
+                }
+                // A set operation with a LOCAL in-memory sequence in one arm (e.g.
+                // db.Select(x => x.Col).Union(new[] { "All", "None" })) has no server-side
+                // table to combine against — the local values aren't a relation. For
+                // VALUE-EQUATABLE element types (scalars, anonymous types) evaluate the set
+                // operation client-side over the DB arm's materialized rows with
+                // LINQ-to-Objects, which is exactly C# set semantics (ordinal, value-based)
+                // — nORM's target. Entity element types keep reference identity, so SQL
+                // value-dedup would diverge from CLR reference-dedup: those fall through.
+                if (IsClientSetEvaluableElement(node.Type.GetGenericArguments()[0]))
+                {
+                    var rightLocal = TryGetLocalSequence(node.Arguments[1], out var rightSeq);
+                    var leftLocal = TryGetLocalSequence(node.Arguments[0], out var leftSeq);
+                    if (rightLocal ^ leftLocal)
+                    {
+                        var dbArm = rightLocal ? node.Arguments[0] : node.Arguments[1];
+                        if (!TryGetLocalSequence(dbArm, out _))
+                        {
+                            return TranslateClientSetOperation(
+                                t, node, dbArm, rightLocal ? rightSeq : leftSeq,
+                                localIsLeft: leftLocal, node.Type.GetGenericArguments()[0]);
+                        }
+                    }
                 }
                 // SQL parsers reject ORDER BY / LIMIT / OFFSET on a bare set-op arm.
                 // SQLite is strictest ("ORDER BY clause should come after UNION ALL

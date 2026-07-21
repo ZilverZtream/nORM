@@ -714,7 +714,14 @@ namespace nORM.Query
                 // any column in the result set").
                 bool sourceIsSetOp = SourceChainIsSetOp(node.Arguments[0]);
                 var source = t.Visit(node.Arguments[0]);
-                if (sourceIsSetOp
+                // A set op with a LOCAL sequence arm is evaluated CLIENT-side (the DB arm's
+                // rows are combined in memory), leaving a post-materialize tail. Its trailing
+                // OrderBy must sort the COMBINED sequence client-side too — the SQL-side set-op
+                // ordering branches below would order only the DB arm and let the appended local
+                // values fall out of order. Skip them so control reaches the post-materialize
+                // ordering path (which sorts the assembled rows).
+                bool setOpIsClientEvaluated = sourceIsSetOp && t.IsPostMaterializeTailMode;
+                if (sourceIsSetOp && !setOpIsClientEvaluated
                     && QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression setOpKeySel
                     && setOpKeySel.Body is MemberExpression keyMember
                     && keyMember.Expression is ParameterExpression)
@@ -740,7 +747,7 @@ namespace nORM.Query
                 // ordinal position — an ordinal ORDER BY is valid in a compound SELECT on all four
                 // providers and, unlike a table-qualified term, is accepted against the UNION result
                 // set (the member-key branch above table-/name-qualifies, which a compound rejects).
-                if (sourceIsSetOp
+                if (sourceIsSetOp && !setOpIsClientEvaluated
                     && QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression setOpIdentitySel
                     && setOpIdentitySel.Body is ParameterExpression setOpIdentityParam
                     && setOpIdentityParam == setOpIdentitySel.Parameters[0])
