@@ -22,6 +22,7 @@ namespace nORM.Tests;
 /// Ordering is by a unique <c>int</c> column so the total order is collation-free and
 /// deterministic across SQLite and LINQ.
 /// </summary>
+[Trait("Category", TestCategory.Fast)]
 public class FilteredSortedPagingFastPathTests
 {
     [Table("PageUser")]
