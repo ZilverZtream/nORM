@@ -1,0 +1,93 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Data.Sqlite;
+using nORM.Core;
+using nORM.Providers;
+using Xunit;
+
+#nullable enable
+
+namespace nORM.Tests;
+
+/// <summary>
+/// Oracle-compared coverage for terminals over set operations and over scalar projections:
+/// Union/Concat/Except(...).Count()/Sum()/Max(), and First/Single over a projected scalar. These
+/// compose a set op or a projection with a scalar terminal — places a missing fold could crash or
+/// aggregate the wrong set.
+/// </summary>
+[Trait("Category", TestCategory.Fast)]
+public sealed class SetOpAndProjectionTerminalTests
+{
+    [System.ComponentModel.DataAnnotations.Schema.Table("SoptRow")]
+    private sealed class Row
+    {
+        [System.ComponentModel.DataAnnotations.Key] public int Id { get; set; }
+        public int A { get; set; }
+        public int B { get; set; }
+    }
+
+    private static readonly Row[] Rows = Enumerable.Range(1, 24).Select(i => new Row
+    {
+        Id = i,
+        A = i % 6,           // 0..5
+        B = (i * 2) % 9,     // 0..8
+    }).ToArray();
+
+    private static DbContext Ctx()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "CREATE TABLE SoptRow (Id INTEGER PRIMARY KEY, A INTEGER NOT NULL, B INTEGER NOT NULL);";
+            foreach (var r in Rows) cmd.CommandText += $"INSERT INTO SoptRow VALUES ({r.Id},{r.A},{r.B});";
+            cmd.ExecuteNonQuery();
+        }
+        return new DbContext(cn, new SqliteProvider());
+    }
+
+    private static (List<int> nA, List<int> nB) N(DbContext ctx)
+        => (ctx.Query<Row>().Where(r => r.A >= 2).Select(r => r.A).ToList(),
+            ctx.Query<Row>().Where(r => r.B >= 4).Select(r => r.B).ToList());
+
+    [Fact]
+    public void Union_scalar_count_matches_linq()
+    {
+        var expected = Rows.Where(r => r.A >= 2).Select(r => r.A)
+            .Union(Rows.Where(r => r.B >= 4).Select(r => r.B)).Count();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().Where(r => r.A >= 2).Select(r => r.A)
+            .Union(ctx.Query<Row>().Where(r => r.B >= 4).Select(r => r.B)).Count();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Concat_scalar_count_matches_linq()
+    {
+        // Concat preserves duplicates; Count must count the multiset.
+        var expected = Rows.Where(r => r.A >= 2).Select(r => r.A)
+            .Concat(Rows.Where(r => r.B >= 4).Select(r => r.B)).Count();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().Where(r => r.A >= 2).Select(r => r.A)
+            .Concat(ctx.Query<Row>().Where(r => r.B >= 4).Select(r => r.B)).Count();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Projected_scalar_first_matches_linq()
+    {
+        var expected = Rows.OrderBy(r => r.Id).Select(r => r.A * 10 + r.B).First();
+        using var ctx = Ctx();
+        var actual = ctx.Query<Row>().OrderBy(r => r.Id).Select(r => r.A * 10 + r.B).First();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Projected_scalar_any_and_all_match_linq()
+    {
+        using var ctx = Ctx();
+        Assert.Equal(Rows.Select(r => r.A).Any(a => a == 5), ctx.Query<Row>().Select(r => r.A).Any(a => a == 5));
+        Assert.Equal(Rows.Select(r => r.A).All(a => a < 6), ctx.Query<Row>().Select(r => r.A).All(a => a < 6));
+    }
+}

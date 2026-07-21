@@ -515,6 +515,11 @@ namespace nORM.Query
             if (predicate == null)
                 throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, "All operation requires a predicate"));
             Visit(sourceQuery);
+            // Over a scalar projection (Select(x => proj).All(a => a OP ...)), the predicate's
+            // parameter is the projected value, not the entity — expand it through the projection so
+            // `a` resolves to `proj` (else `a` renders as an empty operand: `WHERE NOT (( < @p0))`).
+            // No-op when there is no matching projection (plain All(entity predicate)).
+            predicate = ExpandProjection(predicate);
 
             // If the source had an outer Where, its predicates are now sitting in _where
             // and would otherwise be appended by Build() against an outer SELECT with no
