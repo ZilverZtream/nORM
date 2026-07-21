@@ -224,6 +224,45 @@ namespace nORM.Query
                 return node;
             }
 
+            // Collection membership as a projected BOOLEAN value: `list.Contains(col)` or
+            // `Enumerable.Contains(list, col)` in a Select (e.g. `IsSelected = ids.Contains(r.Id)`).
+            // SCV has no IN-list emitter; rewrite to an OR-chain of equality comparisons over the
+            // folded collection, which VisitBinary already renders as a boolean value with correct
+            // null (a null element -> IS NULL) and ordinal-string semantics. String.Contains
+            // (substring) was handled above, so a string receiver never reaches here.
+            if (node.Method.Name == nameof(List<int>.Contains))
+            {
+                Expression? collectionExpr = null;
+                Expression? valueExpr = null;
+                if (node.Object != null && node.Arguments.Count == 1)
+                {
+                    collectionExpr = node.Object;
+                    valueExpr = node.Arguments[0];
+                }
+                else if (node.Object == null && node.Arguments.Count == 2)
+                {
+                    collectionExpr = node.Arguments[0];
+                    valueExpr = node.Arguments[1];
+                }
+                if (collectionExpr != null && valueExpr != null
+                    && collectionExpr.Type != typeof(string)
+                    && QueryTranslator.TryGetConstantValue(collectionExpr, out var collVal)
+                    && collVal is System.Collections.IEnumerable coll and not string)
+                {
+                    Expression? orChain = null;
+                    foreach (var item in coll)
+                    {
+                        var eq = Expression.Equal(valueExpr, Expression.Constant(item, valueExpr.Type));
+                        orChain = orChain == null ? eq : Expression.OrElse(orChain, eq);
+                    }
+                    if (orChain == null)
+                        sb.Append(_provider.BooleanPredicateAsValue("1 = 0")); // empty collection -> false
+                    else
+                        Visit(orChain);
+                    return node;
+                }
+            }
+
             // string.Equals with a StringComparison argument -- mirror
             // ExpressionToSqlVisitor's HandleStringEqualsStatic/Instance
             // fast handlers so projection and Where return identical truths.
