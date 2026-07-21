@@ -340,6 +340,25 @@ namespace nORM.Query
         private static async Task<object> ExecuteSimpleTakeAsObject<T>(DbContext ctx, int? takeCount, bool track, CancellationToken ct) where T : class, new()
             => await ExecuteSimpleTakeList<T>(ctx, takeCount, track, ct).ConfigureAwait(false);
 
+        /// <summary>
+        /// Executes a First/FirstOrDefault fast-path read (WHERE ... LIMIT 1, or LIMIT 1 with no filter) and
+        /// returns the single element as <see cref="object"/>: the materialized row, or — when the sequence is
+        /// empty — either a thrown <see cref="InvalidOperationException"/> (First) or <c>null</c> (FirstOrDefault).
+        /// Reuses the list executors' pooled/prepared command and cached SQL/materializer; the LIMIT 1 keeps the
+        /// intermediate list a single element.
+        /// </summary>
+        private static async Task<object> ExecuteWhereFirstAsObject<T>(DbContext ctx, WhereInfo info, bool hasFilter, bool track, bool throwOnEmpty, CancellationToken ct) where T : class, new()
+        {
+            var list = hasFilter
+                ? await ExecuteSimpleWhereList<T>(ctx, info, 1, track, ct).ConfigureAwait(false)
+                : await ExecuteSimpleTakeList<T>(ctx, 1, track, ct).ConfigureAwait(false);
+            if (list.Count > 0)
+                return list[0];
+            if (throwOnEmpty)
+                throw new InvalidOperationException("Sequence contains no elements.");
+            return null!;
+        }
+
         private static async Task<List<T>> ExecuteSimpleTakeList<T>(DbContext ctx, int? takeCount, bool track, CancellationToken ct) where T : class, new()
         {
             var map = ctx.GetMapping(typeof(T));

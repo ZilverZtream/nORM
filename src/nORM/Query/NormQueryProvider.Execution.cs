@@ -103,6 +103,28 @@ namespace nORM.Query
                         elementType = sourceType.GetGenericArguments()[0];
                 }
             }
+            else if (resultType.IsClass
+                     && expression is MethodCallExpression firstCall
+                     && firstCall.Method.DeclaringType == typeof(Queryable)
+                     && (firstCall.Method.Name == nameof(Queryable.First) || firstCall.Method.Name == nameof(Queryable.FirstOrDefault))
+                     && firstCall.Arguments.Count == 1)
+            {
+                // Scalar First/FirstOrDefault of an entity — route to the fast path (WHERE ... LIMIT 1) instead
+                // of the higher-overhead simple-query path. The result type equals the element type here.
+                try
+                {
+                    if (FastPathQueryExecutor.TryExecuteFirstNonGeneric(resultType, expression, _ctx,
+                            throwOnEmpty: firstCall.Method.Name == nameof(Queryable.First), ct, out var firstTask))
+                    {
+                        result = CastTaskResult<TResult>(firstTask);
+                        return true;
+                    }
+                }
+                catch (NotSupportedException)
+                {
+                    // ignore and fall back to the simple-query / full translation path
+                }
+            }
 
             if (elementType != null)
             {

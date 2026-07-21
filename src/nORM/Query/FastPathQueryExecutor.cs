@@ -29,8 +29,10 @@ namespace nORM.Query
         /// </summary>
         private delegate bool TryExecuteDelegate(Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result);
         private delegate bool TryExecuteListDelegate(Expression expr, DbContext ctx, CancellationToken ct, out object result);
+        private delegate bool TryExecuteFirstDelegate(Expression expr, DbContext ctx, CancellationToken ct, bool throwOnEmpty, out Task<object> result);
         private static readonly ConcurrentDictionary<Type, TryExecuteDelegate> _cachedExecutors = new();
         private static readonly ConcurrentDictionary<Type, TryExecuteListDelegate> _cachedListExecutors = new();
+        private static readonly ConcurrentDictionary<Type, TryExecuteFirstDelegate> _cachedFirstExecutors = new();
 
         /// <summary>
         /// Singleton MaterializerFactory - it only wraps static caches, no instance state.
@@ -103,6 +105,72 @@ namespace nORM.Query
             });
 
             return executor(expr, ctx, ct, out result);
+        }
+
+        /// <summary>
+        /// Non-generic entry point for the scalar First/FirstOrDefault fast path — the single most common
+        /// query shape (a point read). Without it First/FirstOrDefault fall to the higher-overhead simple-query
+        /// path even though the underlying WHERE ... LIMIT 1 is the same pooled/prepared read the list fast path
+        /// already runs.
+        /// </summary>
+        public static bool TryExecuteFirstNonGeneric(Type elementType, Expression expr, DbContext ctx, bool throwOnEmpty, CancellationToken ct, out Task<object> result)
+        {
+            result = default!;
+            if (!_eligibleTypeCache.GetOrAdd(elementType, static t => t.IsClass && t.GetConstructor(Type.EmptyTypes) != null))
+                return false;
+
+            var executor = _cachedFirstExecutors.GetOrAdd(elementType, t =>
+            {
+                var method = typeof(FastPathQueryExecutor)
+                    .GetMethod(nameof(TryExecuteFirst), BindingFlags.Public | BindingFlags.Static)!
+                    .MakeGenericMethod(t);
+
+                return (TryExecuteFirstDelegate)Delegate.CreateDelegate(typeof(TryExecuteFirstDelegate), method);
+            });
+
+            return executor(expr, ctx, ct, throwOnEmpty, out result);
+        }
+
+        /// <summary>
+        /// Fast path for <c>First()</c> / <c>FirstOrDefault()</c> and their predicate-lowered form
+        /// <c>First(Where(source, col == value))</c>: emits WHERE ... LIMIT 1, materializes the one row through
+        /// the same pooled/prepared/cached machinery the list fast path uses, and returns the single element
+        /// (or default / an empty-sequence throw). Falls back for any shape it does not recognize.
+        /// </summary>
+        public static bool TryExecuteFirst<T>(Expression expr, DbContext ctx, CancellationToken ct, bool throwOnEmpty, out Task<object> result) where T : class, new()
+        {
+            result = default!;
+            if (ctx.Options.GlobalFilters.Count > 0 || ctx.Options.TenantProvider != null || ctx.Options.RetryPolicy != null)
+                return false;
+            if (QueryTranslator.FindRootRawSource(expr) is not null)
+                return false;
+            if (ContainsTagWith(expr))
+                return false;
+            if (ContainsAsTracking(expr))
+                return false;
+            if (ctx.GetMapping(typeof(T)).DiscriminatorValue != null)
+                return false;
+
+            if (expr is not MethodCallExpression firstCall || firstCall.Arguments.Count != 1)
+                return false;
+            var inner = firstCall.Arguments[0];
+
+            // First/FirstOrDefault(source): no filter, one row.
+            if (Unwrap(inner) is ConstantExpression)
+            {
+                result = ExecuteWhereFirstAsObject<T>(ctx, default, hasFilter: false, ShouldTrackResults<T>(expr, ctx), throwOnEmpty, ct);
+                return true;
+            }
+            // First/FirstOrDefault(Where(source, singleColumnEquality)): filtered, one row. Reject an inner Take
+            // (First(Take(Where,n)) with n==0 must be empty, which LIMIT 1 alone would not honor).
+            if (IsSimpleWherePattern(inner, out var whereInfo, out var innerTake) && innerTake == null)
+            {
+                if (!ctx.GetMapping(typeof(T)).ColumnsByName.ContainsKey(whereInfo.Property))
+                    return false;
+                result = ExecuteWhereFirstAsObject<T>(ctx, whereInfo, hasFilter: true, ShouldTrackResults<T>(expr, ctx), throwOnEmpty, ct);
+                return true;
+            }
+            return false;
         }
 
         public static bool TryExecute<T>(Expression expr, DbContext ctx, CancellationToken ct, out Task<object> result) where T : class, new()
