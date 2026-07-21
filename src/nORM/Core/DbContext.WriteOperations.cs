@@ -762,6 +762,35 @@ namespace nORM.Core
         private static bool HasExplicitRelationshipDependency(TableMapping dependent, TableMapping candidatePrincipal)
             => candidatePrincipal.Relations.Values.Any(r => r.DependentType == dependent.Type);
 
+        // Batched positional parameter names ("@p0".."@pN") are a small finite set that recurs on every
+        // save; interpolating them per parameter (`$"{prefix}p{index}"`) allocated ~one string per column
+        // per save. Pre-build and cache them per provider prefix so the hot binder just indexes an array.
+        private const int PooledParamNameLimit = 256;
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string[]> _pooledParamNames = new();
+
+        /// <summary>
+        /// Returns the batched positional parameter name <c>prefix + "p" + index</c>, byte-identical to the
+        /// former <c>$"{prefix}p{index}"</c> interpolation (invariant digits, no grouping — matches the SQL
+        /// placeholder emitted by <c>AppendUpdateBatch</c>/<c>AppendInsertBatch</c>). Names for indices below
+        /// <see cref="PooledParamNameLimit"/> come from a per-prefix cache (zero allocation); larger indices
+        /// (huge batches) fall back to concatenation.
+        /// </summary>
+        private static string ParamName(string prefix, int index)
+        {
+            if ((uint)index < PooledParamNameLimit)
+            {
+                var names = _pooledParamNames.GetOrAdd(prefix, static p =>
+                {
+                    var arr = new string[PooledParamNameLimit];
+                    for (int i = 0; i < arr.Length; i++)
+                        arr[i] = p + "p" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    return arr;
+                });
+                return names[index];
+            }
+            return prefix + "p" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null, IReadOnlyList<Column>? setColumns = null)
         {
             var index = startIndex;
@@ -774,7 +803,7 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), val, GetParameterKnownType(col, val));
                     }
                     break;
                 case WriteOperation.Update:
@@ -797,45 +826,45 @@ namespace nORM.Core
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), val, GetParameterKnownType(col, val));
                     }
                     if (map.ClientManagedConcurrencyToken)
                     {
                         // SET slot for the freshly-stamped token (set on the entity above).
                         var tc = map.TimestampColumn!;
                         var newTok = tc.Getter(entity);
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", newTok, GetParameterKnownType(tc, newTok));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), newTok, GetParameterKnownType(tc, newTok));
                     }
                     foreach (var col in map.KeyColumns)
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), val, GetParameterKnownType(col, val));
                     }
                     if (map.TimestampColumn != null)
                     {
                         // WHERE compares the OLD token captured before the new one was stamped.
                         var tokenValue = whereTokenBatched;
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     if (Options.TenantProvider != null)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", GetRequiredTenantId(map, "update batch"));
+                        cmd.AddParam(ParamName(_p.ParamPrefix, index++), GetRequiredTenantId(map, "update batch"));
                     break;
                 case WriteOperation.Delete:
                     foreach (var col in map.KeyColumns)
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", val, GetParameterKnownType(col, val));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), val, GetParameterKnownType(col, val));
                     }
                     if (map.TimestampColumn != null)
                     {
                         // Use the original snapshot token when available.
                         var tokenValue = originalToken ?? map.TimestampColumn.Getter(entity);
-                        cmd.AddOptimizedParam($"{_p.ParamPrefix}p{index++}", tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
+                        cmd.AddOptimizedParam(ParamName(_p.ParamPrefix, index++), tokenValue, GetParameterKnownType(map.TimestampColumn, tokenValue));
                     }
                     if (Options.TenantProvider != null)
-                        cmd.AddParam($"{_p.ParamPrefix}p{index++}", GetRequiredTenantId(map, "delete batch"));
+                        cmd.AddParam(ParamName(_p.ParamPrefix, index++), GetRequiredTenantId(map, "delete batch"));
                     break;
             }
             return index;
