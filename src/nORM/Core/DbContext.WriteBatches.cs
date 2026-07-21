@@ -434,7 +434,8 @@ namespace nORM.Core
                             "Detach the entity, modify the key, then re-attach.");
                 }
 
-                sql.Append(BuildDeleteBatch(map, paramIndex)).Append(';');
+                AppendDeleteBatch(sql, map, paramIndex);
+                sql.Append(';');
                 paramIndex = AddParametersBatched(cmd, map,
                     entity,
                     WriteOperation.Delete, paramIndex, entry.OriginalToken);
@@ -710,29 +711,52 @@ namespace nORM.Core
             }
         }
 
+        // String form of AppendDeleteBatch (currently unused by the hot path, kept for symmetry/
+        // template use). Both share the same builder logic, so they can never diverge.
         private string BuildDeleteBatch(TableMapping map, int startParamIndex)
+        {
+            var sb = new StringBuilder();
+            AppendDeleteBatch(sb, map, startParamIndex);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Appends one entity's batched DELETE directly into <paramref name="sql"/>. Output is
+        /// byte-identical to the former <c>$"DELETE FROM {EscTable} WHERE {where}"</c> interpolation;
+        /// this form skips the per-entity <c>List</c>/<c>string.Join</c>/interpolation/return-string
+        /// allocations. Key/token/tenant predicate order matches <see cref="AddParametersBatched"/>.
+        /// </summary>
+        private void AppendDeleteBatch(StringBuilder sql, TableMapping map, int startParamIndex)
         {
             if (map.KeyColumns.Length == 0)
                 throw new NormConfigurationException(string.Format(
                     ErrorMessages.InvalidConfiguration,
                     $"Entity '{map.Type.Name}' has no primary key; DELETE requires a key."));
+            sql.Append("DELETE FROM ").Append(map.EscTable).Append(" WHERE ");
             var idx = startParamIndex;
-            var whereParts = new List<string>();
+            var wroteWhere = false;
             foreach (var col in map.KeyColumns)
-                whereParts.Add($"{col.EscCol}={_p.ParamPrefix}p{idx++}");
+            {
+                if (wroteWhere) sql.Append(" AND ");
+                sql.Append(col.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx++);
+                wroteWhere = true;
+            }
             if (map.TimestampColumn != null)
             {
+                if (wroteWhere) sql.Append(" AND ");
                 var tc = map.TimestampColumn;
-                whereParts.Add($"({tc.EscCol}={_p.ParamPrefix}p{idx} OR ({tc.EscCol} IS NULL AND {_p.ParamPrefix}p{idx} IS NULL))");
+                sql.Append('(').Append(tc.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx)
+                   .Append(" OR (").Append(tc.EscCol).Append(" IS NULL AND ").Append(_p.ParamPrefix).Append('p').Append(idx).Append(" IS NULL))");
                 idx++;
+                wroteWhere = true;
             }
             if (Options.TenantProvider != null)
             {
+                if (wroteWhere) sql.Append(" AND ");
                 var tenantCol = RequireTenantColumn(map, "delete batch");
-                whereParts.Add($"{tenantCol.EscCol}={_p.ParamPrefix}p{idx++}");
+                sql.Append(tenantCol.EscCol).Append('=').Append(_p.ParamPrefix).Append('p').Append(idx++);
+                wroteWhere = true;
             }
-            var where = string.Join(" AND ", whereParts);
-            return $"DELETE FROM {map.EscTable} WHERE {where}";
         }
     }
 }
