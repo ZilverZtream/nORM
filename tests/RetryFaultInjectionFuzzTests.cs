@@ -95,9 +95,16 @@ public class RetryFaultInjectionFuzzTests
 
     /// <summary>
     /// Environment-directed seed sweep for building the release dry window: set
-    /// NORM_RETRY_FUZZ_SWEEP to "start:count" to run that seed range through the
-    /// fault-injection machine. Unset, this fact is a no-op so the fixed seeds stay
-    /// the baseline.
+    /// NORM_RETRY_FUZZ_SWEEP to "start:count" (optionally "start:count:dop") to run that seed
+    /// range through the fault-injection machine. Unset, this fact is a no-op so the fixed
+    /// seeds stay the baseline.
+    ///
+    /// Each seed runs against its own uniquely-named shared-cache in-memory database
+    /// (<c>rfifuzz_{seed}_{Guid}</c>) with its own fault interceptor, so seeds share no
+    /// mutable state and the sweep is embarrassingly parallel — it fans out across all cores
+    /// via Parallel.ForEachAsync. A failing seed still surfaces (its assertion propagates out
+    /// of the parallel loop); the optional third field overrides the degree of parallelism
+    /// (default = ProcessorCount; ":1" restores serial for A/B timing).
     /// </summary>
     [Fact]
     public async Task Environment_directed_seed_sweep()
@@ -107,8 +114,14 @@ public class RetryFaultInjectionFuzzTests
         var parts = spec.Split(':');
         var start = int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
         var count = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
-        for (var s = start; s < start + count; s++)
-            await Saves_survive_transient_failures_without_loss_or_duplication(s);
+        var dop = parts.Length > 2
+            ? int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture)
+            : Environment.ProcessorCount;
+
+        var options = new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, dop) };
+        await System.Threading.Tasks.Parallel.ForEachAsync(
+            Enumerable.Range(start, count), options,
+            async (s, _) => await Saves_survive_transient_failures_without_loss_or_duplication(s));
     }
 
     [Theory]
