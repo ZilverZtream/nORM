@@ -260,6 +260,30 @@ namespace nORM.Query
                             }
                         }
                     }
+                    else
+                    {
+                        // A computed SCALAR body that mixes the group key and aggregate(s) — e.g.
+                        // Select(g => (int)g.Key + ":" + g.Count()) — matches none of the shape-specific
+                        // branches (not bare Key, not a bare aggregate, not a NewExpression), so nothing
+                        // was emitted and the SELECT list came out empty ("SELECT  FROM ..."). Translate
+                        // the whole body as a single output column with the grouping key registered, so
+                        // g.Key resolves to the group-key SQL and g.Count()/g.Sum(...) resolve to their
+                        // aggregate SQL (the same mechanism the HAVING predicate path uses).
+                        if (!_correlatedParams.ContainsKey(resultSelector.Parameters[0]))
+                            _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
+                        var computedVctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
+                        var computedVisitor = FastExpressionVisitorPool.Get(in computedVctx);
+                        foreach (var gp in resultSelector.Parameters)
+                            computedVisitor.RegisterGroupingKey(gp, groupBySql);
+                        var computedSql = computedVisitor.Translate(resultSelector.Body);
+                        foreach (var kvp in computedVisitor.GetParameters())
+                            AddLiteralParameter(kvp.Key, kvp.Value);
+                        FastExpressionVisitorPool.Return(computedVisitor);
+                        var computedBuilder = PooledStringBuilder.Rent();
+                        computedBuilder.Append(computedSql).Append(" AS ").Append(_provider.Escape("Value"));
+                        selectItems.Add(computedBuilder.ToString());
+                        PooledStringBuilder.Return(computedBuilder);
+                    }
                 }
 
                 _sql.AppendSelect(ReadOnlySpan<char>.Empty);
