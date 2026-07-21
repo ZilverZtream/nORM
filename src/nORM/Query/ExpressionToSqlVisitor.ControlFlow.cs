@@ -115,6 +115,18 @@ namespace nORM.Query
                             castOperandSql, targetUnderlying == typeof(long) || targetUnderlying == typeof(ulong)));
                         return node;
                     }
+                    // A WIDENING integral->floating cast ((double)A, (float)B) carries real-arithmetic
+                    // semantics: without an explicit CAST, `(double)A / B` runs as INTEGER division on
+                    // the provider (SQLite: 3/2 = 1, not 1.5) — a silent wrong result. Emit CAST AS REAL
+                    // so the operand and any surrounding arithmetic/comparison are real. Decimal targets
+                    // are excluded: they keep their own precise TEXT-based coercion (which already works).
+                    if ((targetUnderlying == typeof(double) || targetUnderlying == typeof(float))
+                        && DatabaseProvider.IsIntegralArithmeticType(operandUnderlying))
+                    {
+                        var floatCastSql = GetSql(node.Operand);
+                        _sql.Append(_provider.GetRealCastSql(floatCastSql));
+                        return node;
+                    }
                     Visit(node.Operand);
                     return node;
                 }
