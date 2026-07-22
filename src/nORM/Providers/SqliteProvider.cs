@@ -79,7 +79,7 @@ namespace nORM.Providers
         /// SQLite generates a single-column INTEGER primary key from the rowid when the column is omitted
         /// on INSERT, and honors an explicitly-supplied value — exactly the store-generated-key convention
         /// (EF Core parity). Enabled so a plain <c>int Id</c> primary key with no <c>[DatabaseGenerated]</c>
-        /// annotation is store-generated when default and honored when set. See <see cref="Column.IsConventionGeneratedKey"/>.
+        /// annotation is store-generated when default and honored when set. See <see cref="TableMapping.ConventionGeneratedKeyColumn"/>.
         /// </summary>
         public override bool SupportsConventionKeyStoreGeneration => true;
 

@@ -37,7 +37,7 @@ namespace nORM.Providers
         /// <summary>
         /// A single-column integer primary key with no explicit value-generation config is store-generated
         /// (EF Core parity): MySQL realizes it as an AUTO_INCREMENT column, which generates a value when the
-        /// column is omitted and honors an explicitly-supplied non-zero value. See <see cref="Column.IsConventionGeneratedKey"/>.
+        /// column is omitted and honors an explicitly-supplied non-zero value. See <see cref="TableMapping.ConventionGeneratedKeyColumn"/>.
         /// </summary>
         public override bool SupportsConventionKeyStoreGeneration => true;
 

@@ -359,6 +359,17 @@ namespace nORM.Configuration
         public bool EagerChangeTracking { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets whether the store-generated-key convention (EF Core parity) is applied: a
+        /// single-column integer primary key with no explicit value-generation config is treated as
+        /// store-generated (generated when its value is default, honored when non-default) on providers that
+        /// support it. Enabled by default. Set to <c>false</c> to keep such a key entirely client-set — the
+        /// escape hatch for an existing table whose key column is NOT an identity/auto-increment/rowid column,
+        /// or when the application manages all key values itself. Opting out only affects keys that have no
+        /// explicit configuration; <c>[DatabaseGenerated]</c> and fluent <c>ValueGenerated*</c> always win.
+        /// </summary>
+        public bool UseStoreGeneratedKeyConvention { get; set; } = true;
+
+        /// <summary>
         /// Gets or sets the default tracking behavior applied to queries executed
         /// against the context.
         /// </summary>

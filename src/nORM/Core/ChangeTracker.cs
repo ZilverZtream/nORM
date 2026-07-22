@@ -938,9 +938,10 @@ namespace nORM.Core
                 // DB-generated key at its default means "not yet assigned" - don't key the map. A
                 // store-generated-key CONVENTION column at its default is likewise pending generation
                 // (the INSERT omits it and reads the value back), so two default-keyed new entities must
-                // not collide under key 0 in the identity map. IsConventionGeneratedKey is only set on
-                // providers that store-generate it, so this is inert elsewhere.
-                if ((col.IsDbGenerated || col.IsConventionGeneratedKey) && IsDefaultKeyValue(value, col.Prop.PropertyType))
+                // not collide under key 0 in the identity map. ConventionGeneratedKeyColumn is set only when
+                // the provider store-generates it AND the convention option is on, so this is inert elsewhere.
+                if ((col.IsDbGenerated || ReferenceEquals(col, mapping.ConventionGeneratedKeyColumn))
+                    && IsDefaultKeyValue(value, col.Prop.PropertyType))
                     return null;
                 return value;
             }

@@ -353,28 +353,27 @@ namespace nORM.Mapping
             // explicit value-generation config is store-generated when its value is default (0) and honored
             // when non-default. Composite keys and explicitly-configured keys ([DatabaseGenerated]/
             // ValueGeneratedOnAdd/Never) are excluded, so an opt-out stays client-set. Gated on the provider
-            // actually being able to store-generate it (SQLite: rowid alias) so the mark — and therefore the
-            // write-path and change-tracker behavior keyed off IsConventionGeneratedKey — is a no-op on
-            // providers that do not yet support it. See honor_nonzero_key_convention_plan.
-            Column? conventionGeneratedKey = null;
-            if (KeyColumns.Length == 1
+            // being able to store-generate it (SQLite: rowid alias) AND the context option (default on; set
+            // DbContextOptions.UseStoreGeneratedKeyConvention=false to opt out globally — the escape hatch for
+            // existing non-identity tables). ConventionGeneratedKeyColumn is the SINGLE source of truth read by
+            // the write path, change tracker, and DDL snapshot — it is per-context, so the option gates cleanly
+            // without mutating the shared (cached) Column instance. See honor_nonzero_key_convention_plan.
+            ConventionGeneratedKeyColumn = (KeyColumns.Length == 1
                 && !KeyColumns[0].IsDbGenerated
                 && !KeyColumns[0].ValueGenerationExplicitlyConfigured
                 && Column.IsConventionStoreGeneratedKeyType(KeyColumns[0].Prop.PropertyType)
-                && p.SupportsConventionKeyStoreGeneration)
-            {
-                KeyColumns[0].MarkConventionGeneratedKey();
-                conventionGeneratedKey = KeyColumns[0];
-            }
-            ConventionGeneratedKeyColumn = conventionGeneratedKey;
+                && p.SupportsConventionKeyStoreGeneration
+                && ctx.Options.UseStoreGeneratedKeyConvention)
+                ? KeyColumns[0]
+                : null;
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
             // Start from the provider's insert-column set (SQL Server excludes server-managed ROWVERSION
             // columns) so the store-generated default-value run omits exactly the convention key and nothing
             // the provider itself would exclude. Matches the explicit-value run's _p.GetInsertColumns(map).
-            InsertColumnsWithoutConventionKey = conventionGeneratedKey != null
-                ? p.GetInsertColumns(this).Where(c => !ReferenceEquals(c, conventionGeneratedKey)).ToArray()
+            InsertColumnsWithoutConventionKey = ConventionGeneratedKeyColumn is { } convGenKey
+                ? p.GetInsertColumns(this).Where(c => !ReferenceEquals(c, convGenKey)).ToArray()
                 : InsertColumns;
             // On providers without a native rowversion (SQLite/PostgreSQL/MySQL), nORM writes a fresh
             // [Timestamp] value on every UPDATE (appended to the SET clause by the batched write path)

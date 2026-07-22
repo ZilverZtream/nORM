@@ -1195,6 +1195,7 @@ P:nORM.Configuration.DbContextOptions.TenantProvider:nORM.Enterprise.ITenantProv
 P:nORM.Configuration.DbContextOptions.TimeoutConfiguration:nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
 P:nORM.Configuration.DbContextOptions.UseBatchedBulkOps:System.Boolean
 P:nORM.Configuration.DbContextOptions.UsePreciseChangeTracking:System.Boolean
+P:nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention:System.Boolean
 P:nORM.Configuration.EntityTypeBuilder{`0}.PropertyBuilder.Builder:nORM.Configuration.EntityTypeBuilder{`0}
 P:nORM.Configuration.ExpressionIndexConfiguration.ExpressionSql:System.String
 P:nORM.Configuration.ExpressionIndexConfiguration.FilterSql:System.String
@@ -1404,7 +1405,6 @@ P:nORM.Mapping.Column.Converter:nORM.Mapping.IValueConverter
 P:nORM.Mapping.Column.EscCol:System.String
 P:nORM.Mapping.Column.ForeignKeyPrincipalTypeName:System.String
 P:nORM.Mapping.Column.Getter:System.Func{System.Object,System.Object}
-P:nORM.Mapping.Column.IsConventionGeneratedKey:System.Boolean
 P:nORM.Mapping.Column.IsDbGenerated:System.Boolean
 P:nORM.Mapping.Column.IsKey:System.Boolean
 P:nORM.Mapping.Column.IsNullable:System.Boolean

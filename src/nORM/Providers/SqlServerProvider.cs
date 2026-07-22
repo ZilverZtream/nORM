@@ -46,12 +46,14 @@ namespace nORM.Providers
         public override Column[] GetInsertColumns(TableMapping m)
             => m.InsertColumns.Where(c => !c.IsTimestamp).ToArray();
 
-        // NOTE: SQL Server does NOT yet flip SupportsConventionKeyStoreGeneration on — it works correctly on a
-        // real server (the honor-non-zero live keeper passes for sqlserver), but activating it makes this
-        // provider emit SET IDENTITY_INSERT for a plain [Key] int Id, which breaks nORM's FakeProvider
-        // cross-provider tests (SqlServerProvider SQL run against a SQLite backend) and existing plain-INT
-        // (non-IDENTITY) tables. The IDENTITY_INSERT hooks below stay (inert until the flip) so the flip is a
-        // one-line change once the convention-accommodation approach is chosen. See honor_nonzero_key_convention_plan.
+        // NOTE: SQL Server does NOT flip SupportsConventionKeyStoreGeneration on. It works on a real server
+        // (the honor-non-zero live keeper passes for sqlserver), but activating it makes this provider emit
+        // SET IDENTITY_INSERT for a plain [Key] int Id, which breaks the ENTIRE cross-provider FakeProvider
+        // test suite for the sqlserver kind (SqlServerProvider SQL run against a SQLite backend — every such
+        // test that seeds data fails on "SET IDENTITY_INSERT"), plus existing plain-INT (non-IDENTITY) tables.
+        // The global opt-out DbContextOptions.UseStoreGeneratedKeyConvention exists; flipping SqlServer on
+        // additionally requires opting ~20-30 FakeProvider test factories out (or a different accommodation) —
+        // a decision surfaced to the user. The IDENTITY_INSERT hooks below stay (inert until the flip).
 
         /// <summary>
         /// An IDENTITY column rejects an explicitly-supplied value unless IDENTITY_INSERT is ON; the

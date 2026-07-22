@@ -327,13 +327,14 @@ namespace nORM.Migration
                         IndexOrder   = null,
                         // A store-generated convention key (EF parity) is emitted as an identity/auto-increment
                         // column on providers that realize it that way (SqlServer/PostgreSQL/MySQL); SQLite uses
-                        // the free rowid alias and needs no identity DDL. IsConventionGeneratedKey is only set
-                        // when the provider supports the convention, so this is inert elsewhere.
+                        // the free rowid alias and needs no identity DDL. ConventionGeneratedKeyColumn is set
+                        // only when the provider supports the convention and the option is on, so this is inert
+                        // otherwise.
                         IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity
-                            || (col.IsConventionGeneratedKey && provider?.ConventionKeyUsesIdentityColumn == true),
+                            || (ReferenceEquals(col, map.ConventionGeneratedKeyColumn) && provider?.ConventionKeyUsesIdentityColumn == true),
                         // A convention key's identity honors an explicit value (store-generated only when
                         // default), unlike a strict [DatabaseGenerated(Identity)]. Drives the by-default DDL.
-                        IdentityByDefault = col.IsConventionGeneratedKey && provider?.ConventionKeyUsesIdentityColumn == true,
+                        IdentityByDefault = ReferenceEquals(col, map.ConventionGeneratedKeyColumn) && provider?.ConventionKeyUsesIdentityColumn == true,
                         IdentitySeed = identityOptions?.Seed,
                         IdentityIncrement = identityOptions?.Increment,
                         ComputedColumnSql = computedColumn?.Sql
