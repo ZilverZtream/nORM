@@ -180,6 +180,13 @@ namespace nORM.Query
                         {
                             mceCol.Converter = mceConv;
                         }
+                        else
+                        {
+                            // A method call over a converter column in value position (c.Col.ToString(), a
+                            // cast helper, ...) reads the raw stored value. Grouping aggregates aren't flagged
+                            // (the walker doesn't descend into the aggregate's lambda).
+                            GuardComputedConverterProjection(mce, mapping);
+                        }
                         cols.Add(mceCol);
                     }
                     else if (arg is ConditionalExpression ce)
@@ -209,6 +216,7 @@ namespace nORM.Query
                                  || ue.NodeType == ExpressionType.OnesComplement))
                     {
                         // Primitive/enum cast: collapses to the operand at SQL level.
+                        GuardComputedConverterProjection(ue, mapping);
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, ue.Type, mapping.Type, mapping.Provider, memberName));
                     }

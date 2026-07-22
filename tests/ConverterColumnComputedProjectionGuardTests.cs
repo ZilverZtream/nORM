@@ -88,6 +88,22 @@ public sealed class ConverterColumnComputedProjectionGuardTests
     }
 
     [Fact]
+    public async Task Anon_method_call_over_converter_column_fails_loud()
+    {
+        using var ctx = await CtxAsync();
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
+            ctx.Query<Cat>().Select(c => new { c.Id, X = c.Code.ToString() }).ToList());
+    }
+
+    [Fact]
+    public async Task Anon_cast_over_converter_column_fails_loud()
+    {
+        using var ctx = await CtxAsync();
+        Assert.Throws<NormUnsupportedFeatureException>(() =>
+            ctx.Query<Cat>().Select(c => new { c.Id, X = (long)c.Code }).ToList());
+    }
+
+    [Fact]
     public async Task Direct_projection_of_converter_column_still_converts()
     {
         using var ctx = await CtxAsync();
