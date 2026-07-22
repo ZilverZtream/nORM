@@ -109,6 +109,10 @@ namespace nORM.Query
                         && projectionSubqueryConverters.TryGetValue(QueryTranslator.BareScalarSubqueryConverterKey, out var bareSubConv)
                             ? bareSubConv
                             : TryResolveProjectedColumnConverter(mapping, projection.Body));
+                // No converter resolved for a bare scalar projection: a computed body (cond ? c.Col : x,
+                // c.Col + n) that surfaces a converter column in value position would read the raw stored value.
+                if (scalarConverter == null && projection != null)
+                    GuardComputedConverterProjection(projection.Body, mapping);
                 var getter = CreateReaderGetter(targetType, 0, startOffset, scalarConverter);
                 // Only build a default factory for value types (used when DB returns NULL for non-nullable value type)
                 // Reference types (e.g., string) use null! directly.

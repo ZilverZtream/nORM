@@ -72,6 +72,12 @@ namespace nORM.Query
                         {
                             dtoCol.Converter = subConv;
                         }
+                        else
+                        {
+                            // No converter was attached: a computed binding that surfaces a converter column in
+                            // value position (cond ? c.Col : x, c.Col + n, ...) would read the raw stored value.
+                            GuardComputedConverterProjection(ma.Expression, mapping);
+                        }
                         cols.Add(dtoCol);
                     }
                 }
@@ -179,12 +185,14 @@ namespace nORM.Query
                     else if (arg is ConditionalExpression ce)
                     {
                         // (cond ? a : b) translates to CASE WHEN ... END server-side.
+                        GuardComputedConverterProjection(ce, mapping);
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, ce.Type, mapping.Type, mapping.Provider, memberName));
                     }
                     else if (arg is BinaryExpression be)
                     {
                         // Arithmetic / string concat / etc.: project the computed value.
+                        GuardComputedConverterProjection(be, mapping);
                         var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
                         cols.Add(new Column(memberName, be.Type, mapping.Type, mapping.Provider, memberName));
                     }
@@ -229,6 +237,71 @@ namespace nORM.Query
                 return cols.ToArray();
             }
             return mapping.Columns;
+        }
+
+        /// <summary>
+        /// Fails loud when a COMPUTED projection expression surfaces a value-converter column's raw stored
+        /// value. A converter column in VALUE position inside a conditional / arithmetic / cast / method call
+        /// (e.g. <c>cond ? c.Col : x</c>, <c>c.Col + 5</c>, <c>c.Col.ToString()</c>) emits the STORED column in
+        /// SQL, and ConvertFromProvider can't be applied to the mixed computed result — so the value would come
+        /// back as its provider representation (silent-wrong). A converter column in PREDICATE position (a
+        /// comparison such as <c>c.Col == k</c>, or a conditional Test) is bound by the predicate path and is
+        /// NOT flagged. Direct member projections (<c>Select(x => x.Col)</c>) carry the converter and never
+        /// reach here. Throwing prevents data loss; project the column directly and compute client-side.
+        /// </summary>
+        private static void GuardComputedConverterProjection(Expression? arg, TableMapping mapping)
+        {
+            if (SurfacesConverterInValuePosition(arg, valuePosition: true, mapping))
+                throw new NormUnsupportedFeatureException(
+                    "A value-converter column used inside a computed projection (conditional, arithmetic, cast, " +
+                    "or method call) can't be translated: SQL yields the stored representation and " +
+                    "ConvertFromProvider can't be applied to the computed result, so the value would come back " +
+                    "wrong. Project the column directly (e.g. Select(x => x.Col)) and compute the expression " +
+                    "client-side, or materialise the row first.");
+        }
+
+        private static bool SurfacesConverterInValuePosition(Expression? e, bool valuePosition, TableMapping mapping)
+        {
+            switch (e)
+            {
+                case null:
+                    return false;
+                case MemberExpression m:
+                    if (valuePosition && mapping.TryGetColumnForMemberAccess(m, out var col) && col.Converter != null)
+                        return true;
+                    return SurfacesConverterInValuePosition(m.Expression, valuePosition, mapping);
+                case ConditionalExpression c:
+                    // Test is a predicate; the value branches inherit the caller's position.
+                    return SurfacesConverterInValuePosition(c.Test, false, mapping)
+                        || SurfacesConverterInValuePosition(c.IfTrue, valuePosition, mapping)
+                        || SurfacesConverterInValuePosition(c.IfFalse, valuePosition, mapping);
+                case BinaryExpression b:
+                {
+                    var op = b.NodeType;
+                    // Comparisons and boolean logic put their operands in predicate position (the converter is
+                    // bound, not surfaced); arithmetic / coalesce operands surface the value.
+                    var predicateChildren = op is ExpressionType.Equal or ExpressionType.NotEqual
+                        or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                        or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                        or ExpressionType.AndAlso or ExpressionType.OrElse;
+                    var childValue = !predicateChildren && valuePosition;
+                    return SurfacesConverterInValuePosition(b.Left, childValue, mapping)
+                        || SurfacesConverterInValuePosition(b.Right, childValue, mapping);
+                }
+                case UnaryExpression u:
+                    // Boolean NOT is a predicate; Convert / negate surface the operand's value.
+                    var operandValue = u.NodeType != ExpressionType.Not && valuePosition;
+                    return SurfacesConverterInValuePosition(u.Operand, operandValue, mapping);
+                case MethodCallExpression mc:
+                    if (SurfacesConverterInValuePosition(mc.Object, valuePosition, mapping))
+                        return true;
+                    foreach (var a in mc.Arguments)
+                        if (SurfacesConverterInValuePosition(a, valuePosition, mapping))
+                            return true;
+                    return false;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>
