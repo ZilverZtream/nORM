@@ -13,7 +13,8 @@ synchronous `SaveChanges`); see [Sync and Async Policy](sync-policy.md).
 immediately and return the affected row count. No `SaveChangesAsync` call is needed.
 
 ```csharp
-await ctx.InsertAsync(user);      // one INSERT now; user.Id is populated for DB-generated keys
+await ctx.InsertAsync(user);      // one INSERT now; a store-generated key (a plain int Id by
+                                  // convention, or [DatabaseGenerated(Identity)]) is read back onto user
 user.Email = "new@example.com";
 await ctx.UpdateAsync(user);      // one UPDATE now
 await ctx.DeleteAsync(user);      // one DELETE now
