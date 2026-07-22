@@ -3,8 +3,8 @@ namespace nORM.Scaffolding
     internal static partial class ScaffoldSqlServerSkippedObjectDiscovery
     {
         private const string FunctionParameterModesSql = """
-                          COALESCE((
-                              SELECT STRING_AGG(CONCAT(
+                          COALESCE(STUFF((
+                              SELECT ',' + CONCAT(
                                   pa.name, ':',
                                   CASE WHEN pa.parameter_id = 0 THEN 'RETURN' WHEN pa.is_output = 1 THEN 'OUT' ELSE 'IN' END,
                                   ':',
@@ -18,7 +18,7 @@ namespace nORM.Scaffolding
                                       WHEN COALESCE(base_ty.name, ty.name) IN ('nvarchar', 'nchar') THEN CONCAT('(', CASE WHEN pa.max_length = -1 THEN 'max' ELSE CONVERT(varchar(11), pa.max_length / 2) END, ')')
                                       WHEN COALESCE(base_ty.name, ty.name) IN ('decimal', 'numeric') THEN CONCAT('(', pa.precision, ',', pa.scale, ')')
                                       ELSE ''
-                                  END), ',') WITHIN GROUP (ORDER BY pa.parameter_id)
+                                  END)
                               FROM sys.parameters pa
                               INNER JOIN sys.types ty ON pa.user_type_id = ty.user_type_id
                               LEFT JOIN sys.types base_ty
@@ -27,7 +27,8 @@ namespace nORM.Scaffolding
                                AND base_ty.user_type_id = ty.system_type_id
                                AND base_ty.is_user_defined = 0
                               WHERE pa.object_id = o.object_id
-                          ), ''),
+                              ORDER BY pa.parameter_id
+                              FOR XML PATH(''), TYPE).value('.', 'nvarchar(max)'), 1, 1, ''), ''),
             """;
     }
 }

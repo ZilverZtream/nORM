@@ -105,7 +105,11 @@ public partial class ScaffoldingContractDocTests
         Assert.Contains("decimal precision and optional scale", doc, StringComparison.Ordinal);
         Assert.Contains("exclude provider metadata return rows from callable input counts", doc, StringComparison.Ordinal);
         Assert.Contains("p.parameter_mode IS NOT NULL", skippedDiscoverySource, StringComparison.Ordinal);
-        Assert.Contains("WITHIN GROUP (ORDER BY pa.parameter_id)", skippedDiscoverySource, StringComparison.Ordinal);
+        // Parameter modes are aggregated in declaration order via a compat-safe FOR XML PATH
+        // subquery (STRING_AGG ... WITHIN GROUP requires database compatibility level >= 110, so
+        // it cannot be used to scaffold SQL Server databases running at 2008/2012 compat).
+        Assert.Contains("ORDER BY pa.parameter_id", skippedDiscoverySource, StringComparison.Ordinal);
+        Assert.Contains("FOR XML PATH('')", skippedDiscoverySource, StringComparison.Ordinal);
         Assert.Contains("ty.name", sqlServerUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("base_ty.name", sqlServerUnsupportedSource, StringComparison.Ordinal);
         Assert.Contains("p.data_type", skippedDiscoverySource, StringComparison.Ordinal);
