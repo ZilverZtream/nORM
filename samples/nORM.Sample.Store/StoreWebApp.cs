@@ -293,6 +293,42 @@ public static class StoreWebApp
             var result = await StoreScenario.RunAsync(lease.Connection, ProviderSettings.CreateDatabaseProvider(storeProvider.Kind), storeProvider);
             return Results.Ok(result);
         });
+
+        // Multi-store isolation must hold under concurrent load, not just single-threaded. This fans
+        // out many parallel per-tenant contexts (via the factory — the caller-owned path for parallel
+        // work) hammering reads on the active engine, and asserts every context saw ONLY its own
+        // tenant's rows. A single leaked row across any of the parallel requests fails the proof.
+        api.MapPost("/isolation/concurrent-proof", async (StoreContextFactory factory) =>
+        {
+            const int parallelRequests = 32;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var results = new System.Collections.Concurrent.ConcurrentBag<(int tenant, bool ownOnly, int crossTenantId, bool crossReachable)>();
+            await Parallel.ForEachAsync(Enumerable.Range(0, parallelRequests), async (i, ct) =>
+            {
+                var tenant = i % 2 == 0 ? 101 : 202;
+                var foreignProductId = tenant == 101 ? 2000 : 1000; // a product owned by the OTHER tenant
+                await using var ctx = factory.CreateForTenant(tenant, temporal: false);
+                // An isolated context must not surface a single row belonging to another tenant.
+                var foreignProductVisible = await ctx.Query<StoreProduct>().AnyAsync(p => p.TenantId != tenant);
+                var foreignOrderVisible = await ctx.Query<StoreOrder>().AnyAsync(o => o.TenantId != tenant);
+                var ownOnly = !foreignProductVisible && !foreignOrderVisible;
+                // And a direct by-id read of a known other-tenant row must return nothing.
+                var crossReachable = await ctx.Query<StoreProduct>().AnyAsync(p => p.Id == foreignProductId);
+                results.Add((tenant, ownOnly, foreignProductId, crossReachable));
+            });
+            sw.Stop();
+            var all = results.ToList();
+            var bleed = all.Any(r => !r.ownOnly || r.crossReachable);
+            return Results.Ok(new
+            {
+                parallelRequests,
+                tenantARuns = all.Count(r => r.tenant == 101),
+                tenantBRuns = all.Count(r => r.tenant == 202),
+                crossTenantBleed = bleed,
+                isolationHeld = !bleed,
+                elapsedMs = sw.ElapsedMilliseconds
+            });
+        });
     }
 
     /// <summary>Creates schema + seed for an engine so it is ready to serve (startup and on swap).</summary>
