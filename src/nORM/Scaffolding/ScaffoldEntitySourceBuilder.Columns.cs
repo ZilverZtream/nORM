@@ -61,7 +61,7 @@ namespace nORM.Scaffolding
         {
             var colName = row["ColumnName"]!.ToString()!;
             var allowNull = ResolveColumnNullability(entity, row, colName);
-            var isKey = !entity.SuppressWriteMetadata && GetSchemaBoolean(row, "IsKey");
+            var isKey = !entity.SuppressWriteMetadata && IsPrimaryKeyColumn(entity, row, colName);
             var isAuto = !entity.SuppressWriteMetadata
                 && (GetSchemaBoolean(row, "IsAutoIncrement")
                     || entity.IdentityColumns?.Contains(colName) == true);
@@ -118,6 +118,26 @@ namespace nORM.Scaffolding
                 end--;
             return end > 0 && end < name.Length ? name[..end] : name;
         }
+
+        private static bool IsPrimaryKeyColumn(ScaffoldEntitySourceInfo entity, DataRow row, string columnName)
+            => IsDeclaredPrimaryKeyColumn(entity.PrimaryKeyColumns, columnName, GetSchemaBoolean(row, "IsKey"));
+
+        /// <summary>
+        /// Decides whether a column belongs to the entity's key. The authoritative primary-key columns
+        /// (from the PRIMARY KEY constraint) win over the schema table's IsKey flag:
+        /// SqlDataReader.GetSchemaTable reports the best unique row identifier, which for a table whose
+        /// unique clustered index differs from a nonclustered primary key points at the clustered index
+        /// rather than the declared key — marking the wrong columns [Key] and breaking write and
+        /// relationship mapping. The IsKey flag is used only when no primary key was discovered
+        /// (keyless tables and views).
+        /// </summary>
+        internal static bool IsDeclaredPrimaryKeyColumn(
+            IReadOnlyList<string>? primaryKeyColumns,
+            string columnName,
+            bool schemaIsKeyFallback)
+            => primaryKeyColumns is { Count: > 0 } declaredKey
+                ? declaredKey.Contains(columnName, StringComparer.OrdinalIgnoreCase)
+                : schemaIsKeyFallback;
 
         private static bool ResolveColumnNullability(ScaffoldEntitySourceInfo entity, DataRow row, string columnName)
             => entity.NonNullableColumns is not null

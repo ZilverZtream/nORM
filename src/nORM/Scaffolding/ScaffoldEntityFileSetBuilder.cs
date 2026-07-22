@@ -77,6 +77,7 @@ namespace nORM.Scaffolding
             discovery.CommentsByTable.TryGetValue(table.TableKey, out var comments);
             discovery.SqliteDeclaredTypesByTable.TryGetValue(table.TableKey, out var sqliteDeclaredTypes);
             discovery.FeatureConfigurations.ProviderSpecificColumnTypesByTable.TryGetValue(table.TableKey, out var providerSpecificColumnTypes);
+            discovery.PrimaryKeyColumnsByTable.TryGetValue(table.TableKey, out var primaryKeyColumns);
 
             var isQueryArtifact = discovery.QueryArtifactTableKeys.Contains(table.TableKey);
             var isReadOnlyEntity = ScaffoldEntityFileAdapter.ShouldMarkScaffoldedEntityReadOnly(
@@ -109,7 +110,8 @@ namespace nORM.Scaffolding
                 nonNullableColumns,
                 sqliteDeclaredTypes,
                 columnStoreTypes,
-                providerSpecificColumnTypes);
+                providerSpecificColumnTypes,
+                primaryKeyColumns);
         }
 
         private static string TableKey(string? schema, string table)
