@@ -82,6 +82,7 @@ items:
   - nORM.Providers.DatabaseProvider.TranslateJsonPathAccess(System.String,System.String)
   - nORM.Providers.DatabaseProvider.ValidateJsonPath(System.String)
   - nORM.Providers.DatabaseProvider.GetInsertColumns(nORM.Mapping.TableMapping)
+  - nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
   - nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean)
   - nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping,System.Boolean)
   - nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping,System.Boolean)
@@ -2005,6 +2006,13 @@ references:
     name: TableMapping
     href: nORM.Mapping.TableMapping.html
   - name: )
+- uid: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  commentId: P:nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_SupportsConventionKeyStoreGeneration
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: DatabaseProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
 - uid: nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean)
   commentId: M:nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean)
   parent: nORM.Providers.DatabaseProvider

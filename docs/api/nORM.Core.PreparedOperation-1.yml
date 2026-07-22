@@ -21,7 +21,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PreparedOperation
     path: src/nORM/Core/DbContext.PreparedStatements.cs
-    startLine: 495
+    startLine: 530
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -77,7 +77,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteAsync
     path: src/nORM/Core/DbContext.PreparedStatements.cs
-    startLine: 515
+    startLine: 550
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -120,7 +120,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContext.PreparedStatements.cs
-    startLine: 521
+    startLine: 556
   assemblies:
   - nORM
   namespace: nORM.Core

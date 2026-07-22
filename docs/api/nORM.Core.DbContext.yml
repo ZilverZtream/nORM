@@ -584,7 +584,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateCompiledQueryCommandAsync
     path: src/nORM/Core/DbContext.Connection.cs
-    startLine: 583
+    startLine: 589
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -628,7 +628,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteCompiledQueryListAsync
     path: src/nORM/Core/DbContext.Connection.cs
-    startLine: 602
+    startLine: 608
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -682,7 +682,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetCompiledQueryMaterializer
     path: src/nORM/Core/DbContext.Connection.cs
-    startLine: 625
+    startLine: 631
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -733,7 +733,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsHealthyAsync
     path: src/nORM/Core/DbContext.Connection.cs
-    startLine: 657
+    startLine: 663
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -3472,7 +3472,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackToSavepointAsync
     path: src/nORM/Core/DbContext.Transactions.cs
-    startLine: 140
+    startLine: 223
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -3523,7 +3523,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReleaseSavepointAsync
     path: src/nORM/Core/DbContext.Transactions.cs
-    startLine: 174
+    startLine: 262
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -3857,7 +3857,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkInsertAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 851
+    startLine: 917
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -3906,7 +3906,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkUpdateAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 881
+    startLine: 947
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -3953,7 +3953,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkDeleteAsync
     path: src/nORM/Core/DbContext.WriteOperations.cs
-    startLine: 908
+    startLine: 974
   assemblies:
   - nORM
   namespace: nORM.Core

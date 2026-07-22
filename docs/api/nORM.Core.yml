@@ -15,6 +15,7 @@ items:
   - nORM.Core.DbConcurrencyException
   - nORM.Core.DbContext
   - nORM.Core.DbContextTransaction
+  - nORM.Core.DbSet`1
   - nORM.Core.DebugView
   - nORM.Core.EntityEntry
   - nORM.Core.EntityEntryGraphNode
@@ -69,6 +70,7 @@ items:
 references:
 - uid: nORM.Core.AdvancedLinqExtensions
   commentId: T:nORM.Core.AdvancedLinqExtensions
+  parent: nORM.Core
   href: nORM.Core.AdvancedLinqExtensions.html
   name: AdvancedLinqExtensions
   nameWithType: AdvancedLinqExtensions
@@ -197,6 +199,31 @@ references:
   name: DbContextTransaction
   nameWithType: DbContextTransaction
   fullName: nORM.Core.DbContextTransaction
+- uid: nORM.Core.DbSet`1
+  commentId: T:nORM.Core.DbSet`1
+  href: nORM.Core.DbSet-1.html
+  name: DbSet<T>
+  nameWithType: DbSet<T>
+  fullName: nORM.Core.DbSet<T>
+  nameWithType.vb: DbSet(Of T)
+  fullName.vb: nORM.Core.DbSet(Of T)
+  name.vb: DbSet(Of T)
+  spec.csharp:
+  - uid: nORM.Core.DbSet`1
+    name: DbSet
+    href: nORM.Core.DbSet-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.DbSet`1
+    name: DbSet
+    href: nORM.Core.DbSet-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core.DebugView
   commentId: T:nORM.Core.DebugView
   parent: nORM.Core
@@ -447,6 +474,7 @@ references:
   - name: )
 - uid: nORM.Core.NormIncludableQueryableExtensions
   commentId: T:nORM.Core.NormIncludableQueryableExtensions
+  parent: nORM.Core
   href: nORM.Core.NormIncludableQueryableExtensions.html
   name: NormIncludableQueryableExtensions
   nameWithType: NormIncludableQueryableExtensions
@@ -631,6 +659,7 @@ references:
   fullName: nORM.Core.TenantBoundaryDiagnostics
 - uid: nORM.Core.WindowFunctionsExtensions
   commentId: T:nORM.Core.WindowFunctionsExtensions
+  parent: nORM.Core
   href: nORM.Core.WindowFunctionsExtensions.html
   name: WindowFunctionsExtensions
   nameWithType: WindowFunctionsExtensions

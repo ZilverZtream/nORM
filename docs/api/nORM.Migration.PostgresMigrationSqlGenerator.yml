@@ -72,7 +72,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/PostgresMigrationSqlGenerator.cs
-    startLine: 157
+    startLine: 171
   assemblies:
   - nORM
   namespace: nORM.Migration

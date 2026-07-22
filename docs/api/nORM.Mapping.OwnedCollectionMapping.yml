@@ -30,7 +30,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionMapping
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 898
+    startLine: 955
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -71,7 +71,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavigationProperty
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 901
+    startLine: 958
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -102,7 +102,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedType
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 904
+    startLine: 961
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -133,7 +133,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscTable
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 907
+    startLine: 964
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -164,7 +164,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 910
+    startLine: 967
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -195,7 +195,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SchemaName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 913
+    startLine: 970
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -226,7 +226,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeyColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 916
+    startLine: 973
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -257,7 +257,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscForeignKeyColumn
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 919
+    startLine: 976
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -288,7 +288,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Columns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 922
+    startLine: 979
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -319,7 +319,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: KeyColumns
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 925
+    startLine: 982
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -350,7 +350,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionGetter
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 930
+    startLine: 987
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -381,7 +381,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CollectionSetter
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 933
+    startLine: 990
   assemblies:
   - nORM
   namespace: nORM.Mapping

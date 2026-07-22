@@ -172,6 +172,9 @@ items:
   - uid: nORM.Core.DbContextTransaction
     name: DbContextTransaction
     type: Class
+  - uid: nORM.Core.DbSet`1
+    name: DbSet<T>
+    type: Class
   - uid: nORM.Core.DebugView
     name: DebugView
     type: Class

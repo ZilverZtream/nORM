@@ -266,7 +266,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsTimestamp
     path: src/nORM/Mapping/Column.cs
-    startLine: 34
+    startLine: 40
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -297,7 +297,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsShadow
     path: src/nORM/Mapping/Column.cs
-    startLine: 36
+    startLine: 42
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -328,7 +328,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsNullable
     path: src/nORM/Mapping/Column.cs
-    startLine: 38
+    startLine: 44
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -359,7 +359,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeyPrincipalTypeName
     path: src/nORM/Mapping/Column.cs
-    startLine: 40
+    startLine: 46
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -390,7 +390,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Getter
     path: src/nORM/Mapping/Column.cs
-    startLine: 54
+    startLine: 60
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -421,7 +421,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Setter
     path: src/nORM/Mapping/Column.cs
-    startLine: 56
+    startLine: 62
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -452,7 +452,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SetterMethod
     path: src/nORM/Mapping/Column.cs
-    startLine: 58
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -483,7 +483,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converter
     path: src/nORM/Mapping/Column.cs
-    startLine: 60
+    startLine: 66
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -514,7 +514,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/Column.cs
-    startLine: 125
+    startLine: 133
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -588,7 +588,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/Column.cs
-    startLine: 179
+    startLine: 189
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -635,7 +635,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateGetterDelegate
     path: src/nORM/Mapping/Column.cs
-    startLine: 272
+    startLine: 295
   assemblies:
   - nORM
   namespace: nORM.Mapping

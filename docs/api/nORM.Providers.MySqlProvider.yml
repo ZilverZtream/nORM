@@ -68,6 +68,7 @@ items:
   - nORM.Providers.MySqlProvider.MaxSqlLength
   - nORM.Providers.MySqlProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   - nORM.Providers.MySqlProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
+  - nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration
   - nORM.Providers.MySqlProvider.TranslateFunction(System.String,System.Type,System.String[])
   - nORM.Providers.MySqlProvider.TranslateJsonPathAccess(System.String,System.String)
   - nORM.Providers.MySqlProvider.TranslateMethodCall(System.Linq.Expressions.MethodCallExpression,System.String[])
@@ -329,7 +330,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkDeleteAsync
     path: src/nORM/Providers/MySqlProvider.Bulk.cs
-    startLine: 280
+    startLine: 284
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -386,6 +387,43 @@ items:
   nameWithType.vb: MySqlProvider.BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
   fullName.vb: nORM.Providers.MySqlProvider.BulkDeleteAsync(Of T)(nORM.Core.DbContext, nORM.Mapping.TableMapping, System.Collections.Generic.IEnumerable(Of T), System.Threading.CancellationToken)
   name.vb: BulkDeleteAsync(Of T)(DbContext, TableMapping, IEnumerable(Of T), CancellationToken)
+- uid: nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration
+  commentId: P:nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration
+  id: SupportsConventionKeyStoreGeneration
+  parent: nORM.Providers.MySqlProvider
+  langs:
+  - csharp
+  - vb
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: MySqlProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/MySqlProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SupportsConventionKeyStoreGeneration
+    path: src/nORM/Providers/MySqlProvider.cs
+    startLine: 41
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: >-
+    A single-column integer primary key with no explicit value-generation config is store-generated
+
+    (EF Core parity): MySQL realizes it as an AUTO_INCREMENT column, which generates a value when the
+
+    column is omitted and honors an explicitly-supplied non-zero value. See <xref href="nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public override bool SupportsConventionKeyStoreGeneration { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Overrides ReadOnly Property SupportsConventionKeyStoreGeneration As Boolean
+  overridden: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  overload: nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration*
 - uid: nORM.Providers.MySqlProvider.ForceCaseSensitiveStringComparison(System.String)
   commentId: M:nORM.Providers.MySqlProvider.ForceCaseSensitiveStringComparison(System.String)
   id: ForceCaseSensitiveStringComparison(System.String)
@@ -404,7 +442,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForceCaseSensitiveStringComparison
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 43
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -448,7 +486,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetNullSafeConcatSql
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 50
+    startLine: 60
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -492,7 +530,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValuesInsertClause
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 54
+    startLine: 64
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -524,7 +562,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 73
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -561,7 +599,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 86
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -601,7 +639,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 110
+    startLine: 120
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -658,7 +696,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 130
+    startLine: 140
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -709,7 +747,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxSqlLength
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 173
+    startLine: 183
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -741,7 +779,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxParameters
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 178
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -773,7 +811,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Capabilities
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 181
+    startLine: 191
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -808,7 +846,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Escape
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 199
+    startLine: 209
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -854,7 +892,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyPaging
     path: src/nORM/Providers/MySqlProvider.cs
-    startLine: 215
+    startLine: 225
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -6365,6 +6403,35 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
+- uid: nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn
+  commentId: P:nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn
+  name: ConventionGeneratedKeyColumn
+  nameWithType: TableMapping.ConventionGeneratedKeyColumn
+  fullName: nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn
+- uid: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  commentId: P:nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_SupportsConventionKeyStoreGeneration
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: DatabaseProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+- uid: nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration*
+  commentId: Overload:nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration
+  href: nORM.Providers.MySqlProvider.html#nORM_Providers_MySqlProvider_SupportsConventionKeyStoreGeneration
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: MySqlProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration
+- uid: System.Boolean
+  commentId: T:System.Boolean
+  parent: System
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.boolean
+  name: bool
+  nameWithType: bool
+  fullName: bool
+  nameWithType.vb: Boolean
+  fullName.vb: Boolean
+  name.vb: Boolean
 - uid: nORM.Providers.DatabaseProvider.ForceCaseSensitiveStringComparison(System.String)
   commentId: M:nORM.Providers.DatabaseProvider.ForceCaseSensitiveStringComparison(System.String)
   parent: nORM.Providers.DatabaseProvider
@@ -6490,17 +6557,6 @@ references:
   nameWithType.vb: MySqlProvider.New
   fullName.vb: nORM.Providers.MySqlProvider.New
   name.vb: New
-- uid: System.Boolean
-  commentId: T:System.Boolean
-  parent: System
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.boolean
-  name: bool
-  nameWithType: bool
-  fullName: bool
-  nameWithType.vb: Boolean
-  fullName.vb: Boolean
-  name.vb: Boolean
 - uid: System.InvalidOperationException
   commentId: T:System.InvalidOperationException
   isExternal: true

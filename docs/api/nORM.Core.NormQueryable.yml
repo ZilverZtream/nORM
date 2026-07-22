@@ -172,32 +172,36 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Set
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 101
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: >-
-    Creates a queryable source for the specified entity type backed by the provided
+    Returns the <xref href="nORM.Core.DbSet%601" data-throw-if-not-resolved="false"></xref> for the specified entity type — an <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref>
 
-    context. Alias for <xref href="nORM.Core.NormQueryable.Query%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>, provided for parity with the
+    that also exposes the change-tracking write verbs — matching the Entity Framework Core
 
-    Entity Framework Core <code>DbContext.Set&lt;T&gt;()</code> entry point so that existing
+    <code>DbContext.Set&lt;T&gt;()</code> entry point so existing muscle memory works unchanged. Expose it as
 
-    muscle memory works unchanged.
+    a context property (<code>public DbSet&lt;User&gt; Users =&gt; this.Set&lt;User&gt;();</code>) for
+
+    <code>context.Users</code>-style access. Composing LINQ still yields the same query as
+
+    <xref href="nORM.Core.NormQueryable.Query%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>.
   example: []
   syntax:
-    content: 'public static IQueryable<T> Set<T>(this DbContext ctx) where T : class'
+    content: 'public static DbSet<T> Set<T>(this DbContext ctx) where T : class'
     parameters:
     - id: ctx
       type: nORM.Core.DbContext
       description: The <xref href="nORM.Core.DbContext" data-throw-if-not-resolved="false"></xref> that provides access to the database.
     typeParameters:
     - id: T
-      description: The entity type to query.
+      description: The entity type.
     return:
-      type: System.Linq.IQueryable{{T}}
-      description: An <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> to compose and execute queries.
-    content.vb: Public Shared Function [Set](Of T As Class)(ctx As DbContext) As IQueryable(Of T)
+      type: nORM.Core.DbSet{{T}}
+      description: A <xref href="nORM.Core.DbSet%601" data-throw-if-not-resolved="false"></xref> to query and to register add/update/remove intent.
+    content.vb: Public Shared Function [Set](Of T As Class)(ctx As DbContext) As DbSet(Of T)
   overload: nORM.Core.NormQueryable.Set*
   nameWithType.vb: NormQueryable.Set(Of T)(DbContext)
   fullName.vb: nORM.Core.NormQueryable.Set(Of T)(nORM.Core.DbContext)
@@ -576,6 +580,31 @@ references:
   name: Query
   nameWithType: NormQueryable.Query
   fullName: nORM.Core.NormQueryable.Query
+- uid: nORM.Core.DbSet`1
+  commentId: T:nORM.Core.DbSet`1
+  href: nORM.Core.DbSet-1.html
+  name: DbSet<T>
+  nameWithType: DbSet<T>
+  fullName: nORM.Core.DbSet<T>
+  nameWithType.vb: DbSet(Of T)
+  fullName.vb: nORM.Core.DbSet(Of T)
+  name.vb: DbSet(Of T)
+  spec.csharp:
+  - uid: nORM.Core.DbSet`1
+    name: DbSet
+    href: nORM.Core.DbSet-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.DbSet`1
+    name: DbSet
+    href: nORM.Core.DbSet-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
   commentId: M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext)
   href: nORM.Core.NormQueryable.html#nORM_Core_NormQueryable_Query__1_nORM_Core_DbContext_
@@ -617,3 +646,30 @@ references:
   name: Set
   nameWithType: NormQueryable.Set
   fullName: nORM.Core.NormQueryable.Set
+- uid: nORM.Core.DbSet{{T}}
+  commentId: T:nORM.Core.DbSet{``0}
+  parent: nORM.Core
+  definition: nORM.Core.DbSet`1
+  href: nORM.Core.DbSet-1.html
+  name: DbSet<T>
+  nameWithType: DbSet<T>
+  fullName: nORM.Core.DbSet<T>
+  nameWithType.vb: DbSet(Of T)
+  fullName.vb: nORM.Core.DbSet(Of T)
+  name.vb: DbSet(Of T)
+  spec.csharp:
+  - uid: nORM.Core.DbSet`1
+    name: DbSet
+    href: nORM.Core.DbSet-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.DbSet`1
+    name: DbSet
+    href: nORM.Core.DbSet-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )

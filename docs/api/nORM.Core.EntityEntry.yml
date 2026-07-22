@@ -87,7 +87,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Entity
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 62
+    startLine: 94
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -121,7 +121,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsKeySet
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 70
+    startLine: 102
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -159,7 +159,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: State
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 97
+    startLine: 129
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -205,7 +205,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CurrentValues
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 194
+    startLine: 236
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -239,7 +239,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OriginalValues
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 201
+    startLine: 243
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -275,7 +275,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Property
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 210
+    startLine: 252
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -321,7 +321,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Reload
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 222
+    startLine: 264
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -377,7 +377,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReloadAsync
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 231
+    startLine: 273
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -436,7 +436,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDatabaseValues
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 244
+    startLine: 286
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -500,7 +500,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDatabaseValuesAsync
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 253
+    startLine: 295
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -559,7 +559,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Navigation
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 270
+    startLine: 312
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -598,7 +598,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Reference
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 277
+    startLine: 319
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -637,7 +637,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collection
     path: src/nORM/Core/EntityEntry.cs
-    startLine: 284
+    startLine: 326
   assemblies:
   - nORM
   namespace: nORM.Core

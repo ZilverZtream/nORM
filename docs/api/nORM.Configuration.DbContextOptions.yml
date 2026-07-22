@@ -41,6 +41,7 @@ items:
   - nORM.Configuration.DbContextOptions.UseBatchedBulkOps
   - nORM.Configuration.DbContextOptions.UseInMemoryCache
   - nORM.Configuration.DbContextOptions.UsePreciseChangeTracking
+  - nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention
   - nORM.Configuration.DbContextOptions.UseStrictProviderMobility
   - nORM.Configuration.DbContextOptions.UseStrictProviderMobility(nORM.Configuration.ClientEvaluationPolicy)
   - nORM.Configuration.DbContextOptions.Validate
@@ -777,6 +778,50 @@ items:
       type: System.Boolean
     content.vb: Public Property EagerChangeTracking As Boolean
   overload: nORM.Configuration.DbContextOptions.EagerChangeTracking*
+- uid: nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention
+  commentId: P:nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention
+  id: UseStoreGeneratedKeyConvention
+  parent: nORM.Configuration.DbContextOptions
+  langs:
+  - csharp
+  - vb
+  name: UseStoreGeneratedKeyConvention
+  nameWithType: DbContextOptions.UseStoreGeneratedKeyConvention
+  fullName: nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/DbContextOptions.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: UseStoreGeneratedKeyConvention
+    path: src/nORM/Configuration/DbContextOptions.cs
+    startLine: 369
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets or sets whether the store-generated-key convention (EF Core parity) is applied: a
+
+    single-column integer primary key with no explicit value-generation config is treated as
+
+    store-generated (generated when its value is default, honored when non-default) on providers that
+
+    support it. Enabled by default. Set to <code>false</code> to keep such a key entirely client-set — the
+
+    escape hatch for an existing table whose key column is NOT an identity/auto-increment/rowid column,
+
+    or when the application manages all key values itself. Opting out only affects keys that have no
+
+    explicit configuration; <code>[DatabaseGenerated]</code> and fluent <code>ValueGenerated*</code> always win.
+  example: []
+  syntax:
+    content: public bool UseStoreGeneratedKeyConvention { get; set; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Property UseStoreGeneratedKeyConvention As Boolean
+  overload: nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention*
 - uid: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
   commentId: P:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
   id: DefaultTrackingBehavior
@@ -795,7 +840,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultTrackingBehavior
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 364
+    startLine: 375
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -829,7 +874,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ClientEvaluationPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 372
+    startLine: 383
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -867,7 +912,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ProviderMobilityMode
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 391
+    startLine: 402
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -903,7 +948,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommandInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 421
+    startLine: 432
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -937,7 +982,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SaveChangesInterceptors
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 427
+    startLine: 438
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -971,7 +1016,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheProvider
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 434
+    startLine: 445
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1005,7 +1050,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CacheExpiration
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 440
+    startLine: 451
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1039,7 +1084,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clone
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 449
+    startLine: 460
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1077,7 +1122,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseInMemoryCache
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 514
+    startLine: 525
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1113,7 +1158,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseStrictProviderMobility
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 531
+    startLine: 542
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1159,7 +1204,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UseStrictProviderMobility
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 553
+    startLine: 564
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1212,7 +1257,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableNativeTenantSessionContext
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 569
+    startLine: 580
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1253,7 +1298,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableTemporalVersioning
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 581
+    startLine: 592
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1287,7 +1332,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EnableTemporalVersioning
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 593
+    startLine: 604
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1322,7 +1367,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AmbientTransactionPolicy
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 612
+    startLine: 623
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1368,7 +1413,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RequireMatchedRowOccSemantics
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 632
+    startLine: 643
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1424,7 +1469,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GlobalFilters
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 647
+    startLine: 658
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1462,7 +1507,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 657
+    startLine: 668
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1508,7 +1553,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddGlobalFilter
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 674
+    startLine: 685
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1549,7 +1594,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Validate
     path: src/nORM/Configuration/DbContextOptions.cs
-    startLine: 687
+    startLine: 698
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2955,6 +3000,12 @@ references:
   name: EagerChangeTracking
   nameWithType: DbContextOptions.EagerChangeTracking
   fullName: nORM.Configuration.DbContextOptions.EagerChangeTracking
+- uid: nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention*
+  commentId: Overload:nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention
+  href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_UseStoreGeneratedKeyConvention
+  name: UseStoreGeneratedKeyConvention
+  nameWithType: DbContextOptions.UseStoreGeneratedKeyConvention
+  fullName: nORM.Configuration.DbContextOptions.UseStoreGeneratedKeyConvention
 - uid: nORM.Configuration.DbContextOptions.DefaultTrackingBehavior*
   commentId: Overload:nORM.Configuration.DbContextOptions.DefaultTrackingBehavior
   href: nORM.Configuration.DbContextOptions.html#nORM_Configuration_DbContextOptions_DefaultTrackingBehavior

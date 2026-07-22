@@ -9,8 +9,10 @@ items:
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasCollation(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnName(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasColumnType(System.String)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComment(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComputedColumnSql(System.String,System.Boolean)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasConversion(nORM.Mapping.IValueConverter)
+  - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValue(System.Object)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String,System.String)
   - nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
@@ -268,6 +270,55 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String, String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String, String)
   name.vb: HasDefaultValueSql(String, String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValue(System.Object)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValue(System.Object)
+  id: HasDefaultValue(System.Object)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasDefaultValue(object?)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValue(object?)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValue(object?)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasDefaultValue
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 81
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures a literal (CLR-value) column default (EF Core's <code>HasDefaultValue</code>). The value is
+
+    formatted to a provider-correct SQL literal when the migration snapshot is built — a bool default
+
+    emits <code>0</code>/<code>1</code> on SQLite/SQL Server/MySQL and <code>FALSE</code>/<code>TRUE</code> on PostgreSQL, and
+
+    string/date/Guid values are quoted. Like <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder.HasDefaultValueSql(System.String)" data-throw-if-not-resolved="false"></xref> this affects
+
+    migration DDL only; it does not mark the property database-generated or omit it from INSERT.
+
+    Mutually exclusive with <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder.HasDefaultValueSql(System.String)" data-throw-if-not-resolved="false"></xref> (the last one called wins).
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasDefaultValue(object? value)
+    parameters:
+    - id: value
+      type: System.Object
+      description: The literal default value, or <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/null">null</a> for an explicit <code>DEFAULT NULL</code>.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasDefaultValue(value As Object) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValue*
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValue(Object)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValue(Object)
+  name.vb: HasDefaultValue(Object)
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions(System.Int64,System.Int64)
   id: HasIdentityOptions(System.Int64,System.Int64)
@@ -286,7 +337,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasIdentityOptions
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 76
+    startLine: 92
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -329,7 +380,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasMaxLength
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 90
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -377,7 +428,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsRequired
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 104
+    startLine: 120
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -422,7 +473,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValueGeneratedOnAdd
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 116
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -460,7 +511,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValueGeneratedNever
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 127
+    startLine: 143
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -496,7 +547,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValueGeneratedOnAddOrUpdate
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 139
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -534,7 +585,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsRowVersion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 152
+    startLine: 168
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -574,7 +625,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasColumnType
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 167
+    startLine: 183
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -605,6 +656,57 @@ items:
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType(String)
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType(String)
   name.vb: HasColumnType(String)
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComment(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComment(System.String)
+  id: HasComment(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  langs:
+  - csharp
+  - vb
+  name: HasComment(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasComment(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasComment(string)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: HasComment
+    path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
+    startLine: 199
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Configures a human-readable comment for the column (EF Core's <code>HasComment</code>). Each provider's
+
+    migration generator emits it with its native mechanism: an inline block comment (SQLite), an inline
+
+    <code>COMMENT</code> clause (MySQL), a <code>COMMENT ON COLUMN</code> statement (PostgreSQL), or
+
+    <code>sp_addextendedproperty</code> (SQL Server). The comment is schema metadata only and does not affect
+
+    runtime insert/update/query behavior.
+  example: []
+  syntax:
+    content: public EntityTypeBuilder<TEntity>.PropertyBuilder HasComment(string comment)
+    parameters:
+    - id: comment
+      type: System.String
+      description: The column comment.
+    return:
+      type: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+      description: This <xref href="nORM.Configuration.EntityTypeBuilder%601.PropertyBuilder" data-throw-if-not-resolved="false"></xref> instance for further chaining.
+    content.vb: Public Function HasComment(comment As String) As EntityTypeBuilder(Of TEntity).PropertyBuilder
+  overload: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComment*
+  exceptions:
+  - type: System.ArgumentException
+    commentId: T:System.ArgumentException
+    description: Thrown when <code class="paramref">comment</code> is null or whitespace.
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComment(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComment(String)
+  name.vb: HasComment(String)
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode(System.Boolean)
   id: IsUnicode(System.Boolean)
@@ -623,7 +725,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsUnicode
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 179
+    startLine: 211
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -665,7 +767,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsFixedLength
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 191
+    startLine: 223
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -707,7 +809,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 204
+    startLine: 236
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -752,7 +854,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasPrecision
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 218
+    startLine: 250
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -800,7 +902,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasCollation
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 232
+    startLine: 264
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -847,7 +949,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasComputedColumnSql
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 247
+    startLine: 279
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -897,7 +999,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasConversion
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 259
+    startLine: 291
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -938,7 +1040,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Builder
     path: src/nORM/Configuration/EntityTypeBuilder.PropertyBuilders.cs
-    startLine: 269
+    startLine: 301
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -2046,6 +2148,45 @@ references:
   fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  commentId: M:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+  parent: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder
+  isExternal: true
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  name: HasDefaultValueSql(string)
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string)
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValueSql(string)
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValueSql(String)
+  name.vb: HasDefaultValueSql(String)
+  spec.csharp:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+    name: HasDefaultValueSql
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  - name: (
+  - uid: System.String
+    name: string
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+  spec.vb:
+  - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValueSql(System.String)
+    name: HasDefaultValueSql
+    href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValueSql_System_String_
+  - name: (
+  - uid: System.String
+    name: String
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.string
+  - name: )
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValue*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasDefaultValue
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasDefaultValue_System_Object_
+  name: HasDefaultValue
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValue
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasDefaultValue
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValue
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasDefaultValue
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasIdentityOptions
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasIdentityOptions_System_Int64_System_Int64_
@@ -2150,6 +2291,14 @@ references:
   fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasColumnType
   nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType
   fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasColumnType
+- uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComment*
+  commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.HasComment
+  href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_HasComment_System_String_
+  name: HasComment
+  nameWithType: EntityTypeBuilder<TEntity>.PropertyBuilder.HasComment
+  fullName: nORM.Configuration.EntityTypeBuilder<TEntity>.PropertyBuilder.HasComment
+  nameWithType.vb: EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComment
+  fullName.vb: nORM.Configuration.EntityTypeBuilder(Of TEntity).PropertyBuilder.HasComment
 - uid: nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode*
   commentId: Overload:nORM.Configuration.EntityTypeBuilder`1.PropertyBuilder.IsUnicode
   href: nORM.Configuration.EntityTypeBuilder-1.PropertyBuilder.html#nORM_Configuration_EntityTypeBuilder_1_PropertyBuilder_IsUnicode_System_Boolean_

@@ -151,7 +151,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CommitAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 68
+    startLine: 74
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -194,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Rollback
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 96
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -229,7 +229,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 118
+    startLine: 127
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -270,7 +270,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateSavepointAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 147
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -314,7 +314,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RollbackToSavepointAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 160
+    startLine: 169
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -358,7 +358,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ReleaseSavepointAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 174
+    startLine: 183
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -404,7 +404,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Dispose
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 184
+    startLine: 193
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -437,7 +437,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DisposeAsync
     path: src/nORM/Core/DbContextTransaction.cs
-    startLine: 195
+    startLine: 207
   assemblies:
   - nORM
   namespace: nORM.Core

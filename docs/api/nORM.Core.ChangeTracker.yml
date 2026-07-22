@@ -156,7 +156,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DebugView
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 510
+    startLine: 532
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -194,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DetectChanges
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 568
+    startLine: 590
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -231,7 +231,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: HasChanges
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 584
+    startLine: 606
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -266,7 +266,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AcceptAllChanges
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 600
+    startLine: 622
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -303,7 +303,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Clear
     path: src/nORM/Core/ChangeTracker.cs
-    startLine: 742
+    startLine: 764
   assemblies:
   - nORM
   namespace: nORM.Core

@@ -141,7 +141,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CurrentValue
     path: src/nORM/Core/NavigationEntry.cs
-    startLine: 49
+    startLine: 53
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -172,7 +172,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: LoadAsync
     path: src/nORM/Core/NavigationEntry.cs
-    startLine: 62
+    startLine: 66
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -226,7 +226,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Load
     path: src/nORM/Core/NavigationEntry.cs
-    startLine: 72
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Core

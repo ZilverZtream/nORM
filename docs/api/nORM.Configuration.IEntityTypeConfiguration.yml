@@ -9,9 +9,11 @@ items:
   - nORM.Configuration.IEntityTypeConfiguration.Collations
   - nORM.Configuration.IEntityTypeConfiguration.ColumnNames
   - nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
+  - nORM.Configuration.IEntityTypeConfiguration.Comments
   - nORM.Configuration.IEntityTypeConfiguration.ComputedColumnSql
   - nORM.Configuration.IEntityTypeConfiguration.Converters
   - nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
+  - nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals
   - nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
   - nORM.Configuration.IEntityTypeConfiguration.ExpressionIndexes
   - nORM.Configuration.IEntityTypeConfiguration.FixedLengthSettings
@@ -324,6 +326,42 @@ items:
       type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
     content.vb: ReadOnly Property DefaultValueSql As IReadOnlyDictionary(Of PropertyInfo, String)
   overload: nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql*
+- uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals
+  id: DefaultValueLiterals
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: DefaultValueLiterals
+  nameWithType: IEntityTypeConfiguration.DefaultValueLiterals
+  fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: DefaultValueLiterals
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 65
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets literal (CLR-value) column defaults configured via <code>HasDefaultValue</code>. Each value is
+
+    formatted to a provider-correct SQL literal when the migration snapshot is built. Mutually
+
+    exclusive with <xref href="nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql" data-throw-if-not-resolved="false"></xref> for a given property (last configured wins).
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, object?> DefaultValueLiterals { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Object}
+    content.vb: ReadOnly Property DefaultValueLiterals As IReadOnlyDictionary(Of PropertyInfo, Object)
+  overload: nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals*
 - uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
   id: DefaultValueConstraintNames
@@ -342,7 +380,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DefaultValueConstraintNames
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 64
+    startLine: 71
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -376,7 +414,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IdentityOptions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 69
+    startLine: 76
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -407,7 +445,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxLengths
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 74
+    startLine: 81
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -438,7 +476,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RequiredSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 80
+    startLine: 87
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -472,7 +510,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ValueGeneratedSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 86
+    startLine: 93
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -506,7 +544,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RowVersionSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 92
+    startLine: 99
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -540,7 +578,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ColumnTypes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 98
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -556,6 +594,40 @@ items:
       type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
     content.vb: ReadOnly Property ColumnTypes As IReadOnlyDictionary(Of PropertyInfo, String)
   overload: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes*
+- uid: nORM.Configuration.IEntityTypeConfiguration.Comments
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.Comments
+  id: Comments
+  parent: nORM.Configuration.IEntityTypeConfiguration
+  langs:
+  - csharp
+  - vb
+  name: Comments
+  nameWithType: IEntityTypeConfiguration.Comments
+  fullName: nORM.Configuration.IEntityTypeConfiguration.Comments
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Comments
+    path: src/nORM/Configuration/IEntityTypeConfiguration.cs
+    startLine: 111
+  assemblies:
+  - nORM
+  namespace: nORM.Configuration
+  summary: >-
+    Gets human-readable column comments configured via the fluent API (HasComment). Each provider's
+
+    migration generator emits them using its native comment mechanism.
+  example: []
+  syntax:
+    content: IReadOnlyDictionary<PropertyInfo, string> Comments { get; }
+    parameters: []
+    return:
+      type: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.String}
+    content.vb: ReadOnly Property Comments As IReadOnlyDictionary(Of PropertyInfo, String)
+  overload: nORM.Configuration.IEntityTypeConfiguration.Comments*
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   commentId: P:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   id: UnicodeSettings
@@ -574,7 +646,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UnicodeSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 103
+    startLine: 116
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -605,7 +677,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FixedLengthSettings
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 108
+    startLine: 121
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -636,7 +708,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Precisions
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 113
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -667,7 +739,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Collations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 119
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -701,7 +773,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CheckConstraints
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 124
+    startLine: 137
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -732,7 +804,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ComputedColumnSql
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 129
+    startLine: 142
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -763,7 +835,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExpressionIndexes
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 134
+    startLine: 147
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -794,7 +866,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TableSplitWith
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 139
+    startLine: 152
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -825,7 +897,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 144
+    startLine: 157
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -856,7 +928,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ShadowProperties
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 149
+    startLine: 162
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -887,7 +959,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 154
+    startLine: 167
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -918,7 +990,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Converters
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 157
+    startLine: 170
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -949,7 +1021,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OwnedCollectionNavigations
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 163
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -983,7 +1055,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ManyToManyRelationships
     path: src/nORM/Configuration/IEntityTypeConfiguration.cs
-    startLine: 168
+    startLine: 181
   assemblies:
   - nORM
   namespace: nORM.Configuration
@@ -1987,6 +2059,65 @@ references:
   name: DefaultValueSql
   nameWithType: IEntityTypeConfiguration.DefaultValueSql
   fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
+- uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
+  commentId: P:nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_DefaultValueSql
+  name: DefaultValueSql
+  nameWithType: IEntityTypeConfiguration.DefaultValueSql
+  fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueSql
+- uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_DefaultValueLiterals
+  name: DefaultValueLiterals
+  nameWithType: IEntityTypeConfiguration.DefaultValueLiterals
+  fullName: nORM.Configuration.IEntityTypeConfiguration.DefaultValueLiterals
+- uid: System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Object}
+  commentId: T:System.Collections.Generic.IReadOnlyDictionary{System.Reflection.PropertyInfo,System.Object}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IReadOnlyDictionary`2
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  name: IReadOnlyDictionary<PropertyInfo, object>
+  nameWithType: IReadOnlyDictionary<PropertyInfo, object>
+  fullName: System.Collections.Generic.IReadOnlyDictionary<System.Reflection.PropertyInfo, object>
+  nameWithType.vb: IReadOnlyDictionary(Of PropertyInfo, Object)
+  fullName.vb: System.Collections.Generic.IReadOnlyDictionary(Of System.Reflection.PropertyInfo, Object)
+  name.vb: IReadOnlyDictionary(Of PropertyInfo, Object)
+  spec.csharp:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: <
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IReadOnlyDictionary`2
+    name: IReadOnlyDictionary
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Reflection.PropertyInfo
+    name: PropertyInfo
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.reflection.propertyinfo
+  - name: ','
+  - name: " "
+  - uid: System.Object
+    name: Object
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.object
+  - name: )
 - uid: nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.DefaultValueConstraintNames
   href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_DefaultValueConstraintNames
@@ -2278,6 +2409,12 @@ references:
   name: ColumnTypes
   nameWithType: IEntityTypeConfiguration.ColumnTypes
   fullName: nORM.Configuration.IEntityTypeConfiguration.ColumnTypes
+- uid: nORM.Configuration.IEntityTypeConfiguration.Comments*
+  commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.Comments
+  href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_Comments
+  name: Comments
+  nameWithType: IEntityTypeConfiguration.Comments
+  fullName: nORM.Configuration.IEntityTypeConfiguration.Comments
 - uid: nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings*
   commentId: Overload:nORM.Configuration.IEntityTypeConfiguration.UnicodeSettings
   href: nORM.Configuration.IEntityTypeConfiguration.html#nORM_Configuration_IEntityTypeConfiguration_UnicodeSettings

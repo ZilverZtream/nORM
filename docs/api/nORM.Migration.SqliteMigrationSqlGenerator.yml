@@ -76,7 +76,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GenerateSql
     path: src/nORM/Migration/SqliteMigrationSqlGenerator.cs
-    startLine: 200
+    startLine: 218
   assemblies:
   - nORM
   namespace: nORM.Migration

@@ -28,7 +28,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormIncludableQueryableExtensions
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 510
+    startLine: 512
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -90,7 +90,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Include
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 530
+    startLine: 532
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -154,7 +154,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTracking
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 564
+    startLine: 566
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -207,7 +207,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTrackingWithIdentityResolution
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 585
+    startLine: 587
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -254,7 +254,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsTracking
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 609
+    startLine: 611
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -328,7 +328,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsSplitQuery
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 639
+    startLine: 641
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -377,7 +377,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IgnoreQueryFilters
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 665
+    startLine: 667
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -458,7 +458,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: TagWith
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 697
+    startLine: 699
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -533,7 +533,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 727
+    startLine: 729
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -582,7 +582,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ThenInclude
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 750
+    startLine: 752
   assemblies:
   - nORM
   namespace: nORM.Core

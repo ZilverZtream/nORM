@@ -91,15 +91,17 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// Creates a queryable source for the specified entity type backed by the provided
-        /// context. Alias for <see cref="Query{T}(DbContext)"/>, provided for parity with the
-        /// Entity Framework Core <c>DbContext.Set&lt;T&gt;()</c> entry point so that existing
-        /// muscle memory works unchanged.
+        /// Returns the <see cref="DbSet{T}"/> for the specified entity type — an <see cref="IQueryable{T}"/>
+        /// that also exposes the change-tracking write verbs — matching the Entity Framework Core
+        /// <c>DbContext.Set&lt;T&gt;()</c> entry point so existing muscle memory works unchanged. Expose it as
+        /// a context property (<c>public DbSet&lt;User&gt; Users =&gt; this.Set&lt;User&gt;();</c>) for
+        /// <c>context.Users</c>-style access. Composing LINQ still yields the same query as
+        /// <see cref="Query{T}(DbContext)"/>.
         /// </summary>
-        /// <typeparam name="T">The entity type to query.</typeparam>
+        /// <typeparam name="T">The entity type.</typeparam>
         /// <param name="ctx">The <see cref="DbContext"/> that provides access to the database.</param>
-        /// <returns>An <see cref="IQueryable{T}"/> to compose and execute queries.</returns>
-        public static IQueryable<T> Set<T>(this DbContext ctx) where T : class => ctx.Query<T>();
+        /// <returns>A <see cref="DbSet{T}"/> to query and to register add/update/remove intent.</returns>
+        public static DbSet<T> Set<T>(this DbContext ctx) where T : class => new(ctx);
     }
 
     /// <summary>

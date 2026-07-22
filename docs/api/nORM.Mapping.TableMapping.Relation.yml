@@ -32,7 +32,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Relation
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -76,7 +76,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -123,7 +123,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NavProp
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -154,7 +154,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DependentType
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -185,7 +185,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -216,7 +216,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKey
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -247,7 +247,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CascadeDelete
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 846
+    startLine: 903
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -278,7 +278,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: PrincipalKeys
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 849
+    startLine: 906
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -309,7 +309,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForeignKeys
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 852
+    startLine: 909
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -340,7 +340,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnDelete
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 855
+    startLine: 912
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -371,7 +371,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: OnUpdate
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 858
+    startLine: 915
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -402,7 +402,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ConstraintName
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 861
+    startLine: 918
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -433,7 +433,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: IsComposite
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 864
+    startLine: 921
   assemblies:
   - nORM
   namespace: nORM.Mapping
@@ -464,7 +464,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Mapping/TableMapping.cs
-    startLine: 867
+    startLine: 924
   assemblies:
   - nORM
   namespace: nORM.Mapping

@@ -434,6 +434,20 @@ M:nORM.Core.DbContextTransaction.ReleaseSavepointAsync(System.String,System.Thre
 M:nORM.Core.DbContextTransaction.Rollback():System.Void
 M:nORM.Core.DbContextTransaction.RollbackAsync(System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Core.DbContextTransaction.RollbackToSavepointAsync(System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
+M:nORM.Core.DbSet{`0}.Add(`0):nORM.Core.EntityEntry
+M:nORM.Core.DbSet{`0}.AddAsync(`0,System.Threading.CancellationToken):System.Threading.Tasks.ValueTask{nORM.Core.EntityEntry}
+M:nORM.Core.DbSet{`0}.AddRange(System.Collections.Generic.IEnumerable{`0}):System.Void
+M:nORM.Core.DbSet{`0}.AddRange(`0[]):System.Void
+M:nORM.Core.DbSet{`0}.Attach(`0):nORM.Core.EntityEntry
+M:nORM.Core.DbSet{`0}.Find(System.Object[]):`0
+M:nORM.Core.DbSet{`0}.FindAsync(System.Object[]):System.Threading.Tasks.ValueTask{`0}
+M:nORM.Core.DbSet{`0}.FindAsync(System.Object[],System.Threading.CancellationToken):System.Threading.Tasks.ValueTask{`0}
+M:nORM.Core.DbSet{`0}.GetEnumerator():System.Collections.Generic.IEnumerator{`0}
+M:nORM.Core.DbSet{`0}.Remove(`0):nORM.Core.EntityEntry
+M:nORM.Core.DbSet{`0}.RemoveRange(System.Collections.Generic.IEnumerable{`0}):System.Void
+M:nORM.Core.DbSet{`0}.RemoveRange(`0[]):System.Void
+M:nORM.Core.DbSet{`0}.Update(`0):nORM.Core.EntityEntry
+M:nORM.Core.DbSet{`0}.UpdateRange(System.Collections.Generic.IEnumerable{`0}):System.Void
 M:nORM.Core.DebugView.ToString():System.String
 M:nORM.Core.EntityEntry.Collection(System.String):nORM.Core.NavigationEntry
 M:nORM.Core.EntityEntry.GetDatabaseValues():nORM.Core.PropertyValues
@@ -533,7 +547,7 @@ M:nORM.Core.NormMemoryCacheProvider.Set``1(System.String,`0,System.TimeSpan,Syst
 M:nORM.Core.NormMemoryCacheProvider.TryGet``1(System.String,`0&):System.Boolean
 M:nORM.Core.NormQueryException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
 M:nORM.Core.NormQueryable.Query``1(nORM.Core.DbContext):System.Linq.IQueryable{`0}
-M:nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext):System.Linq.IQueryable{`0}
+M:nORM.Core.NormQueryable.Set``1(nORM.Core.DbContext):nORM.Core.DbSet{`0}
 M:nORM.Core.NormQueryable.ToQueryString``1(System.Linq.IQueryable{`0}):System.String
 M:nORM.Core.NormTimeoutException.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object},System.Exception)
 M:nORM.Core.NormUnsupportedFeatureException.#ctor(System.String,System.Exception)
@@ -1319,6 +1333,9 @@ P:nORM.Core.DbContext.Database:nORM.Core.DatabaseFacade
 P:nORM.Core.DbContext.Options:nORM.Configuration.DbContextOptions
 P:nORM.Core.DbContext.Provider:nORM.Providers.DatabaseProvider
 P:nORM.Core.DbContextTransaction.Transaction:System.Data.Common.DbTransaction
+P:nORM.Core.DbSet{`0}.ElementType:System.Type
+P:nORM.Core.DbSet{`0}.Expression:System.Linq.Expressions.Expression
+P:nORM.Core.DbSet{`0}.Provider:System.Linq.IQueryProvider
 P:nORM.Core.DebugView.LongView:System.String
 P:nORM.Core.DebugView.ShortView:System.String
 P:nORM.Core.EntityEntry.CurrentValues:nORM.Core.PropertyValues
@@ -1725,6 +1742,7 @@ T:nORM.Core.DatabaseTopology.DatabaseRole
 T:nORM.Core.DbConcurrencyException
 T:nORM.Core.DbContext
 T:nORM.Core.DbContextTransaction
+T:nORM.Core.DbSet{`0}
 T:nORM.Core.DebugView
 T:nORM.Core.EntityEntry
 T:nORM.Core.EntityEntryGraphNode

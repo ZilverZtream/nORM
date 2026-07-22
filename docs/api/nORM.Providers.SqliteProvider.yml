@@ -74,6 +74,7 @@ items:
   - nORM.Providers.SqliteProvider.ReleaseSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   - nORM.Providers.SqliteProvider.RollbackToSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken)
   - nORM.Providers.SqliteProvider.StoredProcedureCommandType
+  - nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration
   - nORM.Providers.SqliteProvider.SupportsNativeOrderedStringAggregate
   - nORM.Providers.SqliteProvider.TranslateFunction(System.String,System.Type,System.String[])
   - nORM.Providers.SqliteProvider.TranslateJsonPathAccess(System.String,System.String)
@@ -658,6 +659,45 @@ items:
     content.vb: Public Overrides ReadOnly Property MaxParameters As Integer
   overridden: nORM.Providers.DatabaseProvider.MaxParameters
   overload: nORM.Providers.SqliteProvider.MaxParameters*
+- uid: nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration
+  commentId: P:nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration
+  id: SupportsConventionKeyStoreGeneration
+  parent: nORM.Providers.SqliteProvider
+  langs:
+  - csharp
+  - vb
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: SqliteProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration
+  type: Property
+  source:
+    remote:
+      path: src/nORM/Providers/SqliteProvider.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SupportsConventionKeyStoreGeneration
+    path: src/nORM/Providers/SqliteProvider.cs
+    startLine: 83
+  assemblies:
+  - nORM
+  namespace: nORM.Providers
+  summary: >-
+    SQLite generates a single-column INTEGER primary key from the rowid when the column is omitted
+
+    on INSERT, and honors an explicitly-supplied value — exactly the store-generated-key convention
+
+    (EF Core parity). Enabled so a plain <code>int Id</code> primary key with no <code>[DatabaseGenerated]</code>
+
+    annotation is store-generated when default and honored when set. See <xref href="nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn" data-throw-if-not-resolved="false"></xref>.
+  example: []
+  syntax:
+    content: public override bool SupportsConventionKeyStoreGeneration { get; }
+    parameters: []
+    return:
+      type: System.Boolean
+    content.vb: Public Overrides ReadOnly Property SupportsConventionKeyStoreGeneration As Boolean
+  overridden: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  overload: nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration*
 - uid: nORM.Providers.SqliteProvider.Capabilities
   commentId: P:nORM.Providers.SqliteProvider.Capabilities
   id: Capabilities
@@ -676,7 +716,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Capabilities
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 87
+    startLine: 95
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -711,7 +751,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Escape
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 106
+    startLine: 114
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -759,7 +799,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ParameterPrefixChar
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 118
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -791,7 +831,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: StoredProcedureCommandType
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 123
+    startLine: 131
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -823,7 +863,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetConcatSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 128
+    startLine: 136
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -862,7 +902,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetNullSafeConcatSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 134
+    startLine: 142
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -904,7 +944,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetToStringSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 141
+    startLine: 149
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -941,7 +981,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForceCaseSensitiveStringComparison
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 144
+    startLine: 152
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -985,7 +1025,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetBitwiseXorSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 147
+    startLine: 155
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1024,7 +1064,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormalizeDateTimeForCompare
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 157
+    startLine: 165
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1072,7 +1112,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormalizeDecimalForCompare
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 165
+    startLine: 173
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1116,7 +1156,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormalizeTimeSpanForCompare
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 219
+    startLine: 227
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1160,7 +1200,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: NormalizeDateTimeOffsetForCompare
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 228
+    startLine: 236
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1204,7 +1244,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FormatFixedDecimalSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 280
+    startLine: 288
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1246,7 +1286,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FormatDateUsingDotNetPattern
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 289
+    startLine: 297
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1292,7 +1332,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddSecondsToDateTimeSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 302
+    startLine: 310
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1338,7 +1378,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeOffsetWithOffsetSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 356
+    startLine: 364
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1386,7 +1426,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeOffsetLocalDateTimeSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 367
+    startLine: 375
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1440,7 +1480,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeOffsetUtcEpochSecondsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 397
+    startLine: 405
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1484,7 +1524,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeSpanColumnSecondsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 415
+    startLine: 423
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1537,7 +1577,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddTimeSpanColumnToDateTimeSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 429
+    startLine: 437
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1585,7 +1625,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddTimeSpanColumnToDateTimeOffsetSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 446
+    startLine: 454
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1641,7 +1681,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddDaysToDateOnlySql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 463
+    startLine: 471
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1680,7 +1720,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetStringAggregateSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 467
+    startLine: 475
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1719,7 +1759,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SupportsNativeOrderedStringAggregate
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 477
+    startLine: 485
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1760,7 +1800,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetRegexMatchSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 486
+    startLine: 494
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1808,7 +1848,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetRegexReplaceSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 494
+    startLine: 502
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1854,7 +1894,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddMonthsToDateOnlySql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 512
+    startLine: 520
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1893,7 +1933,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddYearsToDateOnlySql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 516
+    startLine: 524
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1932,7 +1972,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddSecondsToTimeOnlySql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 524
+    startLine: 532
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1976,7 +2016,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddTimeSpanColumnToTimeOnlySql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 532
+    startLine: 540
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2022,7 +2062,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetRealCastSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 540
+    startLine: 548
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2061,7 +2101,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetInsertOrIgnoreSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 543
+    startLine: 551
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2106,7 +2146,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BuildSimpleSelect
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 553
+    startLine: 561
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2151,7 +2191,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InitializeConnectionAsync
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 571
+    startLine: 579
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2189,7 +2229,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: InitializeConnection
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 584
+    startLine: 592
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2222,7 +2262,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyPaging
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 674
+    startLine: 682
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2270,7 +2310,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetIdentityRetrievalString
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 700
+    startLine: 708
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2306,7 +2346,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateParameter
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 715
+    startLine: 728
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2348,7 +2388,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeDifferenceSecondsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 731
+    startLine: 744
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2398,7 +2438,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeFromPartsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 740
+    startLine: 753
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2446,7 +2486,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeFromPartsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 745
+    startLine: 758
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2493,7 +2533,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeFromPartsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 753
+    startLine: 766
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2545,7 +2585,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateOnlyFromPartsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 758
+    startLine: 771
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2586,7 +2626,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeOnlyFromPartsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 762
+    startLine: 775
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2627,7 +2667,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeOnlyFromPartsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 766
+    startLine: 779
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2670,7 +2710,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeOnlyDifferenceSecondsSql
     path: src/nORM/Providers/SqliteProvider.cs
-    startLine: 776
+    startLine: 789
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -7728,6 +7768,24 @@ references:
   name: MaxParameters
   nameWithType: SqliteProvider.MaxParameters
   fullName: nORM.Providers.SqliteProvider.MaxParameters
+- uid: nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn
+  commentId: P:nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn
+  name: ConventionGeneratedKeyColumn
+  nameWithType: TableMapping.ConventionGeneratedKeyColumn
+  fullName: nORM.Mapping.TableMapping.ConventionGeneratedKeyColumn
+- uid: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  commentId: P:nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_SupportsConventionKeyStoreGeneration
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: DatabaseProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+- uid: nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration*
+  commentId: Overload:nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration
+  href: nORM.Providers.SqliteProvider.html#nORM_Providers_SqliteProvider_SupportsConventionKeyStoreGeneration
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: SqliteProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration
 - uid: nORM.Providers.DatabaseProvider.Capabilities
   commentId: P:nORM.Providers.DatabaseProvider.Capabilities
   parent: nORM.Providers.DatabaseProvider

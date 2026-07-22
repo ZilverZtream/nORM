@@ -34,7 +34,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 113
+    startLine: 115
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -91,7 +91,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Include
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 120
+    startLine: 122
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -131,7 +131,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTracking
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 123
+    startLine: 125
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -163,7 +163,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTrackingWithIdentityResolution
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 130
+    startLine: 132
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -200,7 +200,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsSplitQuery
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 137
+    startLine: 139
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -237,7 +237,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsAsyncEnumerable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 140
+    startLine: 142
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -272,7 +272,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 143
+    startLine: 145
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -307,7 +307,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToArrayAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 146
+    startLine: 148
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -342,7 +342,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 149
+    startLine: 151
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -377,7 +377,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AnyAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 152
+    startLine: 154
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -412,7 +412,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 155
+    startLine: 157
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -447,7 +447,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstOrDefaultAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 158
+    startLine: 160
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -482,7 +482,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 161
+    startLine: 163
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -517,7 +517,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleOrDefaultAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 164
+    startLine: 166
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -552,7 +552,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteDeleteAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 167
+    startLine: 169
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -587,7 +587,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteUpdateAsync
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 170
+    startLine: 172
   assemblies:
   - nORM
   namespace: nORM.Core

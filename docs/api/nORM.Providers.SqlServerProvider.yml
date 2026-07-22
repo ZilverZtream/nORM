@@ -123,6 +123,7 @@ items:
   - nORM.Providers.DatabaseProvider.NullSafeEqual(System.String,System.String)
   - nORM.Providers.DatabaseProvider.NullSafeNotEqual(System.String,System.String)
   - nORM.Providers.DatabaseProvider.GetDateTimeOffsetFromPartsSql(System.String,System.String,System.String,System.String,System.String,System.String,System.TimeSpan)
+  - nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
   - nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean)
   - nORM.Providers.DatabaseProvider.BuildUpdate(nORM.Mapping.TableMapping,System.Boolean)
   - nORM.Providers.DatabaseProvider.BuildDelete(nORM.Mapping.TableMapping,System.Boolean)
@@ -325,7 +326,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BulkDeleteAsync
     path: src/nORM/Providers/SqlServerProvider.Bulk.cs
-    startLine: 215
+    startLine: 219
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -434,7 +435,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UsesFetchOffsetPaging
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 66
+    startLine: 87
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -466,7 +467,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ForceCaseSensitiveStringComparison
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 103
+    startLine: 124
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -510,7 +511,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 109
+    startLine: 130
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -541,7 +542,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: .ctor
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 123
+    startLine: 144
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -585,7 +586,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxSqlLength
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 139
+    startLine: 160
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -627,7 +628,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: MaxParameters
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 144
+    startLine: 165
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -659,7 +660,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Capabilities
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 147
+    startLine: 168
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -694,7 +695,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Escape
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 167
+    startLine: 188
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -740,7 +741,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: BuildCorrelatedTopOneSubquery
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 187
+    startLine: 208
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -788,7 +789,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ApplyPaging
     path: src/nORM/Providers/SqlServerProvider.cs
-    startLine: 228
+    startLine: 249
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1106,7 +1107,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetToStringSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 50
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1143,7 +1144,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetBoolCastSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 53
+    startLine: 55
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1180,7 +1181,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FormatFixedDecimalSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 60
+    startLine: 62
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1224,7 +1225,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FormatDateUsingDotNetPattern
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 70
+    startLine: 72
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1272,7 +1273,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddSecondsToDateTimeSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 77
+    startLine: 79
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1311,7 +1312,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetCharCodeSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 81
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1348,7 +1349,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddTimeSpanColumnToDateTimeSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 87
+    startLine: 89
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1392,7 +1393,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeSpanColumnSecondsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 98
+    startLine: 100
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1434,7 +1435,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeOffsetWithOffsetSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 106
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1478,7 +1479,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeOffsetLocalDateTimeSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 110
+    startLine: 112
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1532,7 +1533,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeOffsetUtcEpochSecondsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 114
+    startLine: 116
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1576,7 +1577,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddDaysToDateOnlySql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 124
+    startLine: 126
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1615,7 +1616,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddMonthsToDateOnlySql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 128
+    startLine: 130
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1654,7 +1655,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddYearsToDateOnlySql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 132
+    startLine: 134
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1693,7 +1694,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddSecondsToTimeOnlySql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 139
+    startLine: 141
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1735,7 +1736,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddTimeSpanColumnToTimeOnlySql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 147
+    startLine: 149
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1781,7 +1782,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetRealCastSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 154
+    startLine: 156
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1820,7 +1821,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTruncateToIntSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 160
+    startLine: 162
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1857,7 +1858,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetInsertOrIgnoreSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 164
+    startLine: 166
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1902,7 +1903,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CreateParameter
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 174
+    startLine: 176
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1947,7 +1948,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: EscapeLikePattern
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 207
+    startLine: 209
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -1990,7 +1991,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeDifferenceSecondsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 226
+    startLine: 228
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2036,7 +2037,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeFromPartsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 234
+    startLine: 236
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2077,7 +2078,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeFromPartsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 238
+    startLine: 240
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2124,7 +2125,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateTimeFromPartsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 245
+    startLine: 247
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2176,7 +2177,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetDateOnlyFromPartsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 249
+    startLine: 251
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2217,7 +2218,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeOnlyFromPartsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 253
+    startLine: 255
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -2258,7 +2259,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetTimeOnlyFromPartsSql
     path: src/nORM/Providers/SqlServerProvider.ScalarSql.cs
-    startLine: 257
+    startLine: 259
   assemblies:
   - nORM
   namespace: nORM.Providers
@@ -3712,6 +3713,13 @@ references:
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.timespan
   - name: )
+- uid: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  commentId: P:nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
+  parent: nORM.Providers.DatabaseProvider
+  href: nORM.Providers.DatabaseProvider.html#nORM_Providers_DatabaseProvider_SupportsConventionKeyStoreGeneration
+  name: SupportsConventionKeyStoreGeneration
+  nameWithType: DatabaseProvider.SupportsConventionKeyStoreGeneration
+  fullName: nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration
 - uid: nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean)
   commentId: M:nORM.Providers.DatabaseProvider.BuildInsert(nORM.Mapping.TableMapping,System.Boolean)
   parent: nORM.Providers.DatabaseProvider
