@@ -935,8 +935,12 @@ namespace nORM.Core
             {
                 var col   = mapping.KeyColumns[0];
                 var value = col.Getter(entity);
-                // DB-generated key at its default means "not yet assigned" - don't key the map
-                if (col.IsDbGenerated && IsDefaultKeyValue(value, col.Prop.PropertyType))
+                // DB-generated key at its default means "not yet assigned" - don't key the map. A
+                // store-generated-key CONVENTION column at its default is likewise pending generation
+                // (the INSERT omits it and reads the value back), so two default-keyed new entities must
+                // not collide under key 0 in the identity map. IsConventionGeneratedKey is only set on
+                // providers that store-generate it, so this is inert elsewhere.
+                if ((col.IsDbGenerated || col.IsConventionGeneratedKey) && IsDefaultKeyValue(value, col.Prop.PropertyType))
                     return null;
                 return value;
             }

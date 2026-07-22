@@ -1404,6 +1404,7 @@ P:nORM.Mapping.Column.Converter:nORM.Mapping.IValueConverter
 P:nORM.Mapping.Column.EscCol:System.String
 P:nORM.Mapping.Column.ForeignKeyPrincipalTypeName:System.String
 P:nORM.Mapping.Column.Getter:System.Func{System.Object,System.Object}
+P:nORM.Mapping.Column.IsConventionGeneratedKey:System.Boolean
 P:nORM.Mapping.Column.IsDbGenerated:System.Boolean
 P:nORM.Mapping.Column.IsKey:System.Boolean
 P:nORM.Mapping.Column.IsNullable:System.Boolean
@@ -1601,6 +1602,7 @@ P:nORM.Providers.DatabaseProvider.ParameterPrefixChar:System.Char
 P:nORM.Providers.DatabaseProvider.PrefersBareBooleanPredicates:System.Boolean
 P:nORM.Providers.DatabaseProvider.PrefersSyncExecution:System.Boolean
 P:nORM.Providers.DatabaseProvider.StoredProcedureCommandType:System.Data.CommandType
+P:nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration:System.Boolean
 P:nORM.Providers.DatabaseProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Providers.DatabaseProvider.SupportsNativeTenantSessionContext:System.Boolean
 P:nORM.Providers.DatabaseProvider.SupportsProviderNativeTemporalTables:System.Boolean
@@ -1642,6 +1644,7 @@ P:nORM.Providers.SqliteProvider.ParameterPrefixChar:System.Char
 P:nORM.Providers.SqliteProvider.PrefersBareBooleanPredicates:System.Boolean
 P:nORM.Providers.SqliteProvider.PrefersSyncExecution:System.Boolean
 P:nORM.Providers.SqliteProvider.StoredProcedureCommandType:System.Data.CommandType
+P:nORM.Providers.SqliteProvider.SupportsConventionKeyStoreGeneration:System.Boolean
 P:nORM.Providers.SqliteProvider.SupportsNativeOrderedStringAggregate:System.Boolean
 P:nORM.Query.OptimizedSqlBuilder.Length:System.Int32
 P:nORM.Query.SqlFunctionAttribute.Format:System.String

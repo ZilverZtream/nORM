@@ -71,6 +71,23 @@ namespace nORM.Mapping
         /// <summary>Gets the set of columns included in insert statements.</summary>
         public Column[] InsertColumns { get; }
 
+        /// <summary>
+        /// The single store-generated-key CONVENTION column (EF Core parity), or <c>null</c> when the entity
+        /// has none. Set only when the provider supports store-generating it (<see
+        /// cref="nORM.Providers.DatabaseProvider.SupportsConventionKeyStoreGeneration"/>), so on other
+        /// providers this stays null and the write path / change tracker behave exactly as before. When
+        /// present, an INSERT of an entity whose key is default omits this column and reads back the
+        /// generated value; a non-default value is inserted as-is (honored).
+        /// </summary>
+        internal Column? ConventionGeneratedKeyColumn { get; }
+
+        /// <summary>
+        /// <see cref="InsertColumns"/> with the <see cref="ConventionGeneratedKeyColumn"/> removed — the
+        /// column set for the default-value (store-generated) insert run. Equals <see cref="InsertColumns"/>
+        /// when there is no convention key.
+        /// </summary>
+        internal Column[] InsertColumnsWithoutConventionKey { get; }
+
         /// <summary>Gets the set of columns included in update statements.</summary>
         public Column[] UpdateColumns { get; }
 
@@ -332,22 +349,30 @@ namespace nORM.Mapping
             }
 
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
-            // Store-generated-key convention (EF Core parity), DETECTION only: a SINGLE-column integer primary
-            // key with no explicit value-generation config is a convention key — store-generated when its value
-            // is default, honored when non-default. Composite keys and explicitly-configured keys
-            // ([DatabaseGenerated]/ValueGeneratedOnAdd/Never) are excluded, so an opt-out stays client-set. The
-            // write path reads IsConventionGeneratedKey per-entity (increment 2); flagging it here changes no
-            // behavior yet. See honor_nonzero_key_convention_plan.
+            // Store-generated-key convention (EF Core parity): a SINGLE-column integer primary key with no
+            // explicit value-generation config is store-generated when its value is default (0) and honored
+            // when non-default. Composite keys and explicitly-configured keys ([DatabaseGenerated]/
+            // ValueGeneratedOnAdd/Never) are excluded, so an opt-out stays client-set. Gated on the provider
+            // actually being able to store-generate it (SQLite: rowid alias) so the mark — and therefore the
+            // write-path and change-tracker behavior keyed off IsConventionGeneratedKey — is a no-op on
+            // providers that do not yet support it. See honor_nonzero_key_convention_plan.
+            Column? conventionGeneratedKey = null;
             if (KeyColumns.Length == 1
                 && !KeyColumns[0].IsDbGenerated
                 && !KeyColumns[0].ValueGenerationExplicitlyConfigured
-                && Column.IsConventionStoreGeneratedKeyType(KeyColumns[0].Prop.PropertyType))
+                && Column.IsConventionStoreGeneratedKeyType(KeyColumns[0].Prop.PropertyType)
+                && p.SupportsConventionKeyStoreGeneration)
             {
                 KeyColumns[0].MarkConventionGeneratedKey();
+                conventionGeneratedKey = KeyColumns[0];
             }
+            ConventionGeneratedKeyColumn = conventionGeneratedKey;
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
+            InsertColumnsWithoutConventionKey = conventionGeneratedKey != null
+                ? InsertColumns.Where(c => !ReferenceEquals(c, conventionGeneratedKey)).ToArray()
+                : InsertColumns;
             // On providers without a native rowversion (SQLite/PostgreSQL/MySQL), nORM writes a fresh
             // [Timestamp] value on every UPDATE (appended to the SET clause by the batched write path)
             // so stale concurrent writes are detected. SQL Server's ROWVERSION is DB-generated and read
@@ -667,7 +692,9 @@ namespace nORM.Mapping
             if (entity is null) throw new ArgumentNullException(nameof(entity));
             if (value is null) throw new ArgumentNullException(nameof(value));
 
-            var keyCol = KeyColumns.FirstOrDefault(k => k.IsDbGenerated);
+            // Target the DB-generated key, or — for the store-generated convention key's default-value run —
+            // the convention key column, so the generated value read back from the INSERT lands on the entity.
+            var keyCol = KeyColumns.FirstOrDefault(k => k.IsDbGenerated) ?? ConventionGeneratedKeyColumn;
             if (keyCol != null)
             {
                 var targetType = Nullable.GetUnderlyingType(keyCol.Prop.PropertyType) ?? keyCol.Prop.PropertyType;

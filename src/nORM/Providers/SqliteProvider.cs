@@ -76,6 +76,14 @@ namespace nORM.Providers
         public override int MaxParameters => 999;
 
         /// <summary>
+        /// SQLite generates a single-column INTEGER primary key from the rowid when the column is omitted
+        /// on INSERT, and honors an explicitly-supplied value — exactly the store-generated-key convention
+        /// (EF Core parity). Enabled so a plain <c>int Id</c> primary key with no <c>[DatabaseGenerated]</c>
+        /// annotation is store-generated when default and honored when set. See <see cref="Column.IsConventionGeneratedKey"/>.
+        /// </summary>
+        public override bool SupportsConventionKeyStoreGeneration => true;
+
+        /// <summary>
         /// Minimum SQLite version supported by nORM v1. SQLite 3.25 is the lowest version where
         /// the migration generator's RENAME COLUMN, window functions, and UPSERT (ON CONFLICT)
         /// emit valid statements. Older SQLite builds would parse-fail on those, so v1 fails
@@ -703,7 +711,12 @@ namespace nORM.Providers
             // Use RETURNING clause (SQLite 3.35+) for single-statement identity retrieval.
             // This is faster than "; SELECT last_insert_rowid();" because SQLite
             // executes one statement instead of two (no separate query plan/parse step).
-            var keyCol = m?.KeyColumns?.FirstOrDefault(c => c.IsDbGenerated);
+            // A store-generated-key CONVENTION column (int PK, no explicit config) is also read back
+            // via RETURNING for the default-value (store-generated) insert run: it is the rowid alias,
+            // so RETURNING yields the generated key with the same clean one-result-set-per-row shape the
+            // batch reader loop relies on. Explicit-value rows take the plain path (no read-back).
+            var keyCol = m?.KeyColumns?.FirstOrDefault(c => c.IsDbGenerated)
+                ?? m?.ConventionGeneratedKeyColumn;
             return keyCol != null ? $" RETURNING {keyCol.EscCol}" : "; SELECT last_insert_rowid();";
         }
         

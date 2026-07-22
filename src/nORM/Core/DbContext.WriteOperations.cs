@@ -791,7 +791,7 @@ namespace nORM.Core
             return prefix + "p" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null, IReadOnlyList<Column>? setColumns = null)
+        private int AddParametersBatched(DbCommand cmd, TableMapping map, object entity, WriteOperation operation, int startIndex, object? originalToken = null, IReadOnlyList<Column>? setColumns = null, Column[]? insertColumns = null)
         {
             var index = startIndex;
             switch (operation)
@@ -799,7 +799,10 @@ namespace nORM.Core
                 case WriteOperation.Insert:
                     // Stamp the TPH discriminator so a derived entity persists (and reads back) as its subtype.
                     map.ApplyDiscriminator(entity);
-                    foreach (var col in _p.GetInsertColumns(map))
+                    // insertColumns overrides the default set for the store-generated convention key's
+                    // default-value run (the key column is omitted). Must equal the set AppendInsertBatch
+                    // used, or the positional @pN parameters misalign.
+                    foreach (var col in insertColumns ?? _p.GetInsertColumns(map))
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;
