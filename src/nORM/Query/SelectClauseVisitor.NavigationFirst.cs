@@ -19,6 +19,36 @@ namespace nORM.Query
         /// lex-sorts differently) — those keep the client-evaluation fallback rather than risk a
         /// silent-wrong first row.
         /// </summary>
+        /// <summary>
+        /// True when a lambda body reads a member of its element parameter that maps to a
+        /// value-converter column — which the navigation First/order emit cannot handle (raw stored value
+        /// / stored-representation ordering). Nested (nav-chain) members are conservatively ignored here.
+        /// </summary>
+        private static bool LambdaReferencesConverterColumn(LambdaExpression lambda, TableMapping depMap)
+        {
+            var param = lambda.Parameters[0];
+            var finder = new ConverterColumnFinder(param, depMap);
+            finder.Visit(lambda.Body);
+            return finder.Found;
+        }
+
+        private sealed class ConverterColumnFinder : ExpressionVisitor
+        {
+            private readonly ParameterExpression _param;
+            private readonly TableMapping _depMap;
+            public bool Found { get; private set; }
+            public ConverterColumnFinder(ParameterExpression param, TableMapping depMap) { _param = param; _depMap = depMap; }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (!Found && node.Expression == _param
+                    && _depMap.ColumnsByName.TryGetValue(node.Member.Name, out var col)
+                    && col.Converter != null)
+                    Found = true;
+                return base.VisitMember(node);
+            }
+        }
+
         internal static bool IsSafeNavFirstOrderKeyType(Type t)
         {
             var u = Nullable.GetUnderlyingType(t) ?? t;
@@ -121,6 +151,27 @@ namespace nORM.Query
                     orderings[i] = (orderings[i].Key, !orderings[i].Ascending);
 
             var depType = relation.DependentType;
+
+            // A value-converter column can't be handled here: selecting one returns the raw stored value
+            // (the correlated-subquery result isn't run through ConvertFromProvider), and ordering by one
+            // orders by the stored representation — both silently wrong. Fail loud instead (aggregate the
+            // materialised collection client-side, or select the FK/converted value explicitly).
+            if (_ctx != null)
+            {
+                TableMapping? depMapForConverter = null;
+                try { depMapForConverter = _ctx.GetMapping(depType); } catch { }
+                if (depMapForConverter != null)
+                {
+                    if (LambdaReferencesConverterColumn(selectorLambda, depMapForConverter)
+                        || orderings.Any(o => LambdaReferencesConverterColumn(o.Key, depMapForConverter)))
+                        throw new NormUnsupportedFeatureException(
+                            "First/FirstOrDefault over a navigation collection whose selector or order key is a " +
+                            "value-converter column isn't supported: the subquery would return the raw stored value " +
+                            "(no ConvertFromProvider) and order by the stored representation. Materialise the " +
+                            "collection and evaluate it client-side, or project the underlying/foreign-key column.");
+                }
+            }
+
             var depTable = GetTableName(depType);
             RecordNavReferencedTable(depType);
             var depAlias = _provider.Escape("__nav");

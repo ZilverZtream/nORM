@@ -657,6 +657,7 @@ namespace nORM.Query
                 string aggExpr;
                 if (aggSelector != null)
                 {
+                    GuardAggregateOverConverterColumn(methodName, aggSelector, hop2Rel.DependentType);
                     var selSql = TryRenderDependentSelector(aggSelector.Body, aggSelector.Parameters[0], hop2Alias, hop2Rel.DependentType)
                         ?? RenderDependentSelectorViaSubVisitor(aggSelector, hop2Alias, hop2Rel.DependentType)
                         ?? throw new NormUnsupportedFeatureException(
@@ -954,12 +955,36 @@ namespace nORM.Query
             };
         }
 
+        /// <summary>
+        /// Fails loud (never silent-wrong) when a Sum/Min/Max/Average selector over a navigation collection
+        /// is a value-converter column: the SQL aggregate runs on the STORED representation, so a
+        /// negating/scaling converter yields a wrong total and Min/Max can pick the wrong element under an
+        /// order-reversing converter. The result isn't run through ConvertFromProvider either.
+        /// </summary>
+        private void GuardAggregateOverConverterColumn(string methodName, LambdaExpression selectorLambda, Type depType)
+        {
+            if (methodName is not (nameof(Queryable.Sum) or nameof(Queryable.Min)
+                                or nameof(Queryable.Max) or nameof(Queryable.Average))
+                || _ctx == null)
+                return;
+            TableMapping depMap;
+            try { depMap = _ctx.GetMapping(depType); }
+            catch { return; }
+            if (LambdaReferencesConverterColumn(selectorLambda, depMap))
+                throw new NormUnsupportedFeatureException(
+                    $"{methodName}(...) over a navigation collection cannot aggregate a value-converter column: " +
+                    "the SQL aggregate runs on the stored representation (a negating/scaling converter gives a wrong " +
+                    "result, and Min/Max can pick the wrong element under an order-reversing converter). Materialise " +
+                    "the collection and aggregate it client-side.");
+        }
+
         private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda, LambdaExpression? extraFilter = null)
         {
             // Mirror of EmitNavigationCountSubquery — adds aggregate-function dispatch and
             // a per-row selector. Selector is a member access on the dependent element
             // (e.g. `c => c.Amount`); resolve it to the column name via attribute lookup.
             var depType = relation.DependentType;
+            GuardAggregateOverConverterColumn(methodName, selectorLambda, depType);
             var depTable = GetTableName(depType);
             RecordNavReferencedTable(depType);
             var depAlias = _provider.Escape("__nav");
