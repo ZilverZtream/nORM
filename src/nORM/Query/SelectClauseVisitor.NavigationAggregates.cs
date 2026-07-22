@@ -865,6 +865,14 @@ namespace nORM.Query
                 navAggCall = $"{sqlAgg}({selectorSql})";
             }
 
+            // C# Enumerable.Sum over an EMPTY sequence is 0, but SQL SUM over no rows is NULL. A
+            // standalone projection materializes that NULL back to 0, but when the aggregate is embedded
+            // (e.g. concatenated into a string) the raw NULL leaks through. COALESCE to 0 so an empty
+            // navigation collection sums to 0 in every context. (Min/Max/Average legitimately stay NULL —
+            // C# throws on empty for those; only Sum has a defined empty value.)
+            if (methodName == nameof(Queryable.Sum))
+                navAggCall = $"COALESCE({navAggCall}, 0)";
+
             sb.Append('(').Append("SELECT ").Append(navAggCall)
               .Append(" FROM ").Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias)
               .Append(" WHERE ");
