@@ -113,3 +113,19 @@
 .log-line.ok { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--surface)); }
 .log-line.err { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
 .log-line.running { color: var(--accent); border-color: var(--accent-line); }
+
+/* ── products admin ──────────────────────────────────────────────────────── */
+.prod-admin { display: flex; flex-direction: column; gap: .8rem; }
+.prod-row { display: flex; align-items: center; gap: 1.1rem; padding: 1rem 1.15rem; flex-wrap: wrap; }
+.prod-thumb { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; font: 700 1.2rem var(--font-display); color: color-mix(in srgb, var(--accent) 72%, var(--ink)); background: var(--accent-wash); flex: none; }
+.prod-fields { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: .45rem; }
+.prod-fields .sku { color: var(--muted); }
+.prod-edit { display: flex; gap: .5rem; }
+.prod-edit input { max-width: 340px; }
+.prod-price-edit { display: flex; gap: .4rem; align-items: center; }
+.prod-price-edit input { max-width: 110px; }
+
+/* ── system checks ───────────────────────────────────────────────────────── */
+.check-actions { margin: .9rem 0 .2rem; }
+.check-out { margin-top: .7rem; }
+.check-out:empty { display: none; }

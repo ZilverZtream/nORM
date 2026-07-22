@@ -67,7 +67,12 @@ public static class StoreWebApp
     private static void Configure(WebApplication app)
     {
         app.UseDefaultFiles();
-        app.UseStaticFiles();
+        // Revalidate on every request so edits to the no-build wwwroot show up immediately — this is a
+        // demo you're meant to tweak, not a CDN-cached production bundle.
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache"
+        });
         app.UseAuthentication();
         app.UseAuthorization();
 

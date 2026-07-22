@@ -6,6 +6,8 @@ import { renderLogin } from "./views/login.js";
 import { renderStorefront } from "./views/storefront.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { renderInfrastructure } from "./views/infrastructure.js";
+import { renderProducts } from "./views/products.js";
+import { renderSystem } from "./views/system.js";
 import { renderPlaceholder } from "./views/admin-common.js";
 
 const root = document.getElementById("root");
@@ -35,10 +37,10 @@ function enter(me) {
     router.route("/store", () => renderStorefront());
     router.route("/admin", () => renderDashboard());
     router.route("/admin/infrastructure", () => renderInfrastructure());
-    router.route("/admin/products", () => renderPlaceholder("products", "Products"));
+    router.route("/admin/products", () => renderProducts());
+    router.route("/admin/system", () => renderSystem());
     router.route("/admin/orders", () => renderPlaceholder("orders", "Orders"));
     router.route("/admin/history", () => renderPlaceholder("history", "Version history"));
-    router.route("/admin/system", () => renderPlaceholder("system", "System health"));
     router.start(onRoute);
     routerStarted = true;
   }
