@@ -171,6 +171,43 @@ namespace nORM.Query
                       .Append(node.NodeType == ExpressionType.Equal ? " IS NULL)" : " IS NOT NULL)");
                     return node;
                 }
+                // Two non-null-constant operands where a null is possible (two nullable columns, or a
+                // nullable column vs a null-valued variable): the generic path emits raw `A = B` / `A <> B`,
+                // whose SQL three-valued logic silently materializes C# `null == null` (true) and
+                // `value != null` (true) as FALSE — a silently-wrong projected value. Emit the provider's
+                // null-safe (in)equality instead, mirroring the WHERE-path (ETSV) expansion. Scoped to
+                // nullable scalars (Nullable<T> / string) so whole-entity/navigation comparisons are untouched.
+                else if (!leftIsNull && !rightIsNull)
+                {
+                    static bool CouldBeNullScalar(Expression e)
+                    {
+                        while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                            e = u.Operand;
+                        if (e is ConstantExpression c) return c.Value is null;   // non-null constant is never null
+                        var t = e.Type;
+                        return System.Nullable.GetUnderlyingType(t) != null || t == typeof(string);
+                    }
+                    var leftCbn = CouldBeNullScalar(node.Left);
+                    var rightCbn = CouldBeNullScalar(node.Right);
+                    // Equal: expand only when BOTH could be null (null == "x" is false in SQL and C# alike).
+                    // NotEqual: expand when EITHER could be null (value != null must stay true).
+                    var needsExpansion = node.NodeType == ExpressionType.NotEqual ? (leftCbn || rightCbn) : (leftCbn && rightCbn);
+                    if (needsExpansion)
+                    {
+                        var lStart = sb.Length;
+                        Visit(node.Left);
+                        var lSql = sb.ToString(lStart, sb.Length - lStart);
+                        sb.Length = lStart;
+                        var rStart = sb.Length;
+                        Visit(node.Right);
+                        var rSql = sb.ToString(rStart, sb.Length - rStart);
+                        sb.Length = rStart;
+                        sb.Append(node.NodeType == ExpressionType.Equal
+                            ? _provider.NullSafeEqual(lSql, rSql)
+                            : _provider.NullSafeNotEqual(lSql, rSql));
+                        return node;
+                    }
+                }
             }
 
             // C# `+` on string operands is concatenation, not arithmetic. Emit
