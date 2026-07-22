@@ -290,6 +290,46 @@ namespace nORM.Core
             return await preparedInsert.ExecuteAsync(entity, ct).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Inserts an entity whose store-generated convention key is at its default value: the key column is
+        /// omitted so the database generates it, and the generated value is read back onto the entity via the
+        /// provider's identity-retrieval clause (RETURNING on SQLite). Mirrors how a DB-generated key is
+        /// hydrated on the direct write paths. Explicit (non-default) convention keys never reach here — they
+        /// insert the value as-is on the normal path. The caller performs any tracker accept (the prepared
+        /// path via AcceptTrackedInsert, the transactional path via SyncTrackerAfterDirectWrite).
+        /// </summary>
+        private async Task<int> ExecuteConventionDefaultInsertAsync(object entity, TableMapping map, DbTransaction? transaction, CancellationToken ct)
+        {
+            await using var scope = new CommandScope(RawConnection, transaction);
+            await using var cmd = scope.CreateCommand();
+            var cols = map.InsertColumnsWithoutConventionKey;
+            cmd.CommandText = BuildConventionDefaultInsertSql(map, cols);
+            cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
+            AddParametersOptimized(cmd, map, entity, WriteOperation.Insert, insertColumns: cols);
+            var newId = await cmd.ExecuteScalarWithInterceptionAsync(this, ct).ConfigureAwait(false);
+            if (newId != null && newId != DBNull.Value)
+                map.SetPrimaryKey(entity, newId);
+            Options.CacheProvider?.InvalidateTag(map.TableName);
+            return 1;
+        }
+
+        /// <summary>
+        /// Builds the INSERT for a store-generated convention key's default-value row — the key column omitted
+        /// (<paramref name="cols"/> = <see cref="TableMapping.InsertColumnsWithoutConventionKey"/>) plus the
+        /// provider's identity-retrieval clause to read the generated key back. Uses @PropName parameters to
+        /// match <see cref="AddParametersOptimized"/>. Mirrors <see cref="Providers.DatabaseProvider.BuildInsert"/>.
+        /// </summary>
+        private string BuildConventionDefaultInsertSql(TableMapping map, Column[] cols)
+        {
+            var prefix = _p.GetIdentityRetrievalPrefix(map);
+            var fragment = _p.GetIdentityRetrievalString(map);
+            if (cols.Length == 0)
+                return $"INSERT INTO {map.EscTable}{prefix} {_p.DefaultValuesInsertClause}{fragment}";
+            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+            var valParams = string.Join(", ", cols.Select(c => _p.ParamPrefix + c.PropName));
+            return $"INSERT INTO {map.EscTable} ({colNames}){prefix} VALUES ({valParams}){fragment}";
+        }
+
         private async Task<int> ExecuteWriteCommandAsync<T>(
             T entity,
             TableMapping map,
@@ -332,6 +372,14 @@ namespace nORM.Core
             }
 
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
+
+            // Store-generated convention key at its default: omit the key so the database generates it and
+            // read the value back, instead of inserting the default (which would collide on a second row).
+            // Explicit (non-default) keys fall through to the normal path and are inserted as-is (honored).
+            if (operation == WriteOperation.Insert && map.ConventionGeneratedKeyColumn is { } convKey
+                && IsDefaultConventionKey(entity, convKey))
+                return await ExecuteConventionDefaultInsertAsync(entity, map, transaction, ct).ConfigureAwait(false);
+
             await using var commandScope = new CommandScope(RawConnection, transaction);
             await using var cmd = commandScope.CreateCommand();
             // X1: pass includeTenant so the WHERE clause targets only the current tenant's rows,
@@ -464,14 +512,16 @@ namespace nORM.Core
             entry.OriginalToken = current is byte[] bytes ? bytes.Clone() : current;
         }
 
-        private void AddParametersOptimized<T>(DbCommand cmd, TableMapping map, T entity, WriteOperation operation, object? originalToken = null) where T : class
+        private void AddParametersOptimized<T>(DbCommand cmd, TableMapping map, T entity, WriteOperation operation, object? originalToken = null, Column[]? insertColumns = null) where T : class
         {
             switch (operation)
             {
                 case WriteOperation.Insert:
                     // Stamp the TPH discriminator so a derived entity persists (and reads back) as its subtype.
                     map.ApplyDiscriminator(entity);
-                    foreach (var col in _p.GetInsertColumns(map))
+                    // insertColumns overrides the default set for the store-generated convention key's
+                    // default-value insert (the key column is omitted and read back).
+                    foreach (var col in insertColumns ?? _p.GetInsertColumns(map))
                     {
                         var rawVal = col.Getter(entity);
                         var val = col.Converter != null ? col.Converter.ConvertToProvider(rawVal) : rawVal;

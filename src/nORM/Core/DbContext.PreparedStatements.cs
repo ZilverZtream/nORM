@@ -195,6 +195,10 @@ namespace nORM.Core
             private readonly bool _hydrateGeneratedKeys;
             private readonly bool _hydrateGeneratedKeysFromCommand;
             private readonly bool _hydrateInsertToken;
+            // The store-generated convention key column, when the map has one (SQLite). The prepared command's
+            // fixed SQL includes the key (for explicit-value inserts); a default-value entity is routed to a
+            // per-call insert that omits the key and reads the generated value back.
+            private readonly Mapping.Column? _conventionKey;
             private volatile bool _disposed;
 
             internal PreparedInsertCommand(
@@ -218,6 +222,7 @@ namespace nORM.Core
                     && _mapping.TimestampColumn != null
                     && _context.RawProvider.SupportsNativeRowVersion
                     && _context.RawProvider.GetInsertTokenOutputClause(_mapping).Length > 0;
+                _conventionKey = _mapping.ConventionGeneratedKeyColumn;
 
                 var insertCols = _context.RawProvider.GetInsertColumns(_mapping);
                 _bindings = new (DbParameter, Mapping.Column)[insertCols.Length];
@@ -243,6 +248,12 @@ namespace nORM.Core
                     throw new ObjectDisposedException(nameof(PreparedInsertCommand));
                 if (entity == null)
                     throw new ArgumentNullException(nameof(entity));
+
+                // Store-generated convention key at its default: the prepared command's fixed SQL includes the
+                // key (which would insert 0 and collide). Route to a per-call insert that omits the key and
+                // reads the generated value back. Explicit-value keys stay on the fast prepared path (honored).
+                if (_conventionKey != null && IsDefaultConventionKey(entity, _conventionKey))
+                    return ExecuteConventionDefaultAsync(entity, ct);
 
                 // Stamp the TPH discriminator so a derived entity persists (and reads back) as its subtype.
                 _mapping.ApplyDiscriminator(entity);
@@ -284,6 +295,16 @@ namespace nORM.Core
                 var affected = await _command.ExecuteNonQueryWithInterceptionAsync(_context, ct).ConfigureAwait(false);
                 AcceptTrackedInsert(entity);
                 InvalidateResultCache();
+                return affected;
+            }
+
+            // Store-generated convention key at its default: insert omitting the key + read the generated
+            // value back (the shared DbContext helper does the SQL/bind/read-back and cache invalidation);
+            // then accept the tracked insert exactly like the DB-generated-key hydrate path.
+            private async Task<int> ExecuteConventionDefaultAsync(object entity, CancellationToken ct)
+            {
+                var affected = await _context.ExecuteConventionDefaultInsertAsync(entity, _mapping, BoundTransaction, ct).ConfigureAwait(false);
+                AcceptTrackedInsert(entity);
                 return affected;
             }
 
