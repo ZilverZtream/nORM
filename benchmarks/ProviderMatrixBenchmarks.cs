@@ -36,8 +36,9 @@ public sealed class ProviderMatrixEfContext : EfDbContext
         _connectionString = connectionString;
     }
 
-    public DbSet<BenchmarkUser> Users { get; set; } = null!;
-    public DbSet<BenchmarkOrder> Orders { get; set; } = null!;
+    // Fully qualified: nORM.Core now also defines a DbSet<T>, so a bare DbSet<> here is ambiguous.
+    public Microsoft.EntityFrameworkCore.DbSet<BenchmarkUser> Users { get; set; } = null!;
+    public Microsoft.EntityFrameworkCore.DbSet<BenchmarkOrder> Orders { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

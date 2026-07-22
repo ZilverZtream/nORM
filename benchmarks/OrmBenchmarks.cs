@@ -29,8 +29,9 @@ namespace nORM.Benchmarks
             _connectionString = connectionString;
         }
 
-        public DbSet<BenchmarkUser> Users { get; set; }
-        public DbSet<BenchmarkOrder> Orders { get; set; }
+        // Fully qualified: nORM.Core now also defines a DbSet<T>, so a bare DbSet<> here is ambiguous.
+        public Microsoft.EntityFrameworkCore.DbSet<BenchmarkUser> Users { get; set; }
+        public Microsoft.EntityFrameworkCore.DbSet<BenchmarkOrder> Orders { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
