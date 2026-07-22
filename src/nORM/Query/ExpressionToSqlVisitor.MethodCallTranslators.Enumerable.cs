@@ -287,14 +287,6 @@ namespace nORM.Query
                     // multiple smaller IN clauses let the query optimizer produce better plans than a
                     // single massive IN list, at the cost of a slightly larger SQL string and plan
                     // cache variance (different collection sizes produce different SQL shapes).
-                    // C# list.Contains(string) is ordinal; on providers whose default collation
-                    // makes IN case-insensitive (MySQL, SQL Server), pair each IN with a
-                    // ForceCaseSensitiveStringComparison IN over the SAME parameters — the plain
-                    // IN narrows through any index, the binary IN filters exactly.
-                    bool ordinalStringIn = _provider.DefaultStringEqualityIsCaseInsensitive
-                        && ((Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(string)
-                            || (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(char));
-
                     // If the tested column carries a value converter, the list holds RAW model values but
                     // the column stores PROVIDER values — bind the converted representation, or the IN
                     // matches nothing (silent-wrong). Mirrors the scalar `==` path (EmitConvertedValueOperand).
@@ -309,6 +301,18 @@ namespace nORM.Query
                     {
                         inConverter = inCol.Converter;
                     }
+
+                    // C# list.Contains(string) is ordinal; on providers whose default collation
+                    // makes IN case-insensitive (MySQL, SQL Server), pair each IN with a
+                    // ForceCaseSensitiveStringComparison IN over the SAME parameters — the plain
+                    // IN narrows through any index, the binary IN filters exactly. A converter that
+                    // STORES a string (e.g. an enum->string converter) can hold case-variant members
+                    // (Active/active) that a CI-collation IN would silently fuse, so wrap those too —
+                    // the tested expression's CLR type is the enum, so the string check alone misses it.
+                    bool ordinalStringIn = _provider.DefaultStringEqualityIsCaseInsensitive
+                        && ((Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(string)
+                            || (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(char)
+                            || inConverter?.ProviderType == typeof(string));
 
                     // Emits `col IN (@p…)` (registering the parameters once) and returns the
                     // rendered `(@p…)` list so the ordinal wrap can reference the same names.
