@@ -17,6 +17,7 @@ namespace nORM.Scaffolding
             IReadOnlyList<ScaffoldIndexInfo> indexes,
             IReadOnlyDictionary<string, IReadOnlySet<string>> nonNullableColumnsByTable,
             IReadOnlySet<string> providerOwnedWriteBlockedTableKeys,
+            IReadOnlySet<string> referencedPrincipalTableKeys,
             Dictionary<string, HashSet<string>> memberNamesByTable,
             out ScaffoldManyToManyJoinInfo join)
         {
@@ -27,6 +28,12 @@ namespace nORM.Scaffolding
 
             var canonicalJoinTableKey = TableKey(joinTable.Schema, joinTable.Name);
             if (providerOwnedWriteBlockedTableKeys.Contains(canonicalJoinTableKey))
+                return false;
+
+            // Another table's foreign key targets this one, so it is depended upon as a principal and
+            // must stay a first-class entity rather than being collapsed into a skip navigation.
+            if (referencedPrincipalTableKeys.Contains(joinTableKey)
+                || referencedPrincipalTableKeys.Contains(canonicalJoinTableKey))
                 return false;
 
             if (!TryGetManyToManyForeignKeyGroups(joinTableKey, joinTable.Name, group, primaryKeyColumnsByTable, indexes, out var fkGroups))

@@ -21,6 +21,13 @@ namespace nORM.Scaffolding
             Dictionary<string, HashSet<string>> memberNamesByTable)
         {
             var tablesByKey = tables.ToDictionary(t => TableKey(t.Schema, t.Name), StringComparer.OrdinalIgnoreCase);
+            // Any table that is the principal (target) of some foreign key is depended upon by another
+            // table. Collapsing such a table into an implicit many-to-many join would delete the entity
+            // that dependency needs and leave a navigation pointing at a type that was never generated,
+            // so those tables must remain first-class entities.
+            var referencedPrincipalTableKeys = foreignKeys
+                .Select(fk => TableKey(fk.PrincipalSchema, fk.PrincipalTable))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var joins = new List<ScaffoldManyToManyJoinInfo>();
 
             foreach (var group in foreignKeys
@@ -37,6 +44,7 @@ namespace nORM.Scaffolding
                     indexes,
                     nonNullableColumnsByTable,
                     providerOwnedWriteBlockedTableKeys,
+                    referencedPrincipalTableKeys,
                     memberNamesByTable,
                     out var join))
                 {
