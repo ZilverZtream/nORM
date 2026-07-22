@@ -202,9 +202,39 @@ namespace nORM.Query
                         Visit(node.Right);
                         var rSql = sb.ToString(rStart, sb.Length - rStart);
                         sb.Length = rStart;
-                        sb.Append(node.NodeType == ExpressionType.Equal
-                            ? _provider.NullSafeEqual(lSql, rSql)
-                            : _provider.NullSafeNotEqual(lSql, rSql));
+                        // C# string equality is ordinal (case-sensitive). On providers whose default
+                        // collation folds case (MySQL, SQL Server) the null-safe form must compose the
+                        // sargable ordinal wrap, or the computed boolean is case-insensitive-wrong there
+                        // (invisible on SQLite, whose default collation is already case-sensitive). Mirror
+                        // the WHERE-path (ETSV) expansion exactly, including the asymmetric NotEqual forms.
+                        bool ordinalStringCompare = _provider.DefaultStringEqualityIsCaseInsensitive
+                            && (node.Left.Type == typeof(string) || node.Right.Type == typeof(string)
+                                || (System.Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(char)
+                                || (System.Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(char));
+                        if (node.NodeType == ExpressionType.Equal)
+                        {
+                            sb.Append(ordinalStringCompare
+                                ? $"({_provider.OrdinalStringEqualSql(lSql, rSql)} OR ({lSql} IS NULL AND {rSql} IS NULL))"
+                                : _provider.NullSafeEqual(lSql, rSql));
+                        }
+                        else if (!rightCbn)
+                        {
+                            // Right side is a known non-null value: `rf IS NULL` can never fire, so the
+                            // 3-way expansion reduces to (lf IS NULL OR lf <> rf).
+                            sb.Append(ordinalStringCompare
+                                ? $"({lSql} IS NULL OR {_provider.OrdinalStringNotEqualSql(lSql, rSql)})"
+                                : $"({lSql} IS NULL OR {lSql} <> {rSql})");
+                        }
+                        else if (ordinalStringCompare)
+                        {
+                            sb.Append($"(({lSql} IS NOT NULL AND {rSql} IS NOT NULL AND {_provider.OrdinalStringNotEqualSql(lSql, rSql)})" +
+                                      $" OR ({lSql} IS NULL AND {rSql} IS NOT NULL)" +
+                                      $" OR ({lSql} IS NOT NULL AND {rSql} IS NULL))");
+                        }
+                        else
+                        {
+                            sb.Append(_provider.NullSafeNotEqual(lSql, rSql));
+                        }
                         return node;
                     }
                 }
