@@ -9,17 +9,32 @@ items:
   - nORM.Core.DbSet`1.AddAsync(`0,System.Threading.CancellationToken)
   - nORM.Core.DbSet`1.AddRange(System.Collections.Generic.IEnumerable{`0})
   - nORM.Core.DbSet`1.AddRange(`0[])
+  - nORM.Core.DbSet`1.AnyAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.AsNoTracking
+  - nORM.Core.DbSet`1.AsNoTrackingWithIdentityResolution
+  - nORM.Core.DbSet`1.AsSplitQuery
   - nORM.Core.DbSet`1.Attach(`0)
+  - nORM.Core.DbSet`1.CountAsync(System.Threading.CancellationToken)
   - nORM.Core.DbSet`1.ElementType
+  - nORM.Core.DbSet`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
   - nORM.Core.DbSet`1.Expression
   - nORM.Core.DbSet`1.Find(System.Object[])
   - nORM.Core.DbSet`1.FindAsync(System.Object[])
   - nORM.Core.DbSet`1.FindAsync(System.Object[],System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.FirstAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
   - nORM.Core.DbSet`1.GetEnumerator
+  - nORM.Core.DbSet`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
   - nORM.Core.DbSet`1.Provider
   - nORM.Core.DbSet`1.Remove(`0)
   - nORM.Core.DbSet`1.RemoveRange(System.Collections.Generic.IEnumerable{`0})
   - nORM.Core.DbSet`1.RemoveRange(`0[])
+  - nORM.Core.DbSet`1.SingleAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.ToArrayAsync(System.Threading.CancellationToken)
+  - nORM.Core.DbSet`1.ToListAsync(System.Threading.CancellationToken)
   - nORM.Core.DbSet`1.Update(`0)
   - nORM.Core.DbSet`1.UpdateRange(System.Collections.Generic.IEnumerable{`0})
   langs:
@@ -36,12 +51,12 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbSet
     path: src/nORM/Core/DbSet.cs
-    startLine: 28
+    startLine: 30
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: >-
-    An <xref href="System.Linq.IQueryable%601" data-throw-if-not-resolved="false"></xref> over an entity type that also exposes the change-tracking write verbs
+    A query over an entity type that also exposes the change-tracking write verbs
 
     (<xref href="nORM.Core.DbSet%601.Add(%600)" data-throw-if-not-resolved="false"></xref> / <xref href="nORM.Core.DbSet%601.Remove(%600)" data-throw-if-not-resolved="false"></xref> / <xref href="nORM.Core.DbSet%601.Update(%600)" data-throw-if-not-resolved="false"></xref> / <xref href="nORM.Core.DbSet%601.Attach(%600)" data-throw-if-not-resolved="false"></xref> /
 
@@ -60,19 +75,24 @@ items:
 
     The computed-property form needs no reflection or auto-population, so it is trimming/NativeAOT-safe.
 
-    Querying flows through the same provider as <code>context.Query&lt;T&gt;()</code>; the write verbs delegate to
+    It is a full <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>, so <code>Include</code>/<code>AsNoTracking</code>/<code>AsSplitQuery</code>
 
-    the context's change tracker and are applied on the next <code>SaveChangesAsync</code>.
+    and the async terminal operators compose off it without a cast, exactly as off <code>context.Query&lt;T&gt;()</code>;
+
+    the write verbs delegate to the context's change tracker and apply on the next <code>SaveChangesAsync</code>.
   example: []
   syntax:
-    content: 'public sealed class DbSet<T> : IQueryable<T>, IEnumerable<T>, IQueryable, IEnumerable where T : class'
+    content: 'public sealed class DbSet<T> : INormQueryable<T>, IOrderedQueryable<T>, IOrderedQueryable, IQueryable<T>, IEnumerable<T>, IQueryable, IEnumerable where T : class'
     typeParameters:
     - id: T
       description: The entity CLR type.
-    content.vb: Public NotInheritable Class DbSet(Of T As Class) Implements IQueryable(Of T), IEnumerable(Of T), IQueryable, IEnumerable
+    content.vb: Public NotInheritable Class DbSet(Of T As Class) Implements INormQueryable(Of T), IOrderedQueryable(Of T), IOrderedQueryable, IQueryable(Of T), IEnumerable(Of T), IQueryable, IEnumerable
   inheritance:
   - System.Object
   implements:
+  - nORM.Core.INormQueryable{{T}}
+  - System.Linq.IOrderedQueryable{{T}}
+  - System.Linq.IOrderedQueryable
   - System.Linq.IQueryable{{T}}
   - System.Collections.Generic.IEnumerable{{T}}
   - System.Linq.IQueryable
@@ -170,7 +190,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ElementType
     path: src/nORM/Core/DbSet.cs
-    startLine: 40
+    startLine: 43
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -206,7 +226,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Expression
     path: src/nORM/Core/DbSet.cs
-    startLine: 43
+    startLine: 45
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -242,7 +262,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Core/DbSet.cs
-    startLine: 46
+    startLine: 47
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -295,6 +315,570 @@ items:
   - System.Collections.Generic.IEnumerable{{T}}.GetEnumerator
   nameWithType.vb: DbSet(Of T).GetEnumerator()
   fullName.vb: nORM.Core.DbSet(Of T).GetEnumerator()
+- uid: nORM.Core.DbSet`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  commentId: M:nORM.Core.DbSet`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  id: Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: Include<TProperty>(Expression<Func<T, TProperty>>)
+  nameWithType: DbSet<T>.Include<TProperty>(Expression<Func<T, TProperty>>)
+  fullName: nORM.Core.DbSet<T>.Include<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: Include
+    path: src/nORM/Core/DbSet.cs
+    startLine: 54
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Specifies a navigation property to include in the query results.
+  example: []
+  syntax:
+    content: public INormIncludableQueryable<T, TProperty> Include<TProperty>(Expression<Func<T, TProperty>> navigationPropertyPath)
+    parameters:
+    - id: navigationPropertyPath
+      type: System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}}
+      description: Expression identifying the navigation to include.
+    typeParameters:
+    - id: TProperty
+      description: Type of the navigation property.
+    return:
+      type: nORM.Core.INormIncludableQueryable{{T},{TProperty}}
+    content.vb: Public Function Include(Of TProperty)(navigationPropertyPath As Expression(Of Func(Of T, TProperty))) As INormIncludableQueryable(Of T, TProperty)
+  overload: nORM.Core.DbSet`1.Include*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.Include``1(System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}})
+  nameWithType.vb: DbSet(Of T).Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Core.DbSet(Of T).Include(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+- uid: nORM.Core.DbSet`1.AsNoTracking
+  commentId: M:nORM.Core.DbSet`1.AsNoTracking
+  id: AsNoTracking
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: AsNoTracking()
+  nameWithType: DbSet<T>.AsNoTracking()
+  fullName: nORM.Core.DbSet<T>.AsNoTracking()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsNoTracking
+    path: src/nORM/Core/DbSet.cs
+    startLine: 56
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Disables change tracking for the query results.
+  example: []
+  syntax:
+    content: public INormQueryable<T> AsNoTracking()
+    return:
+      type: nORM.Core.INormQueryable{{T}}
+    content.vb: Public Function AsNoTracking() As INormQueryable(Of T)
+  overload: nORM.Core.DbSet`1.AsNoTracking*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.AsNoTracking
+  nameWithType.vb: DbSet(Of T).AsNoTracking()
+  fullName.vb: nORM.Core.DbSet(Of T).AsNoTracking()
+- uid: nORM.Core.DbSet`1.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.DbSet`1.AsNoTrackingWithIdentityResolution
+  id: AsNoTrackingWithIdentityResolution
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: DbSet<T>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.DbSet<T>.AsNoTrackingWithIdentityResolution()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsNoTrackingWithIdentityResolution
+    path: src/nORM/Core/DbSet.cs
+    startLine: 58
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Disables change tracking but still resolves entity identity: a root entity whose key appears more
+
+    than once in one result set (e.g. from <code>Concat</code> or a self-join/SelectMany flatten) is returned
+
+    as a single shared instance. Matches EF Core's <code>AsNoTrackingWithIdentityResolution</code>.
+  example: []
+  syntax:
+    content: public INormQueryable<T> AsNoTrackingWithIdentityResolution()
+    return:
+      type: nORM.Core.INormQueryable{{T}}
+    content.vb: Public Function AsNoTrackingWithIdentityResolution() As INormQueryable(Of T)
+  overload: nORM.Core.DbSet`1.AsNoTrackingWithIdentityResolution*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.AsNoTrackingWithIdentityResolution
+  nameWithType.vb: DbSet(Of T).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.DbSet(Of T).AsNoTrackingWithIdentityResolution()
+- uid: nORM.Core.DbSet`1.AsSplitQuery
+  commentId: M:nORM.Core.DbSet`1.AsSplitQuery
+  id: AsSplitQuery
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: AsSplitQuery()
+  nameWithType: DbSet<T>.AsSplitQuery()
+  fullName: nORM.Core.DbSet<T>.AsSplitQuery()
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsSplitQuery
+    path: src/nORM/Core/DbSet.cs
+    startLine: 60
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: >-
+    Accepted for EF Core compatibility and has no additional effect:
+
+    <xref href="nORM.Core.INormQueryable%601.Include%60%601(System.Linq.Expressions.Expression%7bSystem.Func%7b%600%2c%60%600%7d%7d)" data-throw-if-not-resolved="false"></xref> always eager-loads its navigation paths
+
+    through coordinated follow-up queries.
+  example: []
+  syntax:
+    content: public INormQueryable<T> AsSplitQuery()
+    return:
+      type: nORM.Core.INormQueryable{{T}}
+    content.vb: Public Function AsSplitQuery() As INormQueryable(Of T)
+  overload: nORM.Core.DbSet`1.AsSplitQuery*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.AsSplitQuery
+  nameWithType.vb: DbSet(Of T).AsSplitQuery()
+  fullName.vb: nORM.Core.DbSet(Of T).AsSplitQuery()
+- uid: nORM.Core.DbSet`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+  id: AsAsyncEnumerable(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: AsAsyncEnumerable(CancellationToken)
+  nameWithType: DbSet<T>.AsAsyncEnumerable(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.AsAsyncEnumerable(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AsAsyncEnumerable
+    path: src/nORM/Core/DbSet.cs
+    startLine: 62
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Executes the query as an asynchronous stream of entities.
+  example: []
+  syntax:
+    content: public IAsyncEnumerable<T> AsAsyncEnumerable(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Collections.Generic.IAsyncEnumerable{{T}}
+    content.vb: Public Function AsAsyncEnumerable(ct As CancellationToken = Nothing) As IAsyncEnumerable(Of T)
+  overload: nORM.Core.DbSet`1.AsAsyncEnumerable*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.AsAsyncEnumerable(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).AsAsyncEnumerable(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).AsAsyncEnumerable(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.ToListAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.ToListAsync(System.Threading.CancellationToken)
+  id: ToListAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: ToListAsync(CancellationToken)
+  nameWithType: DbSet<T>.ToListAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.ToListAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToListAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 64
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Asynchronously materializes the query results into a list.
+  example: []
+  syntax:
+    content: public Task<List<T>> ToListAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+    content.vb: Public Function ToListAsync(ct As CancellationToken = Nothing) As Task(Of List(Of T))
+  overload: nORM.Core.DbSet`1.ToListAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.ToListAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).ToListAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).ToListAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.ToArrayAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.ToArrayAsync(System.Threading.CancellationToken)
+  id: ToArrayAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: ToArrayAsync(CancellationToken)
+  nameWithType: DbSet<T>.ToArrayAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.ToArrayAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ToArrayAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 66
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Asynchronously materializes the query results into an array.
+  example: []
+  syntax:
+    content: public Task<T[]> ToArrayAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{{T}[]}
+    content.vb: Public Function ToArrayAsync(ct As CancellationToken = Nothing) As Task(Of T())
+  overload: nORM.Core.DbSet`1.ToArrayAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.ToArrayAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).ToArrayAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).ToArrayAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.CountAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.CountAsync(System.Threading.CancellationToken)
+  id: CountAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: CountAsync(CancellationToken)
+  nameWithType: DbSet<T>.CountAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.CountAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: CountAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 68
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Asynchronously counts the number of results.
+  example: []
+  syntax:
+    content: public Task<int> CountAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Function CountAsync(ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbSet`1.CountAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.CountAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).CountAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).CountAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.AnyAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.AnyAsync(System.Threading.CancellationToken)
+  id: AnyAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: AnyAsync(CancellationToken)
+  nameWithType: DbSet<T>.AnyAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.AnyAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: AnyAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 70
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Determines asynchronously whether any results exist.
+  example: []
+  syntax:
+    content: public Task<bool> AnyAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Boolean}
+    content.vb: Public Function AnyAsync(ct As CancellationToken = Nothing) As Task(Of Boolean)
+  overload: nORM.Core.DbSet`1.AnyAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.AnyAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).AnyAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).AnyAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.FirstAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.FirstAsync(System.Threading.CancellationToken)
+  id: FirstAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: FirstAsync(CancellationToken)
+  nameWithType: DbSet<T>.FirstAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.FirstAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FirstAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 72
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Returns the first element of the sequence, throwing if none exists.
+  example: []
+  syntax:
+    content: public Task<T> FirstAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Function FirstAsync(ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.DbSet`1.FirstAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.FirstAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).FirstAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).FirstAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  id: FirstOrDefaultAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: FirstOrDefaultAsync(CancellationToken)
+  nameWithType: DbSet<T>.FirstOrDefaultAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: FirstOrDefaultAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 74
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Returns the first element of the sequence or <code>null</code> if none exists.
+  example: []
+  syntax:
+    content: public Task<T?> FirstOrDefaultAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Function FirstOrDefaultAsync(ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.DbSet`1.FirstOrDefaultAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).FirstOrDefaultAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).FirstOrDefaultAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.SingleAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.SingleAsync(System.Threading.CancellationToken)
+  id: SingleAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: SingleAsync(CancellationToken)
+  nameWithType: DbSet<T>.SingleAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.SingleAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SingleAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 76
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Returns the single element of the sequence, throwing if the sequence does not contain exactly one element.
+  example: []
+  syntax:
+    content: public Task<T> SingleAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Function SingleAsync(ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.DbSet`1.SingleAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.SingleAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).SingleAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).SingleAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  id: SingleOrDefaultAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: SingleOrDefaultAsync(CancellationToken)
+  nameWithType: DbSet<T>.SingleOrDefaultAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: SingleOrDefaultAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 78
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Returns the single element of the sequence or <code>null</code> if no elements exist.
+  example: []
+  syntax:
+    content: public Task<T?> SingleOrDefaultAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{{T}}
+    content.vb: Public Function SingleOrDefaultAsync(ct As CancellationToken = Nothing) As Task(Of T)
+  overload: nORM.Core.DbSet`1.SingleOrDefaultAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).SingleOrDefaultAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).SingleOrDefaultAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  id: ExecuteDeleteAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: ExecuteDeleteAsync(CancellationToken)
+  nameWithType: DbSet<T>.ExecuteDeleteAsync(CancellationToken)
+  fullName: nORM.Core.DbSet<T>.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteDeleteAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 80
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Executes a bulk delete based on the query.
+  example: []
+  syntax:
+    content: public Task<int> ExecuteDeleteAsync(CancellationToken ct = default)
+    parameters:
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Function ExecuteDeleteAsync(ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbSet`1.ExecuteDeleteAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).ExecuteDeleteAsync(CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).ExecuteDeleteAsync(System.Threading.CancellationToken)
+- uid: nORM.Core.DbSet`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.DbSet`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  id: ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  parent: nORM.Core.DbSet`1
+  langs:
+  - csharp
+  - vb
+  name: ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>, CancellationToken)
+  nameWithType: DbSet<T>.ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>, CancellationToken)
+  fullName: nORM.Core.DbSet<T>.ExecuteUpdateAsync(System.Linq.Expressions.Expression<System.Func<nORM.Core.SetPropertyCalls<T>, nORM.Core.SetPropertyCalls<T>>>, System.Threading.CancellationToken)
+  type: Method
+  source:
+    remote:
+      path: src/nORM/Core/DbSet.cs
+      branch: main
+      repo: https://github.com/ZilverZtream/nORM.git
+    id: ExecuteUpdateAsync
+    path: src/nORM/Core/DbSet.cs
+    startLine: 82
+  assemblies:
+  - nORM
+  namespace: nORM.Core
+  summary: Executes a bulk update using the provided property setter expression.
+  example: []
+  syntax:
+    content: public Task<int> ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct = default)
+    parameters:
+    - id: set
+      type: System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}}
+    - id: ct
+      type: System.Threading.CancellationToken
+    return:
+      type: System.Threading.Tasks.Task{System.Int32}
+    content.vb: Public Function ExecuteUpdateAsync([set] As Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), ct As CancellationToken = Nothing) As Task(Of Integer)
+  overload: nORM.Core.DbSet`1.ExecuteUpdateAsync*
+  implements:
+  - nORM.Core.INormQueryable{{T}}.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}},System.Threading.CancellationToken)
+  nameWithType.vb: DbSet(Of T).ExecuteUpdateAsync(Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
+  fullName.vb: nORM.Core.DbSet(Of T).ExecuteUpdateAsync(System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.SetPropertyCalls(Of T), nORM.Core.SetPropertyCalls(Of T))), System.Threading.CancellationToken)
+  name.vb: ExecuteUpdateAsync(Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
 - uid: nORM.Core.DbSet`1.Add(`0)
   commentId: M:nORM.Core.DbSet`1.Add(`0)
   id: Add(`0)
@@ -313,7 +897,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Add
     path: src/nORM/Core/DbSet.cs
-    startLine: 54
+    startLine: 86
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -348,7 +932,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 57
+    startLine: 88
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -385,7 +969,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 60
+    startLine: 90
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -419,7 +1003,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 63
+    startLine: 92
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -453,7 +1037,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Attach
     path: src/nORM/Core/DbSet.cs
-    startLine: 66
+    startLine: 94
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -488,7 +1072,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Update
     path: src/nORM/Core/DbSet.cs
-    startLine: 69
+    startLine: 96
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -523,7 +1107,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 72
+    startLine: 98
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -557,7 +1141,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Remove
     path: src/nORM/Core/DbSet.cs
-    startLine: 75
+    startLine: 100
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -592,7 +1176,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 78
+    startLine: 102
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -626,7 +1210,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 81
+    startLine: 104
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -660,7 +1244,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Find
     path: src/nORM/Core/DbSet.cs
-    startLine: 84
+    startLine: 106
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -696,7 +1280,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FindAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 87
+    startLine: 108
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -732,7 +1316,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FindAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 90
+    startLine: 110
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -753,34 +1337,6 @@ items:
   fullName.vb: nORM.Core.DbSet(Of T).FindAsync(Object(), System.Threading.CancellationToken)
   name.vb: FindAsync(Object(), CancellationToken)
 references:
-- uid: System.Linq.IQueryable`1
-  commentId: T:System.Linq.IQueryable`1
-  isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
-  name: IQueryable<T>
-  nameWithType: IQueryable<T>
-  fullName: System.Linq.IQueryable<T>
-  nameWithType.vb: IQueryable(Of T)
-  fullName.vb: System.Linq.IQueryable(Of T)
-  name.vb: IQueryable(Of T)
-  spec.csharp:
-  - uid: System.Linq.IQueryable`1
-    name: IQueryable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
-  - name: <
-  - name: T
-  - name: '>'
-  spec.vb:
-  - uid: System.Linq.IQueryable`1
-    name: IQueryable
-    isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
-  - name: (
-  - name: Of
-  - name: " "
-  - name: T
-  - name: )
 - uid: nORM.Core.DbSet`1.Add(`0)
   commentId: M:nORM.Core.DbSet`1.Add(`0)
   href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_Add__0_
@@ -907,6 +1463,32 @@ references:
   - name: (
   - name: )
   - name: )
+- uid: nORM.Core.INormQueryable`1
+  commentId: T:nORM.Core.INormQueryable`1
+  parent: nORM.Core
+  href: nORM.Core.INormQueryable-1.html
+  name: INormQueryable<T>
+  nameWithType: INormQueryable<T>
+  fullName: nORM.Core.INormQueryable<T>
+  nameWithType.vb: INormQueryable(Of T)
+  fullName.vb: nORM.Core.INormQueryable(Of T)
+  name.vb: INormQueryable(Of T)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: nORM.Core
   commentId: N:nORM.Core
   href: nORM.html
@@ -940,6 +1522,70 @@ references:
   nameWithType.vb: Object
   fullName.vb: Object
   name.vb: Object
+- uid: nORM.Core.INormQueryable{{T}}
+  commentId: T:nORM.Core.INormQueryable{`0}
+  parent: nORM.Core
+  definition: nORM.Core.INormQueryable`1
+  href: nORM.Core.INormQueryable-1.html
+  name: INormQueryable<T>
+  nameWithType: INormQueryable<T>
+  fullName: nORM.Core.INormQueryable<T>
+  nameWithType.vb: INormQueryable(Of T)
+  fullName.vb: nORM.Core.INormQueryable(Of T)
+  name.vb: INormQueryable(Of T)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1
+    name: INormQueryable
+    href: nORM.Core.INormQueryable-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Linq.IOrderedQueryable{{T}}
+  commentId: T:System.Linq.IOrderedQueryable{`0}
+  parent: System.Linq
+  definition: System.Linq.IOrderedQueryable`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable-1
+  name: IOrderedQueryable<T>
+  nameWithType: IOrderedQueryable<T>
+  fullName: System.Linq.IOrderedQueryable<T>
+  nameWithType.vb: IOrderedQueryable(Of T)
+  fullName.vb: System.Linq.IOrderedQueryable(Of T)
+  name.vb: IOrderedQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IOrderedQueryable`1
+    name: IOrderedQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IOrderedQueryable`1
+    name: IOrderedQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: System.Linq.IOrderedQueryable
+  commentId: T:System.Linq.IOrderedQueryable
+  parent: System.Linq
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable
+  name: IOrderedQueryable
+  nameWithType: IOrderedQueryable
+  fullName: System.Linq.IOrderedQueryable
 - uid: System.Linq.IQueryable{{T}}
   commentId: T:System.Linq.IQueryable{``0}
   parent: System.Linq
@@ -6994,6 +7640,34 @@ references:
   name: System
   nameWithType: System
   fullName: System
+- uid: System.Linq.IOrderedQueryable`1
+  commentId: T:System.Linq.IOrderedQueryable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable-1
+  name: IOrderedQueryable<T>
+  nameWithType: IOrderedQueryable<T>
+  fullName: System.Linq.IOrderedQueryable<T>
+  nameWithType.vb: IOrderedQueryable(Of T)
+  fullName.vb: System.Linq.IOrderedQueryable(Of T)
+  name.vb: IOrderedQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IOrderedQueryable`1
+    name: IOrderedQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IOrderedQueryable`1
+    name: IOrderedQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iorderedqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: System.Linq
   commentId: N:System.Linq
   isExternal: true
@@ -7021,6 +7695,34 @@ references:
     name: Linq
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.linq
+- uid: System.Linq.IQueryable`1
+  commentId: T:System.Linq.IQueryable`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  name: IQueryable<T>
+  nameWithType: IQueryable<T>
+  fullName: System.Linq.IQueryable<T>
+  nameWithType.vb: IQueryable(Of T)
+  fullName.vb: System.Linq.IQueryable(Of T)
+  name.vb: IQueryable(Of T)
+  spec.csharp:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.IQueryable`1
+    name: IQueryable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.iqueryable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
 - uid: System.Collections.Generic.IEnumerable`1
   commentId: T:System.Collections.Generic.IEnumerable`1
   isExternal: true
@@ -12993,39 +13695,476 @@ references:
   - name: " "
   - name: T
   - name: )
-- uid: nORM.Core.DbSet`1.Add*
-  commentId: Overload:nORM.Core.DbSet`1.Add
-  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_Add__0_
-  name: Add
-  nameWithType: DbSet<T>.Add
-  fullName: nORM.Core.DbSet<T>.Add
-  nameWithType.vb: DbSet(Of T).Add
-  fullName.vb: nORM.Core.DbSet(Of T).Add
-- uid: '{T}'
-  commentId: '!:T'
-  definition: T
-  name: T
-  nameWithType: T
-  fullName: T
-- uid: nORM.Core.EntityEntry
-  commentId: T:nORM.Core.EntityEntry
+- uid: nORM.Core.DbSet`1.Include*
+  commentId: Overload:nORM.Core.DbSet`1.Include
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  name: Include
+  nameWithType: DbSet<T>.Include
+  fullName: nORM.Core.DbSet<T>.Include
+  nameWithType.vb: DbSet(Of T).Include
+  fullName.vb: nORM.Core.DbSet(Of T).Include
+- uid: nORM.Core.INormQueryable{{T}}.Include``1(System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}})
+  commentId: M:nORM.Core.INormQueryable{`0}.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  name: Include<TProperty>(Expression<Func<T, TProperty>>)
+  nameWithType: INormQueryable<T>.Include<TProperty>(Expression<Func<T, TProperty>>)
+  fullName: nORM.Core.INormQueryable<T>.Include<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: INormQueryable(Of T).Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Core.INormQueryable(Of T).Include(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+    name: Include
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+    name: Include
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression{System.Func{{T},{TProperty}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{`0,``0}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<T, TProperty>>
+  nameWithType: Expression<Func<T, TProperty>>
+  fullName: System.Linq.Expressions.Expression<System.Func<T, TProperty>>
+  nameWithType.vb: Expression(Of Func(Of T, TProperty))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty))
+  name.vb: Expression(Of Func(Of T, TProperty))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+- uid: nORM.Core.INormIncludableQueryable{{T},{TProperty}}
+  commentId: T:nORM.Core.INormIncludableQueryable{`0,``0}
   parent: nORM.Core
-  href: nORM.Core.EntityEntry.html
-  name: EntityEntry
-  nameWithType: EntityEntry
-  fullName: nORM.Core.EntityEntry
-- uid: T
-  name: T
-  nameWithType: T
-  fullName: T
-- uid: nORM.Core.DbSet`1.AddAsync*
-  commentId: Overload:nORM.Core.DbSet`1.AddAsync
-  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AddAsync__0_System_Threading_CancellationToken_
-  name: AddAsync
-  nameWithType: DbSet<T>.AddAsync
-  fullName: nORM.Core.DbSet<T>.AddAsync
-  nameWithType.vb: DbSet(Of T).AddAsync
-  fullName.vb: nORM.Core.DbSet(Of T).AddAsync
+  definition: nORM.Core.INormIncludableQueryable`2
+  href: nORM.Core.INormIncludableQueryable-2.html
+  name: INormIncludableQueryable<T, TProperty>
+  nameWithType: INormIncludableQueryable<T, TProperty>
+  fullName: nORM.Core.INormIncludableQueryable<T, TProperty>
+  nameWithType.vb: INormIncludableQueryable(Of T, TProperty)
+  fullName.vb: nORM.Core.INormIncludableQueryable(Of T, TProperty)
+  name.vb: INormIncludableQueryable(Of T, TProperty)
+  spec.csharp:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+- uid: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  commentId: M:nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  name: Include<TProperty>(Expression<Func<T, TProperty>>)
+  nameWithType: INormQueryable<T>.Include<TProperty>(Expression<Func<T, TProperty>>)
+  fullName: nORM.Core.INormQueryable<T>.Include<TProperty>(System.Linq.Expressions.Expression<System.Func<T, TProperty>>)
+  nameWithType.vb: INormQueryable(Of T).Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  fullName.vb: nORM.Core.INormQueryable(Of T).Include(Of TProperty)(System.Linq.Expressions.Expression(Of System.Func(Of T, TProperty)))
+  name.vb: Include(Of TProperty)(Expression(Of Func(Of T, TProperty)))
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+    name: Include
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  - name: <
+  - name: TProperty
+  - name: '>'
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  - name: '>'
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.Include``1(System.Linq.Expressions.Expression{System.Func{`0,``0}})
+    name: Include
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_Include__1_System_Linq_Expressions_Expression_System_Func__0___0___
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+  - name: )
+  - name: )
+- uid: System.Linq.Expressions.Expression`1
+  commentId: T:System.Linq.Expressions.Expression`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<TDelegate>
+  nameWithType: Expression<TDelegate>
+  fullName: System.Linq.Expressions.Expression<TDelegate>
+  nameWithType.vb: Expression(Of TDelegate)
+  fullName.vb: System.Linq.Expressions.Expression(Of TDelegate)
+  name.vb: Expression(Of TDelegate)
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - name: TDelegate
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TDelegate
+  - name: )
+- uid: nORM.Core.INormIncludableQueryable`2
+  commentId: T:nORM.Core.INormIncludableQueryable`2
+  href: nORM.Core.INormIncludableQueryable-2.html
+  name: INormIncludableQueryable<TEntity, TProperty>
+  nameWithType: INormIncludableQueryable<TEntity, TProperty>
+  fullName: nORM.Core.INormIncludableQueryable<TEntity, TProperty>
+  nameWithType.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  fullName.vb: nORM.Core.INormIncludableQueryable(Of TEntity, TProperty)
+  name.vb: INormIncludableQueryable(Of TEntity, TProperty)
+  spec.csharp:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: <
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: '>'
+  spec.vb:
+  - uid: nORM.Core.INormIncludableQueryable`2
+    name: INormIncludableQueryable
+    href: nORM.Core.INormIncludableQueryable-2.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TEntity
+  - name: ','
+  - name: " "
+  - name: TProperty
+  - name: )
+- uid: nORM.Core.DbSet`1.AsNoTracking*
+  commentId: Overload:nORM.Core.DbSet`1.AsNoTracking
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AsNoTracking
+  name: AsNoTracking
+  nameWithType: DbSet<T>.AsNoTracking
+  fullName: nORM.Core.DbSet<T>.AsNoTracking
+  nameWithType.vb: DbSet(Of T).AsNoTracking
+  fullName.vb: nORM.Core.DbSet(Of T).AsNoTracking
+- uid: nORM.Core.INormQueryable{{T}}.AsNoTracking
+  commentId: M:nORM.Core.INormQueryable{`0}.AsNoTracking
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.AsNoTracking
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  name: AsNoTracking()
+  nameWithType: INormQueryable<T>.AsNoTracking()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTracking()
+  nameWithType.vb: INormQueryable(Of T).AsNoTracking()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTracking()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.AsNoTracking
+    name: AsNoTracking
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.AsNoTracking
+    name: AsNoTracking
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  - name: (
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsNoTracking
+  commentId: M:nORM.Core.INormQueryable`1.AsNoTracking
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  name: AsNoTracking()
+  nameWithType: INormQueryable<T>.AsNoTracking()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTracking()
+  nameWithType.vb: INormQueryable(Of T).AsNoTracking()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTracking()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AsNoTracking
+    name: AsNoTracking
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AsNoTracking
+    name: AsNoTracking
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTracking
+  - name: (
+  - name: )
+- uid: nORM.Core.DbSet`1.AsNoTrackingWithIdentityResolution*
+  commentId: Overload:nORM.Core.DbSet`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution
+  nameWithType: DbSet<T>.AsNoTrackingWithIdentityResolution
+  fullName: nORM.Core.DbSet<T>.AsNoTrackingWithIdentityResolution
+  nameWithType.vb: DbSet(Of T).AsNoTrackingWithIdentityResolution
+  fullName.vb: nORM.Core.DbSet(Of T).AsNoTrackingWithIdentityResolution
+- uid: nORM.Core.INormQueryable{{T}}.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  nameWithType.vb: INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  commentId: M:nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  name: AsNoTrackingWithIdentityResolution()
+  nameWithType: INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  fullName: nORM.Core.INormQueryable<T>.AsNoTrackingWithIdentityResolution()
+  nameWithType.vb: INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsNoTrackingWithIdentityResolution()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AsNoTrackingWithIdentityResolution
+    name: AsNoTrackingWithIdentityResolution
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsNoTrackingWithIdentityResolution
+  - name: (
+  - name: )
+- uid: nORM.Core.DbSet`1.AsSplitQuery*
+  commentId: Overload:nORM.Core.DbSet`1.AsSplitQuery
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AsSplitQuery
+  name: AsSplitQuery
+  nameWithType: DbSet<T>.AsSplitQuery
+  fullName: nORM.Core.DbSet<T>.AsSplitQuery
+  nameWithType.vb: DbSet(Of T).AsSplitQuery
+  fullName.vb: nORM.Core.DbSet(Of T).AsSplitQuery
+- uid: nORM.Core.INormQueryable{{T}}.AsSplitQuery
+  commentId: M:nORM.Core.INormQueryable{`0}.AsSplitQuery
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.AsSplitQuery
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsSplitQuery
+  name: AsSplitQuery()
+  nameWithType: INormQueryable<T>.AsSplitQuery()
+  fullName: nORM.Core.INormQueryable<T>.AsSplitQuery()
+  nameWithType.vb: INormQueryable(Of T).AsSplitQuery()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsSplitQuery()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.AsSplitQuery
+    name: AsSplitQuery
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsSplitQuery
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.AsSplitQuery
+    name: AsSplitQuery
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsSplitQuery
+  - name: (
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsSplitQuery
+  commentId: M:nORM.Core.INormQueryable`1.AsSplitQuery
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsSplitQuery
+  name: AsSplitQuery()
+  nameWithType: INormQueryable<T>.AsSplitQuery()
+  fullName: nORM.Core.INormQueryable<T>.AsSplitQuery()
+  nameWithType.vb: INormQueryable(Of T).AsSplitQuery()
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsSplitQuery()
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AsSplitQuery
+    name: AsSplitQuery
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsSplitQuery
+  - name: (
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AsSplitQuery
+    name: AsSplitQuery
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsSplitQuery
+  - name: (
+  - name: )
+- uid: nORM.Core.DbSet`1.AsAsyncEnumerable*
+  commentId: Overload:nORM.Core.DbSet`1.AsAsyncEnumerable
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  name: AsAsyncEnumerable
+  nameWithType: DbSet<T>.AsAsyncEnumerable
+  fullName: nORM.Core.DbSet<T>.AsAsyncEnumerable
+  nameWithType.vb: DbSet(Of T).AsAsyncEnumerable
+  fullName.vb: nORM.Core.DbSet(Of T).AsAsyncEnumerable
+- uid: nORM.Core.INormQueryable{{T}}.AsAsyncEnumerable(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.AsAsyncEnumerable(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  name: AsAsyncEnumerable(CancellationToken)
+  nameWithType: INormQueryable<T>.AsAsyncEnumerable(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.AsAsyncEnumerable(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).AsAsyncEnumerable(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsAsyncEnumerable(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.AsAsyncEnumerable(System.Threading.CancellationToken)
+    name: AsAsyncEnumerable
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.AsAsyncEnumerable(System.Threading.CancellationToken)
+    name: AsAsyncEnumerable
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
 - uid: System.Threading.CancellationToken
   commentId: T:System.Threading.CancellationToken
   parent: System.Threading
@@ -13034,38 +14173,63 @@ references:
   name: CancellationToken
   nameWithType: CancellationToken
   fullName: System.Threading.CancellationToken
-- uid: System.Threading.Tasks.ValueTask{nORM.Core.EntityEntry}
-  commentId: T:System.Threading.Tasks.ValueTask{nORM.Core.EntityEntry}
-  parent: System.Threading.Tasks
-  definition: System.Threading.Tasks.ValueTask`1
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
-  name: ValueTask<EntityEntry>
-  nameWithType: ValueTask<EntityEntry>
-  fullName: System.Threading.Tasks.ValueTask<nORM.Core.EntityEntry>
-  nameWithType.vb: ValueTask(Of EntityEntry)
-  fullName.vb: System.Threading.Tasks.ValueTask(Of nORM.Core.EntityEntry)
-  name.vb: ValueTask(Of EntityEntry)
+- uid: System.Collections.Generic.IAsyncEnumerable{{T}}
+  commentId: T:System.Collections.Generic.IAsyncEnumerable{``0}
+  parent: System.Collections.Generic
+  definition: System.Collections.Generic.IAsyncEnumerable`1
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  name: IAsyncEnumerable<T>
+  nameWithType: IAsyncEnumerable<T>
+  fullName: System.Collections.Generic.IAsyncEnumerable<T>
+  nameWithType.vb: IAsyncEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
+  name.vb: IAsyncEnumerable(Of T)
   spec.csharp:
-  - uid: System.Threading.Tasks.ValueTask`1
-    name: ValueTask
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
   - name: <
-  - uid: nORM.Core.EntityEntry
-    name: EntityEntry
-    href: nORM.Core.EntityEntry.html
+  - name: T
   - name: '>'
   spec.vb:
-  - uid: System.Threading.Tasks.ValueTask`1
-    name: ValueTask
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
   - name: (
   - name: Of
   - name: " "
-  - uid: nORM.Core.EntityEntry
-    name: EntityEntry
-    href: nORM.Core.EntityEntry.html
+  - name: T
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  name: AsAsyncEnumerable(CancellationToken)
+  nameWithType: INormQueryable<T>.AsAsyncEnumerable(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.AsAsyncEnumerable(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).AsAsyncEnumerable(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).AsAsyncEnumerable(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+    name: AsAsyncEnumerable
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AsAsyncEnumerable(System.Threading.CancellationToken)
+    name: AsAsyncEnumerable
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AsAsyncEnumerable_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
   - name: )
 - uid: System.Threading
   commentId: N:System.Threading
@@ -13094,29 +14258,167 @@ references:
     name: Threading
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading
-- uid: System.Threading.Tasks.ValueTask`1
-  commentId: T:System.Threading.Tasks.ValueTask`1
+- uid: System.Collections.Generic.IAsyncEnumerable`1
+  commentId: T:System.Collections.Generic.IAsyncEnumerable`1
   isExternal: true
-  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
-  name: ValueTask<TResult>
-  nameWithType: ValueTask<TResult>
-  fullName: System.Threading.Tasks.ValueTask<TResult>
-  nameWithType.vb: ValueTask(Of TResult)
-  fullName.vb: System.Threading.Tasks.ValueTask(Of TResult)
-  name.vb: ValueTask(Of TResult)
+  href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  name: IAsyncEnumerable<T>
+  nameWithType: IAsyncEnumerable<T>
+  fullName: System.Collections.Generic.IAsyncEnumerable<T>
+  nameWithType.vb: IAsyncEnumerable(Of T)
+  fullName.vb: System.Collections.Generic.IAsyncEnumerable(Of T)
+  name.vb: IAsyncEnumerable(Of T)
   spec.csharp:
-  - uid: System.Threading.Tasks.ValueTask`1
-    name: ValueTask
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Collections.Generic.IAsyncEnumerable`1
+    name: IAsyncEnumerable
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.DbSet`1.ToListAsync*
+  commentId: Overload:nORM.Core.DbSet`1.ToListAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_ToListAsync_System_Threading_CancellationToken_
+  name: ToListAsync
+  nameWithType: DbSet<T>.ToListAsync
+  fullName: nORM.Core.DbSet<T>.ToListAsync
+  nameWithType.vb: DbSet(Of T).ToListAsync
+  fullName.vb: nORM.Core.DbSet(Of T).ToListAsync
+- uid: nORM.Core.INormQueryable{{T}}.ToListAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.ToListAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.ToListAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToListAsync_System_Threading_CancellationToken_
+  name: ToListAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.ToListAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ToListAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ToListAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ToListAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.ToListAsync(System.Threading.CancellationToken)
+    name: ToListAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToListAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.ToListAsync(System.Threading.CancellationToken)
+    name: ToListAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToListAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Collections.Generic.List{{T}}}
+  commentId: T:System.Threading.Tasks.Task{System.Collections.Generic.List{``0}}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<List<T>>
+  nameWithType: Task<List<T>>
+  fullName: System.Threading.Tasks.Task<System.Collections.Generic.List<T>>
+  nameWithType.vb: Task(Of List(Of T))
+  fullName.vb: System.Threading.Tasks.Task(Of System.Collections.Generic.List(Of T))
+  name.vb: Task(Of List(Of T))
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Collections.Generic.List`1
+    name: List
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+- uid: nORM.Core.INormQueryable`1.ToListAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.ToListAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToListAsync_System_Threading_CancellationToken_
+  name: ToListAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.ToListAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ToListAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ToListAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ToListAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.ToListAsync(System.Threading.CancellationToken)
+    name: ToListAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToListAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.ToListAsync(System.Threading.CancellationToken)
+    name: ToListAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToListAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Threading.Tasks.Task`1
+  commentId: T:System.Threading.Tasks.Task`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<TResult>
+  nameWithType: Task<TResult>
+  fullName: System.Threading.Tasks.Task<TResult>
+  nameWithType.vb: Task(Of TResult)
+  fullName.vb: System.Threading.Tasks.Task(Of TResult)
+  name.vb: Task(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
   - name: <
   - name: TResult
   - name: '>'
   spec.vb:
-  - uid: System.Threading.Tasks.ValueTask`1
-    name: ValueTask
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
     isExternal: true
-    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
   - name: (
   - name: Of
   - name: " "
@@ -13159,6 +14461,1038 @@ references:
     name: Tasks
     isExternal: true
     href: https://learn.microsoft.com/dotnet/api/system.threading.tasks
+- uid: nORM.Core.DbSet`1.ToArrayAsync*
+  commentId: Overload:nORM.Core.DbSet`1.ToArrayAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_ToArrayAsync_System_Threading_CancellationToken_
+  name: ToArrayAsync
+  nameWithType: DbSet<T>.ToArrayAsync
+  fullName: nORM.Core.DbSet<T>.ToArrayAsync
+  nameWithType.vb: DbSet(Of T).ToArrayAsync
+  fullName.vb: nORM.Core.DbSet(Of T).ToArrayAsync
+- uid: nORM.Core.INormQueryable{{T}}.ToArrayAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.ToArrayAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.ToArrayAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToArrayAsync_System_Threading_CancellationToken_
+  name: ToArrayAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.ToArrayAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ToArrayAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ToArrayAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ToArrayAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.ToArrayAsync(System.Threading.CancellationToken)
+    name: ToArrayAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToArrayAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.ToArrayAsync(System.Threading.CancellationToken)
+    name: ToArrayAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToArrayAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Threading.Tasks.Task{{T}[]}
+  commentId: T:System.Threading.Tasks.Task{`0[]}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<T[]>
+  nameWithType: Task<T[]>
+  fullName: System.Threading.Tasks.Task<T[]>
+  nameWithType.vb: Task(Of T())
+  fullName.vb: System.Threading.Tasks.Task(Of T())
+  name.vb: Task(Of T())
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: T
+  - name: '['
+  - name: ']'
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: (
+  - name: )
+  - name: )
+- uid: nORM.Core.INormQueryable`1.ToArrayAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.ToArrayAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToArrayAsync_System_Threading_CancellationToken_
+  name: ToArrayAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.ToArrayAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ToArrayAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ToArrayAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ToArrayAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.ToArrayAsync(System.Threading.CancellationToken)
+    name: ToArrayAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToArrayAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.ToArrayAsync(System.Threading.CancellationToken)
+    name: ToArrayAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ToArrayAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.CountAsync*
+  commentId: Overload:nORM.Core.DbSet`1.CountAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_CountAsync_System_Threading_CancellationToken_
+  name: CountAsync
+  nameWithType: DbSet<T>.CountAsync
+  fullName: nORM.Core.DbSet<T>.CountAsync
+  nameWithType.vb: DbSet(Of T).CountAsync
+  fullName.vb: nORM.Core.DbSet(Of T).CountAsync
+- uid: nORM.Core.INormQueryable{{T}}.CountAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.CountAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.CountAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_CountAsync_System_Threading_CancellationToken_
+  name: CountAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.CountAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.CountAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).CountAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).CountAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.CountAsync(System.Threading.CancellationToken)
+    name: CountAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_CountAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.CountAsync(System.Threading.CancellationToken)
+    name: CountAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_CountAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Int32}
+  commentId: T:System.Threading.Tasks.Task{System.Int32}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<int>
+  nameWithType: Task<int>
+  fullName: System.Threading.Tasks.Task<int>
+  nameWithType.vb: Task(Of Integer)
+  fullName.vb: System.Threading.Tasks.Task(Of Integer)
+  name.vb: Task(Of Integer)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Int32
+    name: int
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Int32
+    name: Integer
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.int32
+  - name: )
+- uid: nORM.Core.INormQueryable`1.CountAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.CountAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_CountAsync_System_Threading_CancellationToken_
+  name: CountAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.CountAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.CountAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).CountAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).CountAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.CountAsync(System.Threading.CancellationToken)
+    name: CountAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_CountAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.CountAsync(System.Threading.CancellationToken)
+    name: CountAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_CountAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.AnyAsync*
+  commentId: Overload:nORM.Core.DbSet`1.AnyAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AnyAsync_System_Threading_CancellationToken_
+  name: AnyAsync
+  nameWithType: DbSet<T>.AnyAsync
+  fullName: nORM.Core.DbSet<T>.AnyAsync
+  nameWithType.vb: DbSet(Of T).AnyAsync
+  fullName.vb: nORM.Core.DbSet(Of T).AnyAsync
+- uid: nORM.Core.INormQueryable{{T}}.AnyAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.AnyAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AnyAsync_System_Threading_CancellationToken_
+  name: AnyAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.AnyAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.AnyAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).AnyAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).AnyAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken)
+    name: AnyAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AnyAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.AnyAsync(System.Threading.CancellationToken)
+    name: AnyAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AnyAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Threading.Tasks.Task{System.Boolean}
+  commentId: T:System.Threading.Tasks.Task{System.Boolean}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<bool>
+  nameWithType: Task<bool>
+  fullName: System.Threading.Tasks.Task<bool>
+  nameWithType.vb: Task(Of Boolean)
+  fullName.vb: System.Threading.Tasks.Task(Of Boolean)
+  name.vb: Task(Of Boolean)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - uid: System.Boolean
+    name: bool
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Boolean
+    name: Boolean
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.boolean
+  - name: )
+- uid: nORM.Core.INormQueryable`1.AnyAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.AnyAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AnyAsync_System_Threading_CancellationToken_
+  name: AnyAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.AnyAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.AnyAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).AnyAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).AnyAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.AnyAsync(System.Threading.CancellationToken)
+    name: AnyAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AnyAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.AnyAsync(System.Threading.CancellationToken)
+    name: AnyAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_AnyAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.FirstAsync*
+  commentId: Overload:nORM.Core.DbSet`1.FirstAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_FirstAsync_System_Threading_CancellationToken_
+  name: FirstAsync
+  nameWithType: DbSet<T>.FirstAsync
+  fullName: nORM.Core.DbSet<T>.FirstAsync
+  nameWithType.vb: DbSet(Of T).FirstAsync
+  fullName.vb: nORM.Core.DbSet(Of T).FirstAsync
+- uid: nORM.Core.INormQueryable{{T}}.FirstAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.FirstAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.FirstAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstAsync_System_Threading_CancellationToken_
+  name: FirstAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.FirstAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.FirstAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).FirstAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).FirstAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.FirstAsync(System.Threading.CancellationToken)
+    name: FirstAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.FirstAsync(System.Threading.CancellationToken)
+    name: FirstAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Threading.Tasks.Task{{T}}
+  commentId: T:System.Threading.Tasks.Task{`0}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.Task`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  name: Task<T>
+  nameWithType: Task<T>
+  fullName: System.Threading.Tasks.Task<T>
+  nameWithType.vb: Task(Of T)
+  fullName.vb: System.Threading.Tasks.Task(Of T)
+  name.vb: Task(Of T)
+  spec.csharp:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: <
+  - name: T
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.Task`1
+    name: Task
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+- uid: nORM.Core.INormQueryable`1.FirstAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.FirstAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstAsync_System_Threading_CancellationToken_
+  name: FirstAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.FirstAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.FirstAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).FirstAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).FirstAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.FirstAsync(System.Threading.CancellationToken)
+    name: FirstAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.FirstAsync(System.Threading.CancellationToken)
+    name: FirstAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.FirstOrDefaultAsync*
+  commentId: Overload:nORM.Core.DbSet`1.FirstOrDefaultAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  name: FirstOrDefaultAsync
+  nameWithType: DbSet<T>.FirstOrDefaultAsync
+  fullName: nORM.Core.DbSet<T>.FirstOrDefaultAsync
+  nameWithType.vb: DbSet(Of T).FirstOrDefaultAsync
+  fullName.vb: nORM.Core.DbSet(Of T).FirstOrDefaultAsync
+- uid: nORM.Core.INormQueryable{{T}}.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  name: FirstOrDefaultAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.FirstOrDefaultAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).FirstOrDefaultAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).FirstOrDefaultAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.FirstOrDefaultAsync(System.Threading.CancellationToken)
+    name: FirstOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.FirstOrDefaultAsync(System.Threading.CancellationToken)
+    name: FirstOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.INormQueryable`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  name: FirstOrDefaultAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.FirstOrDefaultAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.FirstOrDefaultAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).FirstOrDefaultAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).FirstOrDefaultAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+    name: FirstOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.FirstOrDefaultAsync(System.Threading.CancellationToken)
+    name: FirstOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_FirstOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.SingleAsync*
+  commentId: Overload:nORM.Core.DbSet`1.SingleAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_SingleAsync_System_Threading_CancellationToken_
+  name: SingleAsync
+  nameWithType: DbSet<T>.SingleAsync
+  fullName: nORM.Core.DbSet<T>.SingleAsync
+  nameWithType.vb: DbSet(Of T).SingleAsync
+  fullName.vb: nORM.Core.DbSet(Of T).SingleAsync
+- uid: nORM.Core.INormQueryable{{T}}.SingleAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.SingleAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.SingleAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleAsync_System_Threading_CancellationToken_
+  name: SingleAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.SingleAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.SingleAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).SingleAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).SingleAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.SingleAsync(System.Threading.CancellationToken)
+    name: SingleAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.SingleAsync(System.Threading.CancellationToken)
+    name: SingleAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.INormQueryable`1.SingleAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.SingleAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleAsync_System_Threading_CancellationToken_
+  name: SingleAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.SingleAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.SingleAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).SingleAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).SingleAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.SingleAsync(System.Threading.CancellationToken)
+    name: SingleAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.SingleAsync(System.Threading.CancellationToken)
+    name: SingleAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.SingleOrDefaultAsync*
+  commentId: Overload:nORM.Core.DbSet`1.SingleOrDefaultAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  name: SingleOrDefaultAsync
+  nameWithType: DbSet<T>.SingleOrDefaultAsync
+  fullName: nORM.Core.DbSet<T>.SingleOrDefaultAsync
+  nameWithType.vb: DbSet(Of T).SingleOrDefaultAsync
+  fullName.vb: nORM.Core.DbSet(Of T).SingleOrDefaultAsync
+- uid: nORM.Core.INormQueryable{{T}}.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  name: SingleOrDefaultAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.SingleOrDefaultAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).SingleOrDefaultAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).SingleOrDefaultAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.SingleOrDefaultAsync(System.Threading.CancellationToken)
+    name: SingleOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.SingleOrDefaultAsync(System.Threading.CancellationToken)
+    name: SingleOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.INormQueryable`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  name: SingleOrDefaultAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.SingleOrDefaultAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.SingleOrDefaultAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).SingleOrDefaultAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).SingleOrDefaultAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+    name: SingleOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.SingleOrDefaultAsync(System.Threading.CancellationToken)
+    name: SingleOrDefaultAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_SingleOrDefaultAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.ExecuteDeleteAsync*
+  commentId: Overload:nORM.Core.DbSet`1.ExecuteDeleteAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  name: ExecuteDeleteAsync
+  nameWithType: DbSet<T>.ExecuteDeleteAsync
+  fullName: nORM.Core.DbSet<T>.ExecuteDeleteAsync
+  nameWithType.vb: DbSet(Of T).ExecuteDeleteAsync
+  fullName.vb: nORM.Core.DbSet(Of T).ExecuteDeleteAsync
+- uid: nORM.Core.INormQueryable{{T}}.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  name: ExecuteDeleteAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.ExecuteDeleteAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ExecuteDeleteAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ExecuteDeleteAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.ExecuteDeleteAsync(System.Threading.CancellationToken)
+    name: ExecuteDeleteAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.ExecuteDeleteAsync(System.Threading.CancellationToken)
+    name: ExecuteDeleteAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.INormQueryable`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  name: ExecuteDeleteAsync(CancellationToken)
+  nameWithType: INormQueryable<T>.ExecuteDeleteAsync(CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ExecuteDeleteAsync(System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ExecuteDeleteAsync(CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ExecuteDeleteAsync(System.Threading.CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+    name: ExecuteDeleteAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.ExecuteDeleteAsync(System.Threading.CancellationToken)
+    name: ExecuteDeleteAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteDeleteAsync_System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.ExecuteUpdateAsync*
+  commentId: Overload:nORM.Core.DbSet`1.ExecuteUpdateAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  name: ExecuteUpdateAsync
+  nameWithType: DbSet<T>.ExecuteUpdateAsync
+  fullName: nORM.Core.DbSet<T>.ExecuteUpdateAsync
+  nameWithType.vb: DbSet(Of T).ExecuteUpdateAsync
+  fullName.vb: nORM.Core.DbSet(Of T).ExecuteUpdateAsync
+- uid: nORM.Core.INormQueryable{{T}}.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable{`0}.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  parent: nORM.Core.INormQueryable{{T}}
+  definition: nORM.Core.INormQueryable`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  name: ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>, CancellationToken)
+  nameWithType: INormQueryable<T>.ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>, CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ExecuteUpdateAsync(System.Linq.Expressions.Expression<System.Func<nORM.Core.SetPropertyCalls<T>, nORM.Core.SetPropertyCalls<T>>>, System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ExecuteUpdateAsync(Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ExecuteUpdateAsync(System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.SetPropertyCalls(Of T), nORM.Core.SetPropertyCalls(Of T))), System.Threading.CancellationToken)
+  name.vb: ExecuteUpdateAsync(Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable{`0}.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+    name: ExecuteUpdateAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable{`0}.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+    name: ExecuteUpdateAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}}
+  parent: System.Linq.Expressions
+  definition: System.Linq.Expressions.Expression`1
+  href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  name: Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>
+  nameWithType: Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>
+  fullName: System.Linq.Expressions.Expression<System.Func<nORM.Core.SetPropertyCalls<T>, nORM.Core.SetPropertyCalls<T>>>
+  nameWithType.vb: Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T)))
+  fullName.vb: System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.SetPropertyCalls(Of T), nORM.Core.SetPropertyCalls(Of T)))
+  name.vb: Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T)))
+  spec.csharp:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  spec.vb:
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+  - name: )
+- uid: nORM.Core.INormQueryable`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  commentId: M:nORM.Core.INormQueryable`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+  isExternal: true
+  href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  name: ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>, CancellationToken)
+  nameWithType: INormQueryable<T>.ExecuteUpdateAsync(Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>>, CancellationToken)
+  fullName: nORM.Core.INormQueryable<T>.ExecuteUpdateAsync(System.Linq.Expressions.Expression<System.Func<nORM.Core.SetPropertyCalls<T>, nORM.Core.SetPropertyCalls<T>>>, System.Threading.CancellationToken)
+  nameWithType.vb: INormQueryable(Of T).ExecuteUpdateAsync(Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
+  fullName.vb: nORM.Core.INormQueryable(Of T).ExecuteUpdateAsync(System.Linq.Expressions.Expression(Of System.Func(Of nORM.Core.SetPropertyCalls(Of T), nORM.Core.SetPropertyCalls(Of T))), System.Threading.CancellationToken)
+  name.vb: ExecuteUpdateAsync(Expression(Of Func(Of SetPropertyCalls(Of T), SetPropertyCalls(Of T))), CancellationToken)
+  spec.csharp:
+  - uid: nORM.Core.INormQueryable`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+    name: ExecuteUpdateAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: <
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: <
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: <
+  - name: T
+  - name: '>'
+  - name: '>'
+  - name: '>'
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+  spec.vb:
+  - uid: nORM.Core.INormQueryable`1.ExecuteUpdateAsync(System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}},System.Threading.CancellationToken)
+    name: ExecuteUpdateAsync
+    href: nORM.Core.INormQueryable-1.html#nORM_Core_INormQueryable_1_ExecuteUpdateAsync_System_Linq_Expressions_Expression_System_Func_nORM_Core_SetPropertyCalls__0__nORM_Core_SetPropertyCalls__0____System_Threading_CancellationToken_
+  - name: (
+  - uid: System.Linq.Expressions.Expression`1
+    name: Expression
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: System.Func`2
+    name: Func
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.func-2
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: nORM.Core.SetPropertyCalls`1
+    name: SetPropertyCalls
+    href: nORM.Core.SetPropertyCalls-1.html
+  - name: (
+  - name: Of
+  - name: " "
+  - name: T
+  - name: )
+  - name: )
+  - name: )
+  - name: ','
+  - name: " "
+  - uid: System.Threading.CancellationToken
+    name: CancellationToken
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken
+  - name: )
+- uid: nORM.Core.DbSet`1.Add*
+  commentId: Overload:nORM.Core.DbSet`1.Add
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_Add__0_
+  name: Add
+  nameWithType: DbSet<T>.Add
+  fullName: nORM.Core.DbSet<T>.Add
+  nameWithType.vb: DbSet(Of T).Add
+  fullName.vb: nORM.Core.DbSet(Of T).Add
+- uid: '{T}'
+  commentId: '!:T'
+  definition: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: nORM.Core.EntityEntry
+  commentId: T:nORM.Core.EntityEntry
+  parent: nORM.Core
+  href: nORM.Core.EntityEntry.html
+  name: EntityEntry
+  nameWithType: EntityEntry
+  fullName: nORM.Core.EntityEntry
+- uid: T
+  name: T
+  nameWithType: T
+  fullName: T
+- uid: nORM.Core.DbSet`1.AddAsync*
+  commentId: Overload:nORM.Core.DbSet`1.AddAsync
+  href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AddAsync__0_System_Threading_CancellationToken_
+  name: AddAsync
+  nameWithType: DbSet<T>.AddAsync
+  fullName: nORM.Core.DbSet<T>.AddAsync
+  nameWithType.vb: DbSet(Of T).AddAsync
+  fullName.vb: nORM.Core.DbSet(Of T).AddAsync
+- uid: System.Threading.Tasks.ValueTask{nORM.Core.EntityEntry}
+  commentId: T:System.Threading.Tasks.ValueTask{nORM.Core.EntityEntry}
+  parent: System.Threading.Tasks
+  definition: System.Threading.Tasks.ValueTask`1
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+  name: ValueTask<EntityEntry>
+  nameWithType: ValueTask<EntityEntry>
+  fullName: System.Threading.Tasks.ValueTask<nORM.Core.EntityEntry>
+  nameWithType.vb: ValueTask(Of EntityEntry)
+  fullName.vb: System.Threading.Tasks.ValueTask(Of nORM.Core.EntityEntry)
+  name.vb: ValueTask(Of EntityEntry)
+  spec.csharp:
+  - uid: System.Threading.Tasks.ValueTask`1
+    name: ValueTask
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+  - name: <
+  - uid: nORM.Core.EntityEntry
+    name: EntityEntry
+    href: nORM.Core.EntityEntry.html
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.ValueTask`1
+    name: ValueTask
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+  - name: (
+  - name: Of
+  - name: " "
+  - uid: nORM.Core.EntityEntry
+    name: EntityEntry
+    href: nORM.Core.EntityEntry.html
+  - name: )
+- uid: System.Threading.Tasks.ValueTask`1
+  commentId: T:System.Threading.Tasks.ValueTask`1
+  isExternal: true
+  href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+  name: ValueTask<TResult>
+  nameWithType: ValueTask<TResult>
+  fullName: System.Threading.Tasks.ValueTask<TResult>
+  nameWithType.vb: ValueTask(Of TResult)
+  fullName.vb: System.Threading.Tasks.ValueTask(Of TResult)
+  name.vb: ValueTask(Of TResult)
+  spec.csharp:
+  - uid: System.Threading.Tasks.ValueTask`1
+    name: ValueTask
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+  - name: <
+  - name: TResult
+  - name: '>'
+  spec.vb:
+  - uid: System.Threading.Tasks.ValueTask`1
+    name: ValueTask
+    isExternal: true
+    href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1
+  - name: (
+  - name: Of
+  - name: " "
+  - name: TResult
+  - name: )
 - uid: nORM.Core.DbSet`1.AddRange*
   commentId: Overload:nORM.Core.DbSet`1.AddRange
   href: nORM.Core.DbSet-1.html#nORM_Core_DbSet_1_AddRange_System_Collections_Generic_IEnumerable__0__

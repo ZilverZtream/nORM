@@ -1486,7 +1486,7 @@ references:
   - name: )
   - name: )
 - uid: System.Threading.Tasks.Task{{T}}
-  commentId: T:System.Threading.Tasks.Task{``0}
+  commentId: T:System.Threading.Tasks.Task{`0}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1

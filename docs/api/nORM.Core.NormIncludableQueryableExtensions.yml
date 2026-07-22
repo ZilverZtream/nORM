@@ -1367,7 +1367,7 @@ references:
   - name: T
   - name: )
 - uid: nORM.Core.INormQueryable{{T}}
-  commentId: T:nORM.Core.INormQueryable{``0}
+  commentId: T:nORM.Core.INormQueryable{`0}
   parent: nORM.Core
   definition: nORM.Core.INormQueryable`1
   href: nORM.Core.INormQueryable-1.html

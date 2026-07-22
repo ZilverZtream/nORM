@@ -3038,7 +3038,7 @@ references:
   nameWithType: NormAsyncExtensions.ToArrayAsync
   fullName: nORM.Core.NormAsyncExtensions.ToArrayAsync
 - uid: System.Threading.Tasks.Task{{T}[]}
-  commentId: T:System.Threading.Tasks.Task{``0[]}
+  commentId: T:System.Threading.Tasks.Task{`0[]}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
@@ -3176,7 +3176,7 @@ references:
   nameWithType: NormAsyncExtensions.ElementAtAsync
   fullName: nORM.Core.NormAsyncExtensions.ElementAtAsync
 - uid: System.Threading.Tasks.Task{{T}}
-  commentId: T:System.Threading.Tasks.Task{``0}
+  commentId: T:System.Threading.Tasks.Task{`0}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
@@ -3666,7 +3666,7 @@ references:
   nameWithType: NormAsyncExtensions.ExecuteUpdateAsync
   fullName: nORM.Core.NormAsyncExtensions.ExecuteUpdateAsync
 - uid: System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}}
-  commentId: T:System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{``0},nORM.Core.SetPropertyCalls{``0}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}}
   parent: System.Linq.Expressions
   definition: System.Linq.Expressions.Expression`1
   href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1

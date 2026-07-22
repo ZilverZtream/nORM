@@ -53,6 +53,8 @@ items:
     - id: T
       description: The entity type returned by the query.
     content.vb: Public Interface INormQueryable(Of T) Inherits IOrderedQueryable(Of T), IOrderedQueryable, IQueryable(Of T), IEnumerable(Of T), IQueryable, IEnumerable
+  derivedClasses:
+  - nORM.Core.DbSet`1
   inheritedMembers:
   - System.Collections.Generic.IEnumerable{{T}}.GetEnumerator
   - System.Linq.IQueryable.ElementType
@@ -3620,7 +3622,7 @@ references:
   nameWithType.vb: INormQueryable(Of T).ToArrayAsync
   fullName.vb: nORM.Core.INormQueryable(Of T).ToArrayAsync
 - uid: System.Threading.Tasks.Task{{T}[]}
-  commentId: T:System.Threading.Tasks.Task{``0[]}
+  commentId: T:System.Threading.Tasks.Task{`0[]}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
@@ -3747,7 +3749,7 @@ references:
   nameWithType.vb: INormQueryable(Of T).FirstAsync
   fullName.vb: nORM.Core.INormQueryable(Of T).FirstAsync
 - uid: System.Threading.Tasks.Task{{T}}
-  commentId: T:System.Threading.Tasks.Task{``0}
+  commentId: T:System.Threading.Tasks.Task{`0}
   parent: System.Threading.Tasks
   definition: System.Threading.Tasks.Task`1
   href: https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1
@@ -3816,7 +3818,7 @@ references:
   nameWithType.vb: INormQueryable(Of T).ExecuteUpdateAsync
   fullName.vb: nORM.Core.INormQueryable(Of T).ExecuteUpdateAsync
 - uid: System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{{T}},nORM.Core.SetPropertyCalls{{T}}}}
-  commentId: T:System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{``0},nORM.Core.SetPropertyCalls{``0}}}
+  commentId: T:System.Linq.Expressions.Expression{System.Func{nORM.Core.SetPropertyCalls{`0},nORM.Core.SetPropertyCalls{`0}}}
   parent: System.Linq.Expressions
   definition: System.Linq.Expressions.Expression`1
   href: https://learn.microsoft.com/dotnet/api/system.linq.expressions.expression-1
