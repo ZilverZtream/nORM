@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 
 namespace nORM.Scaffolding
 {
@@ -11,19 +12,54 @@ namespace nORM.Scaffolding
             ScaffoldEntitySourceInfo entity,
             DataTable schema)
         {
-            var columns = new List<ScaffoldEntityColumnInfo>();
-            foreach (DataRow row in schema.Rows)
-                columns.Add(BuildEntityColumn(entity, row));
+            var rows = schema.Rows.Cast<DataRow>().ToList();
+            var propertyNames = AssignUniqueColumnPropertyNames(
+                entity.EntityName,
+                entity.ColumnPropertyNames,
+                rows.Select(row => row["ColumnName"]!.ToString()!).ToList());
+
+            var columns = new List<ScaffoldEntityColumnInfo>(rows.Count);
+            for (var i = 0; i < rows.Count; i++)
+                columns.Add(BuildEntityColumn(entity, rows[i], propertyNames[i]));
 
             return columns;
         }
 
+        /// <summary>
+        /// Assigns each physical column a distinct C# property name. A view (and some stored-procedure
+        /// result sets) can legally expose the same column name more than once, and the column->property
+        /// map is keyed by column name, so those duplicates collapse to a single entry. Without this pass
+        /// every physical occurrence would render the same property name, producing a CS0102 "already
+        /// contains a definition" compile error. The first occurrence keeps its mapped name verbatim (so
+        /// non-duplicate entities are byte-identical to prior output and stay aligned with any model
+        /// configuration that references the property by name); each repeat gets a fresh, unique name.
+        /// </summary>
+        internal static IReadOnlyList<string> AssignUniqueColumnPropertyNames(
+            string entityName,
+            IReadOnlyDictionary<string, string>? columnPropertyNames,
+            IReadOnlyList<string> orderedColumnNames)
+        {
+            var usedPropertyNames = ScaffoldColumnPropertyNameBuilder.CreateReservedMemberNameSet();
+            usedPropertyNames.Add(entityName);
+
+            var names = new List<string>(orderedColumnNames.Count);
+            foreach (var columnName in orderedColumnNames)
+            {
+                var preferred = ResolveColumnPropertyName(columnPropertyNames, columnName);
+                names.Add(usedPropertyNames.Add(preferred)
+                    ? preferred
+                    : ScaffoldNameHelper.MakeUnique(StripTrailingDigits(preferred), usedPropertyNames));
+            }
+
+            return names;
+        }
+
         private static ScaffoldEntityColumnInfo BuildEntityColumn(
             ScaffoldEntitySourceInfo entity,
-            DataRow row)
+            DataRow row,
+            string propName)
         {
             var colName = row["ColumnName"]!.ToString()!;
-            var propName = ResolveColumnPropertyName(entity, colName);
             var allowNull = ResolveColumnNullability(entity, row, colName);
             var isKey = !entity.SuppressWriteMetadata && GetSchemaBoolean(row, "IsKey");
             var isAuto = !entity.SuppressWriteMetadata
@@ -68,10 +104,20 @@ namespace nORM.Scaffolding
                 GetColumnIndexes(entity.Indexes, colName));
         }
 
-        private static string ResolveColumnPropertyName(ScaffoldEntitySourceInfo entity, string columnName)
-            => entity.ColumnPropertyNames is not null && entity.ColumnPropertyNames.TryGetValue(columnName, out var mappedProperty)
+        private static string ResolveColumnPropertyName(
+            IReadOnlyDictionary<string, string>? columnPropertyNames,
+            string columnName)
+            => columnPropertyNames is not null && columnPropertyNames.TryGetValue(columnName, out var mappedProperty)
                 ? mappedProperty
                 : ScaffoldNameHelper.EscapeCSharpIdentifier(ScaffoldNameHelper.ToPascalCase(columnName));
+
+        private static string StripTrailingDigits(string name)
+        {
+            var end = name.Length;
+            while (end > 0 && char.IsDigit(name[end - 1]))
+                end--;
+            return end > 0 && end < name.Length ? name[..end] : name;
+        }
 
         private static bool ResolveColumnNullability(ScaffoldEntitySourceInfo entity, DataRow row, string columnName)
             => entity.NonNullableColumns is not null
