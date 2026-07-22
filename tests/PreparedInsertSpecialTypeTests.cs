@@ -21,6 +21,7 @@ file enum PistHue { Red = 0, Green = 1, Blue = 2 }
 file class PistParityItem
 {
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.None)]
     public int Id { get; set; }
     public DateOnly BirthDate { get; set; }
     public Guid Token { get; set; }

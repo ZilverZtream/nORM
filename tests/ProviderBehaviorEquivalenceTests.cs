@@ -58,7 +58,7 @@ public class ProviderBehaviorEquivalenceTests
     [Table("LPM_Item")]
     private class LpmItem
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public string Name { get; set; } = "";
         public int Score { get; set; }
         public bool Active { get; set; }
@@ -69,7 +69,7 @@ public class ProviderBehaviorEquivalenceTests
     [Table("LPM_OccItem")]
     private class LpmOccItem
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public string Payload { get; set; } = "";
         [Timestamp] public byte[]? Token { get; set; }
     }
@@ -77,7 +77,7 @@ public class ProviderBehaviorEquivalenceTests
     [Table("LPM_TenantItem")]
     private class LpmTenantItem
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public int TenantId { get; set; }
         public string Label { get; set; } = "";
     }

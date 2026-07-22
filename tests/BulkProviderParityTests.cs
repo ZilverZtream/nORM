@@ -46,6 +46,7 @@ public class BulkProviderParityTests
     private class G40Item
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Label { get; set; } = "";
         public int Value { get; set; }
@@ -55,6 +56,7 @@ public class BulkProviderParityTests
     private class G40OccItem
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Payload { get; set; } = "";
         [Timestamp]
@@ -65,6 +67,7 @@ public class BulkProviderParityTests
     private class G40OccStr
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Value { get; set; } = "";
         [Timestamp]
@@ -75,6 +78,7 @@ public class BulkProviderParityTests
     private class G40TenantItem
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public int TenantId { get; set; }
         public string Label { get; set; } = "";

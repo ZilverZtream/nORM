@@ -62,8 +62,7 @@ public sealed class StoreGeneratedKeyConventionLiveTests
     [Theory]
     [InlineData("mysql")]
     [InlineData("postgres")]
-    // sqlserver: pending — the convention is validated on a real server but activating it emits
-    // SET IDENTITY_INSERT, which needs the FakeProvider cross-provider test rework decided first.
+    [InlineData("sqlserver")]
     public async Task ConventionKey_StoreGenerates_And_Honors_Explicit_OnLiveServer(string kind)
     {
         var (factory, provider) = OpenLive(kind);

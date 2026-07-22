@@ -45,6 +45,7 @@ public class CrossProviderBehaviorTests
     private class G50Item
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Label { get; set; } = "";
         public int Value { get; set; }
@@ -54,6 +55,7 @@ public class CrossProviderBehaviorTests
     private class G50OccItem
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Payload { get; set; } = "";
         [Timestamp]
@@ -68,6 +70,7 @@ public class CrossProviderBehaviorTests
     private class G50PayloadItem
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Payload { get; set; } = "";
     }
@@ -704,6 +707,7 @@ public class CrossProviderBehaviorTests
     private sealed class PPMItem
     {
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string Name { get; set; } = "";
         public int Score { get; set; }
@@ -865,7 +869,7 @@ public class CrossProviderBehaviorTests
     [Table("PMNull")]
     private sealed class PMNull
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public string Tag { get; set; } = "";
         public int Grp { get; set; }
         public decimal Amount { get; set; }

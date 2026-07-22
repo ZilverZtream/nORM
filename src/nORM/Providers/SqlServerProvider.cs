@@ -46,14 +46,17 @@ namespace nORM.Providers
         public override Column[] GetInsertColumns(TableMapping m)
             => m.InsertColumns.Where(c => !c.IsTimestamp).ToArray();
 
-        // NOTE: SQL Server does NOT flip SupportsConventionKeyStoreGeneration on. It works on a real server
-        // (the honor-non-zero live keeper passes for sqlserver), but activating it makes this provider emit
-        // SET IDENTITY_INSERT for a plain [Key] int Id, which breaks the ENTIRE cross-provider FakeProvider
-        // test suite for the sqlserver kind (SqlServerProvider SQL run against a SQLite backend — every such
-        // test that seeds data fails on "SET IDENTITY_INSERT"), plus existing plain-INT (non-IDENTITY) tables.
-        // The global opt-out DbContextOptions.UseStoreGeneratedKeyConvention exists; flipping SqlServer on
-        // additionally requires opting ~20-30 FakeProvider test factories out (or a different accommodation) —
-        // a decision surfaced to the user. The IDENTITY_INSERT hooks below stay (inert until the flip).
+        /// <summary>
+        /// A single-column integer primary key with no explicit value-generation config is store-generated
+        /// (EF Core parity): SQL Server realizes it as an IDENTITY column, which generates a value when the
+        /// column is omitted. An explicitly-supplied value is inserted under SET IDENTITY_INSERT (see
+        /// <see cref="GetIdentityInsertEnableSql"/>). Applications with an existing plain-INT (non-IDENTITY)
+        /// table opt out via DbContextOptions.UseStoreGeneratedKeyConvention=false (or [DatabaseGenerated(None)]).
+        /// </summary>
+        public override bool SupportsConventionKeyStoreGeneration => true;
+
+        /// <summary>SQL Server realizes the convention key as an IDENTITY column (needs identity DDL).</summary>
+        internal override bool ConventionKeyUsesIdentityColumn => true;
 
         /// <summary>
         /// An IDENTITY column rejects an explicitly-supplied value unless IDENTITY_INSERT is ON; the

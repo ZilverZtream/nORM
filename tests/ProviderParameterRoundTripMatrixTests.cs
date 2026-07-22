@@ -58,6 +58,7 @@ public class ProviderParameterRoundTripMatrixTests
     {
         // Explicit key — no AUTOINCREMENT — so INSERT SQL is provider-agnostic.
         [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string? NullableText { get; set; }
         public RtpStatus Status { get; set; }

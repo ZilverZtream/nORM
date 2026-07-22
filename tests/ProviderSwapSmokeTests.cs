@@ -24,7 +24,7 @@ public class ProviderSwapSmokeTests
     [Table("PS_Customer")]
     private sealed class PsCustomer
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public int TenantId { get; set; }
         public string Name { get; set; } = "";
         public string Email { get; set; } = "";
@@ -34,7 +34,7 @@ public class ProviderSwapSmokeTests
     [Table("PS_Order")]
     private sealed class PsOrder
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public int TenantId { get; set; }
         public int CustomerId { get; set; }
         public decimal Total { get; set; }
@@ -44,7 +44,7 @@ public class ProviderSwapSmokeTests
     [Table("CQ_TakeUser")]
     private sealed class CqTakeUser
     {
-        [Key] public int Id { get; set; }
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.None)] public int Id { get; set; }
         public string Name { get; set; } = "";
         public bool IsActive { get; set; }
     }
