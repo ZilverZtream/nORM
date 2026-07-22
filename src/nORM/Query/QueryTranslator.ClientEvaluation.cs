@@ -189,6 +189,21 @@ namespace nORM.Query
             void Consider(string name, Expression arg)
             {
                 var e = StripConvert(arg);
+                // Direct member of an entity parameter (Select(w => new { w.Col }) / Select(w => w.Col)):
+                // resolve its converter from the PARAMETER's entity mapping. Needed for set operations, where
+                // the outer materializer runs with the element (anon/scalar) mapping, not the entity, so
+                // ExtractColumnsFromProjection can't resolve the column and would read the raw stored value.
+                if (e is MemberExpression dm && dm.Expression is ParameterExpression dp)
+                {
+                    try
+                    {
+                        var dmap = ctx.GetMapping(dp.Type);
+                        if (dmap.TryGetColumnForMemberAccess(dm, out var dcol) && dcol.Converter != null)
+                            (result ??= new Dictionary<string, nORM.Mapping.IValueConverter>(StringComparer.Ordinal))[name] = dcol.Converter;
+                    }
+                    catch { }
+                    return;
+                }
                 if (e is not MethodCallExpression mce || !(IsSubqueryScalarColumnOp(mce) || IsNavigationScalarColumnOp(mce)))
                     return;
                 if (!TryResolveSubqueryProjectedMember(mce, out var elementType, out var member)
@@ -219,30 +234,12 @@ namespace nORM.Query
             }
             else
             {
-                // Bare scalar projection. Two shapes register the converter under the reserved empty-name key
-                // so the scalar-projection materializer applies ConvertFromProvider:
-                //   (1) the body is a correlated subquery op (Select(p => sub....First())) — via Consider;
-                //   (2) the body is a DIRECT member of the projection parameter (Select(w => w.Col)). Resolving
-                //       it here (from the parameter's entity mapping via ctx) matters for set operations
-                //       (Union/Except/Intersect over a scalar converter column): the outer set-op materializer
-                //       runs with the scalar ELEMENT mapping (e.g. int), not the entity, so its own
-                //       direct-member converter resolver can't see the column and the value would come back as
-                //       its raw stored representation.
-                var innerBody = StripConvert(body);
-                if (innerBody is MemberExpression bm && bm.Expression == projection.Parameters[0])
-                {
-                    try
-                    {
-                        var m = ctx.GetMapping(projection.Parameters[0].Type);
-                        if (m.TryGetColumnForMemberAccess(bm, out var col) && col.Converter != null)
-                            (result ??= new Dictionary<string, nORM.Mapping.IValueConverter>(StringComparer.Ordinal))[BareScalarSubqueryConverterKey] = col.Converter;
-                    }
-                    catch { }
-                }
-                else
-                {
-                    Consider(BareScalarSubqueryConverterKey, body);
-                }
+                // Bare scalar projection under the reserved empty-name key. Consider registers either a
+                // correlated subquery op (Select(p => sub....First())) or a DIRECT member (Select(w => w.Col)).
+                // The direct-member case matters for set operations, where the outer materializer runs with the
+                // scalar ELEMENT mapping (e.g. int), not the entity, so the value would otherwise come back as
+                // its raw stored representation.
+                Consider(BareScalarSubqueryConverterKey, body);
             }
             return result;
         }

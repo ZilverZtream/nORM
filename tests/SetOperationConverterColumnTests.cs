@@ -103,6 +103,41 @@ public sealed class SetOperationConverterColumnTests
         Assert.Equal(new[] { 5, 10, 10, 20, 20 }, got);
     }
 
+    private sealed class Dto : IEquatable<Dto>
+    {
+        public int S { get; set; }
+        public bool Equals(Dto? o) => o != null && o.S == S;
+        public override bool Equals(object? o) => Equals(o as Dto);
+        public override int GetHashCode() => S;
+    }
+
+    [Fact]
+    public async Task Union_of_anon_type_with_converter_member_converts()
+    {
+        using var ctx = await CtxAsync();
+        var got = Q1(ctx).Select(w => new { w.Score }).Union(Q2(ctx).Select(w => new { w.Score }))
+            .ToList().Select(x => x.Score).OrderBy(x => x).ToList();
+        Assert.Equal(new[] { 5, 10, 20 }, got);
+    }
+
+    [Fact]
+    public async Task Union_of_anon_type_id_and_converter_member()
+    {
+        using var ctx = await CtxAsync();
+        var got = Q1(ctx).Select(w => new { w.Id, w.Score }).Union(Q2(ctx).Select(w => new { w.Id, w.Score }))
+            .ToList().OrderBy(x => x.Id).Select(x => x.Id + ":" + x.Score).ToList();
+        Assert.Equal(new[] { "1:10", "2:20", "3:5", "4:20" }, got);
+    }
+
+    [Fact]
+    public async Task Union_of_named_dto_with_converter_member_converts()
+    {
+        using var ctx = await CtxAsync();
+        var got = Q1(ctx).Select(w => new Dto { S = w.Score }).Union(Q2(ctx).Select(w => new Dto { S = w.Score }))
+            .ToList().Select(x => x.S).OrderBy(x => x).ToList();
+        Assert.Equal(new[] { 5, 10, 20 }, got);
+    }
+
     [Fact]
     public async Task Set_operations_on_nonconverter_column_baseline()
     {

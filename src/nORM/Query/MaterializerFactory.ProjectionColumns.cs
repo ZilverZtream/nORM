@@ -136,12 +136,23 @@ namespace nORM.Query
                             // Create a lightweight column for writable properties from other
                             // mappings. Read-only properties cannot be bound by the setter-based
                             // materializer; project them as shadow columns instead.
-                            cols.Add(new Column(pi, mapping.Provider, null));
+                            var writableCol = new Column(pi, mapping.Provider, null);
+                            // `mapping` couldn't resolve the column's converter (e.g. a set operation whose
+                            // outer mapping is the element type, not the entity); apply the converter the caller
+                            // resolved from the projection parameter's entity mapping.
+                            if (projectionSubqueryConverters != null
+                                && projectionSubqueryConverters.TryGetValue(newExpr.Members?[i]?.Name ?? $"Item{i + 1}", out var writableConv))
+                                writableCol.Converter = writableConv;
+                            cols.Add(writableCol);
                         }
                         else if (m.Member is PropertyInfo pi2)
                         {
                             var memberName = newExpr.Members?[i]?.Name ?? $"Item{i + 1}";
-                            cols.Add(new Column(memberName, pi2.PropertyType, mapping.Type, mapping.Provider, memberName));
+                            var shadowCol = new Column(memberName, pi2.PropertyType, mapping.Type, mapping.Provider, memberName);
+                            if (projectionSubqueryConverters != null
+                                && projectionSubqueryConverters.TryGetValue(memberName, out var shadowConv))
+                                shadowCol.Converter = shadowConv;
+                            cols.Add(shadowCol);
                         }
                         else
                         {
