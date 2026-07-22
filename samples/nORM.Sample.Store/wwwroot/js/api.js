@@ -25,6 +25,7 @@ export const api = {
   logout: () => req("POST", "/api/logout"),
 
   dashboard: () => req("GET", "/api/dashboard"),
+  orders: () => req("GET", "/api/orders"),
   catalog: (page = 1, size = 6) => req("GET", `/api/catalog?page=${page}&size=${size}`),
   updatePrice: (id, price) => req("POST", `/api/products/${id}/price`, { price }),
   rename: (id, name) => req("POST", `/api/products/${id}/rename`, { name }),

@@ -212,6 +212,24 @@ public static class StoreWebApp
             return Results.Ok(new { saved, product.Id, product.Name });
         });
 
+        // Orders with their lines, eagerly loaded (Include + split query), tenant-scoped.
+        api.MapGet("/orders", async (StoreContext ctx) =>
+        {
+            var orders = await ((INormQueryable<StoreOrder>)ctx.Query<StoreOrder>())
+                .AsSplitQuery()
+                .Include(o => o.Lines)
+                .OrderBy(o => o.Id)
+                .ToListAsync();
+            return Results.Ok(orders.Select(o => new
+            {
+                o.Id,
+                o.Status,
+                o.Total,
+                o.CustomerId,
+                lines = o.Lines.OrderBy(l => l.Id).Select(l => new { l.Id, l.ProductId, l.Quantity, l.UnitPrice })
+            }));
+        });
+
         api.MapPost("/temporal/tags", async (CreateTagRequest request, StoreContext ctx) =>
         {
             await ctx.CreateTagAsync(request.Name);

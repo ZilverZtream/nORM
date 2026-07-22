@@ -129,3 +129,19 @@
 .check-actions { margin: .9rem 0 .2rem; }
 .check-out { margin-top: .7rem; }
 .check-out:empty { display: none; }
+
+/* ── orders ──────────────────────────────────────────────────────────────── */
+.orders-list { display: flex; flex-direction: column; gap: 1.1rem; }
+.order-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .85rem; }
+.order-head .order-id { font-size: 1.02rem; margin-right: .6rem; }
+.order-total { font: 700 1.15rem var(--font-display); }
+
+/* ── temporal / history ──────────────────────────────────────────────────── */
+.temporal-bar { display: flex; gap: 1.1rem; align-items: flex-end; flex-wrap: wrap; }
+.temporal-bar label { min-width: 150px; }
+.temporal-bar .btn-row { align-self: flex-end; }
+.btn-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.timeline { display: flex; flex-direction: column; gap: .5rem; margin-top: 1.3rem; }
+.tl-row { display: grid; grid-template-columns: 96px 1fr auto minmax(160px, auto); gap: 1rem; align-items: center; padding: .7rem .95rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.tl-time { font-size: .72rem; text-align: right; }
+@media (max-width: 660px) { .tl-row { grid-template-columns: auto 1fr; gap: .4rem; } .tl-time { text-align: left; } }
