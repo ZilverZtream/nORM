@@ -771,6 +771,24 @@ namespace nORM.Query
                     }
 
                     break;
+
+                // A property on a captured value — e.g. SetProperty(p => p.Price, request.Price) where
+                // Price is a record/DTO property, not a field. Mirror the field case so any captured
+                // property (chain) folds to a bound parameter, not just closure-hoisted locals.
+                case MemberExpression { Member: PropertyInfo prop } propMember:
+                    if (propMember.Expression == null)
+                    {
+                        value = prop.GetValue(null);
+                        return true;
+                    }
+
+                    if (TryGetSetValue(propMember.Expression, out var propOwner))
+                    {
+                        value = prop.GetValue(propOwner);
+                        return true;
+                    }
+
+                    break;
             }
 
             value = null;
