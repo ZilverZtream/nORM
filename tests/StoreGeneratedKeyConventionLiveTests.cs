@@ -62,6 +62,8 @@ public sealed class StoreGeneratedKeyConventionLiveTests
     [Theory]
     [InlineData("mysql")]
     [InlineData("postgres")]
+    // sqlserver: pending — the convention is validated on a real server but activating it emits
+    // SET IDENTITY_INSERT, which needs the FakeProvider cross-provider test rework decided first.
     public async Task ConventionKey_StoreGenerates_And_Honors_Explicit_OnLiveServer(string kind)
     {
         var (factory, provider) = OpenLive(kind);
@@ -93,7 +95,21 @@ public sealed class StoreGeneratedKeyConventionLiveTests
             await ctx.InsertAsync(d);
             Assert.True(d.Id > 0 && d.Id != 5000);
 
-            Assert.Equal(4, await ctx.Query<Row>().CountAsync());
+            // Direct InsertAsync of an EXPLICIT key -> honored (SQL Server needs IDENTITY_INSERT around it).
+            var de = new Row { Id = 6000, Name = "de" };
+            await ctx.InsertAsync(de);
+            Assert.Equal(6000, de.Id);
+
+            // Direct InsertAsync of an explicit key under an external transaction (the non-prepared path).
+            await using (var tx = (DbTransaction)cn.BeginTransaction())
+            {
+                var det = new Row { Id = 7000, Name = "det" };
+                await ctx.InsertAsync(det, tx);
+                await tx.CommitAsync();
+                Assert.Equal(7000, det.Id);
+            }
+
+            Assert.Equal(6, await ctx.Query<Row>().CountAsync());
         }
         finally
         {

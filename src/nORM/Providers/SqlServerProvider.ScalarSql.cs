@@ -39,7 +39,9 @@ namespace nORM.Providers
         /// <returns>SQL clause e.g. <c> OUTPUT INSERTED.[Id]</c> or <c> OUTPUT INSERTED.[Id], INSERTED.[RowVersion]</c>.</returns>
         public override string GetIdentityRetrievalPrefix(TableMapping m)
         {
-            var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated);
+            // Target a DB-generated key, or — for the store-generated convention key's default-value run —
+            // the convention key column, so OUTPUT INSERTED reads the generated value back.
+            var keyCol = m.KeyColumns.FirstOrDefault(c => c.IsDbGenerated) ?? m.ConventionGeneratedKeyColumn;
             if (keyCol == null) return string.Empty;
             var tsCol = m.TimestampColumn;
             return tsCol != null

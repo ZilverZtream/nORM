@@ -166,12 +166,23 @@ namespace nORM.Core
                     entry.Entity ?? throw new InvalidOperationException("Entity is null"),
                     WriteOperation.Insert, paramIndex, insertColumns: insertCols);
             }
+            // SQL Server: the convention key's EXPLICIT-value run inserts values into an IDENTITY column,
+            // which requires SET IDENTITY_INSERT ON (empty on providers whose identity honors explicit values
+            // natively). This is exactly the explicit run — a convention-key map on a not-read-back run.
+            var identityInsertEnable = map.ConventionGeneratedKeyColumn != null && !needsKeyReadBack
+                ? _p.GetIdentityInsertEnableSql(map)
+                : string.Empty;
+            if (identityInsertEnable.Length > 0)
+            {
+                sql.Insert(0, identityInsertEnable);
+                sql.Append(_p.GetIdentityInsertDisableSql(map));
+            }
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, cmd.CommandText));
-            // Skip PrepareAsync when identity retrieval is needed: the INSERT SQL contains
-            // multiple result-set-returning statements (e.g. "; SELECT LAST_INSERT_ID();")
-            // and some providers (MySQL) do not support preparing multi-statement commands.
-            if (batch.Count > 1 && !needsKeyReadBack && _p.SupportsPreparedBatchCommands)
+            // Skip PrepareAsync when identity retrieval is needed (the INSERT SQL contains multiple
+            // result-set-returning statements, e.g. "; SELECT LAST_INSERT_ID();", that some providers cannot
+            // prepare) or when the batch carries SET IDENTITY_INSERT statements (a multi-statement command).
+            if (batch.Count > 1 && !needsKeyReadBack && identityInsertEnable.Length == 0 && _p.SupportsPreparedBatchCommands)
                 await cmd.PrepareAsync(ct).ConfigureAwait(false);
 
             if (needsKeyReadBack)

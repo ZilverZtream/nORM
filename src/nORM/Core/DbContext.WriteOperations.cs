@@ -354,6 +354,15 @@ namespace nORM.Core
                 WriteOperation.Delete => _p.BuildDelete(map, includeTenant),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             };
+            // SQL Server: a convention key's EXPLICIT-value insert (default values were routed to the omit-key
+            // path above) writes the IDENTITY column, which needs SET IDENTITY_INSERT. Empty on providers whose
+            // identity honors an explicit value natively.
+            if (operation == WriteOperation.Insert && map.ConventionGeneratedKeyColumn != null)
+            {
+                var enable = _p.GetIdentityInsertEnableSql(map);
+                if (enable.Length > 0)
+                    cmd.CommandText = enable + cmd.CommandText + _p.GetIdentityInsertDisableSql(map);
+            }
             // Simple INSERT/UPDATE/DELETE have no JOINs/subqueries - use base timeout
             // to avoid SQL string scanning in GetAdaptiveTimeout.
             cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);

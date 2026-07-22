@@ -370,8 +370,11 @@ namespace nORM.Mapping
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
+            // Start from the provider's insert-column set (SQL Server excludes server-managed ROWVERSION
+            // columns) so the store-generated default-value run omits exactly the convention key and nothing
+            // the provider itself would exclude. Matches the explicit-value run's _p.GetInsertColumns(map).
             InsertColumnsWithoutConventionKey = conventionGeneratedKey != null
-                ? InsertColumns.Where(c => !ReferenceEquals(c, conventionGeneratedKey)).ToArray()
+                ? p.GetInsertColumns(this).Where(c => !ReferenceEquals(c, conventionGeneratedKey)).ToArray()
                 : InsertColumns;
             // On providers without a native rowversion (SQLite/PostgreSQL/MySQL), nORM writes a fresh
             // [Timestamp] value on every UPDATE (appended to the SET clause by the batched write path)

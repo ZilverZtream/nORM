@@ -96,7 +96,18 @@ namespace nORM.Core
                 var hydrateFromCommand = hydrateGeneratedKeys &&
                     _p.SupportsCommandGeneratedKeyRetrieval &&
                     HasDbGeneratedKey(mapping.KeyColumns);
-                cmd.CommandText = _p.BuildInsert(mapping, hydrateGeneratedKeys && !hydrateFromCommand);
+                var insertSql = _p.BuildInsert(mapping, hydrateGeneratedKeys && !hydrateFromCommand);
+                // SQL Server: a convention-key map's prepared command only ever runs EXPLICIT-value inserts
+                // (a default value routes to a separate omit-key insert), and an explicit value into an
+                // IDENTITY column needs SET IDENTITY_INSERT (empty on providers whose identity honors explicit
+                // values natively). A wrapped multi-statement command is not prepared.
+                var identityInsertEnable = mapping.ConventionGeneratedKeyColumn != null
+                    ? _p.GetIdentityInsertEnableSql(mapping)
+                    : string.Empty;
+                var identityInsertWrapped = identityInsertEnable.Length > 0;
+                cmd.CommandText = identityInsertWrapped
+                    ? identityInsertEnable + insertSql + _p.GetIdentityInsertDisableSql(mapping)
+                    : insertSql;
                 cmd.CommandTimeout = ToSecondsClamped(Options.TimeoutConfiguration.BaseTimeout);
 
                 foreach (var col in _p.GetInsertColumns(mapping))
@@ -105,13 +116,16 @@ namespace nORM.Core
                     ApplyPreparedInsertSizeHint(cmd.Parameters[cmd.Parameters.Count - 1], col);
                 }
 
-                try
+                if (!identityInsertWrapped)
                 {
-                    await cmd.PrepareAsync(ct).ConfigureAwait(false);
-                }
-                catch (NotSupportedException)
-                {
-                    // Some providers expose command reuse but not explicit preparation.
+                    try
+                    {
+                        await cmd.PrepareAsync(ct).ConfigureAwait(false);
+                    }
+                    catch (NotSupportedException)
+                    {
+                        // Some providers expose command reuse but not explicit preparation.
+                    }
                 }
 
                 return new PreparedInsertCommand(cmd, mapping, this, hydrateGeneratedKeys, hydrateFromCommand, transaction);

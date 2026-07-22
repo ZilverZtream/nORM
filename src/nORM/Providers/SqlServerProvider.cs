@@ -46,6 +46,24 @@ namespace nORM.Providers
         public override Column[] GetInsertColumns(TableMapping m)
             => m.InsertColumns.Where(c => !c.IsTimestamp).ToArray();
 
+        // NOTE: SQL Server does NOT yet flip SupportsConventionKeyStoreGeneration on — it works correctly on a
+        // real server (the honor-non-zero live keeper passes for sqlserver), but activating it makes this
+        // provider emit SET IDENTITY_INSERT for a plain [Key] int Id, which breaks nORM's FakeProvider
+        // cross-provider tests (SqlServerProvider SQL run against a SQLite backend) and existing plain-INT
+        // (non-IDENTITY) tables. The IDENTITY_INSERT hooks below stay (inert until the flip) so the flip is a
+        // one-line change once the convention-accommodation approach is chosen. See honor_nonzero_key_convention_plan.
+
+        /// <summary>
+        /// An IDENTITY column rejects an explicitly-supplied value unless IDENTITY_INSERT is ON; the
+        /// convention key's explicit-value run wraps its batch/command in this. The statement runs on the
+        /// same connection as the INSERT and is paired with <see cref="GetIdentityInsertDisableSql"/>. Inert
+        /// until SQL Server enables the store-generated-key convention.
+        /// </summary>
+        internal override string GetIdentityInsertEnableSql(TableMapping m) => $"SET IDENTITY_INSERT {m.EscTable} ON;";
+
+        /// <summary>Restores the default after the explicit-value insert (see <see cref="GetIdentityInsertEnableSql"/>).</summary>
+        internal override string GetIdentityInsertDisableSql(TableMapping m) => $"SET IDENTITY_INSERT {m.EscTable} OFF;";
+
         /// <summary>
         /// ROWVERSION regenerates on every UPDATE; read the fresh token back inline
         /// so the tracked instance's next save compares against the current value.
