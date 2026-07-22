@@ -100,9 +100,15 @@ namespace nORM.Query
             // Handle simple scalar types directly
             if (IsSimpleType(targetType))
             {
-                var scalarConverter = projection != null
-                    ? TryResolveProjectedColumnConverter(mapping, projection.Body)
-                    : null;
+                // A bare correlated-subquery scalar projection (Select(p => ctx.Query<C>()....First()))
+                // over a converter column carries the converter under the reserved key — the direct-member
+                // resolver below can't see across the subquery. Prefer it; fall back to the p.Col resolver.
+                var scalarConverter = projection == null
+                    ? null
+                    : (projectionSubqueryConverters != null
+                        && projectionSubqueryConverters.TryGetValue(QueryTranslator.BareScalarSubqueryConverterKey, out var bareSubConv)
+                            ? bareSubConv
+                            : TryResolveProjectedColumnConverter(mapping, projection.Body));
                 var getter = CreateReaderGetter(targetType, 0, startOffset, scalarConverter);
                 // Only build a default factory for value types (used when DB returns NULL for non-nullable value type)
                 // Reference types (e.g., string) use null! directly.

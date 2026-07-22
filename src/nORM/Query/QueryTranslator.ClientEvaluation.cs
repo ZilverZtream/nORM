@@ -167,9 +167,19 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Reserved map key under which <see cref="ComputeProjectionSubqueryConverters"/> registers the
+        /// converter for a BARE scalar projection whose body is itself the correlated subquery op
+        /// (<c>Select(p =&gt; ctx.Query&lt;C&gt;()....First())</c>) — no anonymous-type member name exists. Empty
+        /// string is impossible as a real C# member name, so it never collides with a New/MemberInit member.
+        /// The scalar-projection materializer path reads this key to apply ConvertFromProvider.
+        /// </summary>
+        internal const string BareScalarSubqueryConverterKey = "";
+
+        /// <summary>
         /// For a projection lambda, resolves the value converter of each member whose value comes
         /// from a correlated First/Last/Min/Max subquery over a converter column — keyed by the
-        /// projection member name (matching the shadow-column naming in ExtractColumnsFromProjection).
+        /// projection member name (matching the shadow-column naming in ExtractColumnsFromProjection),
+        /// or by <see cref="BareScalarSubqueryConverterKey"/> when the whole projection body is the subquery.
         /// Returns null when no such member exists, so the materializer path is unchanged for every
         /// ordinary projection. Requires the context to resolve the subquery element's mapping.
         /// </summary>
@@ -193,13 +203,28 @@ namespace nORM.Query
                 catch { }
             }
 
-            if (projection.Body is NewExpression ne)
+            var body = projection.Body;
+            if (body is NewExpression ne)
+            {
                 for (int i = 0; i < ne.Arguments.Count; i++)
                     Consider(ne.Members?[i]?.Name ?? $"Item{i + 1}", ne.Arguments[i]);
-            else if (projection.Body is MemberInitExpression mi)
+            }
+            else if (body is MemberInitExpression mi)
+            {
+                // Braces are REQUIRED: without them the trailing `else` below binds to this inner
+                // `if (b is MemberAssignment ma)` (dangling-else), so a bare projection never registers.
                 foreach (var b in mi.Bindings)
                     if (b is MemberAssignment ma)
                         Consider(ma.Member.Name, ma.Expression);
+            }
+            else
+            {
+                // Bare scalar projection: the body IS the correlated subquery op (Select(p => sub....First()))
+                // with no member wrapper. Register under the reserved empty-name key so the scalar-projection
+                // materializer applies ConvertFromProvider; Consider no-ops unless the body is a
+                // First/Last/Min/Max over a converter column.
+                Consider(BareScalarSubqueryConverterKey, body);
+            }
             return result;
         }
 
