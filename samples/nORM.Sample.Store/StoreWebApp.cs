@@ -22,6 +22,7 @@ public static class StoreWebApp
 
         builder.Services.AddSingleton<ProviderSettings>();
         builder.Services.AddSingleton<StoreContextFactory>();
+        builder.Services.AddSingleton<StoreDataMover>();
         builder.Services.AddHttpContextAccessor();
 
         // Dogfood nORM's DI: one scoped StoreContext per request, built for whatever engine is live
@@ -293,20 +294,29 @@ public static class StoreWebApp
             catch (Exception ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
-        api.MapPost("/settings/providers/{name}/activate", async (string name, TestConnectionRequest request, ProviderSettings settings, StoreContextFactory factory, ILoggerFactory logs) =>
+        api.MapPost("/settings/providers/{name}/activate", async (string name, TestConnectionRequest request, ProviderSettings settings, StoreContextFactory factory, StoreDataMover mover, ILoggerFactory logs) =>
         {
             var kind = StoreProvider.Parse(name)?.Kind;
             if (kind is null) return Results.BadRequest(new { error = $"Unknown engine '{name}'." });
             if (!string.IsNullOrWhiteSpace(request.ConnectionString) && kind != StoreProviderKind.Sqlite)
                 settings.SetConnectionString(kind.Value, request.ConnectionString!);
+
+            var source = settings.ActiveKind;
+            if (kind.Value == source)   // already live — don't wipe the current data by re-seeding
+            {
+                await using var live = factory.CreateForTenant(101);
+                return Results.Ok(new { active = settings.ActiveProvider.Name, ready = true, rowsMoved = 0, productCount = await live.Query<StoreProduct>().CountAsync(), note = "already active" });
+            }
+
             try
             {
-                await BootstrapAsync(settings, kind.Value, logs.CreateLogger("swap"));
+                var log = logs.CreateLogger("swap");
+                await BootstrapAsync(settings, kind.Value, log);          // schema + temporal on the target
+                var rowsMoved = await mover.CloneAsync(source, kind.Value); // carry the LIVE data across, provider-agnostic
                 settings.Activate(kind.Value);
-                // Prove the swap took: a fresh tenant-A context on the now-active engine reads seeded data.
                 await using var proof = factory.CreateForTenant(101);
                 var productCount = await proof.Query<StoreProduct>().CountAsync();
-                return Results.Ok(new { active = settings.ActiveProvider.Name, ready = true, productCount });
+                return Results.Ok(new { active = settings.ActiveProvider.Name, ready = true, from = ProviderSettings.Describe(source).Name, rowsMoved, productCount });
             }
             catch (Exception ex)
             {

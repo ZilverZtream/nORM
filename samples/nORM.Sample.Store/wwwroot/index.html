@@ -1,141 +1,146 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-engine="sqlite">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>nORM Sample Store</title>
+  <meta name="description" content="One app. Any database. Swapped live.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main class="shell">
-    <section id="login" class="login-view">
-      <div class="login-copy">
-        <p class="eyebrow">nORM sample store</p>
-        <h1>Provider-mobile tenant commerce</h1>
-        <p class="lede">A small authenticated store admin that keeps the same app code while switching SQLite, SQL Server, PostgreSQL, and MySQL.</p>
+  <!-- ─────────────────────────────  Sign in  ───────────────────────────── -->
+  <main id="view-login" class="login">
+    <div class="login-brand">
+      <span class="wordmark">nORM</span>
+      <span class="wordmark-sub">Sample&nbsp;Store</span>
+    </div>
+    <div class="login-hero">
+      <p class="kicker">Provider-mobile commerce</p>
+      <h1>One app.<br>Any database.<br><em>Swapped live.</em></h1>
+      <p class="lede">The same code runs on SQLite, SQL&nbsp;Server, PostgreSQL and MySQL. Change the engine from Settings while the app is running — every screen keeps working, tenant isolation intact.</p>
+      <div class="engine-strip" aria-hidden="true">
+        <span data-engine-chip="sqlite">SQLite</span>
+        <span data-engine-chip="sqlserver">SQL Server</span>
+        <span data-engine-chip="postgres">PostgreSQL</span>
+        <span data-engine-chip="mysql">MySQL</span>
       </div>
-      <div class="login-panel" aria-label="Sign in">
-        <div>
-          <p class="eyebrow">Tenant session</p>
-          <h2>Choose a tenant</h2>
-          <p class="muted">The dashboard, writes, compiled query path, includes, bulk events, and temporal reads run behind the selected tenant boundary.</p>
-        </div>
-        <div class="tenant-picker" role="group" aria-label="Tenant">
-          <button class="tenant-button active" data-tenant="tenant-a">Tenant A</button>
-          <button class="tenant-button" data-tenant="tenant-b">Tenant B</button>
-        </div>
-        <button id="loginButton" class="primary-button">Sign in</button>
+    </div>
+    <form class="login-card" id="loginForm">
+      <p class="kicker">Choose a store</p>
+      <h2>Sign in</h2>
+      <p class="muted">Each tenant is an isolated store. Everything you do runs behind that tenant's boundary.</p>
+      <div class="tenant-pick" role="radiogroup" aria-label="Store">
+        <button type="button" class="tenant-opt is-active" data-tenant="tenant-a">
+          <strong>Aurora Coffee</strong><small>Tenant A</small>
+        </button>
+        <button type="button" class="tenant-opt" data-tenant="tenant-b">
+          <strong>Borealis Goods</strong><small>Tenant B</small>
+        </button>
       </div>
-    </section>
-
-    <section id="app" class="app-view hidden">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">nORM Sample Store</p>
-          <h1>Operations Dashboard</h1>
-        </div>
-        <div class="topbar-actions">
-          <span id="providerBadge" class="badge">provider</span>
-          <span id="tenantBadge" class="badge strong">tenant</span>
-          <button id="refreshButton" class="ghost-button">Refresh</button>
-          <button id="logoutButton" class="ghost-button">Sign out</button>
-        </div>
-      </header>
-
-      <section class="status-band" aria-label="Store metrics">
-        <article>
-          <span>Active products</span>
-          <strong id="metricProducts">-</strong>
-        </article>
-        <article>
-          <span>Open orders</span>
-          <strong id="metricOrders">-</strong>
-        </article>
-        <article>
-          <span>Tenant revenue</span>
-          <strong id="metricRevenue">-</strong>
-        </article>
-        <article>
-          <span>Audit events</span>
-          <strong id="metricEvents">-</strong>
-        </article>
-      </section>
-
-      <section class="workspace">
-        <section class="main-column">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Queryable store state</p>
-              <h2>Products</h2>
-            </div>
-            <span class="query-chip">Where + Select DTO + OrderBy</span>
-          </div>
-          <div id="products" class="product-grid"></div>
-
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Navigation loading</p>
-              <h2>Orders</h2>
-            </div>
-            <span id="orderSummary" class="query-chip"></span>
-          </div>
-          <div id="orders" class="order-list"></div>
-
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Bulk writes</p>
-              <h2>Recent Events</h2>
-            </div>
-            <button id="bulkButton" class="secondary-button">Bulk Insert Events</button>
-          </div>
-          <div id="events" class="event-list"></div>
-        </section>
-
-        <aside class="side-column">
-          <section class="panel">
-            <p class="eyebrow">Tenant boundary</p>
-            <h2>Cross-tenant write proof</h2>
-            <p class="muted">Attempts to update/delete a known row owned by the other tenant. The generated write path must affect zero rows.</p>
-            <pre id="tenantDiagnostic" class="result-box compact">Loading tenant diagnostics...</pre>
-            <button id="tenantProofButton" class="secondary-button">Run Proof</button>
-            <pre id="tenantProofResult" class="result-box">Not run yet.</pre>
-          </section>
-
-          <section class="panel">
-            <p class="eyebrow">Temporal history</p>
-            <h2>Tag, update, read back</h2>
-            <label>
-              Product ID
-              <input id="productIdInput" type="number" value="1000">
-            </label>
-            <label>
-              New price
-              <input id="priceInput" type="number" step="0.01" value="19.95">
-            </label>
-            <div class="button-row">
-              <button id="tagButton" class="secondary-button">Create Tag</button>
-              <button id="updatePriceButton" class="secondary-button">Update Price</button>
-              <button id="asOfButton" class="secondary-button">Read As Of</button>
-              <button id="historyButton" class="secondary-button">History</button>
-              <button id="diffButton" class="secondary-button">Diff</button>
-              <button id="restoreButton" class="secondary-button">Restore</button>
-              <button id="pruneButton" class="secondary-button">Prune Closed</button>
-            </div>
-            <pre id="temporalResult" class="result-box">No temporal action yet.</pre>
-            <div id="historyTimeline" class="timeline" aria-live="polite"></div>
-          </section>
-
-          <section class="panel">
-            <p class="eyebrow">Provider evidence</p>
-            <h2>Scenario gate</h2>
-            <p class="muted">Runs the same tenant, LINQ, bulk, compiled query, include, and temporal scenario behind this provider.</p>
-            <button id="verifyButton" class="secondary-button">Verify Scenario</button>
-            <pre id="evidenceResult" class="result-box">Ready.</pre>
-          </section>
-        </aside>
-      </section>
-    </section>
+      <button type="submit" class="btn btn-primary btn-block" id="loginButton">Enter store</button>
+    </form>
   </main>
+
+  <!-- ─────────────────────────────  App shell  ───────────────────────────── -->
+  <div id="app" class="app hidden">
+    <header class="rail">
+      <div class="rail-brand">
+        <span class="wordmark">nORM</span>
+        <span class="rail-brand-sub">Sample Store</span>
+      </div>
+      <nav class="rail-nav" aria-label="Views">
+        <button class="nav-link is-active" data-view="storefront">Storefront</button>
+        <button class="nav-link" data-view="admin">Admin</button>
+        <button class="nav-link" data-view="settings">Settings</button>
+      </nav>
+      <div class="rail-right">
+        <button class="tenant-switch" id="tenantSwitch" title="Switch store">
+          <span class="tenant-dot"></span><span id="tenantLabel">Aurora Coffee</span>
+        </button>
+        <div class="engine-pill" id="enginePill" title="Live database engine">
+          <span class="engine-dot"></span>
+          <span class="engine-name" id="engineName">sqlite</span>
+        </div>
+        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
+        <button class="btn btn-ghost" id="logoutButton">Sign out</button>
+      </div>
+    </header>
+
+    <!-- Storefront -->
+    <main class="view" id="view-storefront" data-view="storefront">
+      <section class="store-hero">
+        <div>
+          <p class="kicker" id="storeKicker">Now serving</p>
+          <h1 id="storeName">Aurora Coffee</h1>
+          <p class="lede" id="storeTagline">Small-batch roasts, shipped the day they're bagged.</p>
+        </div>
+        <div class="store-meta">
+          <span class="mono" id="storeEngineNote">served from sqlite</span>
+        </div>
+      </section>
+      <div class="catalog-head">
+        <h2>Catalog</h2>
+        <span class="chip mono" id="catalogChip">page 1</span>
+      </div>
+      <div class="catalog" id="catalog"></div>
+      <div class="pager" id="pager"></div>
+    </main>
+
+    <!-- Admin -->
+    <main class="view hidden" id="view-admin" data-view="admin">
+      <div class="metrics" id="metrics"></div>
+      <div class="admin-grid">
+        <section class="card span-2">
+          <div class="card-head"><h2>Orders</h2><span class="chip mono" id="orderChip">Include + split query</span></div>
+          <div id="orders" class="orders"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Isolation under load</h2></div>
+          <p class="muted">Fire 32 parallel requests split across both tenants and assert no context ever sees the other store's rows.</p>
+          <button class="btn btn-primary" id="isolationButton">Run 32-way proof</button>
+          <div class="proof" id="isolationResult"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Cross-tenant write</h2></div>
+          <p class="muted">Try to update/delete a row owned by the other store. The generated write must touch zero rows.</p>
+          <button class="btn btn-secondary" id="tenantProofButton">Run write proof</button>
+          <div class="proof" id="tenantProofResult"></div>
+        </section>
+        <section class="card span-2">
+          <div class="card-head"><h2>Temporal history</h2><span class="chip mono">tag → edit → AsOf → restore</span></div>
+          <div class="temporal-controls">
+            <label>Product<select id="temporalProduct"></select></label>
+            <label>New price<input id="priceInput" type="number" step="0.01" value="19.95"></label>
+            <div class="btn-row">
+              <button class="btn btn-secondary" id="tagButton">Tag now</button>
+              <button class="btn btn-secondary" id="updatePriceButton">Update price</button>
+              <button class="btn btn-secondary" id="asOfButton">Read as-of tag</button>
+              <button class="btn btn-secondary" id="diffButton">Diff</button>
+              <button class="btn btn-secondary" id="restoreButton">Restore</button>
+            </div>
+          </div>
+          <div class="timeline" id="historyTimeline"></div>
+          <pre class="out" id="temporalResult">No temporal action yet.</pre>
+        </section>
+      </div>
+    </main>
+
+    <!-- Settings — the hero -->
+    <main class="view hidden" id="view-settings" data-view="settings">
+      <section class="settings-hero">
+        <p class="kicker">The whole point</p>
+        <h1>Change the database engine.<br>The app never notices.</h1>
+        <p class="lede">Point an engine at a connection string, test it, then make it live. nORM re-homes the running app — same schema, same queries, same tenant boundaries — and the entire UI re-tints to the engine you're now on.</p>
+      </section>
+      <div class="engines" id="engines"></div>
+      <div class="swap-log" id="swapLog" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/app.js"></script>
 </body>
 </html>
