@@ -147,4 +147,16 @@ public class ProjectedStringEqualityLiveTests
         => RunParity(kind, q => q.Select(x => new { x.Id, Eq = x.Name == "abc" })
                                  .OrderBy(a => a.Id).ToList()
                                  .Select(a => (a.Id, a.Eq)).ToList());
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
+    public void Projected_inequality_against_constant_is_ordinal_and_null_aware(string kind)
+        // Exercises the asymmetric NotEqual path (right operand a known non-null constant):
+        // `(Name IS NULL OR ordinal-not-equal)`. Row 2 ("ABC" != "abc") must be true (ordinal),
+        // and row 4 (null != "abc") must be true (C# lifted inequality).
+        => RunParity(kind, q => q.Select(x => new { x.Id, Ne = x.Name != "abc" })
+                                 .OrderBy(a => a.Id).ToList()
+                                 .Select(a => (a.Id, a.Ne)).ToList());
 }
