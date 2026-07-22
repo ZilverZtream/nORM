@@ -610,6 +610,13 @@ namespace nORM.Query
                 if (IsQueryRootedScalarAggregate(node) || IsQueryRootedScalarFirst(node))
                     return node;
 
+                // Deterministic "top related value" over a navigation collection —
+                // `nav.OrderBy(key).Select(scalar).First()` — which SelectClauseVisitor emits as a
+                // LIMIT-1 correlated subquery. Admit WITHOUT descending so the nav member / Select /
+                // OrderBy aren't flagged as client-eval; only this exact shape is admitted.
+                if (SelectClauseVisitor.IsNavigationOrderedFirstShape(node))
+                    return node;
+
                 // A shaped collection binding — `o.Lines.ToList()` or
                 // `o.Lines.Where(pred).ToList()` — is fetched via a split query by
                 // SelectClauseVisitor, not materialized client-side. Admit it WITHOUT

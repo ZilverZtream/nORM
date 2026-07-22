@@ -76,6 +76,9 @@ namespace nORM.Query
             if (TryVisitDistinctCountNavigationAggregate(node, sb))
                 return true;
 
+            if (TryVisitNavigationOrderedFirstScalar(node, sb))
+                return true;
+
             if (TryVisitSelectedNavigationScalarAggregate(node, sb))
                 return true;
 
@@ -339,6 +342,7 @@ namespace nORM.Query
               .Append(" WHERE ").Append(whereSql).Append(')');
             return true;
         }
+
 
         /// <summary>
         /// Handles <c>p.Children.Select(c =&gt; c.Col).Distinct().Count()</c> — the distinct-count over a
