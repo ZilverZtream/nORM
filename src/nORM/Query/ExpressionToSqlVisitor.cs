@@ -57,6 +57,10 @@ namespace nORM.Query
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression s_emptyExpression = Expression.Empty();
         private readonly Dictionary<ParameterExpression, string> _groupingKeys = new();
+        // For a group built with an element selector (GroupBy(key, s => s.Amount)): the IGrouping parameter
+        // maps to that selector, so a parameterless/identity aggregate (g.Sum()/g.Sum(x=>x)) inside a computed
+        // projection body lowers to SUM(Amount) — the element selector's body is the aggregate operand.
+        private readonly Dictionary<ParameterExpression, LambdaExpression> _groupingElementSelectors = new();
         // String methods (Contains, StartsWith, EndsWith) are handled via _fastMethodHandlers
         // for better performance, avoiding a redundant _translators dictionary lookup.
         private static readonly Dictionary<MethodInfo, Action<ExpressionToSqlVisitor, MethodCallExpression>> _fastMethodHandlers =
@@ -188,6 +192,7 @@ namespace nORM.Query
             _recursionDepth = context.RecursionDepth;
             _memberParamMap.Clear();
             _groupingKeys.Clear();
+            _groupingElementSelectors.Clear();
         }
         /// <summary>
         /// Resets the internal state so that the visitor can be returned to an object pool and
@@ -214,6 +219,7 @@ namespace nORM.Query
             _constParamMap.Clear();
             _memberParamMap.Clear();
             _groupingKeys.Clear();
+            _groupingElementSelectors.Clear();
             _ownedParamConverters.Clear();
             _paramConverters = null!;
         }
@@ -258,6 +264,17 @@ namespace nORM.Query
         public void RegisterGroupingKey(ParameterExpression parameter, string keySql)
         {
             _groupingKeys[parameter] = keySql;
+        }
+
+        /// <summary>
+        /// Binds the IGrouping <paramref name="parameter"/> to the element selector of a
+        /// <c>GroupBy(key, elementSelector)</c>, so a parameterless or identity aggregate over the group
+        /// (<c>g.Sum()</c> / <c>g.Sum(x =&gt; x)</c>) inside a computed projection body uses the element
+        /// selector's body as the aggregate operand (e.g. <c>SUM(Amount)</c>) instead of failing for lack of one.
+        /// </summary>
+        public void RegisterGroupingElementSelector(ParameterExpression parameter, LambdaExpression elementSelector)
+        {
+            _groupingElementSelectors[parameter] = elementSelector;
         }
 
         /// <summary>

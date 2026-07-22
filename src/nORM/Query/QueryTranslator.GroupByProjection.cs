@@ -274,7 +274,14 @@ namespace nORM.Query
                         var computedVctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                         var computedVisitor = FastExpressionVisitorPool.Get(in computedVctx);
                         foreach (var gp in resultSelector.Parameters)
+                        {
                             computedVisitor.RegisterGroupingKey(gp, groupBySql);
+                            // A group built with an element selector (GroupBy(key, s => s.Amount)) lets a
+                            // parameterless/identity aggregate in this computed body — g.Sum() / g.Sum(x => x)
+                            // — take the element selector's body as its operand (SUM(Amount)).
+                            if (_groupByElementSelector != null)
+                                computedVisitor.RegisterGroupingElementSelector(gp, _groupByElementSelector);
+                        }
                         var computedSql = computedVisitor.Translate(resultSelector.Body);
                         foreach (var kvp in computedVisitor.GetParameters())
                             AddLiteralParameter(kvp.Key, kvp.Value);

@@ -13,6 +13,18 @@ namespace nORM.Query
 {
     internal sealed partial class ExpressionToSqlVisitor
     {
+        /// <summary>True for an identity aggregate selector <c>x =&gt; x</c> (optionally with a conversion),
+        /// whose operand is the group element itself.</summary>
+        private static bool IsIdentityLambda(LambdaExpression lambda)
+        {
+            if (lambda.Parameters.Count != 1)
+                return false;
+            var body = lambda.Body;
+            while (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                body = u.Operand;
+            return body is ParameterExpression p && ReferenceEquals(p, lambda.Parameters[0]);
+        }
+
         private Expression? TryTranslateEnumerableOrQueryableMethod(MethodCallExpression node)
         {
             if (node.Method.DeclaringType == typeof(Enumerable) || node.Method.DeclaringType == typeof(Queryable))
@@ -131,11 +143,16 @@ namespace nORM.Query
                     case "Average":
                     case "Min":
                     case "Max":
-                        if (node.Arguments.Count >= 2
+                        if (node.Arguments.Count >= 1
                             && node.Arguments[0] is ParameterExpression gp
                             && (_parameterMappings.ContainsKey(gp) || _groupingKeys.ContainsKey(gp)))
                         {
-                            var selector = StripQuotes(node.Arguments[1]) as LambdaExpression;
+                            var selector = node.Arguments.Count >= 2 ? StripQuotes(node.Arguments[1]) as LambdaExpression : null;
+                            // Element-selector group: a parameterless (g.Sum()) or identity (g.Sum(x => x))
+                            // aggregate takes the element selector's body as its operand, e.g. SUM(Amount).
+                            if (_groupingElementSelectors.TryGetValue(gp, out var elementSelector)
+                                && (selector == null || IsIdentityLambda(selector)))
+                                selector = elementSelector;
                             if (selector != null)
                             {
                                 // GroupBy aggregate inside HAVING: the IGrouping parameter is in
