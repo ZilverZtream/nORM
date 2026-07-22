@@ -38,19 +38,30 @@ namespace nORM.Query
                 && _mapping.Relations.TryGetValue(hop1NavMember.Member.Name, out var hop1Relation)
                 && StripQuotes(twoHopCall.Arguments[1]) is LambdaExpression hop2SelectorLambda
                 && hop2SelectorLambda.Body is MemberExpression hop2NavMember
-                && (node.Method.Name is nameof(Queryable.Count)
-                                     or nameof(Queryable.LongCount)
-                                     or nameof(Queryable.Any)))
+                && node.Method.Name is nameof(Queryable.Count) or nameof(Queryable.LongCount)
+                                    or nameof(Queryable.Any) or nameof(Queryable.Sum)
+                                    or nameof(Queryable.Min) or nameof(Queryable.Max) or nameof(Queryable.Average))
             {
                 var intermediateMapping = _ctx.GetMapping(hop1Relation.DependentType);
                 QueryTranslator.RecordReferencedTable(intermediateMapping.TableName);
                 if (intermediateMapping.Relations.TryGetValue(hop2NavMember.Member.Name, out var hop2Relation))
                 {
-                    var hop2Filter = node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression hop2Predicate
-                        ? hop2Predicate
-                        : null;
-                    EmitTwoHopNavigationCountSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation, hop2Filter);
-                    return true;
+                    // For Sum/Min/Max/Average the argument is the aggregate SELECTOR; for Count it's an
+                    // optional predicate filter. Sum/Min/Max/Average without a selector isn't this shape.
+                    var isAggWithSelector = node.Method.Name is nameof(Queryable.Sum) or nameof(Queryable.Min)
+                                                              or nameof(Queryable.Max) or nameof(Queryable.Average);
+                    LambdaExpression? hop2AggSelector = null;
+                    LambdaExpression? hop2Filter = null;
+                    if (node.Arguments.Count == 2 && StripQuotes(node.Arguments[1]) is LambdaExpression secondArg)
+                    {
+                        if (isAggWithSelector) hop2AggSelector = secondArg;
+                        else hop2Filter = secondArg;
+                    }
+                    if (!isAggWithSelector || hop2AggSelector != null)
+                    {
+                        EmitTwoHopNavigationAggregateSubquery(sb, node.Method.Name, hop1Relation, intermediateMapping, hop2Relation, hop2Filter, hop2AggSelector);
+                        return true;
+                    }
                 }
             }
 
@@ -597,13 +608,14 @@ namespace nORM.Query
             }
         }
 
-        private void EmitTwoHopNavigationCountSubquery(
+        private void EmitTwoHopNavigationAggregateSubquery(
             StringBuilder sb,
             string methodName,
             TableMapping.Relation hop1Rel,
             TableMapping intermediateMapping,
             TableMapping.Relation hop2Rel,
-            LambdaExpression? hop2Filter)
+            LambdaExpression? hop2Filter,
+            LambdaExpression? aggSelector = null)
         {
             var hop2DepMapping = _ctx!.GetMapping(hop2Rel.DependentType);
             var hop1EscTable  = QueryTranslator.TemporalTableSource(intermediateMapping);
@@ -640,9 +652,40 @@ namespace nORM.Query
                     sb.Append(" AND ").Append(hop1Visibility);
                 sb.Append(")) THEN 1 ELSE 0 END)");
             }
-            else // Count / LongCount
+            else // Count / LongCount / Sum / Min / Max / Average over the flattened two-hop leaves
             {
-                sb.Append("(SELECT COUNT(*) FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
+                string aggExpr;
+                if (aggSelector != null)
+                {
+                    var selSql = TryRenderDependentSelector(aggSelector.Body, aggSelector.Parameters[0], hop2Alias, hop2Rel.DependentType)
+                        ?? RenderDependentSelectorViaSubVisitor(aggSelector, hop2Alias, hop2Rel.DependentType)
+                        ?? throw new NormUnsupportedFeatureException(
+                            "Two-hop navigation aggregate (SelectMany(...).Sum/Min/Max/Average(...)) could not translate its selector to SQL.");
+                    var sqlAgg = methodName switch
+                    {
+                        nameof(Queryable.Sum) => "SUM",
+                        nameof(Queryable.Min) => "MIN",
+                        nameof(Queryable.Max) => "MAX",
+                        _ => "AVG"
+                    };
+                    var aggSelType = Nullable.GetUnderlyingType(aggSelector.Body.Type) ?? aggSelector.Body.Type;
+                    if (aggSelType == typeof(decimal))
+                        aggExpr = _provider.DecimalAggregateSql(sqlAgg, selSql);
+                    else
+                    {
+                        if (sqlAgg == "AVG") selSql = _provider.AverageAggregateOperand(selSql, aggSelector.Body.Type);
+                        aggExpr = $"{sqlAgg}({selSql})";
+                    }
+                    // Enumerable.Sum over an empty (flattened) sequence is 0; COALESCE so an embedded
+                    // two-hop Sum doesn't leak the empty-group NULL (mirror of the single-hop fix).
+                    if (methodName == nameof(Queryable.Sum))
+                        aggExpr = $"COALESCE({aggExpr}, 0)";
+                }
+                else
+                {
+                    aggExpr = "COUNT(*)";
+                }
+                sb.Append("(SELECT ").Append(aggExpr).Append(" FROM ").Append(hop2EscTable).Append(' ').Append(hop2Alias)
                   .Append(" WHERE ");
                 if (hop2FilterSql != null)
                     sb.Append(hop2FilterSql).Append(" AND ");
