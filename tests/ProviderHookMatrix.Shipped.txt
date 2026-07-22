@@ -257,7 +257,6 @@ BulkDeleteAsync
 BulkInsertAsync
 BulkUpdateAsync
 Capabilities
-ConventionKeyUsesIdentityColumn
 CreateParameter
 CreateSavepointAsync
 DefaultStringEqualityIsCaseInsensitive
@@ -319,7 +318,6 @@ PrefersSyncFastPathExecution
 PrefersSyncQueryPlanExecution
 ReleaseSavepointAsync
 RollbackToSavepointAsync
-SupportsConventionKeyStoreGeneration
 SupportsNativeRowVersion
 SupportsNativeTenantSessionContext
 SupportsPreparedBatchCommands

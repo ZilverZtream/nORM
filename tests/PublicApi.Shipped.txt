@@ -1637,7 +1637,6 @@ P:nORM.Providers.ProviderCapabilities.SupportsTemporalVersioning:System.Boolean
 P:nORM.Providers.SqlServerProvider.Capabilities:nORM.Providers.ProviderCapabilities
 P:nORM.Providers.SqlServerProvider.MaxParameters:System.Int32
 P:nORM.Providers.SqlServerProvider.MaxSqlLength:System.Int32
-P:nORM.Providers.SqlServerProvider.SupportsConventionKeyStoreGeneration:System.Boolean
 P:nORM.Providers.SqlServerProvider.SupportsNativeTenantSessionContext:System.Boolean
 P:nORM.Providers.SqlServerProvider.SupportsProviderNativeTemporalTables:System.Boolean
 P:nORM.Providers.SqlServerProvider.UsesFetchOffsetPaging:System.Boolean

@@ -46,17 +46,15 @@ namespace nORM.Providers
         public override Column[] GetInsertColumns(TableMapping m)
             => m.InsertColumns.Where(c => !c.IsTimestamp).ToArray();
 
-        /// <summary>
-        /// A single-column integer primary key with no explicit value-generation config is store-generated
-        /// (EF Core parity): SQL Server realizes it as an IDENTITY column, which generates a value when the
-        /// column is omitted. An explicitly-supplied value is inserted under SET IDENTITY_INSERT (see
-        /// <see cref="GetIdentityInsertEnableSql"/>). Applications with an existing plain-INT (non-IDENTITY)
-        /// table opt out via DbContextOptions.UseStoreGeneratedKeyConvention=false (or [DatabaseGenerated(None)]).
-        /// </summary>
-        public override bool SupportsConventionKeyStoreGeneration => true;
-
-        /// <summary>SQL Server realizes the convention key as an IDENTITY column (needs identity DDL).</summary>
-        internal override bool ConventionKeyUsesIdentityColumn => true;
+        // SQL Server does NOT flip SupportsConventionKeyStoreGeneration on. Unlike MySQL/PostgreSQL — whose
+        // conventions accept an explicit value into a plain-INT column, so they are backward-compatible with an
+        // existing non-identity table — SQL Server realizes the convention key as IDENTITY and must emit
+        // SET IDENTITY_INSERT for explicit-value inserts, which FAILS on any table whose key is not actually an
+        // identity column. That breaks every existing plain-INT (non-IDENTITY) table AND a large swath of
+        // nORM's own live test suite (~20+ classes create raw plain-INT-PK tables and seed explicit keys). The
+        // benefit (zero-config store-gen vs one [DatabaseGenerated(Identity)] annotation) does not justify that
+        // blast radius, so SQL Server stays opt-in. The IDENTITY_INSERT hooks below stay inert until the flip.
+        // See honor_nonzero_key_convention_plan.
 
         /// <summary>
         /// An IDENTITY column rejects an explicitly-supplied value unless IDENTITY_INSERT is ON; the

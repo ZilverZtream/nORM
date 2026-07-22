@@ -62,7 +62,8 @@ public sealed class StoreGeneratedKeyConventionLiveTests
     [Theory]
     [InlineData("mysql")]
     [InlineData("postgres")]
-    [InlineData("sqlserver")]
+    // sqlserver: convention stays opt-in — flipping it emits SET IDENTITY_INSERT, which breaks existing
+    // plain-INT tables (and ~20+ live test classes). Store-gen there via [DatabaseGenerated(Identity)].
     public async Task ConventionKey_StoreGenerates_And_Honors_Explicit_OnLiveServer(string kind)
     {
         var (factory, provider) = OpenLive(kind);
