@@ -23,7 +23,10 @@ namespace nORM.Tests;
 [Trait("Category", TestCategory.LiveProvider)]
 public sealed class StoreGeneratedKeyConventionLiveTests
 {
-    [Table("SgkLive")]
+    // Lowercase, unquoted-safe table name: PostgreSQL folds an unquoted identifier to lowercase, so a
+    // mixed-case name would make DROP TABLE IF EXISTS miss the quoted table EnsureCreated created (leaking it
+    // across runs). Lowercase keeps DROP and CREATE referring to the same table on every provider.
+    [Table("sgkconvlive")]
     public sealed class Row
     {
         [Key] public int Id { get; set; }   // convention key: no [DatabaseGenerated]
@@ -58,13 +61,14 @@ public sealed class StoreGeneratedKeyConventionLiveTests
 
     [Theory]
     [InlineData("mysql")]
+    [InlineData("postgres")]
     public async Task ConventionKey_StoreGenerates_And_Honors_Explicit_OnLiveServer(string kind)
     {
         var (factory, provider) = OpenLive(kind);
         if (factory == null) return;   // provider not configured
 
         using var cn = factory();
-        Exec(cn, "DROP TABLE IF EXISTS SgkLive");
+        Exec(cn, "DROP TABLE IF EXISTS sgkconvlive");
         try
         {
             var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<Row>().HasKey(x => x.Id) };
@@ -93,7 +97,7 @@ public sealed class StoreGeneratedKeyConventionLiveTests
         }
         finally
         {
-            Exec(cn, "DROP TABLE IF EXISTS SgkLive");
+            Exec(cn, "DROP TABLE IF EXISTS sgkconvlive");
         }
     }
 }

@@ -344,6 +344,7 @@ BulkInsertAsync
 BulkUpdateAsync
 Capabilities
 ClampNonNegativeLimitExpression
+ConventionKeyUsesIdentityColumn
 CreateParameter
 CreateSavepointAsync
 Escape
@@ -396,6 +397,7 @@ PrefersSyncQueryPlanExecution
 ReleaseSavepointAsync
 RequiresExplicitNullOrderingForNullableKeys
 RollbackToSavepointAsync
+SupportsConventionKeyStoreGeneration
 SupportsFastPathPreparedCommandCache
 SupportsNativeTenantSessionContext
 SupportsQueryPlanPreparedCommandCache

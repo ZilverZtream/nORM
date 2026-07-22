@@ -268,7 +268,7 @@ namespace nORM.Migration
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
                     var sqlType = c.IsIdentity ? GetIdentitySqlType(c) : GetSqlType(c);
-                    var identityPart = c.IsIdentity ? " GENERATED ALWAYS AS IDENTITY" : "";
+                    var identityPart = c.IsIdentity ? GetIdentityClause(c) : "";
                     return $"{Esc(c.Name)} {sqlType}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
                 }).ToList();
 
@@ -453,7 +453,7 @@ namespace nORM.Migration
                         ? $" DEFAULT {DefaultValueValidator.Validate(c.DefaultValue)}"
                         : "";
                     var sqlType = c.IsIdentity ? GetIdentitySqlType(c) : GetSqlType(c);
-                    var identityPart = c.IsIdentity ? " GENERATED ALWAYS AS IDENTITY" : "";
+                    var identityPart = c.IsIdentity ? GetIdentityClause(c) : "";
                     return $"{Esc(c.Name)} {sqlType}{FormatCollation(c)} {(c.IsNullable ? "NULL" : "NOT NULL")}{identityPart}{defaultPart}";
                 }).ToList();
                 var pkCols = table.Columns.Where(c => c.IsPrimaryKey).ToList();
@@ -512,26 +512,6 @@ namespace nORM.Migration
             typeof(uint).FullName!,
             typeof(ulong).FullName!,
         };
-
-        /// <summary>
-        /// Returns the appropriate PostgreSQL integer type for an identity column.
-        /// BIGINT for long/ulong, INTEGER for all other integer types.
-        /// Non-integer CLR types return INTEGER with a leading SQL warning comment because
-        /// GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL.
-        /// </summary>
-        private static string GetIdentitySqlType(ColumnSchema column)
-        {
-            if (string.Equals(column.ClrType, typeof(long).FullName, StringComparison.Ordinal)
-             || string.Equals(column.ClrType, typeof(ulong).FullName, StringComparison.Ordinal))
-                return "BIGINT";
-
-            if (!_integerClrTypes.Contains(column.ClrType))
-                // WARNING: GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL.
-                // The column CLR type is not an integer type; INTEGER is used as a fallback — verify the mapping is correct.
-                return "/* WARNING: GENERATED ALWAYS AS IDENTITY is only valid for integer types in PostgreSQL */ INTEGER";
-
-            return "INTEGER";
-        }
 
         /// <summary>
         /// Returns the PostgreSQL base type name suitable for USING cast expressions.

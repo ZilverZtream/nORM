@@ -331,6 +331,9 @@ namespace nORM.Migration
                         // when the provider supports the convention, so this is inert elsewhere.
                         IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity
                             || (col.IsConventionGeneratedKey && provider?.ConventionKeyUsesIdentityColumn == true),
+                        // A convention key's identity honors an explicit value (store-generated only when
+                        // default), unlike a strict [DatabaseGenerated(Identity)]. Drives the by-default DDL.
+                        IdentityByDefault = col.IsConventionGeneratedKey && provider?.ConventionKeyUsesIdentityColumn == true,
                         IdentitySeed = identityOptions?.Seed,
                         IdentityIncrement = identityOptions?.Increment,
                         ComputedColumnSql = computedColumn?.Sql

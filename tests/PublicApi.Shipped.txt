@@ -1512,6 +1512,7 @@ P:nORM.Migration.ColumnSchema.Comment:System.String
 P:nORM.Migration.ColumnSchema.ComputedColumnSql:System.String
 P:nORM.Migration.ColumnSchema.DefaultConstraintName:System.String
 P:nORM.Migration.ColumnSchema.DefaultValue:System.String
+P:nORM.Migration.ColumnSchema.IdentityByDefault:System.Boolean
 P:nORM.Migration.ColumnSchema.IdentityIncrement:System.Nullable{System.Int64}
 P:nORM.Migration.ColumnSchema.IdentitySeed:System.Nullable{System.Int64}
 P:nORM.Migration.ColumnSchema.IndexName:System.String
@@ -1623,6 +1624,7 @@ P:nORM.Providers.PostgresProvider.BooleanTrueLiteral:System.String
 P:nORM.Providers.PostgresProvider.Capabilities:nORM.Providers.ProviderCapabilities
 P:nORM.Providers.PostgresProvider.MaxParameters:System.Int32
 P:nORM.Providers.PostgresProvider.MaxSqlLength:System.Int32
+P:nORM.Providers.PostgresProvider.SupportsConventionKeyStoreGeneration:System.Boolean
 P:nORM.Providers.PostgresProvider.SupportsNativeTenantSessionContext:System.Boolean
 P:nORM.Providers.ProviderCapabilities.MaxParameters:System.Int32
 P:nORM.Providers.ProviderCapabilities.MinimumServerVersion:System.Version
