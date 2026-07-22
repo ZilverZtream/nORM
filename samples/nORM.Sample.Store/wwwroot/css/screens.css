@@ -92,3 +92,24 @@
 .out { font-family: var(--font-mono); font-size: .78rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .8rem; white-space: pre-wrap; word-break: break-word; color: var(--ink-2); max-height: 240px; overflow: auto; }
 .empty { color: var(--muted); padding: 1.5rem 0; text-align: center; font-size: .9rem; }
 .engine-line { display: flex; align-items: center; gap: .6rem; margin-top: .5rem; }
+
+/* ── infrastructure (engine swap) ─────────────────────────────────────────── */
+.engines { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.1rem; margin-bottom: 1.75rem; }
+.engine-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; display: flex; flex-direction: column; gap: .9rem; min-height: 190px; transition: var(--tform); }
+.engine-card.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+.engine-card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.engine-badge { display: inline-flex; align-items: center; gap: .55rem; font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+.engine-swatch { width: 11px; height: 11px; border-radius: 3px; background: #8a93a3; }
+.engine-card[data-engine="sqlite"] .engine-swatch { background: #3aa9e0; }
+.engine-card[data-engine="sqlserver"] .engine-swatch { background: #cc2927; }
+.engine-card[data-engine="postgres"] .engine-swatch { background: #3e7cb1; }
+.engine-card[data-engine="mysql"] .engine-swatch { background: #1c9cb0; }
+.engine-cs { font-size: .78rem; }
+.engine-actions { display: flex; align-items: center; gap: .6rem; margin-top: auto; }
+.engine-actions .spacer { flex: 1; }
+.test-result { font-size: .74rem; }
+.swap-log { display: flex; flex-direction: column; gap: .55rem; }
+.log-line { display: flex; align-items: center; gap: .6rem; font: 500 .82rem var(--font-mono); padding: .7rem .9rem; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); }
+.log-line.ok { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--surface)); }
+.log-line.err { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+.log-line.running { color: var(--accent); border-color: var(--accent-line); }

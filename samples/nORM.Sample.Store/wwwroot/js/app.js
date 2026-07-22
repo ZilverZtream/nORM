@@ -5,6 +5,8 @@ import { state, tenantOf, otherTenant, setActiveEngine, ENGINE_LABEL } from "./s
 import { renderLogin } from "./views/login.js";
 import { renderStorefront } from "./views/storefront.js";
 import { renderDashboard } from "./views/dashboard.js";
+import { renderInfrastructure } from "./views/infrastructure.js";
+import { renderPlaceholder } from "./views/admin-common.js";
 
 const root = document.getElementById("root");
 let routerStarted = false;
@@ -32,6 +34,11 @@ function enter(me) {
   if (!routerStarted) {
     router.route("/store", () => renderStorefront());
     router.route("/admin", () => renderDashboard());
+    router.route("/admin/infrastructure", () => renderInfrastructure());
+    router.route("/admin/products", () => renderPlaceholder("products", "Products"));
+    router.route("/admin/orders", () => renderPlaceholder("orders", "Orders"));
+    router.route("/admin/history", () => renderPlaceholder("history", "Version history"));
+    router.route("/admin/system", () => renderPlaceholder("system", "System health"));
     router.start(onRoute);
     routerStarted = true;
   }

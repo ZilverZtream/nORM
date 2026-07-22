@@ -1,6 +1,7 @@
-import { el, money, mount, loading, toast } from "../ui.js";
+import { el, money, mount, loading } from "../ui.js";
 import { api } from "../api.js";
 import { state, tenantOf, ENGINE_LABEL } from "../state.js";
+import { adminSubnav } from "./admin-common.js";
 
 export async function renderDashboard() {
   const view = el("div", { class: "page" }, adminSubnav("dashboard"), loading("Loading dashboard"));
@@ -36,21 +37,6 @@ export async function renderDashboard() {
   } catch (e) {
     view.replaceChildren(adminSubnav("dashboard"), el("div", { class: "empty" }, "Couldn't load: " + e.message));
   }
-}
-
-function adminSubnav(active) {
-  const item = (label, key) =>
-    el("a", {
-      class: active === key ? "active" : "",
-      onClick: () => { if (key !== "dashboard") toast("Building this screen next"); },
-    }, label);
-  return el("nav", { class: "subnav" },
-    item("Dashboard", "dashboard"),
-    item("Products", "products"),
-    item("Orders", "orders"),
-    item("History", "history"),
-    item("Infrastructure", "infra"),
-    item("System", "system"));
 }
 
 function stat(label, value) {
