@@ -332,6 +332,19 @@ namespace nORM.Mapping
             }
 
             KeyColumns = Columns.Where(c => c.IsKey).ToArray();
+            // Store-generated-key convention (EF Core parity), DETECTION only: a SINGLE-column integer primary
+            // key with no explicit value-generation config is a convention key — store-generated when its value
+            // is default, honored when non-default. Composite keys and explicitly-configured keys
+            // ([DatabaseGenerated]/ValueGeneratedOnAdd/Never) are excluded, so an opt-out stays client-set. The
+            // write path reads IsConventionGeneratedKey per-entity (increment 2); flagging it here changes no
+            // behavior yet. See honor_nonzero_key_convention_plan.
+            if (KeyColumns.Length == 1
+                && !KeyColumns[0].IsDbGenerated
+                && !KeyColumns[0].ValueGenerationExplicitlyConfigured
+                && Column.IsConventionStoreGeneratedKeyType(KeyColumns[0].Prop.PropertyType))
+            {
+                KeyColumns[0].MarkConventionGeneratedKey();
+            }
             TimestampColumn = Columns.FirstOrDefault(c => c.IsTimestamp);
             TenantColumn = Columns.FirstOrDefault(c => c.PropName == ctx.Options.TenantColumnName);
             InsertColumns = Columns.Where(c => !c.IsDbGenerated).ToArray();
