@@ -190,5 +190,111 @@ namespace nORM.Query
             sb.Append(_provider.BuildScalarLimitedSubquery(inner.ToString()));
             return true;
         }
+
+        /// <summary>
+        /// The many-to-many analogue of <see cref="TryVisitNavigationOrderedFirstScalar"/>:
+        /// <c>p.Tags.[Where(pred).]OrderBy*(key).Select(sel).First/Last()</c> where <c>Tags</c> is an m2m
+        /// collection. M2M links live in <see cref="TableMapping.ManyToManyJoins"/>, not
+        /// <see cref="TableMapping.Relations"/>, so the relation-based emit above returns false and — without
+        /// this — the First fell through to the outer handler, which rendered it as a bogus SQL function
+        /// (<c>FIRSTORDEFAULT(...)</c>) and crashed. Emits a LIMIT-1 correlated subquery that joins the bridge
+        /// table to the related table, mirroring <see cref="TryVisitManyToManyAggregate"/>. A value-converter
+        /// selector is materialized via ConvertFromProvider (registered by ComputeProjectionSubqueryConverters,
+        /// which recognizes this shape too); ordering runs on the stored column, EF-consistent.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private bool TryVisitManyToManyOrderedFirstScalar(MethodCallExpression node, StringBuilder sb)
+        {
+            if (_ctx == null || !IsNavigationOrderedFirstShape(node))
+                return false;
+            var selCall = (MethodCallExpression)node.Arguments[0];
+            var selectorLambda = (LambdaExpression)StripQuotes(selCall.Arguments[1])!;
+
+            var orderings = new List<(LambdaExpression Key, bool Ascending)>();
+            Expression cur = selCall.Arguments[0];
+            while (cur is MethodCallExpression ord
+                && ord.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                    or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending)
+                && StripQuotes(ord.Arguments[1]) is LambdaExpression keyLambda)
+            {
+                orderings.Add((keyLambda, ord.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.ThenBy)));
+                cur = ord.Arguments[0];
+            }
+            orderings.Reverse();
+
+            LambdaExpression? filter = null;
+            if (cur is MethodCallExpression w && w.Method.Name == nameof(Queryable.Where)
+                && StripQuotes(w.Arguments[1]) is LambdaExpression wl)
+            {
+                filter = wl;
+                cur = w.Arguments[0];
+            }
+
+            if (cur is not MemberExpression navMember || navMember.Expression is not ParameterExpression)
+                return false;
+            var jtm = _mapping.ManyToManyJoins.FirstOrDefault(j => j.LeftNavPropertyName == navMember.Member.Name);
+            if (jtm == null)
+                return false;
+
+            // It IS an m2m ordered-First: emit a correct correlated subquery or fail loud — never fall through
+            // to the outer handler (which renders First as a nonexistent SQL function). Same guards as the
+            // m2m aggregate emit: the bridge is read live, and only single-column bridge keys are handled.
+            if (QueryTranslator.HasActiveTemporalScope)
+                throw new NormUnsupportedFeatureException(
+                    $"First/Last over the many-to-many collection '{navMember.Member.Name}' under AsOf isn't supported yet: the " +
+                    "bridge table is read live, so the association set would reflect the current era, not the historical one. " +
+                    "Load the collection under AsOf and evaluate it client-side.");
+            if (jtm.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
+                throw new NormUnsupportedFeatureException(
+                    $"First/Last over the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet. " +
+                    "Materialise the related items and evaluate it client-side.");
+
+            // Last/LastOrDefault = First of the reversed ordering.
+            if (node.Method.Name is nameof(Queryable.Last) or nameof(Queryable.LastOrDefault))
+                for (var i = 0; i < orderings.Count; i++)
+                    orderings[i] = (orderings[i].Key, !orderings[i].Ascending);
+
+            var rightMap = _ctx.GetMapping(jtm.RightType);
+            var jtAlias = _provider.Escape("__m2mj");
+            var rightAlias = _provider.Escape("__m2mr");
+            QueryTranslator.RecordReferencedTable(jtm.TableName);
+            QueryTranslator.RecordReferencedTable(rightMap.TableName);
+            var ownerKey = jtm.LeftKeyColumns[0];
+            var rightKey = jtm.RightKeyColumns[0];
+
+            string RenderRight(LambdaExpression lambda) =>
+                TryRenderDependentSelector(lambda.Body, lambda.Parameters[0], rightAlias, jtm.RightType)
+                ?? RenderDependentSelectorViaSubVisitor(lambda, rightAlias, jtm.RightType)
+                ?? throw new NormUnsupportedFeatureException(
+                    $"First/Last over the many-to-many collection '{navMember.Member.Name}' could not translate its " +
+                    "selector/order key to SQL. Materialise the related items and evaluate it client-side.");
+
+            var selectorSql = RenderRight(selectorLambda);
+
+            var inner = new StringBuilder();
+            inner.Append("SELECT ").Append(selectorSql)
+                 .Append(" FROM ").Append(jtm.EscTableName).Append(' ').Append(jtAlias)
+                 .Append(" JOIN ").Append(QueryTranslator.TemporalTableSource(rightMap)).Append(' ').Append(rightAlias)
+                 .Append(" ON ").Append(rightAlias).Append('.').Append(rightKey.EscCol)
+                 .Append(" = ").Append(jtAlias).Append('.').Append(jtm.EscRightFkColumn)
+                 .Append(" WHERE ").Append(jtAlias).Append('.').Append(jtm.EscLeftFkColumn)
+                 .Append(" = ").Append(_outerAlias).Append('.').Append(ownerKey.EscCol);
+            var visibility = GlobalFilterFragment.CombineWithTenant(_ctx, jtm.RightType);
+            if (visibility != null)
+                inner.Append(" AND ").Append(RenderNavigationFilter(visibility, rightAlias));
+            if (filter != null)
+                inner.Append(" AND ").Append(RenderNavigationFilter(filter, rightAlias));
+            inner.Append(" ORDER BY ");
+            for (var i = 0; i < orderings.Count; i++)
+            {
+                if (i > 0) inner.Append(", ");
+                inner.Append(RenderRight(orderings[i].Key));
+                if (!orderings[i].Ascending) inner.Append(" DESC");
+            }
+
+            sb.Append(_provider.BuildScalarLimitedSubquery(inner.ToString()));
+            return true;
+        }
     }
 }

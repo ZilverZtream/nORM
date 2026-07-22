@@ -90,6 +90,9 @@ namespace nORM.Query
             if (TryVisitNavigationOrderedFirstScalar(node, sb))
                 return true;
 
+            if (TryVisitManyToManyOrderedFirstScalar(node, sb))
+                return true;
+
             if (TryVisitSelectedNavigationScalarAggregate(node, sb))
                 return true;
 
