@@ -830,12 +830,17 @@ namespace nORM.Query
             // Convert-wrapped, e.g. `(int?)c.X` for nullable aggregation) or a
             // reference-navigation chain (`c.Dept.Bonus`), rendered as the nested
             // correlated scalar the reference-nav feature uses everywhere else.
+            // A member (or reference-nav-chain) selector renders directly; a COMPUTED selector
+            // (`c => c.Qty * c.Price`, ternaries, coalesce chains) is translated against the dependent
+            // element via a full sub-visitor — the same mechanism the predicate-side nav aggregate uses,
+            // so projections and predicates support the identical selector shapes.
             var selectorSql = TryRenderDependentSelector(selectorLambda.Body, selectorLambda.Parameters[0], depAlias, depType)
-                ?? throw new InvalidOperationException(
-                    "Navigation aggregate Select(c => …).Sum/Min/Max/Average in a projection supports member selectors, " +
-                    "including reference-navigation chains (`c => c.Dept.Bonus`) and nullable casts. Computed selectors " +
-                    "(e.g. `c => c.A + c.B`) aren't yet routed through the correlated subquery emit — wrap with " +
-                    "`ClientEvaluationPolicy.Allow` or aggregate after materialising.");
+                ?? RenderDependentSelectorViaSubVisitor(selectorLambda, depAlias, depType)
+                ?? throw new NormUnsupportedFeatureException(
+                    "Navigation aggregate Select(c => …).Sum/Min/Max/Average in a projection could not translate the " +
+                    "selector to SQL. Member selectors, reference-navigation chains (`c => c.Dept.Bonus`), nullable casts " +
+                    "and computed arithmetic/conditional selectors are supported; anything requiring client evaluation " +
+                    "must aggregate after materialising or use `ClientEvaluationPolicy.Allow`.");
 
             var sqlAgg = methodName switch
             {
@@ -1136,6 +1141,45 @@ namespace nORM.Query
         /// wrappers (nullable casts) are transparent. Returns null for computed
         /// selectors, which the caller reports.
         /// </summary>
+        /// <summary>
+        /// Translates a COMPUTED navigation-aggregate selector (`c =&gt; c.Qty * c.Price`, ternaries,
+        /// coalesce chains) against the dependent element via a full expression sub-visitor bound to the
+        /// dependent mapping and alias — the same path the predicate-side nav aggregate uses. Returns null
+        /// only when the required plumbing is unavailable.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private string? RenderDependentSelectorViaSubVisitor(LambdaExpression selectorLambda, string depAlias, Type depType)
+        {
+            if (_ctx == null || SharedParams == null || SharedCompiledParams == null || SharedParamConverters == null)
+                return null;
+            TableMapping depMap;
+            try { depMap = _ctx.GetMapping(depType); }
+            catch { return null; }
+
+            var param = selectorLambda.Parameters[0];
+            var vctx = new VisitorContext(
+                _ctx, depMap, _provider, param, depAlias,
+                correlated: new Dictionary<ParameterExpression, (TableMapping Mapping, string Alias)>(),
+                compiledParams: SharedCompiledParams,
+                paramConverters: SharedParamConverters,
+                paramMap: new Dictionary<ParameterExpression, string>(),
+                recursionDepth: 1,
+                paramIndexStart: SharedParams.Count);
+            var visitor = FastExpressionVisitorPool.Get(in vctx);
+            try
+            {
+                var sql = visitor.Translate(selectorLambda.Body);
+                foreach (var kvp in visitor.GetParameters())
+                    SharedParams[kvp.Key] = kvp.Value;
+                return sql;
+            }
+            finally
+            {
+                FastExpressionVisitorPool.Return(visitor);
+            }
+        }
+
         private string? TryRenderDependentSelector(Expression body, ParameterExpression elementParam, string elementAlias, Type elementType)
         {
             while (body is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
