@@ -34,6 +34,16 @@ namespace nORM.Providers
 
         internal override bool SupportsCommandGeneratedKeyRetrieval => true;
 
+        /// <summary>
+        /// A single-column integer primary key with no explicit value-generation config is store-generated
+        /// (EF Core parity): MySQL realizes it as an AUTO_INCREMENT column, which generates a value when the
+        /// column is omitted and honors an explicitly-supplied non-zero value. See <see cref="Column.IsConventionGeneratedKey"/>.
+        /// </summary>
+        public override bool SupportsConventionKeyStoreGeneration => true;
+
+        /// <summary>MySQL realizes the convention key as an AUTO_INCREMENT column (needs identity DDL).</summary>
+        internal override bool ConventionKeyUsesIdentityColumn => true;
+
         internal override bool PrefersSyncFastPathExecution => true;
 
         internal override bool PrefersSyncQueryPlanExecution => true;

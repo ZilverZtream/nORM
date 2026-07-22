@@ -330,6 +330,21 @@ namespace nORM.Core
             return $"INSERT INTO {map.EscTable} ({colNames}){prefix} VALUES ({valParams}){fragment}";
         }
 
+        /// <summary>
+        /// Plain INSERT for exactly <paramref name="cols"/> with no identity-retrieval clause — used by the
+        /// command-generated-key batch path (MySQL), which reads the generated key from the command object
+        /// (LAST_INSERT_ID) rather than a returned result set. For the convention key's default-value run
+        /// <paramref name="cols"/> omits the key. Uses @PropName parameters to match <see cref="AddParametersOptimized"/>.
+        /// </summary>
+        private string BuildInsertFromColumns(TableMapping map, Column[] cols)
+        {
+            if (cols.Length == 0)
+                return $"INSERT INTO {map.EscTable} {_p.DefaultValuesInsertClause}";
+            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+            var valParams = string.Join(", ", cols.Select(c => _p.ParamPrefix + c.PropName));
+            return $"INSERT INTO {map.EscTable} ({colNames}) VALUES ({valParams})";
+        }
+
         private async Task<int> ExecuteWriteCommandAsync<T>(
             T entity,
             TableMapping map,

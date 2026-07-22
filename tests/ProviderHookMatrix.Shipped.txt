@@ -28,6 +28,7 @@ CanonicalizeDateTimeOffsetGroupKey
 Capabilities
 CastToVarchar
 ClampNonNegativeLimitExpression
+ConventionKeyUsesIdentityColumn
 CreateParameter
 CreateSavepointAsync
 CudWhereInSubqueryNeedsDoubleWrap
@@ -420,6 +421,7 @@ BulkInsertAsync
 BulkUpdateAsync
 Capabilities
 CastToVarchar
+ConventionKeyUsesIdentityColumn
 CreateParameter
 CreateSavepointAsync
 CudWhereInSubqueryNeedsDoubleWrap
@@ -476,6 +478,7 @@ PrefersSyncQueryPlanExecution
 ReleaseSavepointAsync
 RollbackToSavepointAsync
 SupportsCommandGeneratedKeyRetrieval
+SupportsConventionKeyStoreGeneration
 SupportsFastPathPreparedCommandCache
 SupportsQueryPlanPreparedCommandCache
 TimeSpanOperandToSecondsSql

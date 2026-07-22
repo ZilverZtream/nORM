@@ -124,7 +124,13 @@ namespace nORM.Core
             // so execute them one at a time and read the key after each.
             if (needsKeyReadBack && _p.SupportsCommandGeneratedKeyRetrieval)
             {
-                var insertSql = _p.BuildInsert(map, false);
+                // insertCols omits the convention key on its store-generated default-value run; build the
+                // INSERT for exactly those columns (no appended identity fragment — the key comes from the
+                // command object). The DB-generated-key run passes the full insert columns, so it keeps the
+                // cached BuildInsert form.
+                var insertSql = ReferenceEquals(insertCols, _p.GetInsertColumns(map))
+                    ? _p.BuildInsert(map, false)
+                    : BuildInsertFromColumns(map, insertCols);
                 cmd.CommandText = insertSql;
                 cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Insert, insertSql));
                 int keysAssigned = 0;
@@ -132,7 +138,7 @@ namespace nORM.Core
                 {
                     var entity = entry.Entity ?? throw new InvalidOperationException("Entity is null");
                     cmd.Parameters.Clear();
-                    AddParametersOptimized(cmd, map, entity, WriteOperation.Insert);
+                    AddParametersOptimized(cmd, map, entity, WriteOperation.Insert, insertColumns: insertCols);
                     await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
                     var newId = _p.GetCommandGeneratedKey(cmd, map);
                     if (newId != null && newId != DBNull.Value)

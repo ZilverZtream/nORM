@@ -325,7 +325,12 @@ namespace nORM.Migration
                         IsUnique     = col.IsKey && pkCount == 1,
                         IndexName    = col.IsKey ? primaryKeyConstraintName : null,
                         IndexOrder   = null,
-                        IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity,
+                        // A store-generated convention key (EF parity) is emitted as an identity/auto-increment
+                        // column on providers that realize it that way (SqlServer/PostgreSQL/MySQL); SQLite uses
+                        // the free rowid alias and needs no identity DDL. IsConventionGeneratedKey is only set
+                        // when the provider supports the convention, so this is inert elsewhere.
+                        IsIdentity   = dbGenerated == DatabaseGeneratedOption.Identity
+                            || (col.IsConventionGeneratedKey && provider?.ConventionKeyUsesIdentityColumn == true),
                         IdentitySeed = identityOptions?.Seed,
                         IdentityIncrement = identityOptions?.Increment,
                         ComputedColumnSql = computedColumn?.Sql

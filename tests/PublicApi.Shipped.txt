@@ -1617,6 +1617,7 @@ P:nORM.Providers.MySqlProvider.DefaultValuesInsertClause:System.String
 P:nORM.Providers.MySqlProvider.LikeEscapeChar:System.Char
 P:nORM.Providers.MySqlProvider.MaxParameters:System.Int32
 P:nORM.Providers.MySqlProvider.MaxSqlLength:System.Int32
+P:nORM.Providers.MySqlProvider.SupportsConventionKeyStoreGeneration:System.Boolean
 P:nORM.Providers.PostgresProvider.BooleanFalseLiteral:System.String
 P:nORM.Providers.PostgresProvider.BooleanTrueLiteral:System.String
 P:nORM.Providers.PostgresProvider.Capabilities:nORM.Providers.ProviderCapabilities
