@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Threading;
 using nORM.Core;
 using nORM.Internal;
+using nORM.Mapping;
 
 #nullable enable
 
@@ -155,6 +156,100 @@ namespace nORM.Query
             }
         }
         /// <summary>
+        /// A streaming/client GroupBy compiles its key selector and runs it over MATERIALIZED entities
+        /// whose reference navigations are NOT loaded. `c.Parent.Id` (principal key via a nav) would
+        /// dereference a null nav and NullReferenceException; rewrite it to the foreign-key column the
+        /// dependent already carries (`c.Parent.Id` -> `c.ParentId`), which is a materialized column.
+        /// </summary>
+        private LambdaExpression RewriteNavigationKeyToForeignKey(LambdaExpression keySelector)
+        {
+            TableMapping ownerMap;
+            try { ownerMap = _ctx.GetMapping(keySelector.Parameters[0].Type); }
+            catch { return keySelector; }
+            var rewriter = new NavKeyToForeignKeyRewriter(_ctx, ownerMap);
+            var newBody = rewriter.Visit(keySelector.Body);
+            return newBody == keySelector.Body ? keySelector : Expression.Lambda(newBody!, keySelector.Parameters);
+        }
+
+        /// <summary>
+        /// Fails loud (instead of a runtime NullReferenceException) when a client-side grouping key still
+        /// dereferences a reference navigation after the FK rewrite — the nav value isn't in the
+        /// materialized row, so it cannot be computed client-side.
+        /// </summary>
+        private void EnsureNoUnresolvedNavigationInKey(LambdaExpression keySelector)
+        {
+            TableMapping ownerMap;
+            try { ownerMap = _ctx.GetMapping(keySelector.Parameters[0].Type); }
+            catch { return; }
+            var finder = new UnresolvedNavigationFinder(keySelector.Parameters[0], ownerMap);
+            finder.Visit(keySelector.Body);
+            if (finder.FoundNavigation != null)
+                throw new NormUnsupportedFeatureException(
+                    $"GroupBy key references navigation property '{finder.FoundNavigation}', which this query shape " +
+                    "would have to group client-side over entities whose navigations are not loaded. Group by the " +
+                    "foreign-key column (e.g. the '...Id' property) instead, or restructure with an explicit join.");
+        }
+
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private sealed class NavKeyToForeignKeyRewriter : ExpressionVisitor
+        {
+            private readonly DbContext _ctx;
+            private readonly TableMapping _ownerMap;
+            public NavKeyToForeignKeyRewriter(DbContext ctx, TableMapping ownerMap) { _ctx = ctx; _ownerMap = ownerMap; }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                // Pattern: <nav>.<principalKey> where <nav> is a reference navigation on the owner.
+                if (node.Expression is MemberExpression navMember
+                    && navMember.Member is System.Reflection.PropertyInfo navProp
+                    && navMember.Expression != null
+                    && !_ownerMap.ColumnsByName.ContainsKey(navProp.Name)
+                    && navProp.PropertyType.IsClass && navProp.PropertyType != typeof(string))
+                {
+                    TableMapping? principalMap = null;
+                    try { principalMap = _ctx.GetMapping(navProp.PropertyType); } catch { }
+                    if (principalMap != null && principalMap.KeyColumns.Length == 1
+                        && string.Equals(node.Member.Name, principalMap.KeyColumns[0].PropName, StringComparison.Ordinal))
+                    {
+                        var fkCol = ExpressionToSqlVisitor.FindReferenceNavForeignKey(_ownerMap, navProp.Name, navProp.PropertyType, principalMap);
+                        if (fkCol != null)
+                        {
+                            Expression fkAccess = Expression.MakeMemberAccess(navMember.Expression, fkCol.Prop);
+                            if (fkAccess.Type != node.Type)
+                                fkAccess = Expression.Convert(fkAccess, node.Type);
+                            return fkAccess;
+                        }
+                    }
+                }
+                return base.VisitMember(node);
+            }
+        }
+
+        private sealed class UnresolvedNavigationFinder : ExpressionVisitor
+        {
+            private readonly ParameterExpression _param;
+            private readonly TableMapping _ownerMap;
+            public string? FoundNavigation { get; private set; }
+            public UnresolvedNavigationFinder(ParameterExpression param, TableMapping ownerMap) { _param = param; _ownerMap = ownerMap; }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                // A member access whose receiver is `param.<nonColumn>` is a navigation traversal.
+                if (FoundNavigation == null
+                    && node.Expression is MemberExpression inner
+                    && inner.Expression == _param
+                    && inner.Member is System.Reflection.PropertyInfo innerProp
+                    && !_ownerMap.ColumnsByName.ContainsKey(innerProp.Name)
+                    && innerProp.PropertyType.IsClass && innerProp.PropertyType != typeof(string))
+                {
+                    FoundNavigation = innerProp.Name;
+                }
+                return base.VisitMember(node);
+            }
+        }
+
+        /// <summary>
         /// Compiles <paramref name="keySelectorLambda"/> into a client-side grouping transform
         /// that groups a materialized entity list by key, returning a typed
         /// <c>List&lt;IGrouping&lt;K, V&gt;&gt;</c>.  Stored as
@@ -163,6 +258,11 @@ namespace nORM.Query
         /// </summary>
         private void InstallGroupingTransform(LambdaExpression keySelectorLambda, LambdaExpression? elementSelectorLambda = null)
         {
+            // The key selector runs client-side over materialized entities whose reference navigations
+            // are not loaded; rewrite `nav.PrincipalKey` to the local FK column and fail loud (not NRE)
+            // if a non-key nav member survives.
+            keySelectorLambda = RewriteNavigationKeyToForeignKey(keySelectorLambda);
+            EnsureNoUnresolvedNavigationInKey(keySelectorLambda);
             var entityType = keySelectorLambda.Parameters[0].Type;
             var keyType = keySelectorLambda.Body.Type;
             var elementType = elementSelectorLambda?.Body.Type ?? entityType;
