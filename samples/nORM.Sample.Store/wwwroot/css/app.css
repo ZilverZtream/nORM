@@ -1,0 +1,141 @@
+/* ============================================================================
+   nORM Store — design system
+   The signature: --accent is the ACTIVE DATABASE ENGINE's brand color, set on
+   <html data-engine>. Swapping the engine re-tints the whole app, live.
+   ============================================================================ */
+
+:root {
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --canvas: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #fafbfc;
+  --ink: #0d1117;
+  --ink-2: #3a424e;
+  --muted: #6a7381;
+  --line: #e7e9ee;
+  --line-2: #eef0f4;
+
+  --accent: #3aa9e0;         /* overridden per engine below */
+  --accent-ink: #ffffff;
+  --accent-wash: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --accent-line: color-mix(in srgb, var(--accent) 32%, var(--line));
+
+  --ok: #1f9d55;
+  --warn: #c77700;
+  --danger: #cc2927;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(13,17,23,.05), 0 8px 28px -18px rgba(13,17,23,.28);
+  --shadow-lg: 0 24px 60px -28px rgba(13,17,23,.4);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  --tform: .28s cubic-bezier(.2,.7,.2,1);
+}
+
+/* Engine accents — each database's own brand color becomes the app's accent. */
+:root[data-engine="sqlite"]    { --accent: #3aa9e0; }
+:root[data-engine="sqlserver"] { --accent: #cc2927; }
+:root[data-engine="postgres"]  { --accent: #3e7cb1; }
+:root[data-engine="mysql"]     { --accent: #1c9cb0; }
+
+:root[data-theme="dark"] {
+  --canvas: #0a0d13;
+  --surface: #11151d;
+  --surface-2: #0e121a;
+  --ink: #e8ebf1;
+  --ink-2: #b7bfcc;
+  --muted: #7f8a9a;
+  --line: #212836;
+  --line-2: #1a2130;
+  --accent-wash: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  --accent-line: color-mix(in srgb, var(--accent) 40%, var(--line));
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0a0d13; --surface: #11151d; --surface-2: #0e121a;
+    --ink: #e8ebf1; --ink-2: #b7bfcc; --muted: #7f8a9a; --line: #212836; --line-2: #1a2130;
+    --accent-wash: color-mix(in srgb, var(--accent) 18%, var(--surface));
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--tform), color var(--tform);
+}
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -.02em; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(1.9rem, 3.5vw, 2.9rem); }
+h2 { font-size: 1.28rem; }
+h3 { font-size: 1.02rem; }
+a { color: var(--accent); text-decoration: none; }
+.mono { font-family: var(--font-mono); font-size: .82em; letter-spacing: -.01em; }
+.muted { color: var(--muted); }
+.kicker { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin: 0 0 .6rem; font-weight: 600; }
+.lede { color: var(--ink-2); font-size: 1.05rem; max-width: 60ch; }
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 8px; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+/* ── buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  font: 600 .9rem/1 var(--font-body);
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .68rem 1.05rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  cursor: pointer; transition: var(--tform); white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent-line); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { filter: brightness(1.06); box-shadow: 0 8px 22px -12px var(--accent); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: var(--line-2); border-color: transparent; transform: none; }
+.btn-sm { padding: .42rem .7rem; font-size: .8rem; }
+.btn-block { width: 100%; }
+.icon-btn { width: 38px; height: 38px; padding: 0; border-radius: 10px; font-size: 1rem; }
+
+/* ── form controls ───────────────────────────────────────────────────────── */
+input, select, textarea {
+  font: 500 .9rem var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: .6rem .75rem; width: 100%;
+  transition: var(--tform);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: var(--ring); outline: none; }
+label { display: grid; gap: .35rem; font-size: .8rem; font-weight: 600; color: var(--ink-2); }
+input.mono, textarea.mono { font-family: var(--font-mono); font-size: .82rem; }
+
+/* ── chips / badges ──────────────────────────────────────────────────────── */
+.chip { display: inline-flex; align-items: center; gap: .35rem; padding: .28rem .6rem; border-radius: 100px; border: 1px solid var(--line); font-size: .72rem; font-weight: 600; color: var(--muted); background: var(--surface-2); }
+.chip.accent { color: var(--accent); border-color: var(--accent-line); background: var(--accent-wash); }
+.pill-ok { color: var(--ok); } .pill-danger { color: var(--danger); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+
+/* ── card ────────────────────────────────────────────────────────────────── */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.35rem; box-shadow: var(--shadow); }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; background: var(--ink); color: var(--canvas); padding: .7rem 1.1rem; border-radius: 100px; font-size: .85rem; font-weight: 600; box-shadow: var(--shadow-lg); transition: var(--tform); z-index: 90; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.hidden { display: none !important; }
+.spinner { width: 15px; height: 15px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── wordmark ────────────────────────────────────────────────────────────── */
+.wordmark { font-family: var(--font-display); font-weight: 700; letter-spacing: -.04em; }
+.wordmark b { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
