@@ -414,6 +414,9 @@ namespace nORM.Tests.Fuzzing
         private static bool IsTotallyOrdered(QueryIr ir) =>
             ir.Steps.Any(s => s.Kind is IrStepKind.OrderBy or IrStepKind.Skip or IrStepKind.Take);
 
+        private static readonly System.Reflection.MethodInfo ContainsMethod =
+            typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!;
+
         private static bool IsPredicateStep(IrStep s) => s.Kind is IrStepKind.Where or IrStepKind.WhereName;
 
         private static Expression<Func<IrRow, bool>> BuildPredicate(IrStep step)
@@ -425,9 +428,14 @@ namespace nORM.Tests.Fuzzing
                 // expression is the oracle and the nORM query — a case-insensitive divergence would be a real bug.
                 var nameMember = Expression.Property(p, nameof(IrRow.Name));
                 var text = Expression.Constant(step.Text, typeof(string));
-                Expression cmp = step.StringOp == IrStringOp.Eq
-                    ? Expression.Equal(nameMember, text)
-                    : Expression.NotEqual(nameMember, text);
+                Expression cmp = step.StringOp switch
+                {
+                    IrStringOp.Eq => Expression.Equal(nameMember, text),
+                    IrStringOp.Ne => Expression.NotEqual(nameMember, text),
+                    // string.Contains(string) is ordinal (case-sensitive, culture-insensitive) in C#, matching
+                    // nORM's instr/substr translation, so the same expression is the oracle and the nORM query.
+                    _ => Expression.Call(nameMember, ContainsMethod, text),
+                };
                 return Expression.Lambda<Func<IrRow, bool>>(cmp, p);
             }
             var member = Expression.Property(p, step.Column.ToString());

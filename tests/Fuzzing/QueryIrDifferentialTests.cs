@@ -159,5 +159,25 @@ namespace nORM.Tests.Fuzzing
             Assert.Contains("where-name", QueryIrDifferential.ExtractFeatures(
                 new QueryIr { Rows = rows, Steps = new[] { IrStep.WhereName(IrStringOp.Eq, "a") } }));
         }
+
+        [Fact]
+        public void String_contains_is_ordinal_and_case_sensitive()
+        {
+            // Two-char mixed-case names: Contains("a") matches only names with a lowercase a, never the uppercase.
+            // string.Contains(string) is ordinal in C#, so a case-insensitive nORM translation would diverge.
+            var rows = new[]
+            {
+                new IrRow { Id = 1, A = 1, B = 1, Name = "ab" },
+                new IrRow { Id = 2, A = 2, B = 2, Name = "Ab" },
+                new IrRow { Id = 3, A = 3, B = 3, Name = "aB" },
+                new IrRow { Id = 4, A = 4, B = 4, Name = "AB" },
+            };
+            foreach (var needle in new[] { "a", "A", "b", "B", "ab", "AB", "x" })
+            {
+                var ir = new QueryIr { Rows = rows, Steps = new[] { IrStep.WhereName(IrStringOp.Contains, needle) } };
+                var r = QueryIrDifferential.Execute(ir, seed: 4300);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+        }
     }
 }

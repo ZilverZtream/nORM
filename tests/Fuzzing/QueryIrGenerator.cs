@@ -17,8 +17,9 @@ namespace nORM.Tests.Fuzzing
         private static readonly IrColumn[] Columns = { IrColumn.Id, IrColumn.A, IrColumn.B };
         private static readonly IrCompare[] Compares =
             { IrCompare.Eq, IrCompare.Ne, IrCompare.Lt, IrCompare.Le, IrCompare.Gt, IrCompare.Ge };
-        // Mixed case in a tiny domain so string equality exercises case-sensitivity ("a" != "A") and duplicates.
-        private static readonly string[] Names = { "a", "A", "b", "B" };
+        // Two-char mixed case so equality exercises case-sensitivity and duplicates, and Contains has real substrings.
+        private static readonly string[] Names = { "ab", "aB", "Ab", "AB" };
+        private static readonly string[] NameChars = { "a", "A", "b", "B" };   // single-char Contains needles
 
         public static QueryIr Generate(int seed)
         {
@@ -120,10 +121,15 @@ namespace nORM.Tests.Fuzzing
             };
         }
 
-        // A predicate step: usually a numeric comparison, and ~1/4 of the time an ordinal string equality on Name.
-        private static IrStep NextWhere(Random rng) => rng.Next(4) == 0
-            ? IrStep.WhereName((IrStringOp)rng.Next(2), Pick(rng, Names))
-            : IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6));
+        // A predicate step: usually a numeric comparison, and ~1/4 of the time an ordinal string op on Name
+        // (==, !=, or Contains). Contains uses a single-char needle so it is a real substring test.
+        private static IrStep NextWhere(Random rng)
+        {
+            if (rng.Next(4) != 0)
+                return IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6));
+            var op = (IrStringOp)rng.Next(3);
+            return IrStep.WhereName(op, op == IrStringOp.Contains ? Pick(rng, NameChars) : Pick(rng, Names));
+        }
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];
     }
