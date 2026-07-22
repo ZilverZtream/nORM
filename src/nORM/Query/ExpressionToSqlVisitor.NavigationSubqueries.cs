@@ -81,11 +81,6 @@ namespace nORM.Query
                     $"Aggregating the {kind} collection '{navMember.Member.Name}' under AsOf isn't supported yet: the aggregate " +
                     "reads the live table, so it would reflect the current era, not the historical one. Load the collection " +
                     "under AsOf and aggregate the result client-side.");
-            if (method is nameof(Queryable.All))
-                throw new NormUnsupportedFeatureException(
-                    $"All(...) over the {kind} collection '{navMember.Member.Name}' in a predicate isn't supported yet. " +
-                    "Evaluate it after materialising, or filter with a separate query.");
-
             var parentAlias = info.Alias;
             // Resolve the element mapping, the subquery FROM source + alias, and the FK correlation to the owner.
             TableMapping elementMapping;
@@ -120,12 +115,31 @@ namespace nORM.Query
                 QueryTranslator.RecordReferencedTable(elementMapping.TableName);
             }
 
-            var conditions = new List<string> { fkCorrelation };
+            var baseConditions = new List<string> { fkCorrelation };
             // The element type's global/tenant filters restrict visibility, matching the loaded collection
             // (rendered against the sub-alias in a sub-visitor, so soft-deleted/other-tenant rows drop out).
             var visibility = RenderPrincipalGlobalFilterSql(elementMapping, subAlias);
             if (visibility != null)
-                conditions.Add($"({visibility})");
+                baseConditions.Add($"({visibility})");
+
+            if (method is nameof(Queryable.All))
+            {
+                // All(pred) == NOT EXISTS(a visible element where NOT pred). An empty collection is vacuously
+                // true (NOT EXISTS over no rows). Mirrors the query-rooted All translation exactly
+                // (Expression.Not(body) + NOT EXISTS); the m2m/owned junction FROM is the only difference, so
+                // NULL semantics match the relation/owned All that already ships.
+                if (filter == null)
+                    throw new NormUnsupportedFeatureException(
+                        $"All(...) over the {kind} collection '{navMember.Member.Name}' requires a predicate (e.g. x => x.Flag).");
+                var negated = Expression.Lambda(Expression.Not(filter.Body), filter.Parameters[0]);
+                var allConditions = new List<string>(baseConditions)
+                    { $"({TranslateCollectionSubqueryPredicate(negated, elementMapping, subAlias)})" };
+                _sql.Append("NOT EXISTS(SELECT 1 FROM ").Append(fromClause)
+                    .Append(" WHERE ").Append(string.Join(" AND ", allConditions)).Append(')');
+                return true;
+            }
+
+            var conditions = new List<string>(baseConditions);
             // A predicate (`Any(t => p)` / `Count(t => p)` / `Where(p).Agg()`) restricts which rows count.
             if (filter != null)
                 conditions.Add($"({TranslateCollectionSubqueryPredicate(filter, elementMapping, subAlias)})");
