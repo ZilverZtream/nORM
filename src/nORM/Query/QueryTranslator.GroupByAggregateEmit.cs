@@ -25,9 +25,16 @@ namespace nORM.Query
             var selector = selectorArg != null ? StripQuotes(selectorArg) as LambdaExpression : null;
             if (selector == null)
             {
-                if (errorMessage != null)
+                // A parameterless aggregate — g.Sum() / g.Max() — over a group built with an element selector
+                // (GroupBy(key, s => s.Amount)): the aggregate operand IS the element selector's body, so
+                // g.Sum() lowers to SUM(Amount). Without this the parameterless form has no operand and would
+                // fail (SUM(*) is not valid SQL).
+                if (_groupByElementSelector != null)
+                    selector = _groupByElementSelector;
+                else if (errorMessage != null)
                     throw new NormQueryException(string.Format(ErrorMessages.QueryTranslationFailed, errorMessage));
-                return null;
+                else
+                    return null;
             }
             selector = ExpandGroupElementSelector(selector);
             // Also expand through a join / transparent-identifier or Select projection so an
