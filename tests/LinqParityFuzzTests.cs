@@ -1853,13 +1853,6 @@ public class LinqParityFuzzTests
             var secondPredicate = rng.Next(3) == 0 ? GeneratePredicate(rng) : null;
             var caseRng = new Random(rng.Next());
 
-            // Only assert against an oracle .NET evaluates consistently (see OracleSelfConsistent).
-            if (!OracleSelfConsistent(predicate) || (secondPredicate != null && !OracleSelfConsistent(secondPredicate)))
-            {
-                skipped++;
-                continue;
-            }
-
             IQueryable<Row> dbQuery = ctx.Query<Row>().Where(predicate);
             if (secondPredicate != null)
                 dbQuery = dbQuery.Where(secondPredicate);
@@ -1868,7 +1861,12 @@ public class LinqParityFuzzTests
 
             try
             {
-                RunTerminal(pagedDb, predicate, secondPredicate, caseRng, ordered, seed, i);
+                // RunTerminal returns true when it dropped the case because .NET evaluated the LINQ
+                // oracle inconsistently (IL compiler vs interpreter disagree — a .NET Expression.Compile
+                // defect, see OracleSelfConsistent). That check runs ONLY on an assertion failure, so the
+                // passing path never pays the double-compile cost.
+                if (RunTerminal(pagedDb, predicate, secondPredicate, caseRng, ordered, seed, i))
+                    skipped++;
             }
             catch (NormUnsupportedFeatureException)
             {
@@ -1893,7 +1891,12 @@ public class LinqParityFuzzTests
             System.Console.WriteLine($"[LinqParityFuzz] seed={seed}: skipped {skipped}/{cases} case(s) with a .NET-inconsistent oracle (IL compiler vs interpreter disagree).");
     }
 
-    private static void RunTerminal(
+    /// <summary>
+    /// Runs one generated terminal against the DB and the LINQ oracle. Returns <c>true</c> when the
+    /// case was DROPPED because .NET evaluated the oracle inconsistently (see OracleSelfConsistent);
+    /// that check is lazy — only an assertion failure triggers it, so passing cases stay cheap.
+    /// </summary>
+    private static bool RunTerminal(
         IQueryable<Row> db,
         Expression<Func<Row, bool>> predicate,
         Expression<Func<Row, bool>>? secondPredicate,
@@ -2010,10 +2013,23 @@ public class LinqParityFuzzTests
                 break;
         }
         }
-        catch (Exception ex) when (ex is not Xunit.Sdk.XunitException and not NormUnsupportedFeatureException)
+        catch (Xunit.Sdk.XunitException)
+        {
+            // The assertion failed. Before trusting it, confirm the LINQ oracle is one .NET evaluates
+            // consistently: EnumerableQuery filters via Expression.Compile() (the IL compiler), which
+            // has defects on some nested boolean/arithmetic/nullable trees where it disagrees with its
+            // own interpreter and a C#-compiled delegate. If IL != interpreter the oracle is
+            // self-inconsistent (a .NET bug) and cannot fairly judge nORM — drop the case. This runs
+            // ONLY on a failure, so the passing path never pays the double-compile cost.
+            if (!OracleSelfConsistent(predicate) || (secondPredicate != null && !OracleSelfConsistent(secondPredicate)))
+                return true;
+            throw;
+        }
+        catch (Exception ex) when (ex is not NormUnsupportedFeatureException)
         {
             throw new InvalidOperationException("terminal threw: " + Describe(), ex);
         }
+        return false;
     }
 
     private sealed record ProjRow(int Id, int X, bool B, string? S);
