@@ -578,7 +578,11 @@ namespace nORM.Query
                 // message even though SCV can actually emit valid SQL.
                 nameof(Enumerable.Select),
                 nameof(Enumerable.SelectMany),
-                nameof(Enumerable.Where)
+                nameof(Enumerable.Where),
+                // Distinct between a navigation Select and Count — `parent.Children.Select(c => c.X)
+                // .Distinct().Count()` → SCV emits COUNT(DISTINCT x). Admitting the name lets the
+                // analyzer pass the chain; SCV either emits it or fails loud for an unsupported shape.
+                nameof(Enumerable.Distinct)
             };
 
             public TranslatabilityAnalyzer(DatabaseProvider provider)

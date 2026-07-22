@@ -73,6 +73,9 @@ namespace nORM.Query
                 return true;
             }
 
+            if (TryVisitDistinctCountNavigationAggregate(node, sb))
+                return true;
+
             if (TryVisitSelectedNavigationScalarAggregate(node, sb))
                 return true;
 
@@ -334,6 +337,94 @@ namespace nORM.Query
             }
             sb.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
               .Append(" WHERE ").Append(whereSql).Append(')');
+            return true;
+        }
+
+        /// <summary>
+        /// Handles <c>p.Children.Select(c =&gt; c.Col).Distinct().Count()</c> — the distinct-count over a
+        /// navigation collection — as <c>(SELECT COUNT(DISTINCT col) FROM child WHERE fk = pk)</c>. Gated to
+        /// non-nullable value-type selectors: SQL <c>COUNT(DISTINCT)</c> ignores NULLs while C#
+        /// <c>Distinct().Count()</c> counts null as one value, so a nullable/reference selector could
+        /// undercount — those fall through (fail loud) rather than silently diverge.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Runtime LINQ translation reflects over entity types; trimming may remove the required members. See docs/aot-trimming.md.")]
+        private bool TryVisitDistinctCountNavigationAggregate(MethodCallExpression node, StringBuilder sb)
+        {
+            if (node.Method.Name is not (nameof(Queryable.Count) or nameof(Queryable.LongCount))
+                || node.Arguments.Count != 1
+                || node.Arguments[0] is not MethodCallExpression distinctCall
+                || distinctCall.Method.Name != nameof(Queryable.Distinct)
+                || distinctCall.Arguments.Count != 1)
+                return false;
+
+            // After Distinct the source is either Select(nav, sel).Distinct() (distinct scalar values) or
+            // nav.Distinct() directly (distinct ENTITIES — a no-op given the unique key, so COUNT(*)).
+            Expression afterDistinct = distinctCall.Arguments[0];
+            LambdaExpression? selectorLambda = null;
+            if (afterDistinct is MethodCallExpression selCall
+                && selCall.Method.Name == nameof(Queryable.Select)
+                && selCall.Arguments.Count == 2
+                && StripQuotes(selCall.Arguments[1]) is LambdaExpression sel)
+            {
+                selectorLambda = sel;
+                afterDistinct = selCall.Arguments[0];
+            }
+
+            // NULL-semantics guard for the scalar-selector form: only non-nullable value-type selectors are
+            // SQL-COUNT(DISTINCT)-safe (SQL ignores NULLs while C# Distinct counts null as one value).
+            if (selectorLambda != null)
+            {
+                var selType = selectorLambda.Body.Type;
+                if (!selType.IsValueType || Nullable.GetUnderlyingType(selType) != null)
+                    return false;
+            }
+
+            Expression selSource = afterDistinct;
+            LambdaExpression? selFilter = null;
+            if (selSource is MethodCallExpression preWhere
+                && preWhere.Method.Name == nameof(Queryable.Where)
+                && preWhere.Arguments.Count == 2
+                && StripQuotes(preWhere.Arguments[1]) is LambdaExpression preWhereLambda)
+            {
+                selFilter = preWhereLambda;
+                selSource = preWhere.Arguments[0];
+            }
+
+            if (selSource is not MemberExpression selNav
+                || selNav.Expression is not ParameterExpression
+                || !_mapping.Relations.TryGetValue(selNav.Member.Name, out var relation))
+                return false;
+
+            var depType = relation.DependentType;
+            var depTable = GetTableName(depType);
+            RecordNavReferencedTable(depType);
+            var depAlias = _provider.Escape("__nav");
+
+            // COUNT(DISTINCT sel) for a scalar selector; COUNT(*) for distinct entities (no-op by key).
+            string countExpr;
+            if (selectorLambda != null)
+            {
+                var selectorSql = TryRenderDependentSelector(selectorLambda.Body, selectorLambda.Parameters[0], depAlias, depType)
+                    ?? RenderDependentSelectorViaSubVisitor(selectorLambda, depAlias, depType)
+                    ?? throw new NormUnsupportedFeatureException(
+                        "Distinct-count over a navigation collection could not translate its selector to SQL.");
+                countExpr = $"COUNT(DISTINCT {selectorSql})";
+            }
+            else
+            {
+                countExpr = "COUNT(*)";
+            }
+
+            sb.Append('(').Append("SELECT ").Append(countExpr).Append(" FROM ")
+              .Append(NavigationTableSource(depType, depTable)).Append(' ').Append(depAlias).Append(" WHERE ");
+            AppendNavigationRelationPredicate(sb, relation, depAlias, _outerAlias);
+            var visibility = _ctx != null ? GlobalFilterFragment.CombineWithTenant(_ctx, depType) : null;
+            if (visibility != null)
+                sb.Append(" AND ").Append(RenderNavigationFilter(visibility, depAlias));
+            if (selFilter != null)
+                sb.Append(" AND ").Append(RenderNavigationFilter(selFilter, depAlias));
+            sb.Append(')');
             return true;
         }
 
