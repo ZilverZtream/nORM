@@ -189,7 +189,7 @@ namespace nORM.Query
             void Consider(string name, Expression arg)
             {
                 var e = StripConvert(arg);
-                if (e is not MethodCallExpression mce || !IsSubqueryScalarColumnOp(mce))
+                if (e is not MethodCallExpression mce || !(IsSubqueryScalarColumnOp(mce) || IsNavigationScalarColumnOp(mce)))
                     return;
                 if (!TryResolveSubqueryProjectedMember(mce, out var elementType, out var member)
                     || elementType == null || member == null)
@@ -236,6 +236,35 @@ namespace nORM.Query
                || (mce.Method.DeclaringType == typeof(Queryable)
                    && mce.Method.Name is nameof(Queryable.Min) or nameof(Queryable.Max)
                    && IsQueryRootedScalarAggregate(mce));
+
+        /// <summary>
+        /// The navigation-collection analogue of <see cref="IsSubqueryScalarColumnOp"/>: a scalar
+        /// First/Last or Min/Max whose source chain roots at a navigation-collection member of the
+        /// projection parameter (e.g. <c>p.Children.OrderBy(..).Select(c =&gt; c.Col).First()</c> or
+        /// <c>p.Children.Max(c =&gt; c.Col)</c>). The nav emit selects/aggregates the STORED column, so the
+        /// scalar result carries the column's converter and must run through ConvertFromProvider — the same
+        /// contract as the ctx.Query correlated path. Structural only (no mapping): the element type comes
+        /// from <see cref="TryResolveSubqueryProjectedMember"/> and a non-entity root resolves no converter.
+        /// </summary>
+        private static bool IsNavigationScalarColumnOp(MethodCallExpression mce)
+        {
+            var name = mce.Method.Name;
+            var isFirst = name is nameof(Queryable.First) or nameof(Queryable.FirstOrDefault)
+                or nameof(Queryable.Last) or nameof(Queryable.LastOrDefault);
+            var isMinMax = name is nameof(Queryable.Min) or nameof(Queryable.Max) && mce.Arguments.Count == 2;
+            if (!isFirst && !isMinMax)
+                return false;
+            // Walk the source chain to its root. A nav collection roots at a member-on-parameter whose type
+            // is a generic IEnumerable<T> (Enumerable/Queryable operators over p.Children); ctx.Query() roots
+            // at a zero-argument method call and a captured local roots at a member on a constant closure.
+            Expression cur = mce.Arguments.Count > 0 ? mce.Arguments[0] : mce;
+            while (cur is MethodCallExpression m && m.Arguments.Count > 0)
+                cur = m.Arguments[0];
+            return cur is MemberExpression { Expression: ParameterExpression } nm
+                && nm.Type != typeof(string)
+                && nm.Type.IsGenericType
+                && typeof(System.Collections.IEnumerable).IsAssignableFrom(nm.Type);
+        }
 
         /// <summary>
         /// Finds the single scalar member a correlated subquery projects: an aggregate selector

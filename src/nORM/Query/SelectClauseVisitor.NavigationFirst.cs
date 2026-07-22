@@ -152,25 +152,11 @@ namespace nORM.Query
 
             var depType = relation.DependentType;
 
-            // A value-converter column can't be handled here: selecting one returns the raw stored value
-            // (the correlated-subquery result isn't run through ConvertFromProvider), and ordering by one
-            // orders by the stored representation — both silently wrong. Fail loud instead (aggregate the
-            // materialised collection client-side, or select the FK/converted value explicitly).
-            if (_ctx != null)
-            {
-                TableMapping? depMapForConverter = null;
-                try { depMapForConverter = _ctx.GetMapping(depType); } catch { }
-                if (depMapForConverter != null)
-                {
-                    if (LambdaReferencesConverterColumn(selectorLambda, depMapForConverter)
-                        || orderings.Any(o => LambdaReferencesConverterColumn(o.Key, depMapForConverter)))
-                        throw new NormUnsupportedFeatureException(
-                            "First/FirstOrDefault over a navigation collection whose selector or order key is a " +
-                            "value-converter column isn't supported: the subquery would return the raw stored value " +
-                            "(no ConvertFromProvider) and order by the stored representation. Materialise the " +
-                            "collection and evaluate it client-side, or project the underlying/foreign-key column.");
-                }
-            }
+            // Value-converter columns are supported here, matching the ctx.Query correlated path: the emit
+            // selects/orders the STORED column, ORDER BY runs on the stored representation (EF-consistent),
+            // and when the SELECTED column has a converter the materializer applies ConvertFromProvider to
+            // the scalar result — the converter is registered by ComputeProjectionSubqueryConverters, which
+            // recognizes this navigation-First shape (see IsNavigationScalarColumnOp).
 
             var depTable = GetTableName(depType);
             RecordNavReferencedTable(depType);

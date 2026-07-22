@@ -956,15 +956,16 @@ namespace nORM.Query
         }
 
         /// <summary>
-        /// Fails loud (never silent-wrong) when a Sum/Min/Max/Average selector over a navigation collection
-        /// is a value-converter column: the SQL aggregate runs on the STORED representation, so a
-        /// negating/scaling converter yields a wrong total and Min/Max can pick the wrong element under an
-        /// order-reversing converter. The result isn't run through ConvertFromProvider either.
+        /// Fails loud (never silent-wrong) when a Sum/Average selector over a navigation collection is a
+        /// value-converter column: SUM/AVG combine the STORED provider values, and ConvertFromProvider — a
+        /// per-value map — does not distribute over that combination for a non-linear converter, so there is
+        /// no correct scalar result. (Min/Max ARE supported: they return one stored column value, which the
+        /// materializer runs through ConvertFromProvider — same contract as the ctx.Query correlated path,
+        /// with ordering/selection on the stored form; see IsNavigationScalarColumnOp.)
         /// </summary>
         private void GuardAggregateOverConverterColumn(string methodName, LambdaExpression selectorLambda, Type depType)
         {
-            if (methodName is not (nameof(Queryable.Sum) or nameof(Queryable.Min)
-                                or nameof(Queryable.Max) or nameof(Queryable.Average))
+            if (methodName is not (nameof(Queryable.Sum) or nameof(Queryable.Average))
                 || _ctx == null)
                 return;
             TableMapping depMap;
@@ -973,9 +974,9 @@ namespace nORM.Query
             if (LambdaReferencesConverterColumn(selectorLambda, depMap))
                 throw new NormUnsupportedFeatureException(
                     $"{methodName}(...) over a navigation collection cannot aggregate a value-converter column: " +
-                    "the SQL aggregate runs on the stored representation (a negating/scaling converter gives a wrong " +
-                    "result, and Min/Max can pick the wrong element under an order-reversing converter). Materialise " +
-                    "the collection and aggregate it client-side.");
+                    "SUM/AVG combine the stored provider values and ConvertFromProvider does not distribute over " +
+                    "that combination for a non-linear converter, so there is no correct result. Materialise the " +
+                    "collection and aggregate it client-side.");
         }
 
         private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda, LambdaExpression? extraFilter = null)
