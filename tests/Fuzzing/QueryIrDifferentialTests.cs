@@ -107,5 +107,34 @@ namespace nORM.Tests.Fuzzing
             Assert.Contains("where+orderby", features);
             Assert.Contains("orderby+paging", features);
         }
+
+        [Fact]
+        public void Grouped_aggregates_match_the_linq_oracle()
+        {
+            // A has ties (three rows at A=3), so grouping by A yields a real multi-row group whose Count/Sum/Min/Max
+            // differ from one another and from the key — a wrong-key or wrong-aggregate grouping would diverge.
+            foreach (var agg in new[] { IrAggregate.Count, IrAggregate.Sum, IrAggregate.Min, IrAggregate.Max })
+            foreach (var col in new[] { IrColumn.Id, IrColumn.A, IrColumn.B })
+            {
+                var ir = new QueryIr
+                {
+                    Rows = Data,
+                    Steps = Array.Empty<IrStep>(),
+                    GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = agg, AggregateColumn = col },
+                };
+                var r = QueryIrDifferential.Execute(ir, seed: 3100);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+
+            // A filtered grouped Sum also matches, and its features tag the aggregate.
+            var filtered = new QueryIr
+            {
+                Rows = Data,
+                Steps = new[] { IrStep.Where(IrColumn.B, IrCompare.Lt, 8) },
+                GroupBy = new IrGroupBy { Key = IrColumn.B, Aggregate = IrAggregate.Sum, AggregateColumn = IrColumn.A },
+            };
+            Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(filtered, seed: 3200).Outcome);
+            Assert.Contains("groupby-sum", QueryIrDifferential.ExtractFeatures(filtered));
+        }
     }
 }

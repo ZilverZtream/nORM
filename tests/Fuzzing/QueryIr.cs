@@ -53,7 +53,10 @@ namespace nORM.Tests.Fuzzing
         {
             var left = string.Join(".", Steps.Select(s => s.Describe()));
             if (GroupBy is { } gb)
-                return $"rows={Rows.Count} | {left}.GroupBy({gb.Key}).Count()";
+            {
+                var agg = gb.Aggregate == IrAggregate.Count ? "Count()" : $"{gb.Aggregate}({gb.AggregateColumn})";
+                return $"rows={Rows.Count} | {left}.GroupBy({gb.Key}).{agg}";
+            }
             var body = SetOp == null
                 ? left
                 : $"({left}).{SetOp.Kind}({string.Join(".", SetOp.RightWheres.Select(s => s.Describe()))})";
@@ -70,10 +73,17 @@ namespace nORM.Tests.Fuzzing
         public int Add { get; init; }
     }
 
-    /// <summary>A grouping <c>GroupBy(r =&gt; r.Key).Select(g =&gt; g.Count())</c>.</summary>
+    public enum IrAggregate { Count, Sum, Min, Max }
+
+    /// <summary>
+    /// A grouping <c>GroupBy(r =&gt; r.Key).Select(g =&gt; new { g.Key, V = g.&lt;Aggregate&gt;(...) })</c>. The
+    /// aggregate defaults to <see cref="IrAggregate.Count"/>; Sum/Min/Max aggregate <see cref="AggregateColumn"/>.
+    /// </summary>
     public sealed record IrGroupBy
     {
         public required IrColumn Key { get; init; }
+        public IrAggregate Aggregate { get; init; } = IrAggregate.Count;
+        public IrColumn AggregateColumn { get; init; } = IrColumn.A;   // aggregated column for Sum/Min/Max (ignored by Count)
     }
 
     public enum IrSetOpKind { Union, Concat, Intersect, Except }

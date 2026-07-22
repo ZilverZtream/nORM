@@ -52,7 +52,9 @@ namespace nORM.Tests.Fuzzing
         }
 
         private static IrGroupBy? MaybeGroupBy(Random rng)
-            => rng.Next(5) == 0 ? new IrGroupBy { Key = Pick(rng, Columns) } : null;
+            => rng.Next(5) == 0
+                ? new IrGroupBy { Key = Pick(rng, Columns), Aggregate = (IrAggregate)rng.Next(4), AggregateColumn = Pick(rng, Columns) }
+                : null;
 
         private static IrSetOp? MaybeSetOp(Random rng)
         {
@@ -100,10 +102,10 @@ namespace nORM.Tests.Fuzzing
                         ? new IrProjection { Column = Pick(rng, Columns), Add = rng.Next(-5, 100) }
                         : (rng.Next(3) == 0 ? null : projection with { Column = Pick(rng, Columns), Add = rng.Next(-5, 100) });
                     break;
-                case 8: // toggle / reshape the grouping
+                case 8: // toggle / reshape the grouping (key and aggregate)
                     groupBy = groupBy == null
-                        ? new IrGroupBy { Key = Pick(rng, Columns) }
-                        : (rng.Next(3) == 0 ? null : groupBy with { Key = Pick(rng, Columns) });
+                        ? new IrGroupBy { Key = Pick(rng, Columns), Aggregate = (IrAggregate)rng.Next(4), AggregateColumn = Pick(rng, Columns) }
+                        : (rng.Next(3) == 0 ? null : groupBy with { Key = Pick(rng, Columns), Aggregate = (IrAggregate)rng.Next(4), AggregateColumn = Pick(rng, Columns) });
                     break;
             }
             // Grouping is exclusive with the set-op/projection phases (it takes precedence in the differential).

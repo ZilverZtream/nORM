@@ -171,17 +171,39 @@ namespace nORM.Tests.Fuzzing
             };
         }
 
+        // Key-aware: encode (key, aggregate) so a wrong-key grouping with a matching aggregate still diverges. All
+        // key and aggregate values are tiny here (rows < 9, columns < 9, so any Count/Sum/Min/Max < 1000), making
+        // key*1000+value collision-free. The encode runs in memory over the materialized keyed projection, so nORM
+        // still translates the keyed group SELECT (including the SUM/MIN/MAX aggregate).
         private static IEnumerable<int> RunLinqGrouped(QueryIr ir)
         {
             IEnumerable<IrRow> rows = ir.Rows;
             foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
                 rows = rows.Where(BuildPredicate(w).Compile());
-            // Key-aware: encode (key, count) so a wrong-key grouping with matching sizes still diverges. The
-            // key/count domains are tiny here (< 1000), so key*1000+count is collision-free. The encode runs in
-            // memory over the materialized keyed projection, so nORM still translates the keyed group SELECT.
-            return rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile())
-                .Select(g => new { g.Key, C = g.Count() })
-                .Select(x => x.Key * 1000 + x.C);
+            var grouped = rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile());
+            var gb = ir.GroupBy!;
+            return gb.Aggregate switch
+            {
+                IrAggregate.Count => grouped.Select(g => Encode(g.Key, g.Count())),
+                IrAggregate.Sum => gb.AggregateColumn switch
+                {
+                    IrColumn.Id => grouped.Select(g => Encode(g.Key, g.Sum(r => r.Id))),
+                    IrColumn.A => grouped.Select(g => Encode(g.Key, g.Sum(r => r.A))),
+                    _ => grouped.Select(g => Encode(g.Key, g.Sum(r => r.B))),
+                },
+                IrAggregate.Min => gb.AggregateColumn switch
+                {
+                    IrColumn.Id => grouped.Select(g => Encode(g.Key, g.Min(r => r.Id))),
+                    IrColumn.A => grouped.Select(g => Encode(g.Key, g.Min(r => r.A))),
+                    _ => grouped.Select(g => Encode(g.Key, g.Min(r => r.B))),
+                },
+                _ => gb.AggregateColumn switch
+                {
+                    IrColumn.Id => grouped.Select(g => Encode(g.Key, g.Max(r => r.Id))),
+                    IrColumn.A => grouped.Select(g => Encode(g.Key, g.Max(r => r.A))),
+                    _ => grouped.Select(g => Encode(g.Key, g.Max(r => r.B))),
+                },
+            };
         }
 
         private static IEnumerable<int> RunNormGrouped(DbContext ctx, QueryIr ir)
@@ -189,11 +211,34 @@ namespace nORM.Tests.Fuzzing
             IQueryable<IrRow> q = ctx.Query<IrRow>();
             foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
                 q = q.Where(BuildPredicate(w));
-            return q.GroupBy(KeySelector(ir.GroupBy!.Key))
-                .Select(g => new { g.Key, C = g.Count() })
-                .ToList()
-                .Select(x => x.Key * 1000 + x.C);
+            var grouped = q.GroupBy(KeySelector(ir.GroupBy!.Key));
+            var gb = ir.GroupBy!;
+            var pairs = gb.Aggregate switch
+            {
+                IrAggregate.Count => grouped.Select(g => new { g.Key, V = g.Count() }).ToList(),
+                IrAggregate.Sum => gb.AggregateColumn switch
+                {
+                    IrColumn.Id => grouped.Select(g => new { g.Key, V = g.Sum(r => r.Id) }).ToList(),
+                    IrColumn.A => grouped.Select(g => new { g.Key, V = g.Sum(r => r.A) }).ToList(),
+                    _ => grouped.Select(g => new { g.Key, V = g.Sum(r => r.B) }).ToList(),
+                },
+                IrAggregate.Min => gb.AggregateColumn switch
+                {
+                    IrColumn.Id => grouped.Select(g => new { g.Key, V = g.Min(r => r.Id) }).ToList(),
+                    IrColumn.A => grouped.Select(g => new { g.Key, V = g.Min(r => r.A) }).ToList(),
+                    _ => grouped.Select(g => new { g.Key, V = g.Min(r => r.B) }).ToList(),
+                },
+                _ => gb.AggregateColumn switch
+                {
+                    IrColumn.Id => grouped.Select(g => new { g.Key, V = g.Max(r => r.Id) }).ToList(),
+                    IrColumn.A => grouped.Select(g => new { g.Key, V = g.Max(r => r.A) }).ToList(),
+                    _ => grouped.Select(g => new { g.Key, V = g.Max(r => r.B) }).ToList(),
+                },
+            };
+            return pairs.Select(x => Encode(x.Key, x.V));
         }
+
+        private static int Encode(int key, int value) => key * 1000 + value;
 
         private static IEnumerable<int> RunLinqProjected(QueryIr ir)
         {
@@ -472,6 +517,7 @@ namespace nORM.Tests.Fuzzing
             if (ir.GroupBy != null)
             {
                 f.Add("groupby");
+                f.Add("groupby-" + ir.GroupBy.Aggregate.ToString().ToLowerInvariant());
                 if (kinds.Contains(IrStepKind.Where)) f.Add("groupby+where");
             }
             if (ir.Rows.Count == 0) f.Add("empty-table");
