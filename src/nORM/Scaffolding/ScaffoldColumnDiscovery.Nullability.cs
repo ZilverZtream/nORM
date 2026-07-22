@@ -82,6 +82,11 @@ namespace nORM.Scaffolding
                 var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (DataRow row in schema.Rows)
                 {
+                    // Skip KeyInfo-padded hidden columns (base-table keys surfaced for a view): they are
+                    // non-nullable and would otherwise mark a visible view column of the same name as
+                    // non-nullable, mistyping a nullable (e.g. LEFT JOIN) column.
+                    if (ScaffoldEntitySourceBuilder.IsHiddenSchemaColumn(row))
+                        continue;
                     var columnName = row["ColumnName"]!.ToString()!;
                     var allowNull = row["AllowDBNull"] is bool b && b;
                     if (!allowNull)

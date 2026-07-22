@@ -20,6 +20,11 @@ namespace nORM.Scaffolding
             var sourceOrdinal = 0;
             foreach (DataRow row in schema.Rows)
             {
+                // KeyInfo pads a view's schema with hidden base-table key columns that are not part of
+                // the view's projection; materializing them would fail with "invalid column name".
+                if (ScaffoldEntitySourceBuilder.IsHiddenSchemaColumn(row))
+                    continue;
+
                 var colName = row["ColumnName"]?.ToString();
                 if (string.IsNullOrEmpty(colName))
                     continue;

@@ -26,6 +26,10 @@ namespace nORM.Scaffolding
                 var keyColumns = new List<string>();
                 foreach (DataRow row in schema.Rows)
                 {
+                    // KeyInfo pads a view's schema with hidden base-table key columns (all flagged IsKey);
+                    // treating them as the view's primary key would be wrong, so skip them.
+                    if (ScaffoldEntitySourceBuilder.IsHiddenSchemaColumn(row))
+                        continue;
                     if (row.Table.Columns.Contains("IsKey") && row["IsKey"] is bool isKey && isKey)
                         keyColumns.Add(row["ColumnName"]!.ToString()!);
                 }
