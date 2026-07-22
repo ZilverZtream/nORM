@@ -178,6 +178,34 @@ public static class StoreWebApp
             return Results.Ok(new { updated });
         });
 
+        // A paged, tenant-scoped catalog for the storefront — Skip/Take paging with a total count.
+        api.MapGet("/catalog", async (int? page, int? size, StoreContext ctx) =>
+        {
+            var p = Math.Max(1, page ?? 1);
+            var s = Math.Clamp(size ?? 6, 1, 50);
+            var total = await ctx.Query<StoreProduct>().Where(x => x.IsActive).CountAsync();
+            var items = await ctx.Query<StoreProduct>()
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Name)
+                .Skip((p - 1) * s)
+                .Take(s)
+                .Select(x => new StoreProductDto { Id = x.Id, Sku = x.Sku, Name = x.Name, Price = x.Price })
+                .ToListAsync();
+            return Results.Ok(new { page = p, size = s, total, totalPages = (int)Math.Ceiling(total / (double)s), items });
+        });
+
+        // The TRACKED write model, alongside the set-based ExecuteUpdate above: load via DbSet.FindAsync,
+        // mutate one field, SaveChanges. nORM writes only the changed column (partial-column UPDATE) and,
+        // because the context is tenant-scoped, a Find for another tenant's product returns null.
+        api.MapPost("/products/{id:int}/rename", async (int id, RenameRequest request, StoreContext ctx) =>
+        {
+            var product = await ctx.Products.FindAsync(id);
+            if (product is null) return Results.NotFound();
+            product.Name = request.Name;
+            var saved = await ctx.SaveChangesAsync();
+            return Results.Ok(new { saved, product.Id, product.Name });
+        });
+
         api.MapPost("/temporal/tags", async (CreateTagRequest request, StoreContext ctx) =>
         {
             await ctx.CreateTagAsync(request.Name);
@@ -374,6 +402,7 @@ internal sealed class StoreConnectionLease(System.Data.Common.DbConnection conne
 
 public sealed record LoginRequest(string Tenant);
 public sealed record UpdatePriceRequest(decimal Price);
+public sealed record RenameRequest(string Name);
 public sealed record CreateTagRequest(string Name);
 public sealed record RestoreTemporalRequest(string Tag);
 public sealed record TestConnectionRequest(string? ConnectionString);
