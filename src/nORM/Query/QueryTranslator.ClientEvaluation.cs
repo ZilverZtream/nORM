@@ -219,11 +219,30 @@ namespace nORM.Query
             }
             else
             {
-                // Bare scalar projection: the body IS the correlated subquery op (Select(p => sub....First()))
-                // with no member wrapper. Register under the reserved empty-name key so the scalar-projection
-                // materializer applies ConvertFromProvider; Consider no-ops unless the body is a
-                // First/Last/Min/Max over a converter column.
-                Consider(BareScalarSubqueryConverterKey, body);
+                // Bare scalar projection. Two shapes register the converter under the reserved empty-name key
+                // so the scalar-projection materializer applies ConvertFromProvider:
+                //   (1) the body is a correlated subquery op (Select(p => sub....First())) — via Consider;
+                //   (2) the body is a DIRECT member of the projection parameter (Select(w => w.Col)). Resolving
+                //       it here (from the parameter's entity mapping via ctx) matters for set operations
+                //       (Union/Except/Intersect over a scalar converter column): the outer set-op materializer
+                //       runs with the scalar ELEMENT mapping (e.g. int), not the entity, so its own
+                //       direct-member converter resolver can't see the column and the value would come back as
+                //       its raw stored representation.
+                var innerBody = StripConvert(body);
+                if (innerBody is MemberExpression bm && bm.Expression == projection.Parameters[0])
+                {
+                    try
+                    {
+                        var m = ctx.GetMapping(projection.Parameters[0].Type);
+                        if (m.TryGetColumnForMemberAccess(bm, out var col) && col.Converter != null)
+                            (result ??= new Dictionary<string, nORM.Mapping.IValueConverter>(StringComparer.Ordinal))[BareScalarSubqueryConverterKey] = col.Converter;
+                    }
+                    catch { }
+                }
+                else
+                {
+                    Consider(BareScalarSubqueryConverterKey, body);
+                }
             }
             return result;
         }
