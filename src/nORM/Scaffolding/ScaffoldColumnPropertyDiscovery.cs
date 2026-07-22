@@ -42,7 +42,9 @@ namespace nORM.Scaffolding
                 if (entityByTable.TryGetValue(tableKey, out var entityName))
                     existingNames.Add(entityName);
                 result[tableKey] = ScaffoldColumnPropertyNameBuilder.BuildColumnPropertyNames(
-                    schema.Rows.Cast<DataRow>().Select(row => row["ColumnName"]!.ToString()!),
+                    schema.Rows.Cast<DataRow>()
+                        .Where(row => !ScaffoldEntitySourceBuilder.IsHiddenSchemaColumn(row))
+                        .Select(row => row["ColumnName"]!.ToString()!),
                     existingNames,
                     useDatabaseNames);
             }

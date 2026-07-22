@@ -12,7 +12,9 @@ namespace nORM.Scaffolding
             ScaffoldEntitySourceInfo entity,
             DataTable schema)
         {
-            var rows = schema.Rows.Cast<DataRow>().ToList();
+            var rows = schema.Rows.Cast<DataRow>()
+                .Where(row => !IsHiddenSchemaColumn(row))
+                .ToList();
             var propertyNames = AssignUniqueColumnPropertyNames(
                 entity.EntityName,
                 entity.ColumnPropertyNames,
@@ -118,6 +120,13 @@ namespace nORM.Scaffolding
                 end--;
             return end > 0 && end < name.Length ? name[..end] : name;
         }
+
+        internal static bool IsHiddenSchemaColumn(DataRow row)
+            // GetSchemaTable(KeyInfo) pads a view's metadata with the base tables' key columns so that
+            // keys can be read back; those columns are marked IsHidden and are NOT part of the view's
+            // projection. Emitting them as entity properties makes every read fail with "invalid column
+            // name", so they must be excluded (a base table never marks a projected column hidden).
+            => row.Table.Columns.Contains("IsHidden") && row["IsHidden"] is bool hidden && hidden;
 
         private static bool IsPrimaryKeyColumn(ScaffoldEntitySourceInfo entity, DataRow row, string columnName)
             => IsDeclaredPrimaryKeyColumn(entity.PrimaryKeyColumns, columnName, GetSchemaBoolean(row, "IsKey"));
