@@ -101,6 +101,8 @@ namespace nORM.Core
         /// <typeparam name="T">The entity type.</typeparam>
         /// <param name="ctx">The <see cref="DbContext"/> that provides access to the database.</param>
         /// <returns>A <see cref="DbSet{T}"/> to query and to register add/update/remove intent.</returns>
+        [RequiresUnreferencedCode("nORM DbSet querying reflects over entity property metadata to build SQL; trimming may remove the required members. See docs/aot-trimming.md.")]
+        [RequiresDynamicCode("nORM DbSet querying uses MakeGenericType/Compile to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")]
         public static DbSet<T> Set<T>(this DbContext ctx) where T : class => new(ctx);
     }
 

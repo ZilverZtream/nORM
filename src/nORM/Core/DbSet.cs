@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
@@ -22,7 +23,9 @@ namespace nORM.Core
     ///     public DbSet&lt;User&gt; Users =&gt; this.Set&lt;User&gt;();   // context.Users.Where(...) / context.Users.Add(...)
     /// }
     /// </code>
-    /// The computed-property form needs no reflection or auto-population, so it is trimming/NativeAOT-safe.
+    /// The computed-property form needs no reflection or auto-population (unlike EF Core's auto-populated
+    /// set properties), but querying it and <see cref="Find"/> reflect over entity metadata to build SQL
+    /// like all nORM data access, so those members carry the trimming/NativeAOT annotations.
     /// It is a full <see cref="INormQueryable{T}"/>, so <c>Include</c>/<c>AsNoTracking</c>/<c>AsSplitQuery</c>
     /// and the async terminal operators compose off it without a cast, exactly as off <c>context.Query&lt;T&gt;()</c>;
     /// the write verbs delegate to the context's change tracker and apply on the next <c>SaveChangesAsync</c>.
@@ -33,6 +36,8 @@ namespace nORM.Core
         private readonly DbContext _context;
         private readonly INormQueryable<T> _query;
 
+        [RequiresUnreferencedCode("nORM DbSet querying reflects over entity property metadata to build SQL; trimming may remove the required members. See docs/aot-trimming.md.")]
+        [RequiresDynamicCode("nORM DbSet querying uses MakeGenericType/Compile to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")]
         internal DbSet(DbContext context)
         {
             _context = context;
@@ -104,10 +109,16 @@ namespace nORM.Core
         /// <summary>Marks every entity in <paramref name="entities"/> Deleted.</summary>
         public void RemoveRange(params T[] entities) => _context.RemoveRange(entities);
         /// <summary>Finds a tracked or stored entity by primary key, or <c>null</c> (EF Core <c>Find</c>).</summary>
+        [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         public T? Find(params object?[] keyValues) => _context.Find<T>(keyValues);
         /// <summary>Async form of <see cref="Find"/>.</summary>
+        [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         public ValueTask<T?> FindAsync(params object?[] keyValues) => _context.FindAsync<T>(keyValues);
         /// <summary>Async form of <see cref="Find"/> with cancellation.</summary>
+        [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+        [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
         public ValueTask<T?> FindAsync(object?[] keyValues, CancellationToken ct) => _context.FindAsync<T>(keyValues, ct);
     }
 }
