@@ -416,6 +416,10 @@ namespace nORM.Tests.Fuzzing
 
         private static readonly System.Reflection.MethodInfo ContainsMethod =
             typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!;
+        private static readonly System.Reflection.MethodInfo StartsWithOrdinalMethod =
+            typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string), typeof(StringComparison) })!;
+        private static readonly System.Reflection.MethodInfo EndsWithOrdinalMethod =
+            typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string), typeof(StringComparison) })!;
 
         private static bool IsPredicateStep(IrStep s) => s.Kind is IrStepKind.Where or IrStepKind.WhereName;
 
@@ -428,13 +432,18 @@ namespace nORM.Tests.Fuzzing
                 // expression is the oracle and the nORM query — a case-insensitive divergence would be a real bug.
                 var nameMember = Expression.Property(p, nameof(IrRow.Name));
                 var text = Expression.Constant(step.Text, typeof(string));
+                var ordinal = Expression.Constant(StringComparison.Ordinal);
                 Expression cmp = step.StringOp switch
                 {
                     IrStringOp.Eq => Expression.Equal(nameMember, text),
                     IrStringOp.Ne => Expression.NotEqual(nameMember, text),
                     // string.Contains(string) is ordinal (case-sensitive, culture-insensitive) in C#, matching
                     // nORM's instr/substr translation, so the same expression is the oracle and the nORM query.
-                    _ => Expression.Call(nameMember, ContainsMethod, text),
+                    IrStringOp.Contains => Expression.Call(nameMember, ContainsMethod, text),
+                    // StartsWith/EndsWith(string) are CULTURE-sensitive in C#, so use the explicit-Ordinal 2-arg
+                    // overload for both sides — nORM honours the StringComparison, so both are ordinal.
+                    IrStringOp.StartsWith => Expression.Call(nameMember, StartsWithOrdinalMethod, text, ordinal),
+                    _ => Expression.Call(nameMember, EndsWithOrdinalMethod, text, ordinal),
                 };
                 return Expression.Lambda<Func<IrRow, bool>>(cmp, p);
             }

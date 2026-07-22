@@ -127,8 +127,9 @@ namespace nORM.Tests.Fuzzing
         {
             if (rng.Next(4) != 0)
                 return IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6));
-            var op = (IrStringOp)rng.Next(3);
-            return IrStep.WhereName(op, op == IrStringOp.Contains ? Pick(rng, NameChars) : Pick(rng, Names));
+            var op = (IrStringOp)rng.Next(5);
+            // Eq/Ne compare the whole 2-char name; Contains/StartsWith/EndsWith use a single-char needle.
+            return IrStep.WhereName(op, op is IrStringOp.Eq or IrStringOp.Ne ? Pick(rng, Names) : Pick(rng, NameChars));
         }
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];

@@ -107,7 +107,7 @@ namespace nORM.Tests.Fuzzing
 
     public enum IrStepKind { Where, WhereName, OrderBy, Skip, Take, Distinct }
     public enum IrCompare { Eq, Ne, Lt, Le, Gt, Ge }
-    public enum IrStringOp { Eq, Ne, Contains }   // ordinal string ops on the Name column (== / != / Contains)
+    public enum IrStringOp { Eq, Ne, Contains, StartsWith, EndsWith }   // ordinal string ops on the Name column
     public enum IrColumn { Id, A, B }   // orderable / comparable numeric columns
 
     /// <summary>
@@ -139,7 +139,9 @@ namespace nORM.Tests.Fuzzing
             {
                 IrStringOp.Eq => $"Where(Name=='{Text}')",
                 IrStringOp.Ne => $"Where(Name!='{Text}')",
-                _ => $"Where(Name.Contains('{Text}'))",
+                IrStringOp.Contains => $"Where(Name.Contains('{Text}'))",
+                IrStringOp.StartsWith => $"Where(Name.StartsWith('{Text}'))",
+                _ => $"Where(Name.EndsWith('{Text}'))",
             },
             IrStepKind.OrderBy => $"OrderBy({Column}{(Descending ? "-desc" : "")})",
             IrStepKind.Skip => $"Skip({Count})",

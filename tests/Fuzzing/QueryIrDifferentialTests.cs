@@ -179,5 +179,26 @@ namespace nORM.Tests.Fuzzing
                 Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
             }
         }
+
+        [Fact]
+        public void String_prefix_and_suffix_are_ordinal_and_case_sensitive()
+        {
+            // StartsWith/EndsWith(string) are culture-sensitive in C#, so the fuzzer uses the explicit-Ordinal
+            // overload on both sides; nORM honours the StringComparison, so "ab".StartsWith("A") is false (ordinal).
+            var rows = new[]
+            {
+                new IrRow { Id = 1, A = 1, B = 1, Name = "ab" },
+                new IrRow { Id = 2, A = 2, B = 2, Name = "Ab" },
+                new IrRow { Id = 3, A = 3, B = 3, Name = "aB" },
+                new IrRow { Id = 4, A = 4, B = 4, Name = "AB" },
+            };
+            foreach (var op in new[] { IrStringOp.StartsWith, IrStringOp.EndsWith })
+            foreach (var needle in new[] { "a", "A", "b", "B" })
+            {
+                var ir = new QueryIr { Rows = rows, Steps = new[] { IrStep.WhereName(op, needle) } };
+                var r = QueryIrDifferential.Execute(ir, seed: 4400);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+        }
     }
 }
