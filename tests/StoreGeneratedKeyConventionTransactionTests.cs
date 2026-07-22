@@ -81,4 +81,31 @@ public sealed class StoreGeneratedKeyConventionTransactionTests
 
         Assert.Equal(99, (await ctx.Query<Row>().SingleAsync()).Amount);
     }
+
+    [Fact]
+    public async Task SavepointPartialRollback_KeepsPreSavepointRow_ReInsertsPostSavepointRow()
+    {
+        await using var cn = Db();
+        await using var ctx = Ctx(cn);
+        var a = new Row { Name = "a" };
+        var b = new Row { Name = "b" };
+
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            ctx.Add(a);
+            await ctx.SaveChangesAsync();            // A inserted (before the savepoint)
+            await tx.CreateSavepointAsync("sp");
+
+            ctx.Add(b);
+            await ctx.SaveChangesAsync();            // B inserted (after the savepoint)
+            await tx.RollbackToSavepointAsync("sp"); // undo B, keep A
+
+            await ctx.SaveChangesAsync();            // B must re-insert; A must not duplicate
+            await tx.CommitAsync();
+        }
+
+        var rows = await ctx.Query<Row>().OrderBy(r => r.Name).ToListAsync();
+        Assert.Equal(new[] { "a", "b" }, rows.Select(r => r.Name).ToArray());   // both present, no duplicate
+        Assert.True(a.Id > 0 && b.Id > 0 && a.Id != b.Id);
+    }
 }
