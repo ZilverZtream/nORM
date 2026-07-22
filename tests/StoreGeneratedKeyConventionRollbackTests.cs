@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -90,5 +91,74 @@ public sealed class StoreGeneratedKeyConventionRollbackTests
 
         Assert.Equal(2, await ctx.Query<Row>().CountAsync());
         Assert.True(a.Id > 0 && b.Id > 0 && a.Id != b.Id);
+    }
+
+    // A convention-key parent + children graph: after a rolled-back transaction the whole graph must
+    // re-insert with correct FK linkage (the parent key is not reset on rollback for convention keys, and
+    // FK fixup must still resolve the child FKs on the re-save).
+
+    [Table("SgkrParent")]
+    public sealed class Parent
+    {
+        [Key] public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public List<Child> Children { get; set; } = new();
+    }
+
+    [Table("SgkrChild")]
+    public sealed class Child
+    {
+        [Key] public int Id { get; set; }
+        public int ParentId { get; set; }
+        public string Tag { get; set; } = "";
+        public Parent Parent { get; set; } = default!;
+    }
+
+    private static SqliteConnection GraphDb()
+    {
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "CREATE TABLE SgkrParent (Id INTEGER NOT NULL, Name TEXT NULL, CONSTRAINT PK_SgkrParent PRIMARY KEY (Id));" +
+            "CREATE TABLE SgkrChild (Id INTEGER NOT NULL, ParentId INTEGER NOT NULL, Tag TEXT NULL, CONSTRAINT PK_SgkrChild PRIMARY KEY (Id));";
+        cmd.ExecuteNonQuery();
+        return cn;
+    }
+
+    private static DbContext GraphCtx(SqliteConnection cn) => new DbContext(cn, new SqliteProvider(), new DbContextOptions
+    {
+        OnModelCreating = mb =>
+        {
+            mb.Entity<Parent>().HasKey(x => x.Id);
+            mb.Entity<Child>().HasKey(x => x.Id);
+            mb.Entity<Parent>().HasMany(p => p.Children).WithOne(c => c.Parent).HasForeignKey(c => c.ParentId, p => p.Id);
+        }
+    }, ownsConnection: false);
+
+    [Fact]
+    public async Task GraphRolledBackInTransaction_ReInsertsWithCorrectForeignKeyLinkage()
+    {
+        await using var cn = GraphDb();
+        await using var ctx = GraphCtx(cn);
+
+        var p = new Parent { Name = "p" };
+        p.Children.Add(new Child { Tag = "c1" });
+        p.Children.Add(new Child { Tag = "c2" });
+        ctx.Add(p);
+
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            await ctx.SaveChangesAsync();
+            await tx.RollbackAsync();
+        }
+
+        await ctx.SaveChangesAsync();   // re-insert the whole graph
+
+        Assert.Single(await ctx.Query<Parent>().ToListAsync());
+        var children = await ctx.Query<Child>().ToListAsync();
+        Assert.Equal(2, children.Count);
+        Assert.True(p.Id > 0);
+        Assert.All(children, c => Assert.Equal(p.Id, c.ParentId));
     }
 }
