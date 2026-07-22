@@ -136,5 +136,28 @@ namespace nORM.Tests.Fuzzing
             Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(filtered, seed: 3200).Outcome);
             Assert.Contains("groupby-sum", QueryIrDifferential.ExtractFeatures(filtered));
         }
+
+        [Fact]
+        public void String_equality_is_ordinal_and_case_sensitive()
+        {
+            // Mixed-case names: an ordinal "Name == a" matches only the lowercase rows, never "A". A case-
+            // insensitive translation in nORM would diverge from the ordinal LINQ-to-Objects oracle.
+            var rows = new[]
+            {
+                new IrRow { Id = 1, A = 1, B = 1, Name = "a" },
+                new IrRow { Id = 2, A = 2, B = 2, Name = "A" },
+                new IrRow { Id = 3, A = 3, B = 3, Name = "b" },
+                new IrRow { Id = 4, A = 4, B = 4, Name = "a" },
+            };
+            foreach (var (op, text) in new[]
+                { (IrStringOp.Eq, "a"), (IrStringOp.Ne, "a"), (IrStringOp.Eq, "A"), (IrStringOp.Eq, "b") })
+            {
+                var ir = new QueryIr { Rows = rows, Steps = new[] { IrStep.WhereName(op, text) } };
+                var r = QueryIrDifferential.Execute(ir, seed: 4100);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+            Assert.Contains("where-name", QueryIrDifferential.ExtractFeatures(
+                new QueryIr { Rows = rows, Steps = new[] { IrStep.WhereName(IrStringOp.Eq, "a") } }));
+        }
     }
 }

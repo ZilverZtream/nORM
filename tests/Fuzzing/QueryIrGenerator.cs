@@ -17,6 +17,8 @@ namespace nORM.Tests.Fuzzing
         private static readonly IrColumn[] Columns = { IrColumn.Id, IrColumn.A, IrColumn.B };
         private static readonly IrCompare[] Compares =
             { IrCompare.Eq, IrCompare.Ne, IrCompare.Lt, IrCompare.Le, IrCompare.Gt, IrCompare.Ge };
+        // Mixed case in a tiny domain so string equality exercises case-sensitivity ("a" != "A") and duplicates.
+        private static readonly string[] Names = { "a", "A", "b", "B" };
 
         public static QueryIr Generate(int seed)
         {
@@ -24,11 +26,11 @@ namespace nORM.Tests.Fuzzing
             var rowCount = rng.Next(0, 9);
             var rows = new List<IrRow>(rowCount);
             for (var i = 1; i <= rowCount; i++)
-                rows.Add(new IrRow { Id = i, A = rng.Next(0, 6), B = rng.Next(0, 6), Name = ((char)('a' + rng.Next(0, 4))).ToString() });
+                rows.Add(new IrRow { Id = i, A = rng.Next(0, 6), B = rng.Next(0, 6), Name = Pick(rng, Names) });
 
             var steps = new List<IrStep>();
             for (var i = rng.Next(0, 3); i > 0; i--)
-                steps.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6)));
+                steps.Add(NextWhere(rng));
             for (var i = rng.Next(0, 3); i > 0; i--)
                 steps.Add(IrStep.OrderBy(Pick(rng, Columns), rng.Next(2) == 0));
             if (rng.Next(3) == 0)
@@ -86,11 +88,11 @@ namespace nORM.Tests.Fuzzing
             var groupBy = ir.GroupBy;
             switch (rng.Next(9))
             {
-                case 0: steps.Add(IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6))); break;
+                case 0: steps.Add(NextWhere(rng)); break;
                 case 1: if (steps.Count > 0) steps.RemoveAt(rng.Next(steps.Count)); break;
                 case 2: steps.Add(IrStep.OrderBy(Pick(rng, Columns), rng.Next(2) == 0)); break;
                 case 3: steps.Add(rng.Next(2) == 0 ? IrStep.Skip(rng.Next(0, rows.Count + 2)) : IrStep.Take(rng.Next(0, rows.Count + 2))); break;
-                case 4: rows.Add(new IrRow { Id = (rows.Count == 0 ? 1 : rows.Max(r => r.Id) + 1), A = rng.Next(0, 6), B = rng.Next(0, 6), Name = ((char)('a' + rng.Next(0, 4))).ToString() }); break;
+                case 4: rows.Add(new IrRow { Id = (rows.Count == 0 ? 1 : rows.Max(r => r.Id) + 1), A = rng.Next(0, 6), B = rng.Next(0, 6), Name = Pick(rng, Names) }); break;
                 case 5: if (rows.Count > 0) rows.RemoveAt(rng.Next(rows.Count)); break;
                 case 6: // toggle / reshape the set operation
                     setOp = setOp == null
@@ -117,6 +119,11 @@ namespace nORM.Tests.Fuzzing
                 GroupBy = groupBy,
             };
         }
+
+        // A predicate step: usually a numeric comparison, and ~1/4 of the time an ordinal string equality on Name.
+        private static IrStep NextWhere(Random rng) => rng.Next(4) == 0
+            ? IrStep.WhereName((IrStringOp)rng.Next(2), Pick(rng, Names))
+            : IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6));
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];
     }

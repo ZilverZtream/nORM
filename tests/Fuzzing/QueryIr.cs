@@ -105,8 +105,9 @@ namespace nORM.Tests.Fuzzing
         public string Name { get; set; } = "";
     }
 
-    public enum IrStepKind { Where, OrderBy, Skip, Take, Distinct }
+    public enum IrStepKind { Where, WhereName, OrderBy, Skip, Take, Distinct }
     public enum IrCompare { Eq, Ne, Lt, Le, Gt, Ge }
+    public enum IrStringOp { Eq, Ne }   // ordinal string equality on the Name column
     public enum IrColumn { Id, A, B }   // orderable / comparable numeric columns
 
     /// <summary>
@@ -121,8 +122,11 @@ namespace nORM.Tests.Fuzzing
         public int Value { get; init; }
         public bool Descending { get; init; }
         public int Count { get; init; }
+        public IrStringOp StringOp { get; init; }
+        public string Text { get; init; } = "";
 
         public static IrStep Where(IrColumn col, IrCompare op, int value) => new() { Kind = IrStepKind.Where, Column = col, Op = op, Value = value };
+        public static IrStep WhereName(IrStringOp op, string text) => new() { Kind = IrStepKind.WhereName, StringOp = op, Text = text };
         public static IrStep OrderBy(IrColumn col, bool descending = false) => new() { Kind = IrStepKind.OrderBy, Column = col, Descending = descending };
         public static IrStep Skip(int count) => new() { Kind = IrStepKind.Skip, Count = count };
         public static IrStep Take(int count) => new() { Kind = IrStepKind.Take, Count = count };
@@ -131,6 +135,7 @@ namespace nORM.Tests.Fuzzing
         public string Describe() => Kind switch
         {
             IrStepKind.Where => $"Where({Column}{OpSym(Op)}{Value})",
+            IrStepKind.WhereName => $"Where(Name{(StringOp == IrStringOp.Eq ? "==" : "!=")}'{Text}')",
             IrStepKind.OrderBy => $"OrderBy({Column}{(Descending ? "-desc" : "")})",
             IrStepKind.Skip => $"Skip({Count})",
             IrStepKind.Take => $"Take({Count})",

@@ -178,7 +178,7 @@ namespace nORM.Tests.Fuzzing
         private static IEnumerable<int> RunLinqGrouped(QueryIr ir)
         {
             IEnumerable<IrRow> rows = ir.Rows;
-            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+            foreach (var w in ir.Steps.Where(IsPredicateStep))
                 rows = rows.Where(BuildPredicate(w).Compile());
             var grouped = rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile());
             var gb = ir.GroupBy!;
@@ -209,7 +209,7 @@ namespace nORM.Tests.Fuzzing
         private static IEnumerable<int> RunNormGrouped(DbContext ctx, QueryIr ir)
         {
             IQueryable<IrRow> q = ctx.Query<IrRow>();
-            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+            foreach (var w in ir.Steps.Where(IsPredicateStep))
                 q = q.Where(BuildPredicate(w));
             var grouped = q.GroupBy(KeySelector(ir.GroupBy!.Key));
             var gb = ir.GroupBy!;
@@ -243,13 +243,13 @@ namespace nORM.Tests.Fuzzing
         private static IEnumerable<int> RunLinqProjected(QueryIr ir)
         {
             IEnumerable<IrRow> left = ir.Rows;
-            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+            foreach (var w in ir.Steps.Where(IsPredicateStep))
                 left = left.Where(BuildPredicate(w).Compile());
             IEnumerable<IrRow> rows = left;
             if (ir.SetOp is { } setOp)
             {
                 IEnumerable<IrRow> right = ir.Rows;
-                foreach (var w in setOp.RightWheres.Where(s => s.Kind == IrStepKind.Where))
+                foreach (var w in setOp.RightWheres.Where(IsPredicateStep))
                     right = right.Where(BuildPredicate(w).Compile());
                 rows = setOp.Kind switch
                 {
@@ -271,7 +271,7 @@ namespace nORM.Tests.Fuzzing
             IQueryable<IrRow> Filter(IReadOnlyList<IrStep> steps)
             {
                 IQueryable<IrRow> s = ctx.Query<IrRow>();
-                foreach (var w in steps.Where(x => x.Kind == IrStepKind.Where))
+                foreach (var w in steps.Where(IsPredicateStep))
                     s = s.Where(BuildPredicate(w));
                 return s;
             }
@@ -313,14 +313,14 @@ namespace nORM.Tests.Fuzzing
         private static IEnumerable<IrRow> RunLinq(QueryIr ir)
         {
             IEnumerable<IrRow> left = ir.Rows;
-            foreach (var w in ir.Steps.Where(s => s.Kind == IrStepKind.Where))
+            foreach (var w in ir.Steps.Where(IsPredicateStep))
                 left = left.Where(BuildPredicate(w).Compile());
 
             IEnumerable<IrRow> q = left;
             if (ir.SetOp is { } setOp)
             {
                 IEnumerable<IrRow> right = ir.Rows;
-                foreach (var w in setOp.RightWheres.Where(s => s.Kind == IrStepKind.Where))
+                foreach (var w in setOp.RightWheres.Where(IsPredicateStep))
                     right = right.Where(BuildPredicate(w).Compile());
                 q = setOp.Kind switch
                 {
@@ -345,7 +345,7 @@ namespace nORM.Tests.Fuzzing
             IQueryable<IrRow> Filter(IReadOnlyList<IrStep> steps)
             {
                 IQueryable<IrRow> s = ctx.Query<IrRow>();
-                foreach (var w in steps.Where(x => x.Kind == IrStepKind.Where))
+                foreach (var w in steps.Where(IsPredicateStep))
                     s = s.Where(BuildPredicate(w));
                 return s;
             }
@@ -414,9 +414,22 @@ namespace nORM.Tests.Fuzzing
         private static bool IsTotallyOrdered(QueryIr ir) =>
             ir.Steps.Any(s => s.Kind is IrStepKind.OrderBy or IrStepKind.Skip or IrStepKind.Take);
 
+        private static bool IsPredicateStep(IrStep s) => s.Kind is IrStepKind.Where or IrStepKind.WhereName;
+
         private static Expression<Func<IrRow, bool>> BuildPredicate(IrStep step)
         {
             var p = Expression.Parameter(typeof(IrRow), "r");
+            if (step.Kind == IrStepKind.WhereName)
+            {
+                // C# string ==/!= and nORM's string comparison are both ordinal (case-sensitive), so the same
+                // expression is the oracle and the nORM query — a case-insensitive divergence would be a real bug.
+                var nameMember = Expression.Property(p, nameof(IrRow.Name));
+                var text = Expression.Constant(step.Text, typeof(string));
+                Expression cmp = step.StringOp == IrStringOp.Eq
+                    ? Expression.Equal(nameMember, text)
+                    : Expression.NotEqual(nameMember, text);
+                return Expression.Lambda<Func<IrRow, bool>>(cmp, p);
+            }
             var member = Expression.Property(p, step.Column.ToString());
             var constant = Expression.Constant(step.Value, typeof(int));
             Expression body = step.Op switch
@@ -493,10 +506,11 @@ namespace nORM.Tests.Fuzzing
             var f = new SortedSet<string>(StringComparer.Ordinal);
             var kinds = ir.Steps.Select(s => s.Kind).ToHashSet();
             if (kinds.Contains(IrStepKind.Where)) f.Add("where");
+            if (kinds.Contains(IrStepKind.WhereName)) f.Add("where-name");
             if (kinds.Contains(IrStepKind.OrderBy)) f.Add("orderby");
             if (kinds.Contains(IrStepKind.Distinct)) f.Add("distinct");
             if (kinds.Contains(IrStepKind.Skip) || kinds.Contains(IrStepKind.Take)) f.Add("paging");
-            if (ir.Steps.Count(s => s.Kind == IrStepKind.Where) >= 2) f.Add("where-multi");
+            if (ir.Steps.Count(IsPredicateStep) >= 2) f.Add("where-multi");
             if (kinds.Contains(IrStepKind.OrderBy) && (kinds.Contains(IrStepKind.Skip) || kinds.Contains(IrStepKind.Take))) f.Add("orderby+paging");
             if (kinds.Contains(IrStepKind.Where) && kinds.Contains(IrStepKind.OrderBy)) f.Add("where+orderby");
             if (ir.SetOp is { } setOp)
