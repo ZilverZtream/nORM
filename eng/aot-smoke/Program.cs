@@ -108,6 +108,14 @@ public sealed class Customer
     public Address Home { get; set; } = new();
 }
 
+// Projection target (not an entity). A member-init projection builds writable columns via
+// new Column(PropertyInfo) -> Column.CreateGetterDelegate/CreateSetterDelegate.
+public sealed class S1Dto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -259,6 +267,16 @@ public static class Program
             Check("S10_owned_type", ok, r.Count == 1 ? $"City={r[0].Home?.City} Zip={r[0].Home?.Zip}" : "n=" + r.Count);
         }
         catch (Exception e) { Check("S10_owned_type", false, e.GetType().Name + ": " + e.Message); }
+
+        // Member-init DTO projection. Builds writable projection columns via new Column(PropertyInfo),
+        // whose getter/setter delegates must not use Reflection.Emit to run under trimming.
+        try
+        {
+            var r = await ctx.Query<S1>().Where(x => x.Id >= 1)
+                .Select(x => new S1Dto { Id = x.Id, Name = x.Name }).ToListAsync();
+            Check("S11_projection_dto", r.Count >= 2 && r.TrueForAll(d => d.Name.Length > 0), "count=" + r.Count);
+        }
+        catch (Exception e) { Check("S11_projection_dto", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;

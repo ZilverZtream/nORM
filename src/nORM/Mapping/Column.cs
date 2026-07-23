@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
-using System.Reflection.Emit;
 using nORM.Configuration;
 using nORM.Providers;
 using nORM.Internal;
@@ -131,7 +131,7 @@ namespace nORM.Mapping
         /// <param name="getterOverride">Custom getter delegate.</param>
         /// <param name="setterOverride">Custom setter delegate.</param>
         /// <param name="setterMethodOverride">Custom setter method.</param>
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Column construction builds property accessor delegates with DynamicMethod when no overrides are supplied; not NativeAOT-compatible.")]
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Column construction compiles property accessor delegates (Expression.Compile) when no overrides are supplied; runs via the interpreter under NativeAOT.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Column construction reflects over the mapped property; trimming may remove the required members.")]
         public Column(PropertyInfo pi, DatabaseProvider p, IEntityTypeConfiguration? fluentConfig, string? prefix = null,
             Func<object, object?>? getterOverride = null, Action<object, object?>? setterOverride = null,
@@ -293,17 +293,30 @@ namespace nORM.Mapping
         /// </summary>
         /// <param name="property">The property for which to generate a getter.</param>
         /// <returns>A delegate that returns the property's value for a supplied object.</returns>
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("CreateGetterDelegate uses DynamicMethod which is not supported under NativeAOT.")]
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("CreateGetterDelegate compiles an expression tree (Expression.Compile); runs via the interpreter under NativeAOT.")]
         public static Func<object, object?> CreateGetterDelegate(PropertyInfo property)
         {
-            var dm = new DynamicMethod("get_" + property.Name, typeof(object), new[] { typeof(object) }, property.DeclaringType!.Module, true);
-            var il = dm.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, property.DeclaringType!);
-            il.Emit(OpCodes.Callvirt, property.GetGetMethod()!);
-            if (property.PropertyType.IsValueType) il.Emit(OpCodes.Box, property.PropertyType);
-            il.Emit(OpCodes.Ret);
-            return (Func<object, object?>)dm.CreateDelegate(typeof(Func<object, object?>));
+            // Prefer a source-generated getter when one exists (trim/NativeAOT-safe, no runtime codegen).
+            if (property.DeclaringType is Type declaringType &&
+                nORM.SourceGeneration.GeneratedAccessors.TryGetGetter(declaringType, property.Name, out var generatedGetter))
+                return generatedGetter;
+
+            // Expression.Compile (not DynamicMethod/Reflection.Emit): under NativeAOT Reflection.Emit throws
+            // PlatformNotSupportedException, whereas Expression.Compile transparently interprets. Reached via
+            // new Column(PropertyInfo) — e.g. member-init DTO projections — which must run under trimming.
+            // A member-init projection target's getter is never invoked, and the trimmer removes it (only the
+            // setter is referenced), so a missing getter yields a fail-if-invoked delegate instead of throwing
+            // "Expression must be readable" while building the tree.
+            if (property.GetGetMethod(nonPublic: true) is null)
+            {
+                var member = $"{property.DeclaringType?.Name}.{property.Name}";
+                return _ => throw new InvalidOperationException($"Property '{member}' has no readable getter.");
+            }
+            var instanceParam = Expression.Parameter(typeof(object), "instance");
+            var castInstance = Expression.Convert(instanceParam, property.DeclaringType!);
+            var getProperty = Expression.Property(castInstance, property);
+            var convertResult = Expression.Convert(getProperty, typeof(object));
+            return Expression.Lambda<Func<object, object?>>(convertResult, instanceParam).Compile();
         }
 
         /// <summary>
@@ -315,21 +328,27 @@ namespace nORM.Mapping
         /// <returns>
         /// An <see cref="Action{T1,T2}"/> that assigns a value to the provided object's property.
         /// </returns>
-        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("CreateSetterDelegate uses DynamicMethod which is not supported under NativeAOT.")]
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("CreateSetterDelegate compiles an expression tree (Expression.Compile); runs via the interpreter under NativeAOT.")]
         private static Action<object, object?> CreateSetterDelegate(PropertyInfo property)
         {
-            var dm = new DynamicMethod("set_" + property.Name, null, new[] { typeof(object), typeof(object) }, property.DeclaringType!.Module, true);
-            var il = dm.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, property.DeclaringType!);
-            il.Emit(OpCodes.Ldarg_1);
-            if (property.PropertyType.IsValueType)
-                il.Emit(OpCodes.Unbox_Any, property.PropertyType);
-            else
-                il.Emit(OpCodes.Castclass, property.PropertyType);
-            il.Emit(OpCodes.Callvirt, property.GetSetMethod()!);
-            il.Emit(OpCodes.Ret);
-            return (Action<object, object?>)dm.CreateDelegate(typeof(Action<object, object?>));
+            // Prefer a source-generated setter when one exists (trim/NativeAOT-safe, no runtime codegen).
+            if (property.DeclaringType is Type declaringType &&
+                nORM.SourceGeneration.GeneratedAccessors.TryGetSetter(declaringType, property.Name, out var generatedSetter))
+                return generatedSetter;
+
+            // Expression.Compile (not DynamicMethod/Reflection.Emit): AOT-safe (interprets) where Reflection.Emit throws.
+            var setMethod = property.GetSetMethod(nonPublic: true);
+            if (setMethod is null)
+            {
+                var member = $"{property.DeclaringType?.Name}.{property.Name}";
+                return (_, __) => throw new InvalidOperationException($"Property '{member}' has no accessible setter.");
+            }
+            var instanceParam = Expression.Parameter(typeof(object), "instance");
+            var valueParam = Expression.Parameter(typeof(object), "value");
+            var castInstance = Expression.Convert(instanceParam, property.DeclaringType!);
+            var castValue = Expression.Convert(valueParam, property.PropertyType);
+            var setProperty = Expression.Call(castInstance, setMethod, castValue);
+            return Expression.Lambda<Action<object, object?>>(setProperty, instanceParam, valueParam).Compile();
         }
     }
 }
