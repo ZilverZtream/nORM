@@ -993,6 +993,18 @@ namespace nORM.Query
 
             var methodName = node.Method.Name;
             var source = node.Arguments[0];
+            // A DefaultIfEmpty before a value aggregate supplies the empty-set result. Peel it and remember
+            // the fallback so the emitted subquery is wrapped in COALESCE(agg, fallback) below; the raw
+            // aggregate over an empty correlated set is NULL, which COALESCE turns into that fallback.
+            Expression? defaultIfEmptyFallback = null;
+            var hasDefaultIfEmpty = false;
+            if (methodName is nameof(Queryable.Sum) or nameof(Queryable.Min)
+                or nameof(Queryable.Max) or nameof(Queryable.Average)
+                && QueryTranslator.TryPeelDefaultIfEmpty(source, out var deInner, out defaultIfEmptyFallback))
+            {
+                source = deInner;
+                hasDefaultIfEmpty = true;
+            }
             LambdaExpression? lambdaArg = null;
             if (node.Arguments.Count > 1)
             {
@@ -1155,6 +1167,18 @@ namespace nORM.Query
                 if (aggName == "AVG")
                     head = _provider.AverageAggregateOperand(head, operandType);
                 scalarAggCall = $"{aggName}({(distinct ? "DISTINCT " : string.Empty)}{head})";
+            }
+
+            if (hasDefaultIfEmpty)
+            {
+                if (!QueryTranslator.TryRenderDefaultIfEmptyFallbackSql(defaultIfEmptyFallback, operandType, out var fallbackSql))
+                    return false; // non-constant / unsupported fallback — let it client-evaluate
+                if (fallbackSql != null)
+                {
+                    sb.Append("COALESCE((SELECT ").Append(scalarAggCall).Append(tail).Append("), ").Append(fallbackSql).Append(')');
+                    return true;
+                }
+                // fallbackSql == null: the type's default is NULL, so the raw aggregate already yields it.
             }
 
             sb.Append("(SELECT ").Append(scalarAggCall).Append(tail).Append(')');

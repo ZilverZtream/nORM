@@ -25,7 +25,64 @@ namespace nORM.Query
                 or nameof(Queryable.Sum) or nameof(Queryable.Min) or nameof(Queryable.Max)
                 or nameof(Queryable.Average)))
                 return false;
-            return HasQueryRootedSource(node.Arguments.Count > 0 ? node.Arguments[0] : null);
+            var src = node.Arguments.Count > 0 ? node.Arguments[0] : null;
+            // A DefaultIfEmpty before a VALUE aggregate (Sum/Min/Max/Average) supplies the empty-set
+            // result, which lowers to COALESCE(agg, fallback); peel it so the query-rooted source is
+            // still recognized. Count is excluded on purpose: DefaultIfEmpty makes an empty set count 1,
+            // not 0, so a Count over it has no COALESCE form and stays client-evaluated.
+            if (node.Method.Name is nameof(Queryable.Sum) or nameof(Queryable.Min)
+                or nameof(Queryable.Max) or nameof(Queryable.Average)
+                && TryPeelDefaultIfEmpty(src, out var innerAgg, out _))
+                src = innerAgg;
+            return HasQueryRootedSource(src);
+        }
+
+        /// <summary>
+        /// Peels a <c>DefaultIfEmpty()</c> / <c>DefaultIfEmpty(fallback)</c> wrapper off a subquery source,
+        /// returning the inner source and the fallback argument (null for the no-argument overload, which
+        /// means <c>default(T)</c>). Recognizes both the Queryable and Enumerable forms.
+        /// </summary>
+        internal static bool TryPeelDefaultIfEmpty(Expression? src, out Expression inner, out Expression? fallback)
+        {
+            inner = null!;
+            fallback = null;
+            if (src is MethodCallExpression { Method.Name: "DefaultIfEmpty" } mce
+                && (mce.Method.DeclaringType == typeof(Queryable) || mce.Method.DeclaringType == typeof(Enumerable))
+                && mce.Arguments.Count >= 1)
+            {
+                inner = mce.Arguments[0];
+                fallback = mce.Arguments.Count > 1 ? mce.Arguments[1] : null;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Renders the SQL literal for a DefaultIfEmpty fallback wrapping a value aggregate. Returns false
+        /// when the fallback is not a translatable numeric constant (caller then falls back to client
+        /// evaluation or fail-closed). A true result with a null <paramref name="fallbackSql"/> means the
+        /// fallback is the type's NULL default, so the raw aggregate already yields it (no COALESCE needed).
+        /// </summary>
+        internal static bool TryRenderDefaultIfEmptyFallbackSql(Expression? fallback, Type operandType, out string? fallbackSql)
+        {
+            fallbackSql = null;
+            var underlying = Nullable.GetUnderlyingType(operandType) ?? operandType;
+            var isNumeric = underlying == typeof(int) || underlying == typeof(long) || underlying == typeof(short)
+                || underlying == typeof(byte) || underlying == typeof(double) || underlying == typeof(float)
+                || underlying == typeof(decimal);
+            if (fallback == null)
+            {
+                // No-argument DefaultIfEmpty() uses default(T): 0 for a non-nullable numeric, NULL otherwise.
+                if (isNumeric && Nullable.GetUnderlyingType(operandType) == null)
+                    fallbackSql = "0";
+                return true;
+            }
+            if (TryGetConstantValue(fallback, out var val) && val != null && isNumeric)
+            {
+                fallbackSql = Convert.ToString(val, System.Globalization.CultureInfo.InvariantCulture);
+                return fallbackSql != null;
+            }
+            return false;
         }
 
         /// <summary>

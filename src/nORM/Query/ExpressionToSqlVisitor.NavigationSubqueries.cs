@@ -518,6 +518,20 @@ namespace nORM.Query
         /// </summary>
         private void BuildScalarAggregateSubquery(Expression source, LambdaExpression? selector, string aggregateName)
         {
+            // A DefaultIfEmpty before a value aggregate supplies the empty-set result; peel it and wrap the
+            // emitted aggregate in COALESCE(agg, fallback) below, mirroring the projection path. Only the
+            // selector-less form (DefaultIfEmpty over already-projected scalars) is handled.
+            Expression? defaultIfEmptyFallback = null;
+            var hasDefaultIfEmpty = false;
+            if (selector == null
+                && aggregateName is nameof(Queryable.Sum) or nameof(Queryable.Min)
+                    or nameof(Queryable.Max) or nameof(Queryable.Average)
+                && QueryTranslator.TryPeelDefaultIfEmpty(source, out var deInner, out defaultIfEmptyFallback))
+            {
+                source = deInner;
+                hasDefaultIfEmpty = true;
+            }
+
             ThrowIfUnsupportedScalarAggregateSource(source, aggregateName);
             ReserveQuerySourceRootClosureSlot(source);
             var sqlAgg = aggregateName switch
@@ -556,10 +570,21 @@ namespace nORM.Query
             if (sqlAgg == "AVG")
                 head = _provider.AverageAggregateOperand(head, operandType);
 
+            string? defaultIfEmptyFallbackSql = null;
+            if (hasDefaultIfEmpty
+                && !QueryTranslator.TryRenderDefaultIfEmptyFallbackSql(defaultIfEmptyFallback, operandType, out defaultIfEmptyFallbackSql))
+                throw new NormUnsupportedFeatureException(
+                    $"{aggregateName}() with a non-constant DefaultIfEmpty fallback over a correlated subquery is not " +
+                    "supported; use a constant fallback or restructure the query.");
+
+            if (defaultIfEmptyFallbackSql != null)
+                _sql.Append("COALESCE(");
             _sql.Append("(SELECT ").Append(sqlAgg).Append('(');
             if (distinct)
                 _sql.Append("DISTINCT ");
             _sql.Append(head).Append(')').Append(tail).Append(')');
+            if (defaultIfEmptyFallbackSql != null)
+                _sql.Append(", ").Append(defaultIfEmptyFallbackSql).Append(')');
         }
 
         /// <summary>

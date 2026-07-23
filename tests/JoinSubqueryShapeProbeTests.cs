@@ -191,4 +191,74 @@ public class JoinSubqueryShapeProbeTests
             .Select(x => (x.Name, x.Top)).ToList();
         Assert.Equal(oracle, norm);
     }
+
+    // ── DefaultIfEmpty over a correlated value aggregate (empty dept 3 exercises the fallback) ──
+
+    [Fact]
+    public void Correlated_max_with_default_if_empty_const()
+    {
+        using var ctx = NewCtx();
+        var norm = ctx.Query<JDept>().OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = ctx.Query<JEmp>().Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(-1).Max() })
+            .ToList().Select(x => (x.Id, x.V)).ToList();
+        var oracle = Depts.OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = Emps.Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(-1).Max() })
+            .Select(x => (x.Id, x.V)).ToList();
+        Assert.Equal(oracle, norm);
+    }
+
+    [Fact]
+    public void Correlated_min_with_default_if_empty_const()
+    {
+        using var ctx = NewCtx();
+        var norm = ctx.Query<JDept>().OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = ctx.Query<JEmp>().Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(9999).Min() })
+            .ToList().Select(x => (x.Id, x.V)).ToList();
+        var oracle = Depts.OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = Emps.Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(9999).Min() })
+            .Select(x => (x.Id, x.V)).ToList();
+        Assert.Equal(oracle, norm);
+    }
+
+    [Fact]
+    public void Correlated_sum_with_default_if_empty_const()
+    {
+        using var ctx = NewCtx();
+        // DefaultIfEmpty(777) makes an empty dept's sum 777 rather than 0 — distinguishes the fallback from
+        // the plain empty-Sum-is-0 behavior.
+        var norm = ctx.Query<JDept>().OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = ctx.Query<JEmp>().Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(777).Sum() })
+            .ToList().Select(x => (x.Id, x.V)).ToList();
+        var oracle = Depts.OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = Emps.Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(777).Sum() })
+            .Select(x => (x.Id, x.V)).ToList();
+        Assert.Equal(oracle, norm);
+    }
+
+    [Fact]
+    public void Correlated_max_with_default_if_empty_no_arg()
+    {
+        using var ctx = NewCtx();
+        // No-argument DefaultIfEmpty() uses default(int) = 0 for an empty dept.
+        var norm = ctx.Query<JDept>().OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = ctx.Query<JEmp>().Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty().Max() })
+            .ToList().Select(x => (x.Id, x.V)).ToList();
+        var oracle = Depts.OrderBy(d => d.Id)
+            .Select(d => new { d.Id, V = Emps.Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty().Max() })
+            .Select(x => (x.Id, x.V)).ToList();
+        Assert.Equal(oracle, norm);
+    }
+
+    [Fact]
+    public void Correlated_max_default_if_empty_in_predicate()
+    {
+        using var ctx = NewCtx();
+        var norm = ctx.Query<JDept>()
+            .Where(d => ctx.Query<JEmp>().Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(0).Max() >= 150)
+            .OrderBy(d => d.Id).Select(d => d.Name).ToList();
+        var oracle = Depts
+            .Where(d => Emps.Where(e => e.DeptId == d.Id).Select(e => e.Salary).DefaultIfEmpty(0).Max() >= 150)
+            .OrderBy(d => d.Id).Select(d => d.Name).ToList();
+        Assert.Equal(oracle, norm);
+    }
 }
