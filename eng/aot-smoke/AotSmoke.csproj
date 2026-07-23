@@ -2,14 +2,18 @@
   <!--
     NativeAOT smoke consumer. Uses ONLY the source-generated path: [GenerateMaterializer] entities +
     [CompileTimeQuery] methods. Publishes to a native binary and runs a scenario matrix (reads, params,
-    rich types, direct + tracked writes); exit code == failing-scenario count. Run via eng/aot-smoke.ps1.
+    rich types, direct + tracked writes, attribute-based mapping); exit code == failing-scenario count.
+    Run via eng/aot-smoke.ps1.
 
-    The AOT-consumer recipe this project demonstrates:
-      - PublishAot=true
-      - TrimmerRootAssembly for the entity assembly, so the trimmer preserves the property metadata the
-        write path reflects over (without this, write-path getters return default and writes send NULLs).
-      - NoWarn for the two DbContext-construction boundary diagnostics (IL2026/IL3050): construction is
-        annotated dynamic, but the source-gen read/write path works under AOT when metadata is preserved.
+    ZERO CEREMONY: there is deliberately NO <TrimmerRootAssembly>, no DAM annotations, and no per-property
+    preservation here. The nORM source generator emits, per [GenerateMaterializer] entity, a
+    [DynamicDependency(PublicProperties, typeof(TEntity))] on its module initializer, so the trimmer
+    preserves exactly the property/attribute metadata the write mapping reflects over. Reads AND writes
+    (including [Key]/[Column]-driven mapping) run correct on a native binary with no consumer ceremony.
+
+    The only consumer step is NoWarn for the two DbContext-construction boundary diagnostics
+    (IL2026/IL3050): the DbContext constructor is annotated dynamic, and suppressing that at the call site
+    is the standard acknowledgment for consuming any annotated API under AOT.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -25,7 +29,5 @@
     <ProjectReference Include="..\..\src\nORM.SourceGenerators\nORM.SourceGenerators.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <!-- Preserve entity property metadata under trimming (the current AOT-consumer requirement). -->
-    <TrimmerRootAssembly Include="AotSmoke" />
   </ItemGroup>
 </Project>

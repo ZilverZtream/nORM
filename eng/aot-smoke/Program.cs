@@ -2,11 +2,13 @@
 //
 // Every entity opts into a source-generated materializer ([GenerateMaterializer]) and every read goes
 // through a [CompileTimeQuery] method, so the read path uses generated delegates (no runtime IL emit).
-// The write path (Insert/Update) still reflects over property metadata, which the trimmer would remove
-// without the <TrimmerRootAssembly> in AotSmoke.csproj — see that file for the AOT-consumer recipe.
+// The write path reflects over property/attribute metadata to build its mapping; the generator preserves
+// exactly that metadata via an emitted [DynamicDependency], so it survives trimming with no consumer
+// rooting (see AotSmoke.csproj for the zero-ceremony contract).
 //
 // Prints PASS/FAIL per scenario and returns the failing count as the process exit code, so eng/aot-smoke.ps1
-// can assert exit 0. Covers reads (simple, parameterized, rich types) and both write models (direct + tracked).
+// can assert exit 0. Covers reads (simple, parameterized, rich types), both write models (direct + tracked),
+// and attribute-based mapping (non-Id [Key] + [Column] rename).
 
 using System;
 using System.Collections.Generic;
@@ -35,6 +37,17 @@ public sealed class S3
     public Guid Gid { get; set; }
 }
 
+// Attribute-dependent entity: a non-"Id" [Key] and a [Column] rename. Under trimming the write path
+// reflects over these attributes to build the mapping (key for the UPDATE WHERE, renamed column name),
+// so this proves the generator preserves attribute metadata — not just properties by name convention.
+[Table("S6")]
+[GenerateMaterializer]
+public sealed class S6
+{
+    [Key] public int Code { get; set; }
+    [Column("full_name")] public string FullName { get; set; } = "";
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -45,6 +58,9 @@ public static partial class Q
 
     [CompileTimeQuery("SELECT Id, Name, Big, Amount, Flag, Moment, Gid FROM S3")]
     public static partial Task<List<S3>> AllS3(DbContext ctx);
+
+    [CompileTimeQuery("SELECT Code, full_name FROM S6 WHERE Code = @code")]
+    public static partial Task<List<S6>> S6ByCode(DbContext ctx, int code);
 }
 
 public static class Program
@@ -67,7 +83,8 @@ public static class Program
                 "CREATE TABLE S1 (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);" +
                 "INSERT INTO S1 VALUES (1,'ann'),(2,'bob');" +
                 "CREATE TABLE S3 (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Big INTEGER NOT NULL, Amount REAL NOT NULL, Flag INTEGER NOT NULL, Moment TEXT NOT NULL, Gid TEXT NOT NULL);" +
-                "INSERT INTO S3 VALUES (1,'x',9007199254740993,3.5,1,'2023-06-15 12:30:45','" + g + "');";
+                "INSERT INTO S3 VALUES (1,'x',9007199254740993,3.5,1,'2023-06-15 12:30:45','" + g + "');" +
+                "CREATE TABLE S6 (Code INTEGER PRIMARY KEY, full_name TEXT NOT NULL);";
             cmd.ExecuteNonQuery();
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -111,6 +128,20 @@ public static class Program
             Check("S5_tracked_save", r.Count == 1 && r[0].Name == "bob-updated", r.Count == 1 ? r[0].Name : "count=" + r.Count);
         }
         catch (Exception e) { Check("S5_tracked_save", false, e.GetType().Name + ": " + e.Message); }
+
+        // Write: attribute-dependent mapping (non-Id [Key] + [Column] rename). Proves the write mapping's
+        // reflection over [Key]/[Column] survives trimming — insert uses the renamed column, update keys off Code.
+        try
+        {
+            await ctx.InsertAsync(new S6 { Code = 5, FullName = "alpha" });
+            var u = new S6 { Code = 5, FullName = "beta" };
+            ctx.Update(u);
+            await ctx.SaveChangesAsync();
+            ctx.ChangeTracker.Clear();
+            var r = await Q.S6ByCode(ctx, 5);
+            Check("S6_attribute_mapping", r.Count == 1 && r[0].FullName == "beta", r.Count == 1 ? r[0].FullName : "count=" + r.Count);
+        }
+        catch (Exception e) { Check("S6_attribute_mapping", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;

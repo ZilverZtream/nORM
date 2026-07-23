@@ -272,6 +272,16 @@ namespace nORM.SourceGenerators
             if (ns != null) sb.AppendLine($"namespace {ns};");
             sb.AppendLine($"internal static class {generatedClassName}");
             sb.AppendLine("{");
+            // Preserve this entity's (and its owned types') public property metadata so the reflection-based
+            // write mapping (ColumnMappingCache.GetCachedTypeInfo -> GetProperties/attributes/GetSetMethod)
+            // survives trimming / NativeAOT with no consumer <TrimmerRootAssembly>. DynamicDependency is the
+            // sanctioned way to declare "this code reflects over these members" and keeps exactly these types.
+            var preserveTypes = new List<string> { typeName };
+            preserveTypes.AddRange(props.Where(p => IsOwnedType(p.Type))
+                .Select(p => p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                .Distinct());
+            foreach (var preserved in preserveTypes)
+                sb.AppendLine($"    [global::System.Diagnostics.CodeAnalysis.DynamicDependency(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties, typeof({preserved}))]");
             sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
             sb.AppendLine("    {");

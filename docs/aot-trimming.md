@@ -1,10 +1,11 @@
 # AOT and Trimming Policy
 
-nORM v1 targets normal JIT-based .NET 8 applications first. Its **source-generated
-path runs correctly under NativeAOT when entity metadata is preserved** (see
-[NativeAOT via the source-generated path](#nativeaot-via-the-source-generated-path)),
-but the default reflection-based path is not AOT- or trim-safe, so nORM does not
-market itself as a drop-in NativeAOT ORM.
+nORM v1 targets normal JIT-based .NET 8 applications first, but its
+**source-generated path runs correct under NativeAOT with zero consumer ceremony** —
+reads *and* writes, including `[Key]`/`[Column]`-driven mapping (see
+[NativeAOT via the source-generated path](#nativeaot-via-the-source-generated-path)).
+The default reflection path (dynamic table queries, runtime scaffolding) stays
+AOT/trim-unsafe, so nORM does not market itself as a wholesale drop-in NativeAOT ORM.
 
 The runtime uses features that are intentionally dynamic:
 
@@ -22,36 +23,45 @@ The runtime uses features that are intentionally dynamic:
 - `[CompileTimeQuery]` generated query entry points for supported query shapes.
 - Interpreted expression fallback when runtime expression compilation is not
   available for selected internal delegate paths.
-- **NativeAOT publish of the source-generated path, with entity metadata
-  preserved** — verified by `eng/aot-smoke` (see below).
+- **NativeAOT publish of the source-generated path — reads and writes, zero
+  ceremony** — verified by `eng/aot-smoke` (see below).
 
 ## NativeAOT via the source-generated path
 
-The blocker for NativeAOT is not that nORM's code is AOT-hostile — under NativeAOT
-`Expression.Compile()` transparently interprets, so the query, materializer, and
-write delegates all execute. The blocker is *trimming*: the write path reads entity
-values through reflection-built property getters, and the trimmer removes the
-property metadata those getters depend on unless the consumer preserves it. When it
-is removed, getters return defaults and writes silently send wrong values — which is
-why an un-preserved trimmed publish stays unsupported (see the negative test below).
+nORM's code is not AOT-hostile: under NativeAOT `Expression.Compile()` transparently
+interprets, so the query, materializer, and write delegates all execute. The only
+NativeAOT hazard is *trimming*: the write mapping reflects over entity properties and
+attributes (`GetProperties`, `[Key]`/`[Column]`/`[DatabaseGenerated]`,
+`GetSetMethod`), and the trimmer would remove that metadata — leaving an empty column
+set and silently wrong writes.
 
-When the consumer both (a) uses the source-generated path and (b) preserves entity
-metadata, a native publish reads *and writes* correctly. The consumer recipe:
+The source generator closes that automatically. For every `[GenerateMaterializer]`
+entity it emits, alongside the materializer registration, a
+`[DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(TEntity))]`
+on its module initializer (and one per owned type). `DynamicDependency` is the
+sanctioned way to declare a reflection dependency the trimmer cannot see, so the
+trimmer preserves exactly the property/attribute metadata the mapping needs. It also
+source-generates the property getters/setters (`GeneratedAccessors`) so the hot
+read/write delegates are compile-time rather than interpreted. **No
+`<TrimmerRootAssembly>`, no `DynamicallyAccessedMembers` annotations, and no
+per-property preservation are required of the consumer.**
+
+The consumer contract is just:
 
 ```xml
 <PropertyGroup>
   <PublishAot>true</PublishAot>
+  <!-- The DbContext constructor is annotated dynamic; suppress the two boundary
+       diagnostics as you would for any annotated API consumed under AOT. -->
+  <NoWarn>$(NoWarn);IL2026;IL3050</NoWarn>
 </PropertyGroup>
-<ItemGroup>
-  <!-- Preserve the entity assembly's property metadata for the write path. -->
-  <TrimmerRootAssembly Include="MyApp" />
-</ItemGroup>
 ```
 
-`eng/aot-smoke` is a committed proof of this: a minimal consumer that publishes to a
-native binary and runs a scenario matrix — simple and parameterized reads, rich-type
-materialization (`long`/`double`/`bool`/`DateTime`/`Guid`), a direct `InsertAsync`,
-and a tracked `Update` + `SaveChangesAsync`. Run it with:
+`eng/aot-smoke` is a committed proof: a minimal consumer with **no rooting** that
+publishes to a native binary and runs a scenario matrix — simple and parameterized
+reads, rich-type materialization (`long`/`double`/`bool`/`DateTime`/`Guid`), a direct
+`InsertAsync`, a tracked `Update` + `SaveChangesAsync`, and a write whose mapping
+depends on a non-`Id` `[Key]` and a `[Column]` rename. Run it with:
 
 ```
 pwsh eng/aot-smoke.ps1            # or: powershell -File eng/aot-smoke.ps1
@@ -59,22 +69,17 @@ pwsh eng/aot-smoke.ps1            # or: powershell -File eng/aot-smoke.ps1
 
 It is opt-in rather than part of the normal test run because a native publish needs
 the platform AOT toolchain and takes minutes; run it before releases or from a
-dedicated CI job. All five scenarios pass on a ~13 MB self-contained native binary.
-
-The remaining requirement — the consumer's `<TrimmerRootAssembly>` line — is the one
-piece of ceremony left. Removing it (source-generated write accessors so the write
-path never reflects over entity properties) is the tracked path to zero-ceremony
-NativeAOT support.
+dedicated CI job. All scenarios pass on a ~13 MB self-contained native binary.
 
 ## Not supported for v1
 
 The following remain explicitly unsupported for v1 and fail closed rather than
 producing wrong results:
 
-- NativeAOT/trimmed publish of the **reflection path** (dynamic table queries,
-  runtime scaffolding, un-annotated projections).
-- Trimmed publish **without** entity-metadata preservation — silently unsafe for
-  writes, so it is not supported and fails closed rather than shipping wrong data.
+- NativeAOT/trimmed publish of the **reflection path** — entities that do not use
+  `[GenerateMaterializer]`, dynamic table queries, runtime scaffolding, un-annotated
+  projections. Only the source-generated path carries the `[DynamicDependency]`
+  preservation above; a plain reflection entity under trimming is not supported.
 - `DbContext.Query(string)` under NativeAOT or dynamic-code-disabled runtimes.
 - Runtime scaffolding/entity generation under NativeAOT or dynamic-code-disabled
   runtimes.
