@@ -135,6 +135,15 @@ public sealed class Tag
     public string Label { get; set; } = "";
 }
 
+// JSON path query (Json.Value translates to a provider json_extract in SQL — SQL-side, no serialization).
+[Table("JDoc")]
+[GenerateMaterializer]
+public sealed class JDoc
+{
+    [Key] public int Id { get; set; }
+    public string Data { get; set; } = "";
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -184,7 +193,9 @@ public static class Program
                 "CREATE TABLE Tag (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL);" +
                 "INSERT INTO Tag VALUES (1,'t1'),(2,'t2');" +
                 "CREATE TABLE ArticleTag (ArticleId INTEGER NOT NULL, TagId INTEGER NOT NULL);" +
-                "INSERT INTO ArticleTag VALUES (1,1),(1,2);";
+                "INSERT INTO ArticleTag VALUES (1,1),(1,2);" +
+                "CREATE TABLE JDoc (Id INTEGER PRIMARY KEY, Data TEXT NOT NULL);" +
+                "INSERT INTO JDoc VALUES (1,'{\"city\":\"NYC\"}'),(2,'{\"city\":\"LA\"}');";
             cmd.ExecuteNonQuery();
         }
         var opts = new DbContextOptions
@@ -330,6 +341,14 @@ public static class Program
                 r.Count == 1 ? "tags=" + r[0].Tags.Count : "articles=" + r.Count);
         }
         catch (Exception e) { Check("S13_many_to_many", false, e.GetType().Name + ": " + e.Message); }
+
+        // JSON path predicate (Json.Value -> provider json_extract). SQL-side translation + scalar compare.
+        try
+        {
+            var r = await ctx.Query<JDoc>().Where(x => Json.Value<string>(x.Data, "$.city") == "NYC").ToListAsync();
+            Check("S14_json_query", r.Count == 1 && r[0].Id == 1, "count=" + r.Count);
+        }
+        catch (Exception e) { Check("S14_json_query", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;
