@@ -539,6 +539,28 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// True when the source spine contains a set operation (Union/Concat/Intersect/Except) or a Distinct.
+        /// A GROUP BY cannot sit directly on top of a compound or DISTINCT SELECT, so such a source must be
+        /// wrapped as a derived table (<c>FROM (&lt;compound&gt;) AS alias</c>) before the group key can resolve.
+        /// Walks the source chain only (arg 0), never lambda arguments, so a set-op buried inside a predicate
+        /// subquery does not falsely trigger the wrap. Catches wrapper-over-set-op shapes such as
+        /// <c>Concat(...).Distinct().GroupBy(...)</c> and <c>Concat(...).Where(...).GroupBy(...)</c> that a
+        /// bare immediate-source check misses.
+        /// </summary>
+        internal static bool SourceHasSetOpOrDistinct(Expression source)
+        {
+            var current = source;
+            while (current is MethodCallExpression mce)
+            {
+                if (mce.Method.Name is "Union" or "Concat" or "Intersect" or "Except" or nameof(Queryable.Distinct))
+                    return true;
+                if (mce.Arguments.Count == 0) break;
+                current = mce.Arguments[0];
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Strips a trailing ORDER BY so the SQL can embed in a derived table —
         /// unless a paging clause follows it. Every provider emits its paging
         /// tokens (LIMIT/OFFSET/FETCH) after the ORDER BY they depend on, so

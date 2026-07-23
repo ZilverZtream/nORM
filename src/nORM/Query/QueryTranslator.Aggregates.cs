@@ -91,12 +91,13 @@ namespace nORM.Query
                 && !SourceHasClientTailReshape(sourceQuery)
                 && !SourceHasGroupJoinResultTail(sourceQuery)
                 && !SourceHasRawGroupByResultTail(sourceQuery);
-            // GroupBy over a set-op (Union/Concat/Intersect/Except) has the same shape problem as a windowed
-            // source: the group key `g => g.A` cannot resolve against a bare compound SELECT. Wrap the compound as
-            // a derived table (`FROM (<compound>) AS alias`) through the same sub-context path so `GROUP BY
-            // alias.A` and the aggregate SELECT are valid, instead of the member failing to resolve.
-            bool sourceIsSetOp = sourceQuery is MethodCallExpression setOpSrc
-                && setOpSrc.Method.Name is "Union" or "Concat" or "Intersect" or "Except";
+            // GroupBy over a set-op (Union/Concat/Intersect/Except) or a Distinct has the same shape problem as a
+            // windowed source: the group key `g => g.A` cannot resolve against a bare compound or DISTINCT SELECT.
+            // Wrap it as a derived table (`FROM (<compound>) AS alias`) through the same sub-context path so
+            // `GROUP BY alias.A` and the aggregate SELECT are valid, instead of the member failing to resolve. The
+            // spine walk also catches wrapper-over-set-op shapes (`Concat(...).Distinct()/.Where(...)` then GroupBy)
+            // that a bare immediate-source check misses.
+            bool sourceIsSetOp = SourceHasSetOpOrDistinct(sourceQuery);
             if (sourceIsWindowed || sourceIsSetOp)
             {
                 var subPlanG = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapG);
