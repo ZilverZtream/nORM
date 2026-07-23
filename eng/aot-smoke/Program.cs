@@ -49,6 +49,26 @@ public sealed class S6
     [Column("full_name")] public string FullName { get; set; } = "";
 }
 
+// One-to-many relationship: exercises Include (which reflects over navigation metadata and uses
+// MakeGenericMethod to build the related query — both AOT hazards) under trimming.
+[Table("Blog")]
+[GenerateMaterializer]
+public sealed class Blog
+{
+    [Key] public int Id { get; set; }
+    public string Title { get; set; } = "";
+    public List<Post> Posts { get; set; } = new();
+}
+
+[Table("Post")]
+[GenerateMaterializer]
+public sealed class Post
+{
+    [Key] public int Id { get; set; }
+    public int BlogId { get; set; }
+    public string Body { get; set; } = "";
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -85,7 +105,11 @@ public static class Program
                 "INSERT INTO S1 VALUES (1,'ann'),(2,'bob');" +
                 "CREATE TABLE S3 (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Big INTEGER NOT NULL, Amount REAL NOT NULL, Flag INTEGER NOT NULL, Moment TEXT NOT NULL, Gid TEXT NOT NULL);" +
                 "INSERT INTO S3 VALUES (1,'x',9007199254740993,3.5,1,'2023-06-15 12:30:45','" + g + "');" +
-                "CREATE TABLE S6 (Code INTEGER PRIMARY KEY, full_name TEXT NOT NULL);";
+                "CREATE TABLE S6 (Code INTEGER PRIMARY KEY, full_name TEXT NOT NULL);" +
+                "CREATE TABLE Blog (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);" +
+                "INSERT INTO Blog VALUES (1,'first');" +
+                "CREATE TABLE Post (Id INTEGER PRIMARY KEY, BlogId INTEGER NOT NULL, Body TEXT NOT NULL);" +
+                "INSERT INTO Post VALUES (1,1,'p1'),(2,1,'p2');";
             cmd.ExecuteNonQuery();
         }
         using var ctx = new DbContext(cn, new SqliteProvider());
@@ -154,6 +178,16 @@ public static class Program
             Check("S7_runtime_linq_query", r.Count >= 2 && r[0].Id >= r[1].Id, "count=" + r.Count);
         }
         catch (Exception e) { Check("S7_runtime_linq_query", false, e.GetType().Name + ": " + e.Message); }
+
+        // Read: Include (one-to-many). Relationship inference + the eager-load query both reflect over
+        // navigation/related-entity metadata and use MakeGenericMethod — the deepest AOT surface so far.
+        try
+        {
+            var r = await ctx.Query<Blog>().Include(b => b.Posts).ToListAsync();
+            Check("S8_include_one_to_many", r.Count == 1 && r[0].Posts.Count == 2,
+                r.Count == 1 ? "posts=" + r[0].Posts.Count : "blogs=" + r.Count);
+        }
+        catch (Exception e) { Check("S8_include_one_to_many", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;
