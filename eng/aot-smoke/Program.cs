@@ -17,7 +17,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
+using nORM.Configuration;
 using nORM.Core;
+using nORM.Mapping;
 using nORM.Providers;
 using nORM.SourceGeneration;
 
@@ -69,6 +71,24 @@ public sealed class Post
     public string Body { get; set; } = "";
 }
 
+// Value-converter entity. A configured converter deliberately skips the source-generated materializer
+// (it reads raw provider values), so the runtime query path falls back to the REFLECTION materializer.
+// That path constructs the entity and sets properties reflectively — exercising a different slice of the
+// preserved metadata than the generated scenarios do.
+[Table("S9")]
+[GenerateMaterializer]
+public sealed class S9Row
+{
+    [Key] public int Id { get; set; }
+    public bool Active { get; set; }
+}
+
+public sealed class BoolYnConverter : ValueConverter<bool, string>
+{
+    public override object? ConvertToProvider(bool value) => value ? "Y" : "N";
+    public override object? ConvertFromProvider(string value) => value == "Y";
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -109,10 +129,16 @@ public static class Program
                 "CREATE TABLE Blog (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);" +
                 "INSERT INTO Blog VALUES (1,'first');" +
                 "CREATE TABLE Post (Id INTEGER PRIMARY KEY, BlogId INTEGER NOT NULL, Body TEXT NOT NULL);" +
-                "INSERT INTO Post VALUES (1,1,'p1'),(2,1,'p2');";
+                "INSERT INTO Post VALUES (1,1,'p1'),(2,1,'p2');" +
+                "CREATE TABLE S9 (Id INTEGER PRIMARY KEY, Active TEXT NOT NULL);" +
+                "INSERT INTO S9 VALUES (1,'Y'),(2,'N');";
             cmd.ExecuteNonQuery();
         }
-        using var ctx = new DbContext(cn, new SqliteProvider());
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb => mb.Entity<S9Row>().Property(r => r.Active).HasConversion(new BoolYnConverter())
+        };
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
         // Read: simple source-gen materializer + compile-time query.
         try { var r = await Q.AllS1(ctx); Check("S1_simple_select", r.Count == 2 && r[0].Name == "ann"); }
@@ -188,6 +214,20 @@ public static class Program
                 r.Count == 1 ? "posts=" + r[0].Posts.Count : "blogs=" + r.Count);
         }
         catch (Exception e) { Check("S8_include_one_to_many", false, e.GetType().Name + ": " + e.Message); }
+
+        // Value converter (bool <-> 'Y'/'N'). The converter skips the generated materializer, forcing the
+        // REFLECTION materializer + converter application on both read and write under trimming.
+        try
+        {
+            var rows = await ctx.Query<S9Row>().OrderBy(x => x.Id).ToListAsync();
+            bool readOk = rows.Count == 2 && rows[0].Active && !rows[1].Active;   // 'Y'->true, 'N'->false
+            await ctx.InsertAsync(new S9Row { Id = 3, Active = true });           // true->'Y' on write
+            var stored = new SqliteCommand("SELECT Active FROM S9 WHERE Id = 3", cn).ExecuteScalar() as string;
+            var back = await ctx.Query<S9Row>().Where(x => x.Id == 3).ToListAsync();
+            Check("S9_value_converter", readOk && stored == "Y" && back.Count == 1 && back[0].Active,
+                $"read={readOk} stored={stored} back={(back.Count == 1 ? back[0].Active.ToString() : "n=" + back.Count)}");
+        }
+        catch (Exception e) { Check("S9_value_converter", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;
