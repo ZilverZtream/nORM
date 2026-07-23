@@ -39,7 +39,7 @@ public class NamespacePolicyContractTests
     // namespace are NOT permitted; new public types must land in a supported namespace.
     private static readonly HashSet<string> GrandfatheredInternalTypes = new(StringComparer.Ordinal)
     {
-        "nORM.Internal.ConcurrentLruCache`2",
+        // ConcurrentLruCache was internalized during API-freeze prep — no longer public.
         "nORM.Internal.ParameterOptimizer",
     };
 
