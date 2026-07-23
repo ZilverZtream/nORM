@@ -478,6 +478,17 @@ namespace nORM.Benchmarks
             _nOrmContext.ChangeTracker.Clear();
         }
 
+        // Fairness: Update_Full_Single_nORM above uses the CHANGE-TRACKED path (attach + SaveChanges),
+        // whose peer is EF Core's tracked Update — not Dapper/Raw ADO, which issue a direct, untracked
+        // UPDATE. This variant is nORM's equivalent direct path (UpdateAsync, no change tracking), the
+        // apples-to-apples peer for Dapper and Raw ADO. Both are idiomatic nORM; the pairing that matters
+        // is tracked-vs-EF and direct-vs-Dapper/ADO.
+        [Benchmark(Description = "Update Full Single nORM (Direct)")]
+        public async Task Update_Full_Single_nORM_Direct()
+        {
+            await _nOrmContext!.UpdateAsync(UpdateRow("norm-direct"));
+        }
+
         [Benchmark]
         public async Task Update_Full_Single_Dapper()
         {
