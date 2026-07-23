@@ -17,6 +17,10 @@ namespace nORM.Internal
     /// compile-time query methods to use the same parameter binding logic as
     /// runtime queries (SG1 fix).
     /// </summary>
+    // PUBLIC BY DESIGN: the source generator (nORM.SourceGenerators.MaterializerQueryGenerator) emits
+    // `nORM.Internal.ParameterOptimizer.AddOptimizedParam(...)` into the CONSUMER's assembly, which cannot
+    // see nORM internals via InternalsVisibleTo. This type is therefore part of the stable code-gen contract
+    // and must remain public. Enforced by CompileTimeQueryParameterParityTests.SG1_ParameterOptimizer_Type_Is_Public.
     public static class ParameterOptimizer
     {
         /// <summary>

@@ -7,17 +7,20 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Dedicated tests for public nORM.Internal types (ConcurrentLruCache and ParameterOptimizer)
-/// that must remain part of the stable public API surface.
+/// Behavior tests for two nORM.Internal utility types with DIFFERENT public status after the 1.0 freeze
+/// audit: <see cref="ConcurrentLruCache{TKey,TValue}"/> is a genuine implementation detail — internalized so
+/// it does not lock into the stable contract (the test project reaches it via InternalsVisibleTo);
+/// ParameterOptimizer stays PUBLIC by design because the source generator emits calls to it in consumer
+/// assemblies (see SG1_ParameterOptimizer_Type_Is_Public).
 /// </summary>
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ConcurrentLruCache<K,V> — public API coverage
+// ConcurrentLruCache<K,V> — internal behavior coverage
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
 [Xunit.Trait("Category", TestCategory.AdversarialConcurrency)]
-public class ConcurrentLruCachePublicApiTests
+public class ConcurrentLruCacheBehaviorTests
 {
     // ── GetOrAdd ──────────────────────────────────────────────────────────────
 
@@ -249,11 +252,11 @@ public class ConcurrentLruCachePublicApiTests
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ParameterOptimizer — public API coverage
+// ParameterOptimizer — internal behavior coverage
 // ══════════════════════════════════════════════════════════════════════════════
 
 [Xunit.Trait("Category", "Fast")]
-public class ParameterOptimizerPublicApiTests
+public class ParameterOptimizerBehaviorTests
 {
     private static SqliteConnection OpenMemory()
     {

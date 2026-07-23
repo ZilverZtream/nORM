@@ -663,13 +663,6 @@ M:nORM.Execution.AdaptiveTimeoutManager.GetOperationStatistics():System.Collecti
 M:nORM.Execution.AdaptiveTimeoutManager.GetTimeoutForOperation(nORM.Execution.AdaptiveTimeoutManager.OperationType,System.Int32,System.Int32,System.String):System.TimeSpan
 M:nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration.#ctor()
 M:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.#ctor()
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.#ctor(System.Int32,System.Nullable{System.TimeSpan})
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.Clear():System.Void
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.Dispose():System.Void
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.GetOrAdd(`0,System.Func{`0,`1}):`1
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.Set(`0,`1,System.Nullable{System.TimeSpan},System.Collections.Generic.IReadOnlyList{System.String}):System.Void
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.SetMaxSize(System.Int32):System.Void
-M:nORM.Internal.ConcurrentLruCache{`0,`1}.TryGet(`0,`1&):System.Boolean
 M:nORM.Internal.ParameterOptimizer.AddOptimizedParam(System.Data.Common.DbCommand,System.String,System.Object,System.Type):System.Void
 M:nORM.Internal.ParameterOptimizer.AddParam(System.Data.Common.DbCommand,System.String,System.Object):System.Void
 M:nORM.Mapping.Column.#ctor(System.Reflection.PropertyInfo,nORM.Providers.DatabaseProvider,nORM.Configuration.IEntityTypeConfiguration,System.String,System.Func{System.Object,System.Object},System.Action{System.Object,System.Object},System.Reflection.MethodInfo)
@@ -1428,11 +1421,6 @@ P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.ExecutionCount:System.
 P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.MaxExecutionTime:System.TimeSpan
 P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.SuccessRate:System.Double
 P:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics.TimeoutCount:System.Int32
-P:nORM.Internal.ConcurrentLruCache{`0,`1}.Count:System.Int32
-P:nORM.Internal.ConcurrentLruCache{`0,`1}.Evictions:System.Int64
-P:nORM.Internal.ConcurrentLruCache{`0,`1}.HitRate:System.Double
-P:nORM.Internal.ConcurrentLruCache{`0,`1}.Hits:System.Int64
-P:nORM.Internal.ConcurrentLruCache{`0,`1}.Misses:System.Int64
 P:nORM.Mapping.Column.Converter:nORM.Mapping.IValueConverter
 P:nORM.Mapping.Column.EscCol:System.String
 P:nORM.Mapping.Column.ForeignKeyPrincipalTypeName:System.String
@@ -1811,7 +1799,6 @@ T:nORM.Execution.AdaptiveTimeoutManager
 T:nORM.Execution.AdaptiveTimeoutManager.OperationType
 T:nORM.Execution.AdaptiveTimeoutManager.TimeoutConfiguration
 T:nORM.Execution.AdaptiveTimeoutManager.TimeoutStatistics
-T:nORM.Internal.ConcurrentLruCache{`0,`1}
 T:nORM.Internal.ParameterOptimizer
 T:nORM.Mapping.Column
 T:nORM.Mapping.ColumnMappingCache

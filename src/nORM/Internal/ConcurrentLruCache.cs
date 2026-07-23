@@ -11,7 +11,7 @@ namespace nORM.Internal
     /// Concurrent LRU cache with optional TTL. Expired entries are removed on access.
     /// Eviction on insert is size-based only (no TTL prune on insert) to minimize churn in hot paths.
     /// </summary>
-    public class ConcurrentLruCache<TKey, TValue> : IDisposable where TKey : notnull
+    internal class ConcurrentLruCache<TKey, TValue> : IDisposable where TKey : notnull
     {
         /// <summary>Minimum number of tail entries sampled during eviction.</summary>
         private const int MinEvictionSampleWindow = 20;
