@@ -25,6 +25,32 @@ public class QueryTranslatorRecursionTests : TestBase
         return source.Union(BuildNestedUnion(source, depth - 1));
     }
 
+    /// <summary>
+    /// Runs a translation on a thread with a large (16 MB) stack. The translator guards recursion with BOTH
+    /// a physical stack probe (RuntimeHelpers.TryEnsureSufficientExecutionStack) and the logical
+    /// MaxRecursionDepth counter. On runners with a small default thread stack (macOS xUnit worker threads),
+    /// the physical probe fires BEFORE the logical counter for the custom depth-60 cases, throwing the
+    /// generic "nested too deeply" message instead of the MaxRecursionDepth message — a platform-dependent
+    /// path that makes the depth-60 tests flaky. A large stack keeps the logical counter reachable on every
+    /// platform so these tests deterministically exercise the counter they intend to. Translation is a pure
+    /// expression→SQL transformation with no connection I/O, so running it on another thread is safe.
+    /// </summary>
+    private static T RunOnLargeStack<T>(Func<T> func)
+    {
+        T result = default!;
+        Exception? captured = null;
+        var thread = new System.Threading.Thread(() =>
+        {
+            try { result = func(); }
+            catch (Exception ex) { captured = ex; }
+        }, 16 * 1024 * 1024);
+        thread.Start();
+        thread.Join();
+        if (captured != null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(captured).Throw();
+        return result;
+    }
+
  // ─── Original regression test ─────────────────────────────────────────
 
     [Fact]
@@ -100,7 +126,7 @@ public class QueryTranslatorRecursionTests : TestBase
         var expr = query.Expression;
         var translatorType = typeof(DbContext).Assembly.GetType("nORM.Query.QueryTranslator", true)!;
         var translator = Activator.CreateInstance(translatorType, ctx)!;
-        var plan = translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr })!;
+        var plan = RunOnLargeStack(() => translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr })!);
         var sql = (string)plan.GetType().GetProperty("Sql")!.GetValue(plan)!;
         Assert.NotEmpty(sql);
     }
@@ -120,7 +146,7 @@ public class QueryTranslatorRecursionTests : TestBase
         var translator = Activator.CreateInstance(translatorType, ctx)!;
 
         var ex = Assert.Throws<TargetInvocationException>(() =>
-            translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr }));
+            RunOnLargeStack(() => translatorType.GetMethod("Translate")!.Invoke(translator, new object[] { expr })));
         var inner = Assert.IsType<NormQueryException>(ex.InnerException);
         Assert.Contains("60", inner.Message);
         Assert.Contains("MaxRecursionDepth", inner.Message);
