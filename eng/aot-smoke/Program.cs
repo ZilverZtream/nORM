@@ -278,6 +278,20 @@ public static class Program
         }
         catch (Exception e) { Check("S11_projection_dto", false, e.GetType().Name + ": " + e.Message); }
 
+        // Bulk insert — a distinct staging/copy path (BulkOperationProvider) separate from the per-row writes.
+        try
+        {
+            await ctx.BulkInsertAsync(new[]
+            {
+                new S1 { Id = 100, Name = "b1" },
+                new S1 { Id = 101, Name = "b2" },
+                new S1 { Id = 102, Name = "b3" },
+            });
+            var r = await ctx.Query<S1>().Where(x => x.Id >= 100).ToListAsync();
+            Check("S12_bulk_insert", r.Count == 3, "count=" + r.Count);
+        }
+        catch (Exception e) { Check("S12_bulk_insert", false, e.GetType().Name + ": " + e.Message); }
+
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;
     }
