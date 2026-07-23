@@ -346,9 +346,6 @@ items:
   name: nORM.Internal
   type: Namespace
   items:
-  - uid: nORM.Internal.ConcurrentLruCache`2
-    name: ConcurrentLruCache<TKey, TValue>
-    type: Class
   - uid: nORM.Internal.ParameterOptimizer
     name: ParameterOptimizer
     type: Class
@@ -571,5 +568,8 @@ items:
     type: Class
   - uid: nORM.SourceGeneration.GenerateMaterializerAttribute
     name: GenerateMaterializerAttribute
+    type: Class
+  - uid: nORM.SourceGeneration.GeneratedAccessors
+    name: GeneratedAccessors
     type: Class
 memberLayout: SamePage

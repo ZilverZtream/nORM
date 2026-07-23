@@ -190,6 +190,14 @@ namespace nORM.Mapping
         /// <returns>A delegate that returns the property's value for a supplied object.</returns>
         private static Func<object, object?> CreateOptimizedGetter(PropertyInfo property)
         {
+            // Prefer a source-generated getter when one exists for this property. The generated lambda
+            // statically references the property accessor, so a trimmed/NativeAOT publish keeps it and the
+            // write path stays correct without the consumer rooting entity metadata. Falls through to the
+            // reflection/expression path for non-source-generated types and properties.
+            if (property.DeclaringType is Type declaringType &&
+                nORM.SourceGeneration.GeneratedAccessors.TryGetGetter(declaringType, property.Name, out var generatedGetter))
+                return generatedGetter;
+
             var instanceParam = Expression.Parameter(typeof(object), "instance");
             var castInstance = Expression.Convert(instanceParam, property.DeclaringType!);
             var getProperty = Expression.Property(castInstance, property);
@@ -206,6 +214,11 @@ namespace nORM.Mapping
         /// <returns>An <see cref="Action{T1,T2}"/> that sets the property's value.</returns>
         private static Action<object, object?> CreateOptimizedSetter(PropertyInfo property)
         {
+            // Prefer a source-generated setter when one exists (see CreateOptimizedGetter for why).
+            if (property.DeclaringType is Type declaringType &&
+                nORM.SourceGeneration.GeneratedAccessors.TryGetSetter(declaringType, property.Name, out var generatedSetter))
+                return generatedSetter;
+
             var instanceParam = Expression.Parameter(typeof(object), "instance");
             var valueParam = Expression.Parameter(typeof(object), "value");
 

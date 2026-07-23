@@ -190,7 +190,12 @@ items:
     <xref href="nORM.Core.NormQueryable.Query%60%601(nORM.Core.DbContext)" data-throw-if-not-resolved="false"></xref>.
   example: []
   syntax:
-    content: 'public static DbSet<T> Set<T>(this DbContext ctx) where T : class'
+    content: >-
+      [RequiresUnreferencedCode("nORM DbSet querying reflects over entity property metadata to build SQL; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      [RequiresDynamicCode("nORM DbSet querying uses MakeGenericType/Compile to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      public static DbSet<T> Set<T>(this DbContext ctx) where T : class
     parameters:
     - id: ctx
       type: nORM.Core.DbContext
@@ -201,8 +206,24 @@ items:
     return:
       type: nORM.Core.DbSet{{T}}
       description: A <xref href="nORM.Core.DbSet%601" data-throw-if-not-resolved="false"></xref> to query and to register add/update/remove intent.
-    content.vb: Public Shared Function [Set](Of T As Class)(ctx As DbContext) As DbSet(Of T)
+    content.vb: >-
+      <RequiresUnreferencedCode("nORM DbSet querying reflects over entity property metadata to build SQL; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      <RequiresDynamicCode("nORM DbSet querying uses MakeGenericType/Compile to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      Public Shared Function [Set](Of T As Class)(ctx As DbContext) As DbSet(Of T)
   overload: nORM.Core.NormQueryable.Set*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM DbSet querying reflects over entity property metadata to build SQL; trimming may remove the required members. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM DbSet querying uses MakeGenericType/Compile to lift queries onto entity types and is not NativeAOT-compatible. See docs/aot-trimming.md.
   nameWithType.vb: NormQueryable.Set(Of T)(DbContext)
   fullName.vb: nORM.Core.NormQueryable.Set(Of T)(nORM.Core.DbContext)
   name.vb: Set(Of T)(DbContext)

@@ -19,7 +19,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: INormIncludableQueryable
     path: src/nORM/Core/NormQueryable.cs
-    startLine: 178
+    startLine: 180
   assemblies:
   - nORM
   namespace: nORM.Core

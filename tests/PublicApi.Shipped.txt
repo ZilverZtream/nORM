@@ -1182,6 +1182,10 @@ M:nORM.SourceGeneration.CompiledMaterializerStore.Get``1(System.String):System.F
 M:nORM.SourceGeneration.CompiledMaterializerStore.TryGet(System.Type,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{System.Object}}&):System.Boolean
 M:nORM.SourceGeneration.CompiledMaterializerStore.TryGet(System.Type,System.String,System.Func{System.Data.Common.DbDataReader,System.Threading.CancellationToken,System.Threading.Tasks.Task{System.Object}}&):System.Boolean
 M:nORM.SourceGeneration.GenerateMaterializerAttribute.#ctor()
+M:nORM.SourceGeneration.GeneratedAccessors.HasAccessors(System.Type):System.Boolean
+M:nORM.SourceGeneration.GeneratedAccessors.Register(System.Type,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.Object,System.Object}},System.Collections.Generic.IReadOnlyDictionary{System.String,System.Action{System.Object,System.Object}}):System.Void
+M:nORM.SourceGeneration.GeneratedAccessors.TryGetGetter(System.Type,System.String,System.Func{System.Object,System.Object}&):System.Boolean
+M:nORM.SourceGeneration.GeneratedAccessors.TryGetSetter(System.Type,System.String,System.Action{System.Object,System.Object}&):System.Boolean
 P:nORM.Configuration.CheckConstraintConfiguration.Name:System.String
 P:nORM.Configuration.CheckConstraintConfiguration.Sql:System.String
 P:nORM.Configuration.ComputedColumnConfiguration.Sql:System.String
@@ -1864,3 +1868,4 @@ T:nORM.Scaffolding.ScaffoldOptions
 T:nORM.SourceGeneration.CompileTimeQueryAttribute
 T:nORM.SourceGeneration.CompiledMaterializerStore
 T:nORM.SourceGeneration.GenerateMaterializerAttribute
+T:nORM.SourceGeneration.GeneratedAccessors

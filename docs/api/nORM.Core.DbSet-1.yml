@@ -51,7 +51,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: DbSet
     path: src/nORM/Core/DbSet.cs
-    startLine: 30
+    startLine: 33
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -73,7 +73,11 @@ items:
     }</code></pre>
 
 
-    The computed-property form needs no reflection or auto-population, so it is trimming/NativeAOT-safe.
+    The computed-property form needs no reflection or auto-population (unlike EF Core's auto-populated
+
+    set properties), but querying it and <xref href="nORM.Core.DbSet%601.Find(System.Object%5b%5d)" data-throw-if-not-resolved="false"></xref> reflect over entity metadata to build SQL
+
+    like all nORM data access, so those members carry the trimming/NativeAOT annotations.
 
     It is a full <xref href="nORM.Core.INormQueryable%601" data-throw-if-not-resolved="false"></xref>, so <code>Include</code>/<code>AsNoTracking</code>/<code>AsSplitQuery</code>
 
@@ -190,7 +194,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ElementType
     path: src/nORM/Core/DbSet.cs
-    startLine: 43
+    startLine: 48
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -226,7 +230,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Expression
     path: src/nORM/Core/DbSet.cs
-    startLine: 45
+    startLine: 50
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -262,7 +266,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Provider
     path: src/nORM/Core/DbSet.cs
-    startLine: 47
+    startLine: 52
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -298,7 +302,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: GetEnumerator
     path: src/nORM/Core/DbSet.cs
-    startLine: 49
+    startLine: 54
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -333,7 +337,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Include
     path: src/nORM/Core/DbSet.cs
-    startLine: 54
+    startLine: 59
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -375,7 +379,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTracking
     path: src/nORM/Core/DbSet.cs
-    startLine: 56
+    startLine: 61
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -409,7 +413,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsNoTrackingWithIdentityResolution
     path: src/nORM/Core/DbSet.cs
-    startLine: 58
+    startLine: 63
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -448,7 +452,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsSplitQuery
     path: src/nORM/Core/DbSet.cs
-    startLine: 60
+    startLine: 65
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -487,7 +491,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AsAsyncEnumerable
     path: src/nORM/Core/DbSet.cs
-    startLine: 62
+    startLine: 67
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -524,7 +528,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToListAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 64
+    startLine: 69
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -561,7 +565,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ToArrayAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 66
+    startLine: 71
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -598,7 +602,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: CountAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 68
+    startLine: 73
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -635,7 +639,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AnyAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 70
+    startLine: 75
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -672,7 +676,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 72
+    startLine: 77
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -709,7 +713,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FirstOrDefaultAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 74
+    startLine: 79
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -746,7 +750,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 76
+    startLine: 81
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -783,7 +787,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: SingleOrDefaultAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 78
+    startLine: 83
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -820,7 +824,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteDeleteAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 80
+    startLine: 85
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -857,7 +861,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: ExecuteUpdateAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 82
+    startLine: 87
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -897,7 +901,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Add
     path: src/nORM/Core/DbSet.cs
-    startLine: 86
+    startLine: 91
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -932,7 +936,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 88
+    startLine: 93
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -969,7 +973,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 90
+    startLine: 95
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1003,7 +1007,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: AddRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 92
+    startLine: 97
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1037,7 +1041,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Attach
     path: src/nORM/Core/DbSet.cs
-    startLine: 94
+    startLine: 99
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1072,7 +1076,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Update
     path: src/nORM/Core/DbSet.cs
-    startLine: 96
+    startLine: 101
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1107,7 +1111,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: UpdateRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 98
+    startLine: 103
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1141,7 +1145,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Remove
     path: src/nORM/Core/DbSet.cs
-    startLine: 100
+    startLine: 105
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1176,7 +1180,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 102
+    startLine: 107
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1210,7 +1214,7 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: RemoveRange
     path: src/nORM/Core/DbSet.cs
-    startLine: 104
+    startLine: 109
   assemblies:
   - nORM
   namespace: nORM.Core
@@ -1244,21 +1248,42 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: Find
     path: src/nORM/Core/DbSet.cs
-    startLine: 106
+    startLine: 111
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Finds a tracked or stored entity by primary key, or <code>null</code> (EF Core <code>Find</code>).
   example: []
   syntax:
-    content: public T? Find(params object?[] keyValues)
+    content: >-
+      [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      public T? Find(params object?[] keyValues)
     parameters:
     - id: keyValues
       type: System.Object[]
     return:
       type: '{T}'
-    content.vb: Public Function Find(ParamArray keyValues As Object()) As T
+    content.vb: >-
+      <RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      <RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      Public Function Find(ParamArray keyValues As Object()) As T
   overload: nORM.Core.DbSet`1.Find*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
   nameWithType.vb: DbSet(Of T).Find(ParamArray Object())
   fullName.vb: nORM.Core.DbSet(Of T).Find(ParamArray Object())
   name.vb: Find(ParamArray Object())
@@ -1280,21 +1305,42 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FindAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 108
+    startLine: 115
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Async form of <xref href="nORM.Core.DbSet%601.Find(System.Object%5b%5d)" data-throw-if-not-resolved="false"></xref>.
   example: []
   syntax:
-    content: public ValueTask<T?> FindAsync(params object?[] keyValues)
+    content: >-
+      [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      public ValueTask<T?> FindAsync(params object?[] keyValues)
     parameters:
     - id: keyValues
       type: System.Object[]
     return:
       type: System.Threading.Tasks.ValueTask{{T}}
-    content.vb: Public Function FindAsync(ParamArray keyValues As Object()) As ValueTask(Of T)
+    content.vb: >-
+      <RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      <RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      Public Function FindAsync(ParamArray keyValues As Object()) As ValueTask(Of T)
   overload: nORM.Core.DbSet`1.FindAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
   nameWithType.vb: DbSet(Of T).FindAsync(ParamArray Object())
   fullName.vb: nORM.Core.DbSet(Of T).FindAsync(ParamArray Object())
   name.vb: FindAsync(ParamArray Object())
@@ -1316,14 +1362,19 @@ items:
       repo: https://github.com/ZilverZtream/nORM.git
     id: FindAsync
     path: src/nORM/Core/DbSet.cs
-    startLine: 110
+    startLine: 119
   assemblies:
   - nORM
   namespace: nORM.Core
   summary: Async form of <xref href="nORM.Core.DbSet%601.Find(System.Object%5b%5d)" data-throw-if-not-resolved="false"></xref> with cancellation.
   example: []
   syntax:
-    content: public ValueTask<T?> FindAsync(object?[] keyValues, CancellationToken ct)
+    content: >-
+      [RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")]
+
+      [RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")]
+
+      public ValueTask<T?> FindAsync(object?[] keyValues, CancellationToken ct)
     parameters:
     - id: keyValues
       type: System.Object[]
@@ -1331,8 +1382,24 @@ items:
       type: System.Threading.CancellationToken
     return:
       type: System.Threading.Tasks.ValueTask{{T}}
-    content.vb: Public Function FindAsync(keyValues As Object(), ct As CancellationToken) As ValueTask(Of T)
+    content.vb: >-
+      <RequiresUnreferencedCode("nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.")>
+
+      <RequiresDynamicCode("nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.")>
+
+      Public Function FindAsync(keyValues As Object(), ct As CancellationToken) As ValueTask(Of T)
   overload: nORM.Core.DbSet`1.FindAsync*
+  attributes:
+  - type: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresUnreferencedCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Find reflects over the mapped key metadata; trimming may remove the required members. See docs/aot-trimming.md.
+  - type: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute
+    ctor: System.Diagnostics.CodeAnalysis.RequiresDynamicCodeAttribute.#ctor(System.String)
+    arguments:
+    - type: System.String
+      value: nORM Find builds a key predicate and lifts it onto the entity query; not NativeAOT-compatible. See docs/aot-trimming.md.
   nameWithType.vb: DbSet(Of T).FindAsync(Object(), CancellationToken)
   fullName.vb: nORM.Core.DbSet(Of T).FindAsync(Object(), System.Threading.CancellationToken)
   name.vb: FindAsync(Object(), CancellationToken)

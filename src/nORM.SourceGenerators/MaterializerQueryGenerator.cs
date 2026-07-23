@@ -311,6 +311,31 @@ namespace nORM.SourceGenerators
 
             sb.AppendLine("            return entity;");
             sb.AppendLine("        });");
+
+            // Register source-generated property accessors so the write path never reflects over entity
+            // properties: the lambdas below statically reference each accessor, so a trimmed / NativeAOT
+            // publish keeps them and reads+writes stay correct with no consumer entity-rooting ceremony.
+            // Owned/nested properties are omitted here and fall back to the reflection accessor.
+            var scalarProps = props.Where(p => !IsOwnedType(p.Type)).ToList();
+            if (scalarProps.Count > 0)
+            {
+                sb.AppendLine("#nullable enable");
+                sb.AppendLine($"        GeneratedAccessors.Register(typeof({typeName}),");
+                sb.AppendLine("            new System.Collections.Generic.Dictionary<string, Func<object, object?>>");
+                sb.AppendLine("            {");
+                foreach (var p in scalarProps)
+                    sb.AppendLine($"                [\"{p.Name}\"] = o => (({typeName})o).{p.Name},");
+                sb.AppendLine("            },");
+                sb.AppendLine("            new System.Collections.Generic.Dictionary<string, Action<object, object?>>");
+                sb.AppendLine("            {");
+                foreach (var p in scalarProps)
+                {
+                    var pType = p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                    sb.AppendLine($"                [\"{p.Name}\"] = (o, v) => (({typeName})o).{p.Name} = ({pType})v!,");
+                }
+                sb.AppendLine("            });");
+            }
+
             sb.AppendLine("    }");
             sb.AppendLine("}");
 

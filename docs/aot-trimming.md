@@ -66,12 +66,15 @@ piece of ceremony left. Removing it (source-generated write accessors so the wri
 path never reflects over entity properties) is the tracked path to zero-ceremony
 NativeAOT support.
 
-## Not fully supported for v1
+## Not supported for v1
+
+The following remain explicitly unsupported for v1 and fail closed rather than
+producing wrong results:
 
 - NativeAOT/trimmed publish of the **reflection path** (dynamic table queries,
   runtime scaffolding, un-annotated projections).
 - Trimmed publish **without** entity-metadata preservation — silently unsafe for
-  writes, so it fails closed rather than shipping wrong data.
+  writes, so it is not supported and fails closed rather than shipping wrong data.
 - `DbContext.Query(string)` under NativeAOT or dynamic-code-disabled runtimes.
 - Runtime scaffolding/entity generation under NativeAOT or dynamic-code-disabled
   runtimes.

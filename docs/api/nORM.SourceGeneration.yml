@@ -7,6 +7,7 @@ items:
   - nORM.SourceGeneration.CompileTimeQueryAttribute
   - nORM.SourceGeneration.CompiledMaterializerStore
   - nORM.SourceGeneration.GenerateMaterializerAttribute
+  - nORM.SourceGeneration.GeneratedAccessors
   langs:
   - csharp
   - vb
@@ -29,6 +30,12 @@ references:
   name: CompileTimeQueryAttribute
   nameWithType: CompileTimeQueryAttribute
   fullName: nORM.SourceGeneration.CompileTimeQueryAttribute
+- uid: nORM.SourceGeneration.GeneratedAccessors
+  commentId: T:nORM.SourceGeneration.GeneratedAccessors
+  href: nORM.SourceGeneration.GeneratedAccessors.html
+  name: GeneratedAccessors
+  nameWithType: GeneratedAccessors
+  fullName: nORM.SourceGeneration.GeneratedAccessors
 - uid: nORM.SourceGeneration.GenerateMaterializerAttribute
   commentId: T:nORM.SourceGeneration.GenerateMaterializerAttribute
   href: nORM.SourceGeneration.GenerateMaterializerAttribute.html
