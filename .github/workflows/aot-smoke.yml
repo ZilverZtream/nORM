@@ -1,0 +1,38 @@
+name: AOT Smoke
+
+# Guards the zero-ceremony NativeAOT capability: publishes eng/aot-smoke to a native binary and runs its
+# scenario matrix (reads, direct + tracked writes, attribute-based mapping) with NO <TrimmerRootAssembly>.
+# If a change ever reintroduces a reflection dependency the source generator does not preserve, this fails.
+# Runs on pushes that touch the AOT-relevant code, nightly, and on demand. Native publish needs the AOT
+# toolchain and takes a few minutes, so it is deliberately NOT part of the per-push Build and Test job.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * *"
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'eng/aot-smoke/**'
+      - '.github/workflows/aot-smoke.yml'
+
+jobs:
+  aot-smoke:
+    name: NativeAOT source-gen path (native publish, no rooting)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install NativeAOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish and run AOT smoke
+        shell: pwsh
+        run: ./eng/aot-smoke.ps1 -Rid linux-x64
