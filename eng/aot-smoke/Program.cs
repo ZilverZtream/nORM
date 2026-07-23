@@ -89,6 +89,25 @@ public sealed class BoolYnConverter : ValueConverter<bool, string>
     public override object? ConvertFromProvider(string value) => value == "Y";
 }
 
+// Owned value object embedded as columns (Home_City, Home_Zip). The owned getters/setters traverse
+// owner -> owned reflectively, and the owned type is constructed (new Address()) during materialization,
+// so this exercises the generator's per-owned-type [DynamicDependency] (properties + parameterless ctor).
+[Owned]
+public sealed class Address
+{
+    public string City { get; set; } = "";
+    public string Zip { get; set; } = "";
+}
+
+[Table("Customer")]
+[GenerateMaterializer]
+public sealed class Customer
+{
+    [Key] public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public Address Home { get; set; } = new();
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -131,7 +150,8 @@ public static class Program
                 "CREATE TABLE Post (Id INTEGER PRIMARY KEY, BlogId INTEGER NOT NULL, Body TEXT NOT NULL);" +
                 "INSERT INTO Post VALUES (1,1,'p1'),(2,1,'p2');" +
                 "CREATE TABLE S9 (Id INTEGER PRIMARY KEY, Active TEXT NOT NULL);" +
-                "INSERT INTO S9 VALUES (1,'Y'),(2,'N');";
+                "INSERT INTO S9 VALUES (1,'Y'),(2,'N');" +
+                "CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Home_City TEXT NOT NULL, Home_Zip TEXT NOT NULL);";
             cmd.ExecuteNonQuery();
         }
         var opts = new DbContextOptions
@@ -228,6 +248,17 @@ public static class Program
                 $"read={readOk} stored={stored} back={(back.Count == 1 ? back[0].Active.ToString() : "n=" + back.Count)}");
         }
         catch (Exception e) { Check("S9_value_converter", false, e.GetType().Name + ": " + e.Message); }
+
+        // Owned type (value object embedded as columns). Write flattens Home -> Home_City/Home_Zip via
+        // owned getters; read reconstructs Home = new Address() and sets its properties under trimming.
+        try
+        {
+            await ctx.InsertAsync(new Customer { Id = 1, Name = "acme", Home = new Address { City = "NYC", Zip = "10001" } });
+            var r = await ctx.Query<Customer>().Where(x => x.Id == 1).ToListAsync();
+            bool ok = r.Count == 1 && r[0].Home != null && r[0].Home.City == "NYC" && r[0].Home.Zip == "10001";
+            Check("S10_owned_type", ok, r.Count == 1 ? $"City={r[0].Home?.City} Zip={r[0].Home?.Zip}" : "n=" + r.Count);
+        }
+        catch (Exception e) { Check("S10_owned_type", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;

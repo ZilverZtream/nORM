@@ -7,7 +7,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Reflection.Emit;
 using nORM.Configuration;
 using nORM.Providers;
 
@@ -262,46 +261,35 @@ namespace nORM.Mapping
         /// <returns>A delegate that sets the nested property's value on an entity.</returns>
         private static Action<object, object?> CreateOwnedSetter(PropertyInfo owner, PropertyInfo owned, out MethodInfo methodInfo)
         {
-            var dm = new DynamicMethod($"set_{owner.Name}_{owned.Name}", typeof(void), new[] { typeof(object), typeof(object) }, owner.DeclaringType!.Module, true);
-            var il = dm.GetILGenerator();
-
-            // Cast entity to owner type
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, owner.DeclaringType!);
-            il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Callvirt, owner.GetGetMethod()!);
-            var ownedVar = il.DeclareLocal(owner.PropertyType);
-            il.Emit(OpCodes.Stloc, ownedVar);
-            il.Emit(OpCodes.Pop); // remove duplicated entity
-
-            // Initialize owned object if null
-            il.Emit(OpCodes.Ldloc, ownedVar);
-            var hasValue = il.DefineLabel();
-            il.Emit(OpCodes.Brtrue_S, hasValue);
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Castclass, owner.DeclaringType!);
+            // Expression.Compile (not Reflection.Emit): DynamicMethod throws PlatformNotSupportedException
+            // ("Dynamic code generation is not supported") under NativeAOT, whereas Expression.Compile
+            // transparently interprets, so owned types work under trimming / NativeAOT.
             var ownedCtor = owner.PropertyType.GetConstructor(Type.EmptyTypes)
                 ?? throw new InvalidOperationException(
                     $"Owned type '{owner.PropertyType.Name}' must have a public parameterless constructor " +
                     "to be used with owned property setter generation.");
-            il.Emit(OpCodes.Newobj, ownedCtor);
-            il.Emit(OpCodes.Dup);
-            il.Emit(OpCodes.Stloc, ownedVar);
-            il.Emit(OpCodes.Callvirt, owner.GetSetMethod()!);
-            il.MarkLabel(hasValue);
+            methodInfo = owned.GetSetMethod()
+                ?? throw new InvalidOperationException(
+                    $"Owned property '{owner.PropertyType.Name}.{owned.Name}' must have a setter " +
+                    "to be used as a mapped owned column.");
 
-            // Assign value
-            il.Emit(OpCodes.Ldloc, ownedVar);
-            il.Emit(OpCodes.Ldarg_1);
-            if (owned.PropertyType.IsValueType)
-                il.Emit(OpCodes.Unbox_Any, owned.PropertyType);
-            else
-                il.Emit(OpCodes.Castclass, owned.PropertyType);
-            il.Emit(OpCodes.Callvirt, owned.GetSetMethod()!);
-            il.Emit(OpCodes.Ret);
+            var instanceParam = Expression.Parameter(typeof(object), "instance");
+            var valueParam = Expression.Parameter(typeof(object), "value");
+            var castInstance = Expression.Convert(instanceParam, owner.DeclaringType!);
+            var ownerAccess = Expression.Property(castInstance, owner);
 
-            methodInfo = dm;
-            return (Action<object, object?>)dm.CreateDelegate(typeof(Action<object, object?>));
+            // if (owner.<Owned> == null) owner.<Owned> = new OwnedType();
+            var ensureOwned = Expression.IfThen(
+                Expression.Equal(ownerAccess, Expression.Constant(null, owner.PropertyType)),
+                Expression.Assign(ownerAccess, Expression.New(ownedCtor)));
+
+            // owner.<Owned>.<Property> = (TProperty)value;
+            var assignValue = Expression.Assign(
+                Expression.Property(ownerAccess, owned),
+                Expression.Convert(valueParam, owned.PropertyType));
+
+            var body = Expression.Block(ensureOwned, assignValue);
+            return Expression.Lambda<Action<object, object?>>(body, instanceParam, valueParam).Compile();
         }
 
         internal class CachedTypeInfo
