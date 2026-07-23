@@ -91,13 +91,19 @@ namespace nORM.Query
                 && !SourceHasClientTailReshape(sourceQuery)
                 && !SourceHasGroupJoinResultTail(sourceQuery)
                 && !SourceHasRawGroupByResultTail(sourceQuery);
-            if (sourceIsWindowed)
+            // GroupBy over a set-op (Union/Concat/Intersect/Except) has the same shape problem as a windowed
+            // source: the group key `g => g.A` cannot resolve against a bare compound SELECT. Wrap the compound as
+            // a derived table (`FROM (<compound>) AS alias`) through the same sub-context path so `GROUP BY
+            // alias.A` and the aggregate SELECT are valid, instead of the member failing to resolve.
+            bool sourceIsSetOp = sourceQuery is MethodCallExpression setOpSrc
+                && setOpSrc.Method.Name is "Union" or "Concat" or "Intersect" or "Except";
+            if (sourceIsWindowed || sourceIsSetOp)
             {
                 var subPlanG = TranslateInSubContext(sourceQuery, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapG);
                 _mapping = subMapG;
                 MergeSubPlanParameters(subPlanG);
                 alias = EscapeAlias("__wgb" + _joinCounter++);
-                // Store the windowed sub-SQL + alias so BuildGroupBySelectClause emits
+                // Store the sub-SQL + alias so BuildGroupBySelectClause emits
                 // `FROM (subSql) AS alias` instead of the bare `FROM tableName alias`.
                 _windowedGroupBySubSql = subPlanG.Sql;
                 _windowedGroupByAlias = alias;
@@ -163,7 +169,7 @@ namespace nORM.Query
             _groupByKeySelector = keySelectorLambda;
             // A windowed source's rows live in the derived table, which the
             // greatest-N-per-group re-scan cannot see — disable the rewrite there.
-            _groupOrderedFirstSourceWheres = sourceIsWindowed ? null : ExtractGroupSourceWheres(sourceQuery);
+            _groupOrderedFirstSourceWheres = (sourceIsWindowed || sourceIsSetOp) ? null : ExtractGroupSourceWheres(sourceQuery);
             var param = keySelectorLambda.Parameters[0];
             if (!_correlatedParams.ContainsKey(param))
                 _correlatedParams[param] = (_mapping, alias);
