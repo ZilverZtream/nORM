@@ -177,9 +177,24 @@ namespace nORM.Tests.Fuzzing
         // still translates the keyed group SELECT (including the SUM/MIN/MAX aggregate).
         private static IEnumerable<int> RunLinqGrouped(QueryIr ir)
         {
-            IEnumerable<IrRow> rows = ir.Rows;
+            IEnumerable<IrRow> left = ir.Rows;
             foreach (var w in ir.Steps.Where(IsPredicateStep))
-                rows = rows.Where(BuildPredicate(w).Compile());
+                left = left.Where(BuildPredicate(w).Compile());
+            IEnumerable<IrRow> rows = left;
+            if (ir.SetOp is { } setOp)   // GroupBy over a set operation aggregates the combined rows
+            {
+                IEnumerable<IrRow> right = ir.Rows;
+                foreach (var w in setOp.RightWheres.Where(IsPredicateStep))
+                    right = right.Where(BuildPredicate(w).Compile());
+                rows = setOp.Kind switch
+                {
+                    IrSetOpKind.Union => left.Union(right, IrRowComparer.Instance),
+                    IrSetOpKind.Concat => left.Concat(right),
+                    IrSetOpKind.Intersect => left.Intersect(right, IrRowComparer.Instance),
+                    IrSetOpKind.Except => left.Except(right, IrRowComparer.Instance),
+                    _ => left,
+                };
+            }
             var grouped = rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile());
             var gb = ir.GroupBy!;
             return gb.Aggregate switch
@@ -208,10 +223,29 @@ namespace nORM.Tests.Fuzzing
 
         private static IEnumerable<int> RunNormGrouped(DbContext ctx, QueryIr ir)
         {
-            IQueryable<IrRow> q = ctx.Query<IrRow>();
-            foreach (var w in ir.Steps.Where(IsPredicateStep))
-                q = q.Where(BuildPredicate(w));
-            var grouped = q.GroupBy(KeySelector(ir.GroupBy!.Key));
+            IQueryable<IrRow> Filter(IReadOnlyList<IrStep> steps)
+            {
+                IQueryable<IrRow> s = ctx.Query<IrRow>();
+                foreach (var w in steps.Where(IsPredicateStep))
+                    s = s.Where(BuildPredicate(w));
+                return s;
+            }
+
+            var left = Filter(ir.Steps);
+            IQueryable<IrRow> src = left;
+            if (ir.SetOp is { } setOp)
+            {
+                var right = Filter(setOp.RightWheres);
+                src = setOp.Kind switch
+                {
+                    IrSetOpKind.Union => left.Union(right),
+                    IrSetOpKind.Concat => left.Concat(right),
+                    IrSetOpKind.Intersect => left.Intersect(right),
+                    IrSetOpKind.Except => left.Except(right),
+                    _ => left,
+                };
+            }
+            var grouped = src.GroupBy(KeySelector(ir.GroupBy!.Key));
             var gb = ir.GroupBy!;
             var pairs = gb.Aggregate switch
             {
@@ -550,6 +584,7 @@ namespace nORM.Tests.Fuzzing
                 f.Add("groupby");
                 f.Add("groupby-" + ir.GroupBy.Aggregate.ToString().ToLowerInvariant());
                 if (kinds.Contains(IrStepKind.Where)) f.Add("groupby+where");
+                if (ir.SetOp is { } gso) { f.Add("groupby+setop"); f.Add("groupby+setop-" + gso.Kind.ToString().ToLowerInvariant()); }
             }
             if (ir.Rows.Count == 0) f.Add("empty-table");
             if (ir.Rows.Count == 1) f.Add("single-row");

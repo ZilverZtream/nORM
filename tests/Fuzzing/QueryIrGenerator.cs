@@ -41,14 +41,14 @@ namespace nORM.Tests.Fuzzing
             if (rng.Next(2) == 0)
                 steps.Add(IrStep.Take(rng.Next(0, rowCount + 2)));
 
-            // GroupBy is its own terminal shape (it takes precedence in the differential), so make it exclusive
-            // with the set-op/projection phases to avoid generating a case whose set-op/projection is ignored.
+            // A set-op may feed a GroupBy (GroupBy over a compound), a scalar projection, or stand alone; GroupBy
+            // and the scalar projection remain mutually exclusive (GroupBy takes precedence in the differential).
             var groupBy = MaybeGroupBy(rng);
             return new QueryIr
             {
                 Rows = rows,
                 Steps = steps,
-                SetOp = groupBy == null ? MaybeSetOp(rng) : null,
+                SetOp = MaybeSetOp(rng),
                 Projection = groupBy == null ? MaybeProjection(rng) : null,
                 GroupBy = groupBy,
             };
@@ -111,11 +111,12 @@ namespace nORM.Tests.Fuzzing
                         : (rng.Next(3) == 0 ? null : groupBy with { Key = Pick(rng, Columns), Aggregate = (IrAggregate)rng.Next(4), AggregateColumn = Pick(rng, Columns) });
                     break;
             }
-            // Grouping is exclusive with the set-op/projection phases (it takes precedence in the differential).
+            // A set-op may coexist with a GroupBy (GroupBy over a compound); GroupBy stays exclusive with the
+            // scalar projection (it takes precedence in the differential).
             return new QueryIr
             {
                 Rows = rows, Steps = steps,
-                SetOp = groupBy == null ? setOp : null,
+                SetOp = setOp,
                 Projection = groupBy == null ? projection : null,
                 GroupBy = groupBy,
             };

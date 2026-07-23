@@ -138,6 +138,34 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public void Grouped_over_a_setop_matches_the_linq_oracle()
+        {
+            // GroupBy over each set operation must aggregate the combined rows and match the oracle (nORM wraps the
+            // compound as a derived table). Both arms unfiltered on one axis exercises the historically fragile shape.
+            foreach (var kind in new[] { IrSetOpKind.Union, IrSetOpKind.Concat, IrSetOpKind.Intersect, IrSetOpKind.Except })
+            foreach (var agg in new[] { IrAggregate.Count, IrAggregate.Sum, IrAggregate.Max })
+            {
+                var ir = new QueryIr
+                {
+                    Rows = Data,
+                    Steps = Array.Empty<IrStep>(),
+                    SetOp = new IrSetOp { Kind = kind, RightWheres = new[] { IrStep.Where(IrColumn.A, IrCompare.Ge, 3) } },
+                    GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = agg, AggregateColumn = IrColumn.B },
+                };
+                var r = QueryIrDifferential.Execute(ir, seed: 5100);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+
+            Assert.Contains("groupby+setop", QueryIrDifferential.ExtractFeatures(new QueryIr
+            {
+                Rows = Data,
+                Steps = Array.Empty<IrStep>(),
+                SetOp = new IrSetOp { Kind = IrSetOpKind.Concat, RightWheres = Array.Empty<IrStep>() },
+                GroupBy = new IrGroupBy { Key = IrColumn.A },
+            }));
+        }
+
+        [Fact]
         public void String_equality_is_ordinal_and_case_sensitive()
         {
             // Mixed-case names: an ordinal "Name == a" matches only the lowercase rows, never "A". A case-
