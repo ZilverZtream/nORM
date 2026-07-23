@@ -158,6 +158,12 @@ release commit, using the job settings and claim rules in
 - **Idiomatic bulk insert** is **2.4×–4.6× faster** than EF `AddRange` / Dapper-in-
   transaction across providers (PostgreSQL 963 µs vs EF 4,483 µs; MySQL 6,065 µs vs
   Dapper 20,226 µs).
+- **Allocation is where the gap is widest, and it is machine-independent** (unlike
+  latency, allocation does not move with machine load, so these figures are solid
+  regardless of the run environment). Single insert allocates **424 B (PostgreSQL),
+  643 B (MySQL), 1.1 KB (SQL Server), 1.6 KB (SQLite)** — roughly **4–10× less than
+  Dapper** (4.4–6.2 KB) and **14–44× less than EF Core** (16–29 KB) on every
+  provider. Reads are similarly lean (SQLite join: nORM 11–17 KB vs EF Core 60 KB).
 
 > † **SQLite single-insert is measured under equalized durability.** Every
 > compared connection (nORM, EF Core, Dapper, Raw ADO) uses identical
