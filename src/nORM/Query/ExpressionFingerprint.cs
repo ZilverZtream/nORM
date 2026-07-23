@@ -204,9 +204,9 @@ namespace nORM.Query
                 Justification = "Guarded by _collectValues, enabled only on the RequiresDynamicCode value-collection path.")]
             protected override Expression VisitMember(MemberExpression node)
             {
-                // Use MetadataToken + declaring type handle instead of MVID (16 bytes).
-                // MetadataToken is unique within a module, and the type handle distinguishes modules.
-                AppendInt(node.Member.MetadataToken);
+                // Stable per-process member id (trim/NativeAOT-safe) + declaring type handle.
+                // GetStableMemberId replaces MemberInfo.MetadataToken, which is unavailable under NativeAOT.
+                AppendInt(GetStableMemberId(node.Member));
                 if (node.Member.DeclaringType != null)
                     AppendLong(node.Member.DeclaringType.TypeHandle.Value.ToInt64());
 
@@ -279,8 +279,10 @@ namespace nORM.Query
 
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
-                // Use MetadataToken + declaring type handle instead of MVID
-                AppendInt(node.Method.MetadataToken);
+                // Stable per-process method id (trim/NativeAOT-safe) + declaring type handle.
+                // GetStableMemberId replaces MethodInfo.MetadataToken, which is unavailable under NativeAOT.
+                // Distinct MethodInfos (including overloads and constructed generics) get distinct ids.
+                AppendInt(GetStableMemberId(node.Method));
                 if (node.Method.DeclaringType != null)
                     AppendLong(node.Method.DeclaringType.TypeHandle.Value.ToInt64());
                 AppendInt(node.Arguments.Count);
@@ -313,6 +315,18 @@ namespace nORM.Query
                 }
                 return base.VisitLambda(node);
             }
+
+            // Trim/NativeAOT-safe replacement for MemberInfo.MetadataToken, which throws
+            // "no metadata token available for the given member" for trimmed members under NativeAOT.
+            // Each distinct member gets a stable per-process id via reference identity (MemberInfo
+            // equality identifies the underlying member, including overloads and declaring type), so it
+            // is strictly more unique than a module-local token. The plan cache is in-memory per process,
+            // so per-process id stability is sufficient; the map is bounded by the small set of distinct
+            // members that appear in query expressions.
+            private static readonly System.Collections.Concurrent.ConcurrentDictionary<MemberInfo, int> _memberIds = new();
+            private static int _memberIdCounter;
+            private static int GetStableMemberId(MemberInfo member)
+                => _memberIds.GetOrAdd(member, static _ => System.Threading.Interlocked.Increment(ref _memberIdCounter));
 
             private void AppendInt(int value)
             {

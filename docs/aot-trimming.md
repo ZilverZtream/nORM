@@ -37,14 +37,21 @@ set and silently wrong writes.
 
 The source generator closes that automatically. For every `[GenerateMaterializer]`
 entity it emits, alongside the materializer registration, a
-`[DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(TEntity))]`
+`[DynamicDependency(PublicProperties | PublicParameterlessConstructor, typeof(TEntity))]`
 on its module initializer (and one per owned type). `DynamicDependency` is the
 sanctioned way to declare a reflection dependency the trimmer cannot see, so the
-trimmer preserves exactly the property/attribute metadata the mapping needs. It also
-source-generates the property getters/setters (`GeneratedAccessors`) so the hot
-read/write delegates are compile-time rather than interpreted. **No
-`<TrimmerRootAssembly>`, no `DynamicallyAccessedMembers` annotations, and no
-per-property preservation are required of the consumer.**
+trimmer preserves exactly the property/attribute metadata the mapping needs and the
+parameterless constructor the runtime materializer invokes. It also source-generates
+the property getters/setters (`GeneratedAccessors`) so the hot read/write delegates
+are compile-time rather than interpreted. **No `<TrimmerRootAssembly>`, no
+`DynamicallyAccessedMembers` annotations, and no per-property preservation are required
+of the consumer.**
+
+Both query entry points work: the `[CompileTimeQuery]` methods **and** the runtime
+LINQ path (`ctx.Query<T>().Where(...).OrderBy(...)`) for source-generated entities.
+The runtime path builds a cached query plan whose fingerprint is derived without
+`MemberInfo.MetadataToken` (unavailable under NativeAOT), and materializes through the
+registered generated materializer.
 
 The consumer contract is just:
 

@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using nORM.Core;
@@ -142,6 +143,17 @@ public static class Program
             Check("S6_attribute_mapping", r.Count == 1 && r[0].FullName == "beta", r.Count == 1 ? r[0].FullName : "count=" + r.Count);
         }
         catch (Exception e) { Check("S6_attribute_mapping", false, e.GetType().Name + ": " + e.Message); }
+
+        // Read: RUNTIME LINQ query path (not [CompileTimeQuery]) — expression translation + the registered
+        // generated materializer, over the reflection-built mapping. The DbContext ctor is annotated dynamic
+        // for exactly this path; this proves it runs under trimming for a source-generated entity (where the
+        // negative PublishTrimmed test's non-source-gen entity does not).
+        try
+        {
+            var r = await ctx.Query<S1>().Where(x => x.Id >= 1).OrderByDescending(x => x.Id).ToListAsync();
+            Check("S7_runtime_linq_query", r.Count >= 2 && r[0].Id >= r[1].Id, "count=" + r.Count);
+        }
+        catch (Exception e) { Check("S7_runtime_linq_query", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;

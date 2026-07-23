@@ -280,8 +280,11 @@ namespace nORM.SourceGenerators
             preserveTypes.AddRange(props.Where(p => IsOwnedType(p.Type))
                 .Select(p => p.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
                 .Distinct());
+            // PublicProperties for the write mapping's reflection; PublicParameterlessConstructor so the
+            // RUNTIME query materializer (ctx.Query<T>()...) can reflectively construct the entity/owned type
+            // under trimming — the compile-time materializer uses `new T()` directly and needs neither.
             foreach (var preserved in preserveTypes)
-                sb.AppendLine($"    [global::System.Diagnostics.CodeAnalysis.DynamicDependency(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties, typeof({preserved}))]");
+                sb.AppendLine($"    [global::System.Diagnostics.CodeAnalysis.DynamicDependency(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicProperties | global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof({preserved}))]");
             sb.AppendLine("    [global::System.Runtime.CompilerServices.ModuleInitializer]");
             sb.AppendLine("    public static void Register()");
             sb.AppendLine("    {");
