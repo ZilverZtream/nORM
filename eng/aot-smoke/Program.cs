@@ -116,6 +116,25 @@ public sealed class S1Dto
     public string Name { get; set; } = "";
 }
 
+// Many-to-many via a join table (fluent HasMany/WithMany/UsingTable). Distinct from the one-to-many
+// Include path: the eager load joins through ArticleTag and reflects over both sides' navigation metadata.
+[Table("Article")]
+[GenerateMaterializer]
+public sealed class Article
+{
+    [Key] public int Id { get; set; }
+    public string Title { get; set; } = "";
+    public List<Tag> Tags { get; set; } = new();
+}
+
+[Table("Tag")]
+[GenerateMaterializer]
+public sealed class Tag
+{
+    [Key] public int Id { get; set; }
+    public string Label { get; set; } = "";
+}
+
 public static partial class Q
 {
     [CompileTimeQuery("SELECT Id, Name FROM S1")]
@@ -159,12 +178,22 @@ public static class Program
                 "INSERT INTO Post VALUES (1,1,'p1'),(2,1,'p2');" +
                 "CREATE TABLE S9 (Id INTEGER PRIMARY KEY, Active TEXT NOT NULL);" +
                 "INSERT INTO S9 VALUES (1,'Y'),(2,'N');" +
-                "CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Home_City TEXT NOT NULL, Home_Zip TEXT NOT NULL);";
+                "CREATE TABLE Customer (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Home_City TEXT NOT NULL, Home_Zip TEXT NOT NULL);" +
+                "CREATE TABLE Article (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);" +
+                "INSERT INTO Article VALUES (1,'a1');" +
+                "CREATE TABLE Tag (Id INTEGER PRIMARY KEY, Label TEXT NOT NULL);" +
+                "INSERT INTO Tag VALUES (1,'t1'),(2,'t2');" +
+                "CREATE TABLE ArticleTag (ArticleId INTEGER NOT NULL, TagId INTEGER NOT NULL);" +
+                "INSERT INTO ArticleTag VALUES (1,1),(1,2);";
             cmd.ExecuteNonQuery();
         }
         var opts = new DbContextOptions
         {
-            OnModelCreating = mb => mb.Entity<S9Row>().Property(r => r.Active).HasConversion(new BoolYnConverter())
+            OnModelCreating = mb =>
+            {
+                mb.Entity<S9Row>().Property(r => r.Active).HasConversion(new BoolYnConverter());
+                mb.Entity<Article>().HasMany<Tag>(a => a.Tags).WithMany().UsingTable("ArticleTag", "ArticleId", "TagId");
+            }
         };
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
 
@@ -291,6 +320,16 @@ public static class Program
             Check("S12_bulk_insert", r.Count == 3, "count=" + r.Count);
         }
         catch (Exception e) { Check("S12_bulk_insert", false, e.GetType().Name + ": " + e.Message); }
+
+        // Many-to-many Include (join table). Distinct eager-load path that reflects over both navigation
+        // sides and the join-table mapping under trimming.
+        try
+        {
+            var r = await ctx.Query<Article>().Include(a => a.Tags).ToListAsync();
+            Check("S13_many_to_many", r.Count == 1 && r[0].Tags.Count == 2,
+                r.Count == 1 ? "tags=" + r[0].Tags.Count : "articles=" + r.Count);
+        }
+        catch (Exception e) { Check("S13_many_to_many", false, e.GetType().Name + ": " + e.Message); }
 
         Console.WriteLine(_fail == 0 ? "ALL SCENARIOS PASSED under NativeAOT" : $"{_fail} SCENARIO(S) FAILED under NativeAOT");
         return _fail;
