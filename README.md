@@ -147,6 +147,14 @@ release commit, using the job settings and claim rules in
   (54.2 µs vs Raw ADO 59.1, Dapper 60.0, EF 76.8, all under *equalized* durability
   settings), PostgreSQL (129.0 µs vs Raw ADO 212.4), SQL Server (110.9 µs vs
   Raw ADO 135.0), and MySQL (1,692 µs vs Raw ADO 1,757, Dapper 1,797, EF 2,925).
+- **Single full-column update** exposes nORM's two write models, and each beats its
+  fair peer (SQLite, current OrmBenchmarks run under equalized settings). The
+  change-**tracked** path (`Update` + `SaveChanges`, the same model EF uses) is
+  12.3 KB / 57.0 µs vs EF Core's tracked update 15.9 KB / 72.1 µs. The **direct**
+  path (`UpdateAsync`, the same shape Dapper issues) is 5.0 KB / 51.1 µs vs Dapper
+  5.4 KB / 49.7 µs - lower allocation, tied latency. The comparison to avoid is
+  nORM's tracked path against Dapper's direct one: that is tracked-vs-untracked,
+  not a like-for-like write.
 - **Idiomatic bulk insert** is **2.4×–4.6× faster** than EF `AddRange` / Dapper-in-
   transaction across providers (PostgreSQL 963 µs vs EF 4,483 µs; MySQL 6,065 µs vs
   Dapper 20,226 µs).
