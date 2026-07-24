@@ -23,6 +23,7 @@ BuildSimpleSelectSlow
 BulkDeleteAsync
 BulkInsertAsync
 BulkUpdateAsync
+CanonicalDateTimeTextForExactCompare
 CanonicalDecimalTextForExactCompare
 CanonicalTimeOnlyTextForExactCompare
 CanonicalTimeSpanTextForExactCompare
@@ -169,6 +170,7 @@ BuildSimpleSelect
 BulkDeleteAsync
 BulkInsertAsync
 BulkUpdateAsync
+CanonicalDateTimeTextForExactCompare
 CanonicalDecimalTextForExactCompare
 CanonicalTimeOnlyTextForExactCompare
 CanonicalTimeSpanTextForExactCompare

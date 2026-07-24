@@ -281,6 +281,17 @@ namespace nORM.Providers
         internal virtual string? CanonicalTimeOnlyTextForExactCompare(string sql) => null;
 
         /// <summary>
+        /// Canonical plain-<see cref="DateTime"/> TEXT for EXACT equality on providers that store DateTime
+        /// as TEXT (SQLite: <c>"yyyy-MM-dd HH:mm:ss[.fffffff]"</c>). The same instant written with a
+        /// different fractional scale (<c>"12:00:00.0000000"</c> vs <c>"12:00:00"</c>) compares unequal on a
+        /// raw <c>=</c> and silently drops rows / splits groups. The only <c>.</c> in a plain DateTime is the
+        /// fractional separator, so trailing fraction zeros can be stripped safely (unlike <c>datetime()</c>,
+        /// this does not overflow <see cref="DateTime.MaxValue"/>). Null = native DATETIME compares by value.
+        /// Plain DateTime only — <see cref="DateTimeOffset"/> keeps its offset/instant handling.
+        /// </summary>
+        internal virtual string? CanonicalDateTimeTextForExactCompare(string sql) => null;
+
+        /// <summary>
         /// Canonical <see cref="TimeSpan"/> TEXT for an EXACT KEY (GROUP BY / DISTINCT / dedup / join) on
         /// providers that store TimeSpan as <c>'c'</c> TEXT (SQLite: <c>"[d.]hh:mm:ss[.fffffff]"</c>). The
         /// same duration written with a different fraction scale (<c>"1.00:00:00.0000000"</c> vs
@@ -315,6 +326,7 @@ namespace nORM.Providers
             if (t == typeof(decimal)) return ExactDecimalKeySql(sql);
             if (t == typeof(TimeOnly)) return CanonicalTimeOnlyTextForExactCompare(sql) ?? sql;
             if (t == typeof(TimeSpan)) return CanonicalTimeSpanTextForExactCompare(sql) ?? sql;
+            if (t == typeof(DateTime)) return CanonicalDateTimeTextForExactCompare(sql) ?? sql;
             return sql;
         }
 

@@ -100,6 +100,17 @@ security, and documentation.
   while returning the actual stored value, across scalar, `GROUP BY`, set-op, windowed,
   and navigation-subquery aggregates. Native `TIME`/`INTERVAL`/`DATETIMEOFFSET`
   providers are unaffected.
+- A plain `DateTime` equality predicate (`col == value`) on SQLite silently dropped
+  rows whose stored TEXT had a different fractional scale (`"12:00:00.0000000"` is the
+  same instant as `"12:00:00"` but compared unequal), and `GROUP BY` / `DISTINCT` over
+  a `DateTime` column split them into separate groups / rows. `DateTime` was not
+  canonicalized for exact comparison the way `TimeOnly`/`TimeSpan`/decimal are. The full
+  translator now strips trailing fraction zeros for `DateTime` equality (the only `.` in
+  a plain `DateTime` is the fractional separator, so this is safe and avoids
+  `datetime()`'s `MaxValue` overflow), applied across predicates, projected comparisons,
+  `GROUP BY`, `DISTINCT`, and set-op dedup, with the read fast paths deferring `DateTime`
+  equality to it. Ordering was already handled; native `DATETIME` providers are
+  unaffected.
 - A `TimeOnly` equality predicate (`col == value`) on SQLite silently dropped rows
   whose stored TEXT had a different fractional scale (`"12:00:00.0000000"` is the same
   time as `"12:00:00"` but compared unequal). Unlike the fast-path-only fixes this was

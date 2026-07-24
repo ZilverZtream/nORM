@@ -246,6 +246,12 @@ namespace nORM.Providers
         internal override string? CanonicalTimeOnlyTextForExactCompare(string sql)
             => $"(CASE WHEN instr({sql}, '.') = 0 THEN {sql} ELSE rtrim(rtrim({sql}, '0'), '.') END)";
 
+        // Plain DateTime 'yyyy-MM-dd HH:mm:ss[.fffffff]' TEXT: the only '.' is the fractional separator, so
+        // strip trailing fraction zeros for exact equality (only when a '.' is present, so a whole-second
+        // "12:00:00" is untouched). Makes "12:00:00.0000000" == "12:00:00".
+        internal override string? CanonicalDateTimeTextForExactCompare(string sql)
+            => $"(CASE WHEN instr({sql}, '.') = 0 THEN {sql} ELSE rtrim(rtrim({sql}, '0'), '.') END)";
+
         // SQLite stores TimeSpan as 'c' TEXT "[d.]hh:mm:ss[.fffffff]". A '.' can be the DAY separator, so
         // the fraction-strip must fire only when there is a fractional part — i.e. a '.' AFTER the seconds
         // colon. Walk past the two time-part colons (hh:mm:ss) and strip trailing zeros only if the

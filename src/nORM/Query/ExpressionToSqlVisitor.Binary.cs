@@ -416,6 +416,26 @@ namespace nORM.Query
                 }
             }
 
+            // Plain DateTime EQUALITY on a TEXT-storing provider (SQLite): "12:00:00.0000000" and
+            // "12:00:00" are the same instant but lexically distinct, so a raw `=` silently drops the
+            // differently-scaled row / splits groups. Canonicalize both raw-storage/constant operands
+            // (strip trailing fraction zeros). Only BOTH-plain-DateTime — DateTimeOffset keeps its
+            // offset/instant handling (TryEmitDateTimeOffsetEqualsLiteral above), and relational operators
+            // fall through to the datetime()-wrapped order path below.
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                && (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(DateTime)
+                && (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(DateTime)
+                && _provider.CanonicalDateTimeTextForExactCompare("x") != null
+                && (IsRawStorageOperand(node.Left) || TryGetConstantValue(node.Left, out _))
+                && (IsRawStorageOperand(node.Right) || TryGetConstantValue(node.Right, out _)))
+            {
+                string WrapDt(string sql) => _provider.CanonicalDateTimeTextForExactCompare(sql)!;
+                _sql.Append('(').Append(WrapDt(GetSql(node.Left)));
+                _sql.Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ");
+                _sql.Append(WrapDt(GetSql(node.Right))).Append(')');
+                return node;
+            }
+
             // DateTime / DateTimeOffset comparison: SQLite stores as TEXT and lex-compares
             // ISO strings, which mis-orders rows with mixed timezone offsets ('+02:00'
             // suffix vs 'Z'). Other providers' native DATETIME types compare correctly so

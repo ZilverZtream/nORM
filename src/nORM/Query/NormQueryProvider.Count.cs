@@ -345,7 +345,8 @@ namespace nORM.Query
                 // DTO; numeric fractional-seconds for TimeSpan): a raw `col = @p` lexically under-counts an
                 // equal value stored in a different representation. Defer both.
                 var eqClrType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
-                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan) || eqClrType == typeof(TimeOnly))
+                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan)
+                    || eqClrType == typeof(TimeOnly) || eqClrType == typeof(DateTime))
                     return false;
 
                 // SQLite stores decimal as TEXT; a raw `col = @p` here is a lexical string compare that

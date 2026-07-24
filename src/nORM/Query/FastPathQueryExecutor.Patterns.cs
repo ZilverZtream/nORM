@@ -90,7 +90,8 @@ namespace nORM.Query
                 // format for TimeSpan). Defer both to the full translator (native providers keep parity —
                 // the deferred SQL is identical there).
                 var eqClrType = Nullable.GetUnderlyingType(me.Type) ?? me.Type;
-                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan) || eqClrType == typeof(TimeOnly))
+                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan)
+                    || eqClrType == typeof(TimeOnly) || eqClrType == typeof(DateTime))
                     return false;
 
                 info = new WhereInfo(propertyPath, value);
@@ -304,6 +305,12 @@ namespace nORM.Query
             // "12:00:00.0000000" equals "12:00:00"); a raw `col = @p` misses it. Ranges/ordering are already
             // lexically correct for zero-padded TimeOnly text, so only equality defers.
             if (memberType == typeof(TimeOnly) && binary.NodeType == ExpressionType.Equal)
+                return false;
+
+            // Plain DateTime EQUALITY needs the canonical fraction-strip the full translator emits; a raw
+            // `col = @p` misses a differently-scaled instant. Ranges stay (BuildFilteredOrderedPageSql wraps
+            // DateTime order comparisons with datetime()).
+            if (memberType == typeof(DateTime) && binary.NodeType == ExpressionType.Equal)
                 return false;
 
             // A decimal comparison on a TEXT-storing provider (SQLite) needs the canonical wrapping the

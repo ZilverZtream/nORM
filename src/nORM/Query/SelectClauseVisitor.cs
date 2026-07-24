@@ -440,7 +440,8 @@ namespace nORM.Query
             {
                 var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
                 if (ExactDecimalProjectionKeys
-                    && (memberType == typeof(decimal) || memberType == typeof(TimeOnly) || memberType == typeof(TimeSpan)))
+                    && (memberType == typeof(decimal) || memberType == typeof(TimeOnly)
+                        || memberType == typeof(TimeSpan) || memberType == typeof(DateTime)))
                 {
                     // Provider hook: SqliteProvider emits the canonical text (decimal: scale-insensitive
                     // exact dedup — TEXT storage where REAL would merge values beyond double precision;

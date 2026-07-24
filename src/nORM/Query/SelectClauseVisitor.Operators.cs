@@ -509,6 +509,9 @@ namespace nORM.Query
                     tempWrap = s => _provider.NormalizeTimeSpanForCompare(s);
                 else if (tempLt == typeof(DateTimeOffset) && tempRt == typeof(DateTimeOffset))
                     tempWrap = s => _provider.NormalizeDateTimeOffsetForCompare(s);
+                else if (tempLt == typeof(DateTime) && tempRt == typeof(DateTime)
+                         && _provider.CanonicalDateTimeTextForExactCompare("x") != null)
+                    tempWrap = s => _provider.CanonicalDateTimeTextForExactCompare(s)!;
 
                 if (tempWrap != null
                     && (IsRawStorageOperandScv(node.Left) || QueryTranslator.TryGetConstantValue(node.Left, out _))
