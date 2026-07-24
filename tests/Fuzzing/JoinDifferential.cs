@@ -192,6 +192,30 @@ namespace nORM.Tests.Fuzzing
             return (norm, oracle);
         }
 
+        /// <summary>
+        /// INNER join followed by Distinct over the joined projection (<c>p.P*100 + c.C</c>): duplicate joined
+        /// pairs (two parents sharing P, two children sharing C) must collapse to one. LINQ's identical pipeline
+        /// is the oracle. Exercises the join→Distinct combination — dedup over a joined result set.
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunJoinDistinctAsync(
+            IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
+        {
+            using var ctx = Seed(parents, children);
+
+            var norm = (await ctx.Query<Parent>()
+                .Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { V = p.P * 100 + c.C })
+                .Distinct()
+                .ToListAsync())
+                .Select(x => x.V).OrderBy(x => x).ToList();
+
+            var oracle = parents
+                .Join(children, p => p.Id, c => c.ParentId, (p, c) => p.P * 100 + c.C)
+                .Distinct()
+                .OrderBy(x => x).ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");

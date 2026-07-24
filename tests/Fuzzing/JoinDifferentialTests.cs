@@ -119,6 +119,43 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public async Task Join_then_distinct_matches_oracle()
+        {
+            // Two parents share P=10 and two children share C=1, so joined pairs collide: (P=10,C=1) arises from
+            // both P1×C1 and P2×C3 → must dedup to one. P3×C4 (P=20,C=1) and P1×C2 (P=10,C=2) are distinct.
+            var parents = new[] { new P { Id = 1, P = 10 }, new P { Id = 2, P = 10 }, new P { Id = 3, P = 20 } };
+            var children = new[]
+            {
+                new C { Id = 1, ParentId = 1, C = 1 }, new C { Id = 2, ParentId = 1, C = 2 },
+                new C { Id = 3, ParentId = 2, C = 1 }, new C { Id = 4, ParentId = 3, C = 1 },
+            };
+            var (norm, oracle) = await JoinDifferential.RunJoinDistinctAsync(parents, children);
+            // pairs: (10,1)×2→1001, (10,2)→1002, (20,1)→2001 → distinct {1001,1002,2001}.
+            Assert.Equal(new[] { 1001, 1002, 2001 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
+        public async Task Coverage_sweep_join_then_distinct_agrees_with_oracle()
+        {
+            // Randomized join→Distinct; small domains make joined pairs collide. Tracks that dedup actually fires.
+            var failures = new List<string>();
+            var deduped = 0;
+            for (var seed = 0; seed < 400; seed++)
+            {
+                var (parents, children, _, _) = JoinDifferential.Generate(seed);
+                var (norm, oracle) = await JoinDifferential.RunJoinDistinctAsync(parents, children);
+                if (!norm.SequenceEqual(oracle))
+                    failures.Add($"seed {seed}: nORM=[{string.Join(",", norm)}] oracle=[{string.Join(",", oracle)}]");
+                // Dedup fired when the joined pair count exceeds the distinct count.
+                var joinCount = parents.Join(children, p => p.Id, c => c.ParentId, (p, c) => 1).Count();
+                if (joinCount > oracle.Count) deduped++;
+            }
+            Assert.True(failures.Count == 0, "join→Distinct sweep divergences:\n" + string.Join("\n", failures.Take(10)));
+            Assert.True(deduped > 5, $"sweep should exercise duplicate joined pairs, got {deduped}");
+        }
+
+        [Fact]
         public async Task Coverage_sweep_join_then_groupby_agrees_with_oracle()
         {
             // Randomized join→GroupBy: small P domain groups joined rows across parents; the aggregate sums the
