@@ -108,6 +108,43 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
         Assert.Equal(2, count);
     }
 
+    // DateTimeOffset == DateTimeOffset literal must match by UTC instant: rows 1 and 2 are the same
+    // instant in different offsets, so both must match a literal for that instant. A raw `Dto = @p` on
+    // any fast path is a lexical TEXT compare that finds only the exact-offset row (1) — the full
+    // translator already lowers to instant equality, so every read fast path must defer here.
+    private static readonly DateTimeOffset SameInstantAsRows1And2 =
+        new DateTimeOffset(2026, 5, 25, 12, 30, 45, 123, TimeSpan.Zero);
+
+    [Fact]
+    public async Task DateTimeOffset_equals_DateTimeOffset_literal_full_translator_matches_by_instant()
+    {
+        var ids = await _ctx.Query<DeqRow>().Where(r => r.Dto == SameInstantAsRows1And2)
+            .Select(r => new { r.Id }).ToListAsync();
+        Assert.Equal(new[] { 1, 2 }, ids.Select(r => r.Id).OrderBy(x => x).ToArray());
+    }
+
+    [Fact]
+    public async Task DateTimeOffset_equals_DateTimeOffset_literal_filtered_ordered_matches_by_instant()
+    {
+        var rows = await _ctx.Query<DeqRow>().Where(r => r.Dto == SameInstantAsRows1And2)
+            .OrderBy(r => r.Id).ToListAsync();
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).ToArray());
+    }
+
+    [Fact]
+    public async Task DateTimeOffset_equals_DateTimeOffset_literal_simple_where_matches_by_instant()
+    {
+        var rows = await _ctx.Query<DeqRow>().Where(r => r.Dto == SameInstantAsRows1And2).ToListAsync();
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).OrderBy(x => x).ToArray());
+    }
+
+    [Fact]
+    public async Task DateTimeOffset_equals_DateTimeOffset_literal_via_count_matches_by_instant()
+    {
+        var count = await _ctx.Query<DeqRow>().CountAsync(r => r.Dto == SameInstantAsRows1And2);
+        Assert.Equal(2, count);
+    }
+
     [Fact]
     public async Task DateTimeOffset_column_equals_unspecified_local_DateTime_literal_uses_literal_instant_offset()
     {

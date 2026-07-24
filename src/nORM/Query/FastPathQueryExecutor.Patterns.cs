@@ -84,12 +84,11 @@ namespace nORM.Query
                 if (!TryGetSimpleValue(be.Right, out var value))
                     return false;
 
-                // A DateTimeOffset column compared to a DateTime literal must lower to UTC-instant
-                // equality: the literal binds without an offset, so a raw `col = @p` is a lexical TEXT
-                // compare that misses rows storing the same instant in a different offset (returns none).
-                // Defer to the full translator (ETSV TryEmitDateTimeOffsetEqualsLiteral), matching the
-                // filtered-ordered path's guard.
-                if ((Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(DateTimeOffset) && value is DateTime)
+                // A DateTimeOffset column equality must lower to UTC-instant comparison (ETSV): a raw
+                // `col = @p` is a lexical TEXT compare on SQLite's offset-suffixed storage, so it misses
+                // the same instant stored in a different offset — whether the literal is an offset-less
+                // DateTime or a DateTimeOffset in another offset. Defer all DTO equality to the full translator.
+                if ((Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(DateTimeOffset))
                     return false;
 
                 info = new WhereInfo(propertyPath, value);
@@ -275,13 +274,16 @@ namespace nORM.Query
             if ((value == null || value == DBNull.Value) && binary.NodeType != ExpressionType.Equal)
                 return false;
 
-            // DTO col [op] DateTime literal needs UTC-epoch lowering (the literal
-            // binds without offset and would mismatch rows storing the same UTC
-            // instant in a different offset). The slow translator (ETSV
-            // TryEmitDateTimeOffsetEqualsLiteral) handles this - bail out of the
-            // fast path so it takes that branch.
+            // A DateTimeOffset EQUALITY must lower to UTC-instant comparison (ETSV), not a raw text `=`:
+            // on SQLite's offset-suffixed storage that lexical compare misses the same instant stored in a
+            // different offset — whether the literal is an offset-less DateTime or a DateTimeOffset in
+            // another offset. Also defer a DTO compared to an offset-less DateTime literal under ANY
+            // operator (a range needs the literal's offset resolved). DTO ranges against a DateTimeOffset
+            // literal stay on the fast path — BuildFilteredOrderedPageSql wraps the column with
+            // NormalizeDateTimeForCompare for order comparisons.
             var memberType = Nullable.GetUnderlyingType(member.Type) ?? member.Type;
-            if (memberType == typeof(DateTimeOffset) && value is DateTime)
+            if (memberType == typeof(DateTimeOffset)
+                && (binary.NodeType == ExpressionType.Equal || value is DateTime))
                 return false;
 
             // A decimal comparison on a TEXT-storing provider (SQLite) needs the canonical wrapping the

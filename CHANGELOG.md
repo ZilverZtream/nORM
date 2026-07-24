@@ -73,13 +73,17 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
-- A `DateTimeOffset` column compared to a `DateTime` literal (`dtoCol == dateTime`)
-  returned no rows on the simple-`Where`, `First`/`FirstOrDefault`, and
-  `Count(predicate)` fast paths: they emitted a raw `col = @p`, and on SQLite (DTO
-  stored as offset-suffixed TEXT) the offset-less literal lexically mismatches every
-  stored value, so equivalent UTC instants in any offset were missed. These shapes
-  now defer to the full translator's UTC-instant lowering, matching the
-  filtered-ordered path (which was already guarded).
+- A `DateTimeOffset` column equality (`dtoCol == literal`) matched by stored TEXT
+  instead of by UTC instant on the read fast paths. On SQLite a `DateTimeOffset` is
+  stored as offset-suffixed TEXT, and a raw `col = @p` is a lexical compare: against
+  a `DateTime` literal (offset-less) it missed every row (returned none), and against
+  a `DateTimeOffset` literal it found only the exact-offset row, dropping the same
+  instant stored in a different offset. This affected the simple-`Where`,
+  `First`/`FirstOrDefault`, and `Count(predicate)` fast paths for both literal kinds,
+  and the filtered-ordered fast path for a `DateTimeOffset` literal. All read fast
+  paths now defer `DateTimeOffset` equality to the full translator's UTC-instant
+  lowering; `DateTimeOffset` range comparisons (already column-normalized) are
+  unaffected.
 - `Count(x => x.Name == "abc")` counted case-insensitively on MySQL and SQL Server:
   the direct-count fast path emitted a bare `col = @p`, which folds case under those
   servers' default collation, so it counted `"ABC"`/`"AbC"` that C# ordinal equality
