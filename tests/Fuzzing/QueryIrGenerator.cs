@@ -27,7 +27,7 @@ namespace nORM.Tests.Fuzzing
             var rowCount = rng.Next(0, 9);
             var rows = new List<IrRow>(rowCount);
             for (var i = 1; i <= rowCount; i++)
-                rows.Add(new IrRow { Id = i, A = rng.Next(0, 6), B = rng.Next(0, 6), Name = Pick(rng, Names) });
+                rows.Add(new IrRow { Id = i, A = rng.Next(0, 6), B = rng.Next(0, 6), Name = Pick(rng, Names), N = MaybeNull(rng) });
 
             var steps = new List<IrStep>();
             for (var i = rng.Next(0, 3); i > 0; i--)
@@ -93,7 +93,7 @@ namespace nORM.Tests.Fuzzing
                 case 1: if (steps.Count > 0) steps.RemoveAt(rng.Next(steps.Count)); break;
                 case 2: steps.Add(IrStep.OrderBy(Pick(rng, Columns), rng.Next(2) == 0)); break;
                 case 3: steps.Add(rng.Next(2) == 0 ? IrStep.Skip(rng.Next(0, rows.Count + 2)) : IrStep.Take(rng.Next(0, rows.Count + 2))); break;
-                case 4: rows.Add(new IrRow { Id = (rows.Count == 0 ? 1 : rows.Max(r => r.Id) + 1), A = rng.Next(0, 6), B = rng.Next(0, 6), Name = Pick(rng, Names) }); break;
+                case 4: rows.Add(new IrRow { Id = (rows.Count == 0 ? 1 : rows.Max(r => r.Id) + 1), A = rng.Next(0, 6), B = rng.Next(0, 6), Name = Pick(rng, Names), N = MaybeNull(rng) }); break;
                 case 5: if (rows.Count > 0) rows.RemoveAt(rng.Next(rows.Count)); break;
                 case 6: // toggle / reshape the set operation
                     setOp = setOp == null
@@ -131,16 +131,29 @@ namespace nORM.Tests.Fuzzing
             };
         }
 
-        // A predicate step: usually a numeric comparison, and ~1/4 of the time an ordinal string op on Name
-        // (==, !=, or Contains). Contains uses a single-char needle so it is a real substring test.
+        // A predicate step: ~1/2 a numeric comparison on Id/A/B, ~1/4 an ordinal string op on Name, ~1/4 a
+        // predicate on the nullable N (a lifted numeric compare, or ~1/3 of those an IS NULL / IS NOT NULL check).
         private static IrStep NextWhere(Random rng)
         {
-            if (rng.Next(4) != 0)
-                return IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6));
-            var op = (IrStringOp)rng.Next(5);
-            // Eq/Ne compare the whole 2-char name; Contains/StartsWith/EndsWith use a single-char needle.
-            return IrStep.WhereName(op, op is IrStringOp.Eq or IrStringOp.Ne ? Pick(rng, Names) : Pick(rng, NameChars));
+            switch (rng.Next(4))
+            {
+                case 0:
+                    var op = (IrStringOp)rng.Next(5);
+                    // Eq/Ne compare the whole 2-char name; Contains/StartsWith/EndsWith use a single-char needle.
+                    return IrStep.WhereName(op, op is IrStringOp.Eq or IrStringOp.Ne ? Pick(rng, Names) : Pick(rng, NameChars));
+                case 1:
+                    // IS NULL / IS NOT NULL (~1/3) exercises the null-equality translation; else a lifted compare
+                    // where NULL rows drop out (3-valued logic).
+                    return rng.Next(3) == 0
+                        ? IrStep.WhereNullable(rng.Next(2) == 0 ? IrCompare.Eq : IrCompare.Ne, null)
+                        : IrStep.WhereNullable(Pick(rng, Compares), rng.Next(0, 6));
+                default:
+                    return IrStep.Where(Pick(rng, Columns), Pick(rng, Compares), rng.Next(0, 6));
+            }
         }
+
+        // ~1/3 of the time NULL, else a small value that overlaps the predicate domain (0..5).
+        private static int? MaybeNull(Random rng) => rng.Next(3) == 0 ? null : rng.Next(0, 6);
 
         private static T Pick<T>(Random rng, T[] items) => items[rng.Next(items.Length)];
     }

@@ -50,6 +50,8 @@ namespace nORM.Tests.Fuzzing
             Assert.Contains("projection", frontier);
             Assert.Contains("setop+projection", frontier);    // the shape whose Distinct previously did not dedup
             Assert.Contains("groupby", frontier);             // the shape whose bare aggregate returned the key
+            Assert.Contains("where-nullable", frontier);      // 3-valued predicate logic on the nullable N column
+            Assert.Contains("where-null-check", frontier);    // IS NULL / IS NOT NULL translation
         }
 
         [Fact]

@@ -116,9 +116,10 @@ namespace nORM.Tests.Fuzzing
         public int A { get; set; }
         public int B { get; set; }
         public string Name { get; set; } = "";
+        public int? N { get; set; }   // nullable — exercises 3-valued predicate logic, IS NULL, and NULL dedup
     }
 
-    public enum IrStepKind { Where, WhereName, OrderBy, Skip, Take, Distinct }
+    public enum IrStepKind { Where, WhereName, WhereNullable, OrderBy, Skip, Take, Distinct }
     public enum IrCompare { Eq, Ne, Lt, Le, Gt, Ge }
     public enum IrStringOp { Eq, Ne, Contains, StartsWith, EndsWith }   // ordinal string ops on the Name column
     public enum IrColumn { Id, A, B }   // orderable / comparable numeric columns
@@ -137,9 +138,14 @@ namespace nORM.Tests.Fuzzing
         public int Count { get; init; }
         public IrStringOp StringOp { get; init; }
         public string Text { get; init; } = "";
+        public bool NullLiteral { get; init; }   // WhereNullable: compare N to NULL (IS NULL / IS NOT NULL) vs to Value
 
         public static IrStep Where(IrColumn col, IrCompare op, int value) => new() { Kind = IrStepKind.Where, Column = col, Op = op, Value = value };
         public static IrStep WhereName(IrStringOp op, string text) => new() { Kind = IrStepKind.WhereName, StringOp = op, Text = text };
+        // A predicate on the nullable N column: `value` null → `N IS NULL`/`IS NOT NULL` (Op Eq/Ne); else a lifted
+        // numeric comparison `N <op> value` where NULL rows are excluded (3-valued logic), matching SQL and C# int?.
+        public static IrStep WhereNullable(IrCompare op, int? value) =>
+            new() { Kind = IrStepKind.WhereNullable, Op = op, Value = value ?? 0, NullLiteral = value is null };
         public static IrStep OrderBy(IrColumn col, bool descending = false) => new() { Kind = IrStepKind.OrderBy, Column = col, Descending = descending };
         public static IrStep Skip(int count) => new() { Kind = IrStepKind.Skip, Count = count };
         public static IrStep Take(int count) => new() { Kind = IrStepKind.Take, Count = count };
@@ -156,6 +162,9 @@ namespace nORM.Tests.Fuzzing
                 IrStringOp.StartsWith => $"Where(Name.StartsWith('{Text}'))",
                 _ => $"Where(Name.EndsWith('{Text}'))",
             },
+            IrStepKind.WhereNullable => NullLiteral
+                ? $"Where(N {(Op == IrCompare.Eq ? "IS NULL" : "IS NOT NULL")})"
+                : $"Where(N{OpSym(Op)}{Value})",
             IrStepKind.OrderBy => $"OrderBy({Column}{(Descending ? "-desc" : "")})",
             IrStepKind.Skip => $"Skip({Count})",
             IrStepKind.Take => $"Take({Count})",

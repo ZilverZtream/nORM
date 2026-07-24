@@ -18,15 +18,16 @@ namespace nORM.Tests.Fuzzing
     public class QueryIrDifferentialTests
     {
         // A has ties (3 at Id 2,5,7) so ordering exercises the Id tiebreaker; some rows filter out.
+        // N mixes NULLs (Id 1,3,6) with a repeated value (3 at Id 2,5,7) so NULL predicates and NULL dedup have teeth.
         private static readonly IrRow[] Data =
         {
-            new() { Id = 1, A = 8, B = 2, Name = "a" },
-            new() { Id = 2, A = 3, B = 9, Name = "b" },
-            new() { Id = 3, A = 7, B = 7, Name = "c" },
-            new() { Id = 4, A = 1, B = 1, Name = "d" },
-            new() { Id = 5, A = 3, B = 4, Name = "e" },
-            new() { Id = 6, A = 6, B = 6, Name = "f" },
-            new() { Id = 7, A = 3, B = 8, Name = "g" },
+            new() { Id = 1, A = 8, B = 2, Name = "a", N = null },
+            new() { Id = 2, A = 3, B = 9, Name = "b", N = 3 },
+            new() { Id = 3, A = 7, B = 7, Name = "c", N = null },
+            new() { Id = 4, A = 1, B = 1, Name = "d", N = 7 },
+            new() { Id = 5, A = 3, B = 4, Name = "e", N = 3 },
+            new() { Id = 6, A = 6, B = 6, Name = "f", N = null },
+            new() { Id = 7, A = 3, B = 8, Name = "g", N = 3 },
         };
 
         private static QueryIr Q(params IrStep[] steps) => new() { Rows = Data, Steps = steps };
@@ -208,6 +209,59 @@ namespace nORM.Tests.Fuzzing
                 Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
             }
         }
+
+        [Fact]
+        public void Nullable_predicates_match_the_linq_oracle()
+        {
+            // The nullable N column: IS NULL / IS NOT NULL must translate correctly (a `N = @p` with @p=NULL would
+            // silently drop every row), and lifted numeric comparisons must exclude NULL rows (3-valued logic).
+            // Data has NULLs at Id 1,3,6 and value 3 at Id 2,5,7, so each predicate has a non-trivial result.
+            var cases = new (string Name, IrStep Step, int ExpectedCount)[]
+            {
+                ("N IS NULL",       IrStep.WhereNullable(IrCompare.Eq, null), 3),   // Id 1,3,6
+                ("N IS NOT NULL",   IrStep.WhereNullable(IrCompare.Ne, null), 4),   // Id 2,4,5,7
+                ("N == 3",          IrStep.WhereNullable(IrCompare.Eq, 3),    3),   // Id 2,5,7 (NULLs excluded: null==3 is false)
+                ("N != 3",          IrStep.WhereNullable(IrCompare.Ne, 3),    4),   // Id 1,3,4,6 — C# null!=3 is TRUE, so NULLs are INCLUDED (EF-parity; a bare SQL `N<>3` would wrongly give 1)
+                ("N > 3",           IrStep.WhereNullable(IrCompare.Gt, 3),    1),   // Id 4
+                ("N <= 3",          IrStep.WhereNullable(IrCompare.Le, 3),    3),   // Id 2,5,7
+                ("N > 99",          IrStep.WhereNullable(IrCompare.Gt, 99),   0),   // none
+            };
+            foreach (var (name, step, expected) in cases)
+            {
+                var ir = new QueryIr { Rows = Data, Steps = new[] { step } };
+                var r = QueryIrDifferential.Execute(ir, seed: 3500);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{name}: {ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+                // Cross-check the oracle count itself, so a wrong shared expression can't make both sides agree.
+                Assert.Equal(expected, Data.Count(BuildOraclePredicate(step)));
+            }
+
+            // `N == 3` (3 rows) and `N != 3` (4 rows) sum to 7 = every row, because C# includes NULLs in `!=`
+            // (null != 3 is true) but excludes them from `==`. nORM matches this (EF-parity null semantics) — a
+            // naive `N <> 3` in SQL would drop the 3 NULL rows and desync from LINQ. That divergence is the trap.
+            Assert.Contains("where-nullable", QueryIrDifferential.ExtractFeatures(new QueryIr { Rows = Data, Steps = new[] { IrStep.WhereNullable(IrCompare.Gt, 1) } }));
+            Assert.Contains("where-null-check", QueryIrDifferential.ExtractFeatures(new QueryIr { Rows = Data, Steps = new[] { IrStep.WhereNullable(IrCompare.Eq, null) } }));
+
+            // NULL dedup through a set operation: EXCEPT of the table with its NULL-and-3 rows removed leaves the
+            // rest; NULLs must dedup as equal (SQLite treats NULLs as not distinct in set ops), matching the oracle.
+            var setopNullable = new QueryIr
+            {
+                Rows = Data, Steps = Array.Empty<IrStep>(),
+                SetOp = new IrSetOp { Kind = IrSetOpKind.Except, RightWheres = new[] { IrStep.WhereNullable(IrCompare.Eq, null) } },
+            };
+            Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(setopNullable, seed: 3501).Outcome);
+        }
+
+        private static Func<IrRow, bool> BuildOraclePredicate(IrStep step) => step.NullLiteral
+            ? (step.Op == IrCompare.Ne ? r => r.N != null : r => r.N == null)
+            : step.Op switch
+            {
+                IrCompare.Eq => r => r.N == step.Value,
+                IrCompare.Ne => r => r.N != step.Value,
+                IrCompare.Lt => r => r.N < step.Value,
+                IrCompare.Le => r => r.N <= step.Value,
+                IrCompare.Gt => r => r.N > step.Value,
+                _ => r => r.N >= step.Value,
+            };
 
         [Fact]
         public void Grouped_over_a_setop_matches_the_linq_oracle()

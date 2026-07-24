@@ -459,11 +459,41 @@ namespace nORM.Tests.Fuzzing
         private static readonly System.Reflection.MethodInfo EndsWithOrdinalMethod =
             typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string), typeof(StringComparison) })!;
 
-        private static bool IsPredicateStep(IrStep s) => s.Kind is IrStepKind.Where or IrStepKind.WhereName;
+        private static bool IsPredicateStep(IrStep s) => s.Kind is IrStepKind.Where or IrStepKind.WhereName or IrStepKind.WhereNullable;
 
         private static Expression<Func<IrRow, bool>> BuildPredicate(IrStep step)
         {
             var p = Expression.Parameter(typeof(IrRow), "r");
+            if (step.Kind == IrStepKind.WhereNullable)
+            {
+                // Predicate on the nullable N (int?). NullLiteral → `N == null` / `N != null`, which nORM must
+                // translate to IS NULL / IS NOT NULL (a `N = @p` with @p=NULL would silently drop every row).
+                // Otherwise a lifted numeric comparison `N <op> value` (liftToNull:false → NULL rows are false,
+                // matching both C# int? semantics and SQL 3-valued logic). Same tree drives oracle and nORM.
+                var nMember = Expression.Property(p, nameof(IrRow.N));
+                Expression nullCmp;
+                if (step.NullLiteral)
+                {
+                    var nullConst = Expression.Constant(null, typeof(int?));
+                    nullCmp = step.Op == IrCompare.Ne
+                        ? Expression.NotEqual(nMember, nullConst)
+                        : Expression.Equal(nMember, nullConst);
+                }
+                else
+                {
+                    var lifted = Expression.Constant((int?)step.Value, typeof(int?));
+                    nullCmp = step.Op switch
+                    {
+                        IrCompare.Eq => Expression.Equal(nMember, lifted),
+                        IrCompare.Ne => Expression.NotEqual(nMember, lifted),
+                        IrCompare.Lt => Expression.LessThan(nMember, lifted),
+                        IrCompare.Le => Expression.LessThanOrEqual(nMember, lifted),
+                        IrCompare.Gt => Expression.GreaterThan(nMember, lifted),
+                        _ => Expression.GreaterThanOrEqual(nMember, lifted),
+                    };
+                }
+                return Expression.Lambda<Func<IrRow, bool>>(nullCmp, p);
+            }
             if (step.Kind == IrStepKind.WhereName)
             {
                 // C# string ==/!= and nORM's string comparison are both ordinal (case-sensitive), so the same
@@ -551,17 +581,18 @@ namespace nORM.Tests.Fuzzing
             cn.Open();
             using (var cmd = cn.CreateCommand())
             {
-                cmd.CommandText = "CREATE TABLE IrRow (Id INTEGER PRIMARY KEY, A INTEGER NOT NULL, B INTEGER NOT NULL, Name TEXT NOT NULL);";
+                cmd.CommandText = "CREATE TABLE IrRow (Id INTEGER PRIMARY KEY, A INTEGER NOT NULL, B INTEGER NOT NULL, Name TEXT NOT NULL, N INTEGER NULL);";
                 cmd.ExecuteNonQuery();
             }
             foreach (var r in rows)
             {
                 using var c = cn.CreateCommand();
-                c.CommandText = "INSERT INTO IrRow (Id, A, B, Name) VALUES ($id,$a,$b,$n)";
+                c.CommandText = "INSERT INTO IrRow (Id, A, B, Name, N) VALUES ($id,$a,$b,$n,$nn)";
                 c.Parameters.AddWithValue("$id", r.Id);
                 c.Parameters.AddWithValue("$a", r.A);
                 c.Parameters.AddWithValue("$b", r.B);
                 c.Parameters.AddWithValue("$n", r.Name);
+                c.Parameters.AddWithValue("$nn", (object?)r.N ?? DBNull.Value);
                 c.ExecuteNonQuery();
             }
             return new DbContext(cn, new SqliteProvider(), new nORM.Configuration.DbContextOptions(), ownsConnection: true);
@@ -573,14 +604,14 @@ namespace nORM.Tests.Fuzzing
             IEnumerable<IrRow> ax = a, bx = b;
             if (!ordered)
             {
-                ax = a.OrderBy(r => r.Id).ThenBy(r => r.A).ThenBy(r => r.B).ThenBy(r => r.Name, StringComparer.Ordinal);
-                bx = b.OrderBy(r => r.Id).ThenBy(r => r.A).ThenBy(r => r.B).ThenBy(r => r.Name, StringComparer.Ordinal);
+                ax = a.OrderBy(r => r.Id).ThenBy(r => r.A).ThenBy(r => r.B).ThenBy(r => r.Name, StringComparer.Ordinal).ThenBy(r => r.N);
+                bx = b.OrderBy(r => r.Id).ThenBy(r => r.A).ThenBy(r => r.B).ThenBy(r => r.Name, StringComparer.Ordinal).ThenBy(r => r.N);
             }
             return ax.Zip(bx, (x, y) => IrRowComparer.Instance.Equals(x, y)).All(eq => eq);
         }
 
         private static string Render(IReadOnlyList<IrRow> rows) =>
-            "[" + string.Join(",", rows.Select(r => $"({r.Id},{r.A},{r.B},{r.Name})")) + "]";
+            "[" + string.Join(",", rows.Select(r => $"({r.Id},{r.A},{r.B},{r.Name},{(r.N.HasValue ? r.N.ToString() : "null")})")) + "]";
 
         private static string FirstUnsupportedToken(string message) =>
             new string(message.TakeWhile(ch => char.IsLetterOrDigit(ch) || ch == ' ').ToArray()).Trim().Replace(' ', '-').ToLowerInvariant();
@@ -599,6 +630,12 @@ namespace nORM.Tests.Fuzzing
             var kinds = ir.Steps.Select(s => s.Kind).ToHashSet();
             if (kinds.Contains(IrStepKind.Where)) f.Add("where");
             if (kinds.Contains(IrStepKind.WhereName)) f.Add("where-name");
+            if (kinds.Contains(IrStepKind.WhereNullable))
+            {
+                f.Add("where-nullable");
+                if (ir.Steps.Any(s => s.Kind == IrStepKind.WhereNullable && s.NullLiteral)) f.Add("where-null-check");
+                if (ir.SetOp != null) f.Add("setop+nullable");
+            }
             if (kinds.Contains(IrStepKind.OrderBy)) f.Add("orderby");
             if (kinds.Contains(IrStepKind.Distinct)) f.Add("distinct");
             if (kinds.Contains(IrStepKind.Skip) || kinds.Contains(IrStepKind.Take)) f.Add("paging");
@@ -637,8 +674,9 @@ namespace nORM.Tests.Fuzzing
         {
             public static readonly IrRowComparer Instance = new();
             public bool Equals(IrRow? x, IrRow? y) =>
-                x != null && y != null && x.Id == y.Id && x.A == y.A && x.B == y.B && string.Equals(x.Name, y.Name, StringComparison.Ordinal);
-            public int GetHashCode(IrRow r) => HashCode.Combine(r.Id, r.A, r.B, r.Name);
+                x != null && y != null && x.Id == y.Id && x.A == y.A && x.B == y.B
+                && string.Equals(x.Name, y.Name, StringComparison.Ordinal) && x.N == y.N; // null==null → equal (SQLite NULL dedup)
+            public int GetHashCode(IrRow r) => HashCode.Combine(r.Id, r.A, r.B, r.Name, r.N);
         }
     }
 }
