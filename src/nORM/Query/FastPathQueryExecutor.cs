@@ -163,7 +163,7 @@ namespace nORM.Query
             }
             // First/FirstOrDefault(Where(source, singleColumnEquality)): filtered, one row. Reject an inner Take
             // (First(Take(Where,n)) with n==0 must be empty, which LIMIT 1 alone would not honor).
-            if (IsSimpleWherePattern(inner, out var whereInfo, out var innerTake) && innerTake == null)
+            if (IsSimpleWherePattern(inner, ctx.RawProvider.StoresDecimalAsText, out var whereInfo, out var innerTake) && innerTake == null)
             {
                 if (!ctx.GetMapping(typeof(T)).ColumnsByName.ContainsKey(whereInfo.Property))
                     return false;
@@ -207,7 +207,7 @@ namespace nORM.Query
                 result = ExecuteSimpleCount<T>(ctx, ct);
                 return true;
             }
-            if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
+            if (IsSimpleWherePattern(expr, ctx.RawProvider.StoresDecimalAsText, out var whereInfo, out var takeCount))
             {
                 var map = ctx.GetMapping(typeof(T));
                 if (!map.ColumnsByName.ContainsKey(whereInfo.Property))
@@ -261,7 +261,7 @@ namespace nORM.Query
                     return false;
             }
 
-            if (IsSimpleWherePattern(expr, out var whereInfo, out var takeCount))
+            if (IsSimpleWherePattern(expr, ctx.RawProvider.StoresDecimalAsText, out var whereInfo, out var takeCount))
             {
                 var map = ctx.GetMapping(typeof(T));
                 if (!map.ColumnsByName.ContainsKey(whereInfo.Property))
@@ -276,7 +276,7 @@ namespace nORM.Query
                 return true;
             }
             if (ctx.Options.CommandInterceptors.Count == 0 &&
-                IsFilteredOrderedPagePattern(expr, out var pageInfo))
+                IsFilteredOrderedPagePattern(expr, ctx.RawProvider.StoresDecimalAsText, out var pageInfo))
             {
                 var map = ctx.GetMapping(typeof(T));
                 if (!HasFilteredOrderedPageColumns(map, pageInfo))

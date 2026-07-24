@@ -34,7 +34,7 @@ namespace nORM.Query
             }
             return false;
         }
-        private static bool IsSimpleWherePattern(Expression expr, out WhereInfo info, out int? takeCount)
+        private static bool IsSimpleWherePattern(Expression expr, bool storesDecimalAsText, out WhereInfo info, out int? takeCount)
         {
             info = default;
             takeCount = null;
@@ -71,6 +71,13 @@ namespace nORM.Query
                 if (!TableMapping.TryGetMemberAccessPath(me, out var propertyPath))
                     return false;
 
+                // A decimal equality on a TEXT-storing provider (SQLite) is a lexical string compare here
+                // ("24.500" = "24.5" is false though the values are equal); only the full translator's
+                // canonical decimal wrapping is correct. Native-DECIMAL providers compare exactly and keep
+                // the fast path.
+                if (storesDecimalAsText && (Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(decimal))
+                    return false;
+
                 // Only accept ConstantExpression or simple MemberExpression.
                 // Never compile and execute arbitrary expressions (would be an RCE vulnerability).
                 // Complex expressions fall back to the safe ExpressionToSqlVisitor.
@@ -103,7 +110,7 @@ namespace nORM.Query
             return false;
         }
 
-        private static bool IsFilteredOrderedPagePattern(Expression expr, out ComplexQueryInfo info)
+        private static bool IsFilteredOrderedPagePattern(Expression expr, bool storesDecimalAsText, out ComplexQueryInfo info)
         {
             info = default!;
             var predicates = new List<PredicateInfo>(4);
@@ -176,10 +183,12 @@ namespace nORM.Query
                             orderLambda.Body is not MemberExpression orderMember)
                             return false;
                         // Ordering by a decimal column must be NUMERIC. This fast path emits a raw
-                        // `ORDER BY col`, which on SQLite (decimals stored as TEXT) sorts LEXICALLY
+                        // `ORDER BY col`, which on a TEXT-storing provider (SQLite) sorts LEXICALLY
                         // ("24.50","429.00","79.99") — silently wrong. Defer decimal order keys to the
-                        // full translator, which emits the canonical numeric ordering.
-                        if ((Nullable.GetUnderlyingType(orderMember.Type) ?? orderMember.Type) == typeof(decimal))
+                        // full translator there, which emits the canonical numeric ordering. Native-DECIMAL
+                        // providers order exactly, so they keep the fast path.
+                        if (storesDecimalAsText
+                            && (Nullable.GetUnderlyingType(orderMember.Type) ?? orderMember.Type) == typeof(decimal))
                             return false;
                         if (!TableMapping.TryGetMemberAccessPath(orderMember, out orderProperty))
                             return false;
@@ -192,7 +201,7 @@ namespace nORM.Query
                         if (predicates.Count > 0)
                             return false;
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression whereLambda ||
-                            !TryCollectPredicates(whereLambda.Body, predicates))
+                            !TryCollectPredicates(whereLambda.Body, predicates, storesDecimalAsText))
                             return false;
                         expr = call.Arguments[0];
                         break;
@@ -216,12 +225,12 @@ namespace nORM.Query
             return true;
         }
 
-        private static bool TryCollectPredicates(Expression expression, List<PredicateInfo> predicates)
+        private static bool TryCollectPredicates(Expression expression, List<PredicateInfo> predicates, bool storesDecimalAsText)
         {
             if (expression is BinaryExpression { NodeType: ExpressionType.AndAlso } and)
             {
-                return TryCollectPredicates(and.Left, predicates) &&
-                       TryCollectPredicates(and.Right, predicates);
+                return TryCollectPredicates(and.Left, predicates, storesDecimalAsText) &&
+                       TryCollectPredicates(and.Right, predicates, storesDecimalAsText);
             }
 
             if (expression is MemberExpression boolMember
@@ -267,14 +276,15 @@ namespace nORM.Query
             if (memberType == typeof(DateTimeOffset) && value is DateTime)
                 return false;
 
-            // A decimal range comparison needs the canonical numeric comparison the full translator
-            // emits (e.g. CAST(col AS REAL) < CAST(@p AS REAL) on SQLite, where decimals are stored as
-            // TEXT). This flat fast path emits a raw `col < @p`, which is a LEXICAL string comparison for
-            // TEXT-stored decimals ("79.99" < "100" is false) and silently drops rows — so defer decimal
-            // range comparisons to the full translator, which compares them numerically.
-            if (memberType == typeof(decimal)
-                && binary.NodeType is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
-                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual)
+            // A decimal comparison on a TEXT-storing provider (SQLite) needs the canonical wrapping the
+            // full translator emits: CAST(col AS REAL) for ranges, and canonical decimal TEXT (trailing
+            // zeros stripped) for equality. This flat fast path emits a raw `col op @p`, which for
+            // TEXT-stored decimals is a LEXICAL string comparison — ranges silently drop rows
+            // ("79.99" < "100" is false) and equality misses scale-mismatched rows ("24.500" = "24.5" is
+            // false though 24.500m == 24.5m). Defer EVERY decimal predicate (range AND equality) to the
+            // full translator there. Native-DECIMAL providers compare exactly, so their raw predicate is
+            // already identical to the full translator's — they keep the fast path.
+            if (memberType == typeof(decimal) && storesDecimalAsText)
                 return false;
 
             predicates.Add(new PredicateInfo(propertyPath, binary.NodeType, value));

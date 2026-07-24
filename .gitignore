@@ -57,3 +57,6 @@ coverage-report/
 *.scratch.ps1
 .claude/
 .tmp/
+
+# Playwright MCP session artifacts (local only)
+.playwright-mcp/

@@ -173,6 +173,10 @@ namespace nORM.Providers
         /// </summary>
         public override string NormalizeDecimalForCompare(string sql) => $"CAST({sql} AS REAL)";
 
+        /// <summary>SQLite stores decimal as TEXT, so raw fast-path decimal comparisons are lexical
+        /// (scale-sensitive equality, magnitude-wrong ordering) and must defer to the full translator.</summary>
+        internal override bool StoresDecimalAsText => true;
+
         /// <summary>
         /// Name of the registered collation that orders decimal TEXT at full 28-digit precision.
         /// </summary>

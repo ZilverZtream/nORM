@@ -211,6 +211,19 @@ namespace nORM.Providers
         public virtual string NormalizeDecimalForCompare(string sql) => sql;
 
         /// <summary>
+        /// True when this provider stores <see cref="decimal"/> as TEXT (SQLite), so a raw
+        /// <c>col = @p</c> / <c>col &lt; @p</c> comparison is a lexical string compare rather than a
+        /// numeric one: equality is scale-sensitive (<c>"24.500"</c> ≠ <c>"24.5"</c> though the values
+        /// are equal) and relational operators mis-order by magnitude. Only the full translator's
+        /// <see cref="NormalizeDecimalForCompare"/> (CAST AS REAL) / <see cref="CanonicalDecimalTextForExactCompare"/>
+        /// wrapping is correct, so the read fast paths must defer a decimal predicate to it when this is
+        /// true. Native-DECIMAL providers (SQL Server / PostgreSQL / MySQL) compare exactly, so their
+        /// fast-path raw predicate is already identical to what the full translator emits — the default
+        /// is <c>false</c> and the fast path stays engaged.
+        /// </summary>
+        internal virtual bool StoresDecimalAsText => false;
+
+        /// <summary>
         /// The sort key for a decimal ORDER BY / ThenBy. Server providers (SQL Server / PostgreSQL /
         /// MySQL) order the native DECIMAL exactly, so the default reuses
         /// <see cref="NormalizeDecimalForCompare"/> (identity). SQLite stores decimal as TEXT and the

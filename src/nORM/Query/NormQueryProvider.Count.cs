@@ -341,6 +341,13 @@ namespace nORM.Query
                     return true;
                 }
 
+                // SQLite stores decimal as TEXT; a raw `col = @p` here is a lexical string compare that
+                // counts the wrong rows when the stored scale differs ("24.500" = "24.5" is false though
+                // 24.500m == 24.5m). Defer decimal equality to the full translator, which canonicalizes both
+                // sides. Native-DECIMAL providers compare exactly and keep this fast path.
+                if (_ctx.RawProvider.StoresDecimalAsText && (Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(decimal))
+                    return false;
+
                 // Apply the column's value converter so the count matches the STORED representation, exactly
                 // as the WHERE fast path and the full pipeline do. Binding the raw model value counts the
                 // wrong rows (typically zero) — e.g. Score == 42 against a column storing 42 as -42.

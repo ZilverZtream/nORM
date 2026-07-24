@@ -274,6 +274,10 @@ public class LinqParityFuzzTests
         0 => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.IntVal)), Expression.Constant(rng.Next(-6, 7))),
         // Multi-digit constants so the single-digit Amount row values expose any lexical-vs-numeric
         // (TEXT-stored decimal) divergence: 3.25 < 10 is true numerically but "3.25" > "10" lexically.
+        // BLIND SPOT this fuzzer CANNOT cover: it seeds every Amount through nORM's write path, which
+        // canonicalizes the stored scale ("2.50m" -> "2.5"), so a scale-SENSITIVE bug — decimal `==`
+        // that does a lexical compare and misses "24.500" vs "24.5" — never shows here. That class needs
+        // NON-canonical stored text and lives in DecimalStorageFormatFuzzTests.
         1 => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.Amount)),
                 Expression.Constant(new[] { -100m, -20m, -10m, -1m, 0m, 1m, 9m, 10m, 20m, 100m }[rng.Next(10)] + rng.Next(4) * 0.25m)),
         2 => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.Price)), Expression.Constant((double)rng.Next(-6, 7) + (rng.Next(2) * 0.5))),

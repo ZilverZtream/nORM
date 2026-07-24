@@ -73,6 +73,16 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- A `decimal` **equality** predicate (`col == value`) on SQLite could silently miss
+  rows whose stored TEXT had a different trailing-zero scale (`"24.500"` is
+  numerically equal to `24.5m` but lexically distinct). Every read fast path that
+  accepts an equality predicate — the simple `Where`, `First`/`FirstOrDefault`, the
+  filtered-ordered list, and `Count(predicate)` — emitted a raw `col = @p` and so
+  disagreed with both the full translator (which canonicalizes) and C# `decimal`
+  equality. nORM-written data was unaffected (nORM stores a canonical scale); the gap
+  only bit decimals written by other clients with a different scale. On SQLite these
+  predicates now defer to the full translator; native-DECIMAL providers (SQL Server /
+  PostgreSQL / MySQL) compare exactly and keep the fast path.
 
 ### Performance
 

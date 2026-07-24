@@ -180,6 +180,12 @@ namespace nORM.Query
                         // nothing. Defer converter columns to the full translator, which applies the converter.
                         if (column.Converter != null)
                             return false;
+                        // SQLite stores decimal as TEXT; a raw `col = @p` here is a lexical string compare
+                        // that misses scale-mismatched rows ("24.500" = "24.5" is false though the values are
+                        // equal). Defer decimal equality to the full translator, which canonicalizes both
+                        // sides. Native-DECIMAL providers compare exactly and keep this fast path.
+                        if (_ctx.RawProvider.StoresDecimalAsText && (Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(decimal))
+                            return false;
                         // Use ExpressionValueExtractor instead of Compile().DynamicInvoke();
                         // DynamicInvoke is significantly slower and poses RCE risks.
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
