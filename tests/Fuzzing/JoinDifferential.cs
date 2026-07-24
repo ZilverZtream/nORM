@@ -104,6 +104,31 @@ namespace nORM.Tests.Fuzzing
             return (norm, oracle);
         }
 
+        /// <summary>
+        /// GroupJoin that CONSUMES the group (<c>cs.Count()</c> per outer), projecting <c>p.Id*1000 + count</c>.
+        /// When <paramref name="joinOnValue"/> is true the join key is the NON-unique <c>p.P</c> (vs <c>c.ParentId</c>),
+        /// so two distinct outer rows can share a join key — the precise outer-row segmentation scenario: the
+        /// flattened stream must be grouped back by the outer's identity (PK), not by the join key, or the two
+        /// same-key outers merge and one is lost. LINQ GroupJoin groups per outer element, so it is the oracle.
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunGroupCountAsync(
+            IReadOnlyList<Parent> parents, IReadOnlyList<Child> children, bool joinOnValue)
+        {
+            using var ctx = Seed(parents, children);
+
+            var norm = (joinOnValue
+                    ? await ctx.Query<Parent>().GroupJoin(ctx.Query<Child>(), p => p.P, c => c.ParentId, (p, cs) => new { V = p.Id * 1000 + cs.Count() }).ToListAsync()
+                    : await ctx.Query<Parent>().GroupJoin(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, cs) => new { V = p.Id * 1000 + cs.Count() }).ToListAsync())
+                .Select(x => x.V).OrderBy(x => x).ToList();
+
+            var oracle = (joinOnValue
+                    ? parents.GroupJoin(children, p => p.P, c => c.ParentId, (p, cs) => p.Id * 1000 + cs.Count())
+                    : parents.GroupJoin(children, p => p.Id, c => c.ParentId, (p, cs) => p.Id * 1000 + cs.Count()))
+                .OrderBy(x => x).ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");

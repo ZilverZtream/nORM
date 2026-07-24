@@ -84,6 +84,36 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public async Task GroupJoin_count_per_outer_matches_oracle()
+        {
+            // GroupJoin consuming the group with a per-outer Count, joined on the unique PK.
+            // P1 has 2 children, P2 has 1, P3 has 0 → 1002, 2001, 3000.
+            var (norm, oracle) = await JoinDifferential.RunGroupCountAsync(Parents, Children, joinOnValue: false);
+            Assert.Equal(new[] { 1002, 2001, 3000 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
+        public async Task GroupJoin_on_a_non_unique_key_does_not_merge_distinct_outers()
+        {
+            // The outer-row segmentation scenario: two DISTINCT parents (Id 1,2) share the join key P=5, one
+            // parent has P=9. Joining on the NON-unique P means both P=5 parents match the same children. The
+            // flattened stream must segment by the outer PK, not by the join key — otherwise the two P=5 parents
+            // merge and one row is lost. LINQ GroupJoin gives one row per outer element → 3 rows.
+            var parents = new[] { new P { Id = 1, P = 5 }, new P { Id = 2, P = 5 }, new P { Id = 3, P = 9 } };
+            var children = new[]
+            {
+                new C { Id = 1, ParentId = 5, C = 1 }, new C { Id = 2, ParentId = 5, C = 2 },
+                new C { Id = 3, ParentId = 9, C = 3 },
+            };
+            var (norm, oracle) = await JoinDifferential.RunGroupCountAsync(parents, children, joinOnValue: true);
+            // P1(P=5)→{C1,C2}=2, P2(P=5)→{C1,C2}=2, P3(P=9)→{C3}=1 → 1002, 2002, 3001. Three distinct outer rows.
+            Assert.Equal(new[] { 1002, 2002, 3001 }, oracle);
+            Assert.Equal(3, norm.Count); // teeth: a merge-by-key bug would collapse the two P=5 parents to 2 rows
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
         public async Task Left_join_keeps_childless_parents_as_null_rows()
         {
             var (norm, oracle) = await JoinDifferential.RunLeftAsync(Parents, Children);
@@ -130,6 +160,26 @@ namespace nORM.Tests.Fuzzing
             }
             Assert.True(failures.Count == 0, "join sweep divergences:\n" + string.Join("\n", failures.Take(10)));
             Assert.True(multiplicity > 5, $"sweep should exercise parent row-multiplication, got {multiplicity}");
+        }
+
+        [Fact]
+        public async Task Coverage_sweep_groupjoin_nonunique_key_agrees_with_oracle()
+        {
+            // GroupJoin on the non-unique P (small 0-5 domain, so parents frequently share a join key) consuming a
+            // per-outer Count. Every distinct outer must survive with its own count. Tracks that key-sharing (the
+            // segmentation trigger) is actually exercised.
+            var failures = new List<string>();
+            var sharedKey = 0;
+            for (var seed = 0; seed < 400; seed++)
+            {
+                var (parents, children, _, _) = JoinDifferential.Generate(seed);
+                var (norm, oracle) = await JoinDifferential.RunGroupCountAsync(parents, children, joinOnValue: true);
+                if (!norm.SequenceEqual(oracle))
+                    failures.Add($"seed {seed}: nORM=[{string.Join(",", norm)}] oracle=[{string.Join(",", oracle)}]");
+                if (parents.GroupBy(p => p.P).Any(g => g.Count() >= 2)) sharedKey++;
+            }
+            Assert.True(failures.Count == 0, "GroupJoin non-unique-key sweep divergences:\n" + string.Join("\n", failures.Take(10)));
+            Assert.True(sharedKey > 20, $"sweep should exercise distinct outers sharing a join key, got {sharedKey}");
         }
 
         [Fact]
