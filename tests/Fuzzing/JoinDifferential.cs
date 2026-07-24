@@ -66,6 +66,44 @@ namespace nORM.Tests.Fuzzing
             return (parents, children, pf, cf);
         }
 
+        /// <summary>
+        /// Runs a LEFT OUTER join (GroupJoin + SelectMany + DefaultIfEmpty) through nORM and the LINQ-to-Objects
+        /// oracle. Every outer (parent) row survives: a parent with no matching child yields one row with a NULL
+        /// child, projected to <c>-p.P</c> (a distinct negative marker); a matched pair projects <c>p.P*100+c.C</c>.
+        /// Optional pre-join filters apply to each source identically on both sides. The null-child row and the
+        /// <c>c == null</c> projection are the subtle LEFT-join surface (outer-row segmentation, NULL handling).
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunLeftAsync(
+            IReadOnlyList<Parent> parents,
+            IReadOnlyList<Child> children,
+            Expression<Func<Parent, bool>>? parentFilter = null,
+            Expression<Func<Child, bool>>? childFilter = null)
+        {
+            using var ctx = Seed(parents, children);
+
+            IQueryable<Parent> outer = ctx.Query<Parent>();
+            if (parentFilter != null) outer = outer.Where(parentFilter);
+            IQueryable<Child> inner = ctx.Query<Child>();
+            if (childFilter != null) inner = inner.Where(childFilter);
+
+            var norm = (await outer
+                .GroupJoin(inner, p => p.Id, c => c.ParentId, (p, cs) => new { p, cs })
+                .SelectMany(x => x.cs.DefaultIfEmpty(), (x, c) => new { V = c == null ? -x.p.P : x.p.P * 100 + c.C })
+                .ToListAsync())
+                .Select(x => x.V).OrderBy(x => x).ToList();
+
+            IEnumerable<Parent> oParents = parents;
+            if (parentFilter != null) oParents = oParents.Where(parentFilter.Compile());
+            IEnumerable<Child> oChildren = children;
+            if (childFilter != null) oChildren = oChildren.Where(childFilter.Compile());
+            var oracle = oParents
+                .GroupJoin(oChildren, p => p.Id, c => c.ParentId, (p, cs) => new { p, cs })
+                .SelectMany(x => x.cs.DefaultIfEmpty(), (x, c) => c == null ? -x.p.P : x.p.P * 100 + c.C)
+                .OrderBy(x => x).ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");

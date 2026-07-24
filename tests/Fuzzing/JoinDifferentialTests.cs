@@ -84,6 +84,34 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public async Task Left_join_keeps_childless_parents_as_null_rows()
+        {
+            var (norm, oracle) = await JoinDifferential.RunLeftAsync(Parents, Children);
+            // P1×C1=1001, P1×C2=1002, P2×C3=2003, and P3 (childless) → -30 (null child). Orphan C4 excluded.
+            Assert.Equal(new[] { -30, 1001, 1002, 2003 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
+        public async Task Left_join_all_parents_childless_yields_a_row_per_parent()
+        {
+            // No children at all → every parent survives as a null-child row: -10, -20, -30.
+            var (norm, oracle) = await JoinDifferential.RunLeftAsync(Parents, Array.Empty<C>());
+            Assert.Equal(new[] { -30, -20, -10 }.OrderBy(x => x), oracle.OrderBy(x => x));
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
+        public async Task Left_join_with_a_child_filter_reverts_filtered_out_parents_to_null_rows()
+        {
+            // Child filter C>2 keeps only C3 (ParentId 2). So P1's children are filtered out → P1 becomes a null
+            // row (-10); P2 keeps C3 → 2003; P3 stays null (-30). The classic "filter demotes to null row" case.
+            var (norm, oracle) = await JoinDifferential.RunLeftAsync(Parents, Children, childFilter: c => c.C > 2);
+            Assert.Equal(new[] { -30, -10, 2003 }.OrderBy(x => x), oracle.OrderBy(x => x));
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
         public async Task Coverage_sweep_inner_join_agrees_with_oracle()
         {
             // Randomized parents/children/filters across 400 seeds — orphans, shared keys, multiplication, empty
@@ -102,6 +130,25 @@ namespace nORM.Tests.Fuzzing
             }
             Assert.True(failures.Count == 0, "join sweep divergences:\n" + string.Join("\n", failures.Take(10)));
             Assert.True(multiplicity > 5, $"sweep should exercise parent row-multiplication, got {multiplicity}");
+        }
+
+        [Fact]
+        public async Task Coverage_sweep_left_join_agrees_with_oracle()
+        {
+            // Same randomized data as the INNER sweep, but LEFT-joined: every parent survives, childless parents
+            // become NULL rows. Must match the LINQ oracle. Tracks that NULL-child rows are actually exercised.
+            var failures = new List<string>();
+            var nullRows = 0;
+            for (var seed = 0; seed < 400; seed++)
+            {
+                var (parents, children, pf, cf) = JoinDifferential.Generate(seed);
+                var (norm, oracle) = await JoinDifferential.RunLeftAsync(parents, children, pf, cf);
+                if (!norm.SequenceEqual(oracle))
+                    failures.Add($"seed {seed}: nORM=[{string.Join(",", norm)}] oracle=[{string.Join(",", oracle)}]");
+                if (oracle.Any(v => v < 0)) nullRows++; // negative marker = a null-child (childless-parent) row
+            }
+            Assert.True(failures.Count == 0, "LEFT join sweep divergences:\n" + string.Join("\n", failures.Take(10)));
+            Assert.True(nullRows > 20, $"LEFT sweep should exercise null-child rows, got {nullRows}");
         }
 
         [Fact]
