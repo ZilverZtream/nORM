@@ -341,11 +341,11 @@ namespace nORM.Query
                     return true;
                 }
 
-                // A DateTimeOffset column equality must lower to UTC-instant comparison; a raw `col = @p`
-                // lexically under-counts equivalent instants stored in a different offset, whether the
-                // literal is an offset-less DateTime or a DateTimeOffset. Defer all DTO equality to the
-                // full translator.
-                if ((Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType) == typeof(DateTimeOffset))
+                // DateTimeOffset and TimeSpan equality must lower in the full translator (UTC-instant for
+                // DTO; numeric fractional-seconds for TimeSpan): a raw `col = @p` lexically under-counts an
+                // equal value stored in a different representation. Defer both.
+                var eqClrType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan))
                     return false;
 
                 // SQLite stores decimal as TEXT; a raw `col = @p` here is a lexical string compare that

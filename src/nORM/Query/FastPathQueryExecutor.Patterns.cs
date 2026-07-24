@@ -84,11 +84,13 @@ namespace nORM.Query
                 if (!TryGetSimpleValue(be.Right, out var value))
                     return false;
 
-                // A DateTimeOffset column equality must lower to UTC-instant comparison (ETSV): a raw
-                // `col = @p` is a lexical TEXT compare on SQLite's offset-suffixed storage, so it misses
-                // the same instant stored in a different offset — whether the literal is an offset-less
-                // DateTime or a DateTimeOffset in another offset. Defer all DTO equality to the full translator.
-                if ((Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(DateTimeOffset))
+                // DateTimeOffset and TimeSpan equality must lower to instant / numeric comparison in the
+                // full translator: on SQLite both are stored as TEXT whose lexical `col = @p` compare misses
+                // an equal value in a different representation (offset for DateTimeOffset; fractional-digit
+                // format for TimeSpan). Defer both to the full translator (native providers keep parity —
+                // the deferred SQL is identical there).
+                var eqClrType = Nullable.GetUnderlyingType(me.Type) ?? me.Type;
+                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan))
                     return false;
 
                 info = new WhereInfo(propertyPath, value);
@@ -197,6 +199,10 @@ namespace nORM.Query
                         if (storesDecimalAsText
                             && (Nullable.GetUnderlyingType(orderMember.Type) ?? orderMember.Type) == typeof(decimal))
                             return false;
+                        // A TimeSpan order key sorts 'c' TEXT lexically on SQLite, mis-ordering multi-day
+                        // durations. Defer to the full translator's NormalizeTimeSpanForCompare ordering.
+                        if ((Nullable.GetUnderlyingType(orderMember.Type) ?? orderMember.Type) == typeof(TimeSpan))
+                            return false;
                         if (!TableMapping.TryGetMemberAccessPath(orderMember, out orderProperty))
                             return false;
                         orderDescending = call.Method.Name == nameof(Queryable.OrderByDescending);
@@ -284,6 +290,14 @@ namespace nORM.Query
             var memberType = Nullable.GetUnderlyingType(member.Type) ?? member.Type;
             if (memberType == typeof(DateTimeOffset)
                 && (binary.NodeType == ExpressionType.Equal || value is DateTime))
+                return false;
+
+            // SQLite stores TimeSpan as 'c' TEXT and lex-compares, which mis-orders multi-day durations
+            // ("10.00:00:00" < "9.23:59:59") and misses equality against a differently-formatted-but-equal
+            // duration. The full translator wraps both sides with NormalizeTimeSpanForCompare (fractional
+            // seconds); this fast path emits a raw `col op @p`. Defer EVERY TimeSpan predicate (range AND
+            // equality). Native TIME/INTERVAL providers keep parity (their normalize is identity).
+            if (memberType == typeof(TimeSpan))
                 return false;
 
             // A decimal comparison on a TEXT-storing provider (SQLite) needs the canonical wrapping the

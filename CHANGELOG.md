@@ -73,6 +73,17 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- `TimeSpan` predicates matched/ordered by stored TEXT instead of by duration on the
+  read fast paths. On SQLite a `TimeSpan` is stored as canonical `'c'` TEXT; a raw
+  `col = @p` / `col < @p` / `ORDER BY col` compares lexically, so equality missed an
+  equal duration written with a different fractional-digit format
+  (`"1.00:00:00.0000000"` vs `"1.00:00:00"`) and ranges/ordering mis-sorted multi-day
+  durations (`"10.00:00:00"` sorts below `"9.23:59:59"`). This affected the
+  simple-`Where`, `First`/`FirstOrDefault`, and `Count(predicate)` fast paths
+  (equality) and the filtered-ordered fast path (equality, range, and order key). All
+  read fast paths now defer `TimeSpan` predicates to the full translator, which
+  normalizes both sides to fractional seconds; native `TIME`/`INTERVAL` providers are
+  unaffected.
 - A `DateTimeOffset` column equality (`dtoCol == literal`) matched by stored TEXT
   instead of by UTC instant on the read fast paths. On SQLite a `DateTimeOffset` is
   stored as offset-suffixed TEXT, and a raw `col = @p` is a lexical compare: against

@@ -190,11 +190,11 @@ namespace nORM.Query
                         // DynamicInvoke is significantly slower and poses RCE risks.
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                             return false;
-                        // A DateTimeOffset column equality must lower to UTC-instant comparison; a raw
-                        // `col = @p` lexically misses equivalent instants stored in a different offset,
-                        // whether the literal is an offset-less DateTime or a DateTimeOffset. Defer all DTO
-                        // equality to the full translator.
-                        if ((Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(DateTimeOffset))
+                        // DateTimeOffset and TimeSpan equality must lower in the full translator (UTC-instant
+                        // for DTO; numeric fractional-seconds for TimeSpan): a raw `col = @p` lexically misses
+                        // an equal value stored in a different representation. Defer both.
+                        var eqClrType = Nullable.GetUnderlyingType(me.Type) ?? me.Type;
+                        if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan))
                             return false;
                         if (me.Type == typeof(bool) && value is bool boolValue)
                         {
