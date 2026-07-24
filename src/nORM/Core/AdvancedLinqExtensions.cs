@@ -159,7 +159,7 @@ namespace nORM.Core
         /// <returns>A task containing the minimum value.</returns>
         public static Task<TResult> MinAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class, new()
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteAggregateAsync(source, selector, "Min", ct);
 
         /// <summary>
@@ -173,7 +173,7 @@ namespace nORM.Core
         /// <returns>A task containing the minimum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MinAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class, new()
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteAggregateAsync(source, selector, "Min", ct);
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace nORM.Core
         /// <returns>A task containing the minimum value.</returns>
         public static Task<TResult> MinAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteQueryableAggregateAsync(source, selector, "Min", ct);
 
         /// <summary>
@@ -201,7 +201,7 @@ namespace nORM.Core
         /// <returns>A task containing the minimum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MinAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteQueryableAggregateAsync(source, selector, "Min", ct);
 
         /// <summary>
@@ -215,7 +215,7 @@ namespace nORM.Core
         /// <returns>A task containing the maximum value.</returns>
         public static Task<TResult> MaxAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class, new()
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteAggregateAsync(source, selector, "Max", ct);
 
         /// <summary>
@@ -229,7 +229,7 @@ namespace nORM.Core
         /// <returns>A task containing the maximum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MaxAsync<TSource, TResult>(this INormQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class, new()
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteAggregateAsync(source, selector, "Max", ct);
 
         /// <summary>
@@ -243,7 +243,7 @@ namespace nORM.Core
         /// <returns>A task containing the maximum value.</returns>
         public static Task<TResult> MaxAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult>> selector, CancellationToken ct = default)
             where TSource : class
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteQueryableAggregateAsync(source, selector, "Max", ct);
 
         /// <summary>
@@ -257,7 +257,7 @@ namespace nORM.Core
         /// <returns>A task containing the maximum value or <c>null</c> if the sequence is empty.</returns>
         public static Task<TResult?> MaxAsync<TSource, TResult>(this IQueryable<TSource> source, Expression<Func<TSource, TResult?>> selector, CancellationToken ct = default)
             where TSource : class
-            where TResult : struct, INumber<TResult>
+            where TResult : struct
             => ExecuteQueryableAggregateAsync(source, selector, "Max", ct);
 
         #endregion

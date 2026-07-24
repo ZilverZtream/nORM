@@ -90,4 +90,21 @@ public class TemporalAggregateMinMaxTests
         var mins = ctx.Query<DtoRow>().GroupBy(r => 1).Select(g => g.Min(x => x.Dto)).ToList();
         Assert.Equal(new DateTimeOffset(2026, 5, 25, 23, 0, 0, TimeSpan.Zero), mins.Single());
     }
+
+    // MaxAsync/MinAsync now accept non-numeric struct types (constraint relaxed from INumber to struct),
+    // so temporal aggregates have async parity with the sync Max/Min path.
+    [Fact]
+    public async System.Threading.Tasks.Task MaxAsync_timespan_is_by_duration()
+    {
+        using var ctx = NewCtx(TsData);
+        Assert.Equal(TimeSpan.FromDays(10), await ctx.Query<TsRow>().MaxAsync(r => r.Duration));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MinAsync_datetimeoffset_is_by_instant()
+    {
+        using var ctx = NewCtx(DtoData);
+        Assert.Equal(new DateTimeOffset(2026, 5, 25, 23, 0, 0, TimeSpan.Zero),
+            await ctx.Query<DtoRow>().MinAsync(r => r.Dto));
+    }
 }

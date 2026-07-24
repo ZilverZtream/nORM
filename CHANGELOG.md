@@ -14,6 +14,10 @@ security, and documentation.
 
 ### Features
 
+- `MaxAsync` / `MinAsync` now accept any `struct` result type (the constraint was
+  relaxed from `INumber<TResult>`), so `TimeSpan`, `DateTimeOffset`, `TimeOnly`,
+  `DateOnly`, and enum aggregates have async parity with the sync `Max`/`Min`.
+  `SumAsync`/`AverageAsync` keep the numeric constraint. Source-compatible (widening).
 - **Zero-ceremony NativeAOT** for the source-generated path. `[GenerateMaterializer]`
   entities queried via the runtime LINQ API or `[CompileTimeQuery]` methods publish to a
   self-contained native binary — reads and all write models (direct, tracked, bulk),
