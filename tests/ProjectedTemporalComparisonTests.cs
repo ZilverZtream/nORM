@@ -92,4 +92,20 @@ public class ProjectedTemporalComparisonTests
         Assert.True(rows.Single(r => r.Id == 2).M);   // same instant, +02:00 offset
         Assert.False(rows.Single(r => r.Id == 3).M);
     }
+
+    // Mixed projection: a DateTimeOffset column compared to a DateTime literal. C# promotes the
+    // DateTime (Utc kind → zero offset) to DateTimeOffset via its implicit operator, so this is an
+    // instant comparison — row 2 (same instant, +02:00) must still project true. The SCV temporal
+    // block gates DateTimeOffset canonicalization on BOTH sides being DTO; a DateTime literal on the
+    // right is a Convert node, so this checks that mixed form is not left as a raw-text compare.
+    [Fact]
+    public async Task Projected_dto_equals_datetime_literal_is_by_instant()
+    {
+        using var ctx = NewCtx();
+        var utcNoon = new DateTime(2026, 5, 25, 12, 0, 0, DateTimeKind.Utc);
+        var rows = await ctx.Query<Row>().Select(r => new { r.Id, M = r.Dto == utcNoon }).OrderBy(r => r.Id).ToListAsync();
+        Assert.True(rows.Single(r => r.Id == 1).M);
+        Assert.True(rows.Single(r => r.Id == 2).M);   // 2026-05-25 14:00:00+02:00 == 12:00Z
+        Assert.False(rows.Single(r => r.Id == 3).M);
+    }
 }
