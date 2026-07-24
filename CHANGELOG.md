@@ -73,6 +73,13 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- A temporal comparison projected in a `Select` (`Select(r => r.T == value)`) was
+  evaluated on the raw stored TEXT rather than by value, so the computed boolean
+  disagreed with the same comparison in a `Where`. `TimeOnly`, `TimeSpan`, and
+  `DateTimeOffset` projected equality all returned the wrong result for values stored
+  in a different scale/offset (`decimal` and `string` were already correct). The
+  projection visitor now mirrors the predicate visitor's canonicalization for these
+  types ("fix both visitors"); native providers are unaffected.
 - A `TimeOnly` equality predicate (`col == value`) on SQLite silently dropped rows
   whose stored TEXT had a different fractional scale (`"12:00:00.0000000"` is the same
   time as `"12:00:00"` but compared unequal). Unlike the fast-path-only fixes this was

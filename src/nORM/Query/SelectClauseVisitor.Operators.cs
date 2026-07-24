@@ -492,6 +492,43 @@ namespace nORM.Query
                 return node;
             }
 
+            // Projected temporal EQUALITY must be by value, mirroring the predicate visitor (ETSV): a raw
+            // TEXT `=` on SQLite silently mis-compares an equal value stored in a different representation.
+            // TimeOnly -> canonical text (strip fraction zeros); TimeSpan -> numeric seconds; DateTimeOffset
+            // (both sides) -> UTC instant. Native-typed providers return identity from these hooks. Same
+            // raw-or-constant gating as the decimal block (a computed operand stays on the generic path).
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                var tempLt = Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type;
+                var tempRt = Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type;
+                Func<string, string>? tempWrap = null;
+                if ((tempLt == typeof(TimeOnly) || tempRt == typeof(TimeOnly))
+                    && _provider.CanonicalTimeOnlyTextForExactCompare("x") != null)
+                    tempWrap = s => _provider.CanonicalTimeOnlyTextForExactCompare(s)!;
+                else if (tempLt == typeof(TimeSpan) || tempRt == typeof(TimeSpan))
+                    tempWrap = s => _provider.NormalizeTimeSpanForCompare(s);
+                else if (tempLt == typeof(DateTimeOffset) && tempRt == typeof(DateTimeOffset))
+                    tempWrap = s => _provider.NormalizeDateTimeOffsetForCompare(s);
+
+                if (tempWrap != null
+                    && (IsRawStorageOperandScv(node.Left) || QueryTranslator.TryGetConstantValue(node.Left, out _))
+                    && (IsRawStorageOperandScv(node.Right) || QueryTranslator.TryGetConstantValue(node.Right, out _)))
+                {
+                    var tLeftStart = sb.Length;
+                    Visit(node.Left);
+                    var tLeftSql = sb.ToString(tLeftStart, sb.Length - tLeftStart);
+                    sb.Length = tLeftStart;
+                    var tRightStart = sb.Length;
+                    Visit(node.Right);
+                    var tRightSql = sb.ToString(tRightStart, sb.Length - tRightStart);
+                    sb.Length = tRightStart;
+                    sb.Append('(').Append(tempWrap(tLeftSql))
+                      .Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ")
+                      .Append(tempWrap(tRightSql)).Append(')');
+                    return node;
+                }
+            }
+
             // C# string equality is ordinal; on providers whose default collation folds case
             // (MySQL, SQL Server) a projected `x.Name == "abc"` must use the sargable ordinal
             // wrap so the computed boolean matches LINQ-to-Objects and the Where translation.
