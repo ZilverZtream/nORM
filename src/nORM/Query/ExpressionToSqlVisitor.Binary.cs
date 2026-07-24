@@ -390,6 +390,27 @@ namespace nORM.Query
                 return node;
             }
 
+            // TimeOnly EQUALITY on a TEXT-storing provider (SQLite): "12:00:00.0000000" and "12:00:00" are
+            // the same time but lexically distinct, so a raw `=` silently drops the differently-scaled row.
+            // Canonicalize both raw-storage operands (strip trailing fraction zeros). Relational operators
+            // are already lexically correct for zero-padded TimeOnly text, and native TIME providers return
+            // null from the hook (identity) so the shape stays `(left op right)` there.
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            {
+                bool leftIsTimeOnly = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(TimeOnly);
+                bool rightIsTimeOnly = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeOnly);
+                if ((leftIsTimeOnly || rightIsTimeOnly)
+                    && IsRawStorageOperand(node.Left) && IsRawStorageOperand(node.Right)
+                    && _provider.CanonicalTimeOnlyTextForExactCompare("x") != null)
+                {
+                    string WrapTimeOnly(string sql) => _provider.CanonicalTimeOnlyTextForExactCompare(sql)!;
+                    _sql.Append('(').Append(WrapTimeOnly(GetSql(node.Left)));
+                    _sql.Append(node.NodeType == ExpressionType.Equal ? " = " : " <> ");
+                    _sql.Append(WrapTimeOnly(GetSql(node.Right))).Append(')');
+                    return node;
+                }
+            }
+
             // DateTime / DateTimeOffset comparison: SQLite stores as TEXT and lex-compares
             // ISO strings, which mis-orders rows with mixed timezone offsets ('+02:00'
             // suffix vs 'Z'). Other providers' native DATETIME types compare correctly so

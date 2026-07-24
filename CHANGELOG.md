@@ -73,6 +73,14 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- A `TimeOnly` equality predicate (`col == value`) on SQLite silently dropped rows
+  whose stored TEXT had a different fractional scale (`"12:00:00.0000000"` is the same
+  time as `"12:00:00"` but compared unequal). Unlike the fast-path-only fixes this was
+  **product-wide**: the full translator normalized `TimeSpan` comparisons but not
+  `TimeOnly`, so equality fell through to a raw lexical compare on every path. The full
+  translator now canonicalizes `TimeOnly` equality (strips trailing fraction zeros) and
+  the read fast paths defer it; ordering was already correct (zero-padded text sorts
+  chronologically) and native `TIME` providers are unaffected.
 - `TimeSpan` predicates matched/ordered by stored TEXT instead of by duration on the
   read fast paths. On SQLite a `TimeSpan` is stored as canonical `'c'` TEXT; a raw
   `col = @p` / `col < @p` / `ORDER BY col` compares lexically, so equality missed an

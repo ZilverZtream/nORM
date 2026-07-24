@@ -223,6 +223,12 @@ namespace nORM.Providers
             return $"(CASE WHEN instr({sql}, '.') = 0 THEN {sql} WHEN {trimmed} = '-0' THEN '0' ELSE {trimmed} END)";
         }
 
+        // SQLite stores TimeOnly as "HH:mm:ss[.fffffff]" TEXT. Strip trailing fraction zeros for exact
+        // equality, but ONLY when a fractional part exists (the instr guard), so "12:30:00" keeps its
+        // whole-second zeros. This makes "12:00:00.0000000" == "12:00:00" compare equal as they should.
+        internal override string? CanonicalTimeOnlyTextForExactCompare(string sql)
+            => $"(CASE WHEN instr({sql}, '.') = 0 THEN {sql} ELSE rtrim(rtrim({sql}, '0'), '.') END)";
+
         /// <summary>
         /// SQLite stores TimeSpan as canonical 'c' TEXT ("d.hh:mm:ss.fffffff").
         /// Lex-comparison of the TEXT column gives wrong order for multi-day durations

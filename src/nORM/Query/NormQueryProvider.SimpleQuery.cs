@@ -194,7 +194,7 @@ namespace nORM.Query
                         // for DTO; numeric fractional-seconds for TimeSpan): a raw `col = @p` lexically misses
                         // an equal value stored in a different representation. Defer both.
                         var eqClrType = Nullable.GetUnderlyingType(me.Type) ?? me.Type;
-                        if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan))
+                        if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan) || eqClrType == typeof(TimeOnly))
                             return false;
                         if (me.Type == typeof(bool) && value is bool boolValue)
                         {

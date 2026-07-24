@@ -41,22 +41,27 @@ public class FastPathFullTranslatorDifferentialTests
         public string Str { get; set; } = "";
         public int Num { get; set; }
         public bool Flag { get; set; }
+        public DateOnly Do { get; set; }
+        [Column("T_o")] public TimeOnly To { get; set; }
     }
 
     // Each row carries a NON-CANONICAL text form so a raw `col = @p` / `col < @p` on the fast path would
     // diverge from the full translator's normalized comparison. Columns Dec/Dto/Ts/Str are TEXT.
     // Dto rows 1&2 are the same instant in different offsets; Ts rows 1&2 are the same duration in
     // different fractional formats; Dec has trailing-zero scales; Ts rows 5&6 are multi-day (lexical trap).
+    // DateOnly rows are canonical "yyyy-MM-dd" (lexical == chronological). TimeOnly rows 1&2 are the same
+    // time in canonical and extra-fraction TEXT ("12:00:00" vs "12:00:00.0000000") — the equality trap.
     private static readonly string SeedSql =
         "CREATE TABLE Diff_Test (Id INTEGER PRIMARY KEY, Dec TEXT NOT NULL, Dto TEXT NOT NULL, " +
-        "Ts TEXT NOT NULL, Str TEXT NOT NULL, Num INTEGER NOT NULL, Flag INTEGER NOT NULL);" +
-        "INSERT INTO Diff_Test (Id, Dec, Dto, Ts, Str, Num, Flag) VALUES " +
-        "(1, '24.500',  '2026-05-25 12:30:45.123+00:00', '1.00:00:00',          'abc', 5,  1)," +
-        "(2, '24.5',    '2026-05-25 14:30:45.123+02:00', '1.00:00:00.0000000',  'xyz', 5,  0)," +
-        "(3, '100.00',  '2026-05-25 09:00:00.000+00:00', '2.00:00:00',          'abc', 10, 1)," +
-        "(4, '79.99',   '2026-05-25 12:30:46.000+00:00', '0.12:00:00',          'def', 0,  0)," +
-        "(5, '429.000', '2026-05-24 00:00:00.000+00:00', '10.00:00:00',         'ghi', 20, 1)," +
-        "(6, '9.9',     '2026-05-26 23:59:59.999+00:00', '9.23:59:59',          'jkl', -3, 0);";
+        "Ts TEXT NOT NULL, Str TEXT NOT NULL, Num INTEGER NOT NULL, Flag INTEGER NOT NULL, " +
+        "Do TEXT NOT NULL, T_o TEXT NOT NULL);" +
+        "INSERT INTO Diff_Test (Id, Dec, Dto, Ts, Str, Num, Flag, Do, T_o) VALUES " +
+        "(1, '24.500',  '2026-05-25 12:30:45.123+00:00', '1.00:00:00',          'abc', 5,  1, '2026-05-25', '12:00:00')," +
+        "(2, '24.5',    '2026-05-25 14:30:45.123+02:00', '1.00:00:00.0000000',  'xyz', 5,  0, '2026-05-25', '12:00:00.0000000')," +
+        "(3, '100.00',  '2026-05-25 09:00:00.000+00:00', '2.00:00:00',          'abc', 10, 1, '2026-05-26', '13:30:00')," +
+        "(4, '79.99',   '2026-05-25 12:30:46.000+00:00', '0.12:00:00',          'def', 0,  0, '2026-05-24', '00:00:00')," +
+        "(5, '429.000', '2026-05-24 00:00:00.000+00:00', '10.00:00:00',         'ghi', 20, 1, '2026-05-25', '23:59:59')," +
+        "(6, '9.9',     '2026-05-26 23:59:59.999+00:00', '9.23:59:59',          'jkl', -3, 0, '2026-05-27', '06:15:00');";
 
     // Predicates over the awkward types. Built as Expression<Func<DiffRow,bool>> so both the fast path
     // (Where / Where+OrderBy / Count) and the full translator (Where+Select) evaluate the same tree.
@@ -76,6 +81,10 @@ public class FastPathFullTranslatorDifferentialTests
         ("num == 5",           r => r.Num == 5),
         ("num < 10",           r => r.Num < 10),
         ("flag == true",       r => r.Flag),
+        ("dateonly == 5-25",   r => r.Do == new DateOnly(2026, 5, 25)),
+        ("dateonly < 5-26",    r => r.Do < new DateOnly(2026, 5, 26)),
+        ("timeonly == 12:00",  r => r.To == new TimeOnly(12, 0, 0)),
+        ("timeonly < 13:00",   r => r.To < new TimeOnly(13, 0, 0)),
     };
 
     private static DbContext NewCtx()

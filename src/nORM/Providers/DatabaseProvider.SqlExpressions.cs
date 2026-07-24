@@ -260,6 +260,17 @@ namespace nORM.Providers
         internal virtual string? CanonicalDecimalTextForExactCompare(string sql) => null;
 
         /// <summary>
+        /// Canonical <see cref="TimeOnly"/> TEXT for EXACT equality on providers that store TimeOnly as
+        /// TEXT (SQLite: <c>"HH:mm:ss[.fffffff]"</c>). A raw <c>=</c> is lexical, so the same time written
+        /// with a different fractional scale (<c>"12:00:00.0000000"</c> vs <c>"12:00:00"</c>) compares
+        /// unequal and silently drops rows. The canonical text strips trailing fraction zeros (only when a
+        /// fractional part is present, so the whole-second field is untouched). Ordering does NOT need this
+        /// — zero-padded TimeOnly text sorts chronologically. Null means the provider's native TIME type
+        /// already compares by value.
+        /// </summary>
+        internal virtual string? CanonicalTimeOnlyTextForExactCompare(string sql) => null;
+
+        /// <summary>
         /// The expression to use where a decimal participates as an exact KEY
         /// (GROUP BY, DISTINCT, set-op dedup): the canonical text when the provider
         /// needs it, otherwise the ordinary comparison normalization.

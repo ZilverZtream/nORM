@@ -90,7 +90,7 @@ namespace nORM.Query
                 // format for TimeSpan). Defer both to the full translator (native providers keep parity —
                 // the deferred SQL is identical there).
                 var eqClrType = Nullable.GetUnderlyingType(me.Type) ?? me.Type;
-                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan))
+                if (eqClrType == typeof(DateTimeOffset) || eqClrType == typeof(TimeSpan) || eqClrType == typeof(TimeOnly))
                     return false;
 
                 info = new WhereInfo(propertyPath, value);
@@ -298,6 +298,12 @@ namespace nORM.Query
             // seconds); this fast path emits a raw `col op @p`. Defer EVERY TimeSpan predicate (range AND
             // equality). Native TIME/INTERVAL providers keep parity (their normalize is identity).
             if (memberType == typeof(TimeSpan))
+                return false;
+
+            // TimeOnly EQUALITY needs the canonical-text comparison the full translator emits (a TEXT-stored
+            // "12:00:00.0000000" equals "12:00:00"); a raw `col = @p` misses it. Ranges/ordering are already
+            // lexically correct for zero-padded TimeOnly text, so only equality defers.
+            if (memberType == typeof(TimeOnly) && binary.NodeType == ExpressionType.Equal)
                 return false;
 
             // A decimal comparison on a TEXT-storing provider (SQLite) needs the canonical wrapping the
