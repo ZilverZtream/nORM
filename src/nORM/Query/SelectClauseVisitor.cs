@@ -449,6 +449,14 @@ namespace nORM.Query
                     // canonical text still materializes as the original value.
                     sb.Append(_provider.ExactKeySql(col.EscCol, memberType));
                 }
+                else if (ExactDecimalProjectionKeys && memberType == typeof(DateTimeOffset)
+                         && _provider.CanonicalizeDateTimeOffsetGroupKey(col.EscCol) is { } dtoKey)
+                {
+                    // DateTimeOffset DISTINCT / set-op dedup is instant-based: the same instant stored at a
+                    // different offset must collapse. Emit the canonical instant text (matches the GROUP BY
+                    // key handling); it still materializes back as the DateTimeOffset value.
+                    sb.Append(dtoKey);
+                }
                 else if (ForceOrdinalStringProjections && memberType == typeof(string)
                          && _provider.OrdinalComparableStringProjection(col.EscCol) is { } ordinalSql)
                 {

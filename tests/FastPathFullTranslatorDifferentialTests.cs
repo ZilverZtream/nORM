@@ -143,4 +143,80 @@ public class FastPathFullTranslatorDifferentialTests
         var count = await ctx.Query<DiffRow>().CountAsync(predicate);
         Assert.Equal(oracle.Count, count);
     }
+
+    // ── GROUP BY / DISTINCT dedup vs the absolute oracle over non-canonical storage ──────────────────
+    // A TEXT-stored type whose exact-key canonicalization is missing splits equal values into separate
+    // groups / distinct rows (exactly how the TimeOnly and TimeSpan grouping bugs manifested). Comparing
+    // the sorted group SIZES / distinct COUNT against LINQ-to-objects catches a mis-dedup as an extra group.
+
+    private static async Task<(List<int> nrm, List<int> oracle)> GroupSizes<TKey>(
+        DbContext ctx, Expression<Func<DiffRow, TKey>> key)
+    {
+        var nrm = (await ctx.Query<DiffRow>().GroupBy(key).Select(g => new { N = g.Count() }).ToListAsync())
+            .Select(x => x.N).OrderBy(n => n).ToList();
+        var oracle = Reference.GroupBy(key.Compile()).Select(g => g.Count()).OrderBy(n => n).ToList();
+        return (nrm, oracle);
+    }
+
+    [Theory]
+    [InlineData("Dec")]
+    [InlineData("Ts")]
+    [InlineData("To")]
+    [InlineData("Do")]
+    [InlineData("Str")]
+    [InlineData("Num")]
+    [InlineData("Dto")]
+    [InlineData("Flag")]
+    public async Task GroupBy_group_sizes_match_oracle(string column)
+    {
+        using var ctx = NewCtx();
+        List<int> nrm, oracle;
+        switch (column)
+        {
+            case "Dec": (nrm, oracle) = await GroupSizes(ctx, r => r.Dec); break;
+            case "Ts": (nrm, oracle) = await GroupSizes(ctx, r => r.Ts); break;
+            case "To": (nrm, oracle) = await GroupSizes(ctx, r => r.To); break;
+            case "Do": (nrm, oracle) = await GroupSizes(ctx, r => r.Do); break;
+            case "Str": (nrm, oracle) = await GroupSizes(ctx, r => r.Str); break;
+            case "Num": (nrm, oracle) = await GroupSizes(ctx, r => r.Num); break;
+            case "Dto": (nrm, oracle) = await GroupSizes(ctx, r => r.Dto); break;
+            case "Flag": (nrm, oracle) = await GroupSizes(ctx, r => r.Flag); break;
+            default: throw new ArgumentOutOfRangeException(nameof(column));
+        }
+        Assert.Equal(oracle, nrm);
+    }
+
+    private static async Task<(int nrm, int oracle)> DistinctCount<TAnon>(
+        DbContext ctx, Expression<Func<DiffRow, TAnon>> selector) where TAnon : class
+    {
+        var nrm = (await ctx.Query<DiffRow>().Select(selector).Distinct().ToListAsync()).Count;
+        var oracle = Reference.Select(selector.Compile()).Distinct().Count();
+        return (nrm, oracle);
+    }
+
+    [Theory]
+    [InlineData("Dec")]
+    [InlineData("Ts")]
+    [InlineData("To")]
+    [InlineData("Do")]
+    [InlineData("Str")]
+    [InlineData("Num")]
+    [InlineData("Dto")]
+    public async Task Distinct_count_matches_oracle(string column)
+    {
+        using var ctx = NewCtx();
+        int nrm, oracle;
+        switch (column)
+        {
+            case "Dec": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Dec }); break;
+            case "Ts": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Ts }); break;
+            case "To": (nrm, oracle) = await DistinctCount(ctx, r => new { r.To }); break;
+            case "Do": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Do }); break;
+            case "Str": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Str }); break;
+            case "Num": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Num }); break;
+            case "Dto": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Dto }); break;
+            default: throw new ArgumentOutOfRangeException(nameof(column));
+        }
+        Assert.Equal(oracle, nrm);
+    }
 }

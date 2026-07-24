@@ -73,6 +73,10 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- `DISTINCT` over a `DateTimeOffset` column (`Select(r => new { r.Dto }).Distinct()`)
+  did not collapse the same instant stored at different offsets on SQLite — it kept
+  both rows. `GROUP BY` on the same column already deduped by instant; the `DISTINCT` /
+  set-op projection key now applies the same instant canonicalization.
 - A temporal comparison projected in a `Select` (`Select(r => r.T == value)`) was
   evaluated on the raw stored TEXT rather than by value, so the computed boolean
   disagreed with the same comparison in a `Where`. `TimeOnly`, `TimeSpan`, and
