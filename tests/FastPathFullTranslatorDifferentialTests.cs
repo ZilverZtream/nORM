@@ -219,4 +219,40 @@ public class FastPathFullTranslatorDifferentialTests
         }
         Assert.Equal(oracle, nrm);
     }
+
+    // ── ORDER BY by value, not by lexical TEXT ───────────────────────────────────────────────────────
+    // OrderBy over a TEXT-stored type must sort by value: the materialized column read back from an
+    // ORDER BY must be non-decreasing under the CLR comparer (DateTimeOffset by instant, TimeSpan by
+    // duration, decimal by magnitude). A lexical sort would return rows whose values decrease somewhere.
+    private static async Task AssertOrderedByValue<TKey>(DbContext ctx, Expression<Func<DiffRow, TKey>> key)
+        where TKey : IComparable<TKey>
+    {
+        var sel = key.Compile();
+        var rows = await ctx.Query<DiffRow>().OrderBy(key).ToListAsync();
+        for (var i = 1; i < rows.Count; i++)
+            Assert.True(sel(rows[i - 1]).CompareTo(sel(rows[i])) <= 0,
+                $"ORDER BY not by value at index {i}: {sel(rows[i - 1])} then {sel(rows[i])}");
+    }
+
+    [Theory]
+    [InlineData("Dec")]
+    [InlineData("Ts")]
+    [InlineData("To")]
+    [InlineData("Do")]
+    [InlineData("Dto")]
+    [InlineData("Num")]
+    public async Task OrderBy_is_by_value(string column)
+    {
+        using var ctx = NewCtx();
+        switch (column)
+        {
+            case "Dec": await AssertOrderedByValue(ctx, r => r.Dec); break;
+            case "Ts": await AssertOrderedByValue(ctx, r => r.Ts); break;
+            case "To": await AssertOrderedByValue(ctx, r => r.To); break;
+            case "Do": await AssertOrderedByValue(ctx, r => r.Do); break;
+            case "Dto": await AssertOrderedByValue(ctx, r => r.Dto); break;
+            case "Num": await AssertOrderedByValue(ctx, r => r.Num); break;
+            default: throw new ArgumentOutOfRangeException(nameof(column));
+        }
+    }
 }
