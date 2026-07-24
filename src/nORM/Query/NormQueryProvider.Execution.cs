@@ -216,6 +216,18 @@ namespace nORM.Query
                 return (TResult)(object)Convert.ToDateTime(result, ic);
             if (underlyingType == typeof(Guid))
                 return (TResult)(object)(Guid)result;
+            // TimeSpan / DateTimeOffset / TimeOnly / DateOnly are not IConvertible, so Convert.ChangeType
+            // throws InvalidCastException from the TEXT the provider returns. Route them through the shared
+            // materializer converters (the same ones row materialization uses) so a scalar aggregate or
+            // scalar projection of these types round-trips instead of crashing.
+            if (underlyingType == typeof(TimeSpan))
+                return (TResult)(object)MaterializerFactory.ConvertToTimeSpan(result);
+            if (underlyingType == typeof(DateTimeOffset))
+                return (TResult)(object)MaterializerFactory.ConvertToDateTimeOffset(result);
+            if (underlyingType == typeof(TimeOnly))
+                return (TResult)(object)MaterializerFactory.ConvertToTimeOnly(result);
+            if (underlyingType == typeof(DateOnly))
+                return (TResult)(object)MaterializerFactory.ConvertToDateOnly(result);
 
             // Fallback for other types (still better than ChangeType for common cases above)
             return (TResult)Convert.ChangeType(result, underlyingType, ic)!;

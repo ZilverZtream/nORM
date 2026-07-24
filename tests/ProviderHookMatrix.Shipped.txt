@@ -111,6 +111,7 @@ IsTransactionLogNearCapacityAsync
 LikeEscapeChar
 MaxParameters
 MaxSqlLength
+MinMaxAggregateOperand
 NormalizeDateTimeForCompare
 NormalizeDateTimeOffsetForCompare
 NormalizeDecimalForCompare
@@ -218,6 +219,7 @@ IsConnectionScopedDatabase
 IsObjectNotFoundError
 MaxParameters
 MaxSqlLength
+MinMaxAggregateOperand
 NormalizeDateTimeForCompare
 NormalizeDateTimeOffsetForCompare
 NormalizeDecimalForCompare

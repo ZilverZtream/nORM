@@ -181,6 +181,10 @@ namespace nORM.Providers
         /// Name of the registered collation that orders decimal TEXT at full 28-digit precision.
         /// </summary>
         internal const string DecimalOrderCollation = "NORM_DECIMAL";
+        /// <summary>Collation ordering TimeSpan 'c' TEXT by duration (parses + compares), for MIN/MAX.</summary>
+        internal const string TimeSpanOrderCollation = "NORM_TIMESPAN";
+        /// <summary>Collation ordering DateTimeOffset TEXT by UTC instant (parses + compares), for MIN/MAX.</summary>
+        internal const string DateTimeOffsetOrderCollation = "NORM_DTO";
 
         /// <summary>
         /// Full-precision decimal ORDER BY key. Unlike <see cref="NormalizeDecimalForCompare"/>
@@ -209,6 +213,19 @@ namespace nORM.Providers
                 "MIN" or "MAX" => $"{sqlFunction}({d}({operandSql}) COLLATE {DecimalOrderCollation})",
                 _ => base.DecimalAggregateSql(sqlFunction, operandSql, distinct),
             };
+        }
+
+        /// <summary>
+        /// TimeSpan / DateTimeOffset MIN/MAX must order by value, not by BINARY-lexical TEXT. Wrap the
+        /// operand in the value-ordering collation so the extreme is chosen correctly while the actual
+        /// stored TEXT is returned (materializes back). Other types keep identity.
+        /// </summary>
+        internal override string MinMaxAggregateOperand(string operandSql, Type clrType)
+        {
+            var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
+            if (t == typeof(TimeSpan)) return $"({operandSql}) COLLATE {TimeSpanOrderCollation}";
+            if (t == typeof(DateTimeOffset)) return $"({operandSql}) COLLATE {DateTimeOffsetOrderCollation}";
+            return operandSql;
         }
 
         /// <summary>
@@ -642,6 +659,13 @@ namespace nORM.Providers
             // at full 28-digit precision. Applied only where OrderByDecimalKeySql emits COLLATE NORM_DECIMAL.
             sqlite.CreateCollation(DecimalOrderCollation, static (x, y) => CompareCanonicalDecimalText(x, y));
 
+            // TimeSpan / DateTimeOffset stored as TEXT order lexically under BINARY, which mis-sorts
+            // multi-day durations ("10.00:00:00" < "9.23:59:59") and mixed-offset instants (by wall-clock
+            // text, not instant). These collations parse and compare by value, and MIN/MAX still returns the
+            // actual stored TEXT (materializes back). Applied only where MinMaxAggregateOperand emits COLLATE.
+            sqlite.CreateCollation(TimeSpanOrderCollation, static (x, y) => CompareTimeSpanText(x, y));
+            sqlite.CreateCollation(DateTimeOffsetOrderCollation, static (x, y) => CompareDateTimeOffsetText(x, y));
+
             // Full-precision decimal SUM / AVG: the REAL coercion would accumulate in IEEE-754 double,
             // silently losing precision beyond ~16 significant digits. These aggregates accumulate in
             // decimal and return canonical decimal TEXT, which materializes exactly like a stored
@@ -690,6 +714,30 @@ namespace nORM.Providers
             if (decimal.TryParse(x, NumberStyles.Number, CultureInfo.InvariantCulture, out var dx)
                 && decimal.TryParse(y, NumberStyles.Number, CultureInfo.InvariantCulture, out var dy))
                 return decimal.Compare(dx, dy);
+            return string.CompareOrdinal(x, y);
+        }
+
+        /// <summary>Compares two TimeSpan 'c' TEXT values by duration for the NORM_TIMESPAN collation.</summary>
+        internal static int CompareTimeSpanText(string? x, string? y)
+        {
+            if (ReferenceEquals(x, y)) return 0;
+            if (x is null) return -1;
+            if (y is null) return 1;
+            if (TimeSpan.TryParse(x, CultureInfo.InvariantCulture, out var tx)
+                && TimeSpan.TryParse(y, CultureInfo.InvariantCulture, out var ty))
+                return TimeSpan.Compare(tx, ty);
+            return string.CompareOrdinal(x, y);
+        }
+
+        /// <summary>Compares two DateTimeOffset TEXT values by UTC instant for the NORM_DTO collation.</summary>
+        internal static int CompareDateTimeOffsetText(string? x, string? y)
+        {
+            if (ReferenceEquals(x, y)) return 0;
+            if (x is null) return -1;
+            if (y is null) return 1;
+            if (DateTimeOffset.TryParse(x, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dx)
+                && DateTimeOffset.TryParse(y, CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dy))
+                return DateTimeOffset.Compare(dx, dy);
             return string.CompareOrdinal(x, y);
         }
         

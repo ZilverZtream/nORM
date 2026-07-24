@@ -62,6 +62,8 @@ namespace nORM.Query
                 // provider hook casts integral operands to FLOAT (identity elsewhere).
                 if (sqlFunction == "AVG")
                     columnSql = _provider.AverageAggregateOperand(columnSql, selectorLambda.Body.Type);
+                else if (sqlFunction == "MIN" || sqlFunction == "MAX")
+                    columnSql = _provider.MinMaxAggregateOperand(columnSql, aggBodyType);
                 _sql.AppendAggregateFunction(sqlFunction, columnSql);
             }
 
@@ -460,6 +462,7 @@ namespace nORM.Query
                     else
                     {
                         if (setAggFn == "AVG") setCol = _provider.AverageAggregateOperand(setCol, setElemType);
+                        else if (setAggFn == "MIN" || setAggFn == "MAX") setCol = _provider.MinMaxAggregateOperand(setCol, setElemUnderlying);
                         setAggExpr = $"{setAggFn}({setCol})";
                     }
                     var setAggAlias = EscapeAlias("__saggu" + _joinCounter++);
@@ -521,6 +524,8 @@ namespace nORM.Query
                         // See HandleAggregate: SQL Server AVG(int) truncates; cast integral operands.
                         if (aggUpper == "AVG")
                             colSql = _provider.AverageAggregateOperand(colSql, selA.Body.Type);
+                        else if (aggUpper == "MIN" || aggUpper == "MAX")
+                            colSql = _provider.MinMaxAggregateOperand(colSql, selABodyType);
                         aggCallA = $"{aggUpper}({colSql})";
                     }
                     _sql.Append("SELECT ").Append(aggCallA).Append(" FROM (")
@@ -586,6 +591,10 @@ namespace nORM.Query
                     // not sit inside the CAST, so apply it after AverageAggregateOperand.
                     if (sqlFunction == "AVG")
                         columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
+                    // MIN/MAX over a TEXT-stored temporal type (TimeSpan multi-day, DateTimeOffset
+                    // mixed-offset) must order by value; SQLite's BINARY-lexical MIN/MAX mis-orders it.
+                    else if (sqlFunction == "MIN" || sqlFunction == "MAX")
+                        columnSql = _provider.MinMaxAggregateOperand(columnSql, selBodyType);
                     _sql.AppendAggregateFunction(sqlFunction, aggregateDistinct ? "DISTINCT " + columnSql : columnSql);
                 }
                 _sql.AppendFragment(" FROM ").Append(RootTableSource()).Append(' ').Append(alias);

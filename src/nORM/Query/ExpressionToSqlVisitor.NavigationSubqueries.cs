@@ -178,6 +178,8 @@ namespace nORM.Query
             {
                 if (sqlAgg == "AVG")
                     selectorSql = _provider.AverageAggregateOperand(selectorSql, selector.Body.Type);
+                else if (sqlAgg == "MIN" || sqlAgg == "MAX")
+                    selectorSql = _provider.MinMaxAggregateOperand(selectorSql, aggType);
                 aggCall = $"{sqlAgg}({selectorSql})";
             }
             _sql.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');

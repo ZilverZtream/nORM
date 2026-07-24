@@ -84,6 +84,18 @@ security, and documentation.
   in a different scale/offset (`decimal` and `string` were already correct). The
   projection visitor now mirrors the predicate visitor's canonicalization for these
   types ("fix both visitors"); native providers are unaffected.
+- `Max`/`Min` over a `TimeSpan` or `DateTimeOffset` column threw
+  `InvalidCastException` on SQLite. Two problems: the scalar-aggregate materialization
+  did not apply the type converters (raw `Convert.ChangeType` cannot produce a
+  `TimeSpan`/`DateTimeOffset`), and once materializing, SQLite's `MIN`/`MAX` used the
+  lexical `BINARY` collation, which mis-orders multi-day `TimeSpan` (`"10.00:00:00"`
+  sorts below `"9.23:59:59"`) and mixed-offset `DateTimeOffset` (by wall-clock text,
+  not instant). Scalar aggregates and scalar projections of `TimeSpan`/`DateTimeOffset`/
+  `TimeOnly`/`DateOnly` now round-trip via the shared materializer converters, and
+  `MIN`/`MAX` order these types by value (via registered value-ordering collations)
+  while returning the actual stored value, across scalar, `GROUP BY`, set-op, windowed,
+  and navigation-subquery aggregates. Native `TIME`/`INTERVAL`/`DATETIMEOFFSET`
+  providers are unaffected.
 - A `TimeOnly` equality predicate (`col == value`) on SQLite silently dropped rows
   whose stored TEXT had a different fractional scale (`"12:00:00.0000000"` is the same
   time as `"12:00:00"` but compared unequal). Unlike the fast-path-only fixes this was

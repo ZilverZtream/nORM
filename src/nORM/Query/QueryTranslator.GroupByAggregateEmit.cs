@@ -72,11 +72,14 @@ namespace nORM.Query
             if (!decimalOperand && sqlAgg == "AVG")
                 columnSql = _provider.AverageAggregateOperand(columnSql, selector.Body.Type);
 
+            // MIN/MAX over a TEXT-stored temporal operand (TimeSpan multi-day, DateTimeOffset mixed-offset)
+            // must order by value; SQLite's BINARY-lexical MIN/MAX mis-orders it. Wrap the final operand.
+            bool minMaxOperand = sqlAgg == "MIN" || sqlAgg == "MAX";
             var whereFilter = ExtractAggregateSourceFilter(methodCall);
             if (whereFilter == null)
                 return decimalOperand
                     ? _provider.DecimalAggregateSql(sqlAgg, columnSql)
-                    : $"{sqlAgg}({columnSql})";
+                    : $"{sqlAgg}({(minMaxOperand ? _provider.MinMaxAggregateOperand(columnSql, selBodyType) : columnSql)})";
 
             // Rebind the filter lambda's parameter onto the selector's parameter so both
             // expressions reference the same group-element alias, then translate the
@@ -88,7 +91,7 @@ namespace nORM.Query
             var caseSql = $"CASE WHEN {predSql} THEN {columnSql} ELSE {unmatchedBranchSql} END";
             return decimalOperand
                 ? _provider.DecimalAggregateSql(sqlAgg, caseSql)
-                : $"{sqlAgg}({caseSql})";
+                : $"{sqlAgg}({(minMaxOperand ? _provider.MinMaxAggregateOperand(caseSql, selBodyType) : caseSql)})";
         }
 
         private LambdaExpression ExpandGroupElementSelector(LambdaExpression selector)

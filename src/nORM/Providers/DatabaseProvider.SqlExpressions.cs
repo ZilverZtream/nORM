@@ -235,6 +235,16 @@ namespace nORM.Providers
         internal virtual string OrderByDecimalKeySql(string sql) => NormalizeDecimalForCompare(sql);
 
         /// <summary>
+        /// The operand SQL to place inside <c>MIN()</c>/<c>MAX()</c> so the extreme is chosen by VALUE. The
+        /// default is identity — native providers order their column types correctly. SQLite stores
+        /// <see cref="TimeSpan"/> / <see cref="DateTimeOffset"/> as TEXT that BINARY-collates lexically
+        /// (multi-day durations and mixed-offset instants mis-sort), so SqliteProvider wraps them in a
+        /// value-ordering collation; MIN/MAX still returns the actual stored value (which materializes back).
+        /// Decimal MIN/MAX go through <see cref="DecimalAggregateSql"/> instead.
+        /// </summary>
+        internal virtual string MinMaxAggregateOperand(string operandSql, Type clrType) => operandSql;
+
+        /// <summary>
         /// The complete aggregate-call SQL for a decimal operand (SUM / AVG / MIN / MAX). Server
         /// providers aggregate the native DECIMAL exactly, so the default emits the plain aggregate
         /// over <see cref="NormalizeDecimalForCompare"/> (identity there). SQLite stores decimal as
