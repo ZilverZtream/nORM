@@ -201,6 +201,33 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public async Task Join_with_post_join_filter_matches_oracle()
+        {
+            // Where on the joined result referencing BOTH sides (x.P from parent, x.C from child).
+            var (norm, oracle) = await JoinDifferential.RunJoinPostFilterAsync(Parents, Children);
+            // pairs (10,1),(10,2),(20,3); filter P>=2 && C<=3 keeps all three (all P>=2, all C<=3) → 1001,1002,2003.
+            Assert.Equal(new[] { 1001, 1002, 2003 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
+        public async Task Coverage_sweep_join_post_filter_agrees_with_oracle()
+        {
+            var failures = new List<string>();
+            var kept = 0;
+            for (var seed = 0; seed < 300; seed++)
+            {
+                var (parents, children, _, _) = JoinDifferential.Generate(seed);
+                var (norm, oracle) = await JoinDifferential.RunJoinPostFilterAsync(parents, children);
+                if (!norm.SequenceEqual(oracle))
+                    failures.Add($"seed {seed}: nORM=[{string.Join(",", norm)}] oracle=[{string.Join(",", oracle)}]");
+                if (oracle.Count > 0) kept++;
+            }
+            Assert.True(failures.Count == 0, "join post-filter sweep divergences:\n" + string.Join("\n", failures.Take(10)));
+            Assert.True(kept > 20, $"sweep should exercise non-empty post-join filters, got {kept}");
+        }
+
+        [Fact]
         public async Task Coverage_sweep_join_then_groupby_agrees_with_oracle()
         {
             // Randomized join→GroupBy: small P domain groups joined rows across parents; the aggregate sums the

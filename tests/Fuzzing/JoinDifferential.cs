@@ -267,6 +267,32 @@ namespace nORM.Tests.Fuzzing
             return (norm, oracle);
         }
 
+        /// <summary>
+        /// INNER join with a Where on the JOINED RESULT (referencing both sides: <c>x.P >= 2 &amp;&amp; x.C &lt;= 3</c>),
+        /// distinct from filtering the sources before the join. Constants sit in the generator's 0-5 value domain so
+        /// the filter selects on randomized data. Projects <c>p.P*100 + c.C</c>. LINQ's identical pipeline is the oracle.
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunJoinPostFilterAsync(
+            IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
+        {
+            using var ctx = Seed(parents, children);
+
+            var norm = (await ctx.Query<Parent>()
+                .Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.P, c.C })
+                .Where(x => x.P >= 2 && x.C <= 3)
+                .Select(x => new { V = x.P * 100 + x.C })
+                .ToListAsync())
+                .Select(x => x.V).OrderBy(x => x).ToList();
+
+            var oracle = parents
+                .Join(children, p => p.Id, c => c.ParentId, (p, c) => new { p.P, c.C })
+                .Where(x => x.P >= 2 && x.C <= 3)
+                .Select(x => x.P * 100 + x.C)
+                .OrderBy(x => x).ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");
