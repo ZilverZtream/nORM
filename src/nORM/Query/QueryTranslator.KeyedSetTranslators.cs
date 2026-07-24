@@ -137,7 +137,7 @@ namespace nORM.Query
                     t._parameterManager.Index = t._params.Count;
                 FastExpressionVisitorPool.Return(visitor);
                 var type = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
-                return type == typeof(decimal) ? t._provider.ExactDecimalKeySql(sql) : sql;
+                return t._provider.ExactKeySql(sql, type);
             }
 
             private static string RemoveTrailingOrderBy(Expression source, string sql)
@@ -324,7 +324,7 @@ namespace nORM.Query
                     t._parameterManager.Index = t._params.Count;
                 FastExpressionVisitorPool.Return(visitor);
                 var type = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
-                return type == typeof(decimal) ? t._provider.ExactDecimalKeySql(sql) : sql;
+                return t._provider.ExactKeySql(sql, type);
             }
 
             private static string RemoveTrailingOrderBy(Expression source, string sql)

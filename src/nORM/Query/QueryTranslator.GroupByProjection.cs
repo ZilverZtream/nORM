@@ -635,9 +635,7 @@ namespace nORM.Query
         {
             var sql = TranslateAgainstSubAlias(keyPart, keyParam, subAlias);
             var partType = Nullable.GetUnderlyingType(keyPart.Type) ?? keyPart.Type;
-            if (partType == typeof(decimal))
-                sql = _provider.ExactDecimalKeySql(sql);
-            return sql;
+            return _provider.ExactKeySql(sql, partType);
         }
 
         /// <summary>

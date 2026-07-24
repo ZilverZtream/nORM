@@ -79,8 +79,8 @@ namespace nORM.Query
             var t = keyClrType == null ? null : Nullable.GetUnderlyingType(keyClrType) ?? keyClrType;
             if (provider != null && t == typeof(string) && provider.DefaultStringEqualityIsCaseInsensitive)
                 return provider.OrdinalStringEqualSql(outerKeySql, innerKeySql);
-            if (provider != null && t == typeof(decimal))
-                return $"{provider.ExactDecimalKeySql(outerKeySql)} = {provider.ExactDecimalKeySql(innerKeySql)}";
+            if (provider != null && (t == typeof(decimal) || t == typeof(TimeOnly)))
+                return $"{provider.ExactKeySql(outerKeySql, t!)} = {provider.ExactKeySql(innerKeySql, t!)}";
             if (provider != null && t == typeof(DateTimeOffset))
                 return $"{provider.NormalizeDateTimeOffsetForCompare(outerKeySql)} = {provider.NormalizeDateTimeOffsetForCompare(innerKeySql)}";
             // Boolean key members render as PREDICATES (e.g. `[Flag] = 1`,

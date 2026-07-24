@@ -80,7 +80,11 @@ security, and documentation.
   `TimeOnly`, so equality fell through to a raw lexical compare on every path. The full
   translator now canonicalizes `TimeOnly` equality (strips trailing fraction zeros) and
   the read fast paths defer it; ordering was already correct (zero-padded text sorts
-  chronologically) and native `TIME` providers are unaffected.
+  chronologically) and native `TIME` providers are unaffected. The same canonical key is
+  now applied wherever a `TimeOnly` participates as an exact key — `GROUP BY`, `DISTINCT`,
+  `UNION`/`INTERSECT`/`EXCEPT` dedup, `SequenceEqual`, and join equi-keys — so equal
+  times in different scales collapse to one group / one distinct value / one match
+  (previously they split). Centralized via a provider `ExactKeySql(sql, type)` dispatcher.
 - `TimeSpan` predicates matched/ordered by stored TEXT instead of by duration on the
   read fast paths. On SQLite a `TimeSpan` is stored as canonical `'c'` TEXT; a raw
   `col = @p` / `col < @p` / `ORDER BY col` compares lexically, so equality missed an

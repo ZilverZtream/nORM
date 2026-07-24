@@ -279,6 +279,22 @@ namespace nORM.Providers
             => CanonicalDecimalTextForExactCompare(sql) ?? NormalizeDecimalForCompare(sql);
 
         /// <summary>
+        /// The SQL to use where a column/value of <paramref name="clrType"/> participates as an EXACT KEY
+        /// (GROUP BY, DISTINCT, set-op dedup, join equi-key): the type's canonical form on a provider that
+        /// stores it as TEXT, otherwise the value unchanged. Centralizes the per-type canonicalization so a
+        /// key site does not have to know which CLR types need it — <c>decimal</c> uses the canonical decimal
+        /// text (REAL would merge values beyond double precision), <c>TimeOnly</c> strips trailing fraction
+        /// zeros so the same time in a different scale keys together. Native-typed providers return identity.
+        /// </summary>
+        internal string ExactKeySql(string sql, Type clrType)
+        {
+            var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
+            if (t == typeof(decimal)) return ExactDecimalKeySql(sql);
+            if (t == typeof(TimeOnly)) return CanonicalTimeOnlyTextForExactCompare(sql) ?? sql;
+            return sql;
+        }
+
+        /// <summary>
         /// Wraps a SQL operand for numeric TimeSpan comparison. SQL Server / Postgres /
         /// MySQL store TimeSpan in native TIME / INTERVAL types whose comparison operators
         /// already use numeric ordering - the default is identity. SQLite stores TimeSpan

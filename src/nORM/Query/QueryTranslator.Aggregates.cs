@@ -203,8 +203,9 @@ namespace nORM.Query
                     // expression, and the canonical text still parses as the
                     // materialized decimal key.
                     var partType = Nullable.GetUnderlyingType(compositeKey.Arguments[i].Type) ?? compositeKey.Arguments[i].Type;
-                    if (partType == typeof(decimal))
-                        partSql = _provider.ExactDecimalKeySql(partSql);
+                    // Exact key canonicalization (decimal text, TimeOnly fraction-strip); DateTimeOffset is
+                    // handled by its instant hook just below.
+                    partSql = _provider.ExactKeySql(partSql, partType);
                     // .NET DateTimeOffset equality is instant-based; canonicalize the key so
                     // same-instant values at different offsets group together (SQLite TEXT
                     // storage would otherwise split them). The canonical text doubles as the
@@ -270,10 +271,10 @@ namespace nORM.Query
                     foreach (var kvp in visitor.GetParameters())
                         AddLiteralParameter(kvp.Key, kvp.Value);
                     FastExpressionVisitorPool.Return(visitor);
-                    // Decimal key: canonical exact text (see composite-key path above).
+                    // Exact key canonicalization (decimal text, TimeOnly fraction-strip; see composite-key
+                    // path above). DateTimeOffset is handled by its instant hook just below.
                     var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
-                    if (keyType == typeof(decimal))
-                        groupBySql = _provider.ExactDecimalKeySql(groupBySql);
+                    groupBySql = _provider.ExactKeySql(groupBySql, keyType);
                     // Instant-based DateTimeOffset grouping (see the composite-key path above).
                     if (keyType == typeof(DateTimeOffset)
                         && _provider.CanonicalizeDateTimeOffsetGroupKey(groupBySql) is { } canonicalKey)
