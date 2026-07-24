@@ -261,6 +261,16 @@ namespace nORM.Query
             if (memberType == typeof(DateTimeOffset) && value is DateTime)
                 return false;
 
+            // A decimal range comparison needs the canonical numeric comparison the full translator
+            // emits (e.g. CAST(col AS REAL) < CAST(@p AS REAL) on SQLite, where decimals are stored as
+            // TEXT). This flat fast path emits a raw `col < @p`, which is a LEXICAL string comparison for
+            // TEXT-stored decimals ("79.99" < "100" is false) and silently drops rows — so defer decimal
+            // range comparisons to the full translator, which compares them numerically.
+            if (memberType == typeof(decimal)
+                && binary.NodeType is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual)
+                return false;
+
             predicates.Add(new PredicateInfo(propertyPath, binary.NodeType, value));
             return true;
         }
