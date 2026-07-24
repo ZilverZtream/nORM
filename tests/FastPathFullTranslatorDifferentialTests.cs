@@ -87,6 +87,21 @@ public class FastPathFullTranslatorDifferentialTests
         ("timeonly < 13:00",   r => r.To < new TimeOnly(13, 0, 0)),
     };
 
+    // The TRUE values the seeded TEXT represents (rows 1&2 share a decimal value, a DateTimeOffset instant,
+    // a TimeSpan duration, and a TimeOnly — each stored in a different non-canonical TEXT form). Running the
+    // predicate over this LINQ-to-objects reference is the ABSOLUTE oracle: it catches a bug where BOTH the
+    // fast path and the full translator agree on the wrong answer (which a consistency-only differential
+    // cannot — that was how the product-wide TimeOnly bug slipped a purely fast-path-vs-full-translator check).
+    private static readonly DiffRow[] Reference =
+    {
+        new() { Id = 1, Dec = 24.500m, Dto = new DateTimeOffset(2026, 5, 25, 12, 30, 45, 123, TimeSpan.Zero),      Ts = TimeSpan.FromDays(1),      Str = "abc", Num = 5,  Flag = true,  Do = new DateOnly(2026, 5, 25), To = new TimeOnly(12, 0, 0) },
+        new() { Id = 2, Dec = 24.5m,   Dto = new DateTimeOffset(2026, 5, 25, 14, 30, 45, 123, TimeSpan.FromHours(2)), Ts = TimeSpan.FromDays(1),    Str = "xyz", Num = 5,  Flag = false, Do = new DateOnly(2026, 5, 25), To = new TimeOnly(12, 0, 0) },
+        new() { Id = 3, Dec = 100.00m, Dto = new DateTimeOffset(2026, 5, 25, 9, 0, 0, 0, TimeSpan.Zero),           Ts = TimeSpan.FromDays(2),      Str = "abc", Num = 10, Flag = true,  Do = new DateOnly(2026, 5, 26), To = new TimeOnly(13, 30, 0) },
+        new() { Id = 4, Dec = 79.99m,  Dto = new DateTimeOffset(2026, 5, 25, 12, 30, 46, 0, TimeSpan.Zero),        Ts = TimeSpan.FromHours(12),    Str = "def", Num = 0,  Flag = false, Do = new DateOnly(2026, 5, 24), To = new TimeOnly(0, 0, 0) },
+        new() { Id = 5, Dec = 429.000m,Dto = new DateTimeOffset(2026, 5, 24, 0, 0, 0, 0, TimeSpan.Zero),           Ts = TimeSpan.FromDays(10),     Str = "ghi", Num = 20, Flag = true,  Do = new DateOnly(2026, 5, 25), To = new TimeOnly(23, 59, 59) },
+        new() { Id = 6, Dec = 9.9m,    Dto = new DateTimeOffset(2026, 5, 26, 23, 59, 59, 999, TimeSpan.Zero),      Ts = new TimeSpan(9, 23, 59, 59), Str = "jkl", Num = -3, Flag = false, Do = new DateOnly(2026, 5, 27), To = new TimeOnly(6, 15, 0) },
+    };
+
     private static DbContext NewCtx()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
@@ -104,9 +119,15 @@ public class FastPathFullTranslatorDifferentialTests
         var predicate = Predicates.First(p => p.Name == name).Pred;
         using var ctx = NewCtx();
 
-        // Oracle: the projection defeats every read fast path, forcing the full translator.
-        var oracle = (await ctx.Query<DiffRow>().Where(predicate).Select(r => new { r.Id }).ToListAsync())
+        // ABSOLUTE oracle: the predicate over the true in-memory values (LINQ-to-objects).
+        var oracle = Reference.Where(predicate.Compile()).Select(r => r.Id).OrderBy(x => x).ToList();
+
+        // Full translator (the projection defeats every read fast path). Checked against the absolute
+        // oracle so a product-wide bug (fast path AND full translator both wrong) is caught, not just a
+        // fast-path-vs-full-translator divergence.
+        var fullTranslator = (await ctx.Query<DiffRow>().Where(predicate).Select(r => new { r.Id }).ToListAsync())
             .Select(r => r.Id).OrderBy(x => x).ToList();
+        Assert.Equal(oracle, fullTranslator);
 
         // Simple-Where fast path (async list, no ordering).
         var simpleWhere = (await ctx.Query<DiffRow>().Where(predicate).ToListAsync())

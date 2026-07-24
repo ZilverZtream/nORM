@@ -395,13 +395,18 @@ namespace nORM.Query
             // Canonicalize both raw-storage operands (strip trailing fraction zeros). Relational operators
             // are already lexically correct for zero-padded TimeOnly text, and native TIME providers return
             // null from the hook (identity) so the shape stays `(left op right)` there.
-            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+            if (node.NodeType is ExpressionType.Equal or ExpressionType.NotEqual
+                && _provider.CanonicalTimeOnlyTextForExactCompare("x") != null)
             {
                 bool leftIsTimeOnly = (Nullable.GetUnderlyingType(node.Left.Type) ?? node.Left.Type) == typeof(TimeOnly);
                 bool rightIsTimeOnly = (Nullable.GetUnderlyingType(node.Right.Type) ?? node.Right.Type) == typeof(TimeOnly);
-                if ((leftIsTimeOnly || rightIsTimeOnly)
-                    && IsRawStorageOperand(node.Left) && IsRawStorageOperand(node.Right)
-                    && _provider.CanonicalTimeOnlyTextForExactCompare("x") != null)
+                // Canonicalize when each operand is a column OR a constant/bound literal. A `new TimeOnly(..)`
+                // is a NewExpression (not a ConstantExpression), so IsRawStorageOperand alone would miss the
+                // common `col == new TimeOnly(..)` form; TryGetConstantValue folds it to a bound param. A
+                // genuinely computed operand (arithmetic) matches neither and stays on the raw comparison path.
+                bool leftOk = IsRawStorageOperand(node.Left) || TryGetConstantValue(node.Left, out _);
+                bool rightOk = IsRawStorageOperand(node.Right) || TryGetConstantValue(node.Right, out _);
+                if ((leftIsTimeOnly || rightIsTimeOnly) && leftOk && rightOk)
                 {
                     string WrapTimeOnly(string sql) => _provider.CanonicalTimeOnlyTextForExactCompare(sql)!;
                     _sql.Append('(').Append(WrapTimeOnly(GetSql(node.Left)));
