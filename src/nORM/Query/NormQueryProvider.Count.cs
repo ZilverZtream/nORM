@@ -341,6 +341,13 @@ namespace nORM.Query
                     return true;
                 }
 
+                // A DateTimeOffset column compared to a DateTime literal must lower to UTC-instant equality;
+                // a raw `col = @p` binds the offset-less literal and lexically under-counts equivalent
+                // instants. Defer to the full translator, matching the filtered-ordered path.
+                if ((Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType) == typeof(DateTimeOffset)
+                    && constValue is DateTime)
+                    return false;
+
                 // SQLite stores decimal as TEXT; a raw `col = @p` here is a lexical string compare that
                 // counts the wrong rows when the stored scale differs ("24.500" = "24.5" is false though
                 // 24.500m == 24.5m). Defer decimal equality to the full translator, which canonicalizes both

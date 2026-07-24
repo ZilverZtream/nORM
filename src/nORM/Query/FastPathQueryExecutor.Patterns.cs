@@ -84,6 +84,14 @@ namespace nORM.Query
                 if (!TryGetSimpleValue(be.Right, out var value))
                     return false;
 
+                // A DateTimeOffset column compared to a DateTime literal must lower to UTC-instant
+                // equality: the literal binds without an offset, so a raw `col = @p` is a lexical TEXT
+                // compare that misses rows storing the same instant in a different offset (returns none).
+                // Defer to the full translator (ETSV TryEmitDateTimeOffsetEqualsLiteral), matching the
+                // filtered-ordered path's guard.
+                if ((Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(DateTimeOffset) && value is DateTime)
+                    return false;
+
                 info = new WhereInfo(propertyPath, value);
                 return true;
             }

@@ -87,6 +87,27 @@ public class LinqDateTimeOffsetEqualsDateTimeLiteralTests : IAsyncLifetime
         Assert.Equal(new[] { 5 }, rows.Select(r => r.Id).ToArray());
     }
 
+    // No OrderBy: this shape takes the SIMPLE-WHERE fast path, which must lower the DTO==DateTime
+    // comparison to UTC-instant equality exactly as the filtered-ordered path and full translator do —
+    // a raw `Dto = @p` is a lexical TEXT compare that misses the offset-shifted equivalent instant (row 2).
+    [Fact]
+    public async Task DateTimeOffset_equals_UTC_DateTime_literal_via_simple_where_matches_by_UTC_instant()
+    {
+        var literal = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
+        var rows = await _ctx.Query<DeqRow>().Where(r => r.Dto == literal).ToListAsync();
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.Id).OrderBy(x => x).ToArray());
+    }
+
+    // Count(predicate) takes the direct-count fast path, which must lower the same way — a raw `Dto = @p`
+    // counts only the exact-offset text and under-counts equivalent instants.
+    [Fact]
+    public async Task DateTimeOffset_equals_UTC_DateTime_literal_via_count_matches_by_UTC_instant()
+    {
+        var literal = new DateTime(2026, 5, 25, 12, 30, 45, 123, DateTimeKind.Utc);
+        var count = await _ctx.Query<DeqRow>().CountAsync(r => r.Dto == literal);
+        Assert.Equal(2, count);
+    }
+
     [Fact]
     public async Task DateTimeOffset_column_equals_unspecified_local_DateTime_literal_uses_literal_instant_offset()
     {

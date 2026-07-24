@@ -190,6 +190,11 @@ namespace nORM.Query
                         // DynamicInvoke is significantly slower and poses RCE risks.
                         if (!ExpressionValueExtractor.TryGetConstantValue(be.Right, out var value))
                             return false;
+                        // A DateTimeOffset column compared to a DateTime literal must lower to UTC-instant
+                        // equality; a raw `col = @p` binds the offset-less literal and lexically misses
+                        // equivalent instants. Defer to the full translator, matching the filtered-ordered path.
+                        if ((Nullable.GetUnderlyingType(me.Type) ?? me.Type) == typeof(DateTimeOffset) && value is DateTime)
+                            return false;
                         if (me.Type == typeof(bool) && value is bool boolValue)
                         {
                             whereClause = $" WHERE {_ctx.RawProvider.FormatBooleanPredicate(column.EscCol, boolValue)}";

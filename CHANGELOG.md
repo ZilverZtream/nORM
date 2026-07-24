@@ -73,6 +73,13 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- A `DateTimeOffset` column compared to a `DateTime` literal (`dtoCol == dateTime`)
+  returned no rows on the simple-`Where`, `First`/`FirstOrDefault`, and
+  `Count(predicate)` fast paths: they emitted a raw `col = @p`, and on SQLite (DTO
+  stored as offset-suffixed TEXT) the offset-less literal lexically mismatches every
+  stored value, so equivalent UTC instants in any offset were missed. These shapes
+  now defer to the full translator's UTC-instant lowering, matching the
+  filtered-ordered path (which was already guarded).
 - `Count(x => x.Name == "abc")` counted case-insensitively on MySQL and SQL Server:
   the direct-count fast path emitted a bare `col = @p`, which folds case under those
   servers' default collation, so it counted `"ABC"`/`"AbC"` that C# ordinal equality
