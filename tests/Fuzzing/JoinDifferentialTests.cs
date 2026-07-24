@@ -84,6 +84,44 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public async Task Join_then_groupby_matches_oracle()
+        {
+            // Two parents share P=10 (so one group aggregates children from BOTH), P3 has two children.
+            var parents = new[] { new P { Id = 1, P = 10 }, new P { Id = 2, P = 10 }, new P { Id = 3, P = 20 } };
+            var children = new[]
+            {
+                new C { Id = 1, ParentId = 1, C = 1 }, new C { Id = 2, ParentId = 2, C = 2 },
+                new C { Id = 3, ParentId = 3, C = 3 }, new C { Id = 4, ParentId = 3, C = 4 },
+            };
+            var (norm, oracle) = await JoinDifferential.RunJoinGroupByAsync(parents, children);
+            // group P=10 → sum(C1,C2)=3 → 10003; group P=20 → sum(C3,C4)=7 → 20007.
+            Assert.Equal(new[] { 10003, 20007 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
+        [Fact]
+        public async Task Coverage_sweep_join_then_groupby_agrees_with_oracle()
+        {
+            // Randomized join→GroupBy: small P domain groups joined rows across parents; the aggregate sums the
+            // inner C. Every case must match the LINQ pipeline. Tracks that a group spanning >=2 parents is hit.
+            var failures = new List<string>();
+            var multiParentGroup = 0;
+            for (var seed = 0; seed < 400; seed++)
+            {
+                var (parents, children, _, _) = JoinDifferential.Generate(seed);
+                var (norm, oracle) = await JoinDifferential.RunJoinGroupByAsync(parents, children);
+                if (!norm.SequenceEqual(oracle))
+                    failures.Add($"seed {seed}: nORM=[{string.Join(",", norm)}] oracle=[{string.Join(",", oracle)}]");
+                // A group spans >=2 parents when >=2 parents share a P value AND both have >=1 child.
+                var childByParent = children.GroupBy(c => c.ParentId).Select(g => g.Key).ToHashSet();
+                if (parents.Where(p => childByParent.Contains(p.Id)).GroupBy(p => p.P).Any(g => g.Count() >= 2))
+                    multiParentGroup++;
+            }
+            Assert.True(failures.Count == 0, "join→GroupBy sweep divergences:\n" + string.Join("\n", failures.Take(10)));
+            Assert.True(multiParentGroup > 5, $"sweep should exercise groups spanning multiple parents, got {multiParentGroup}");
+        }
+
+        [Fact]
         public async Task GroupJoin_count_per_outer_matches_oracle()
         {
             // GroupJoin consuming the group with a per-outer Count, joined on the unique PK.

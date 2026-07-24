@@ -129,6 +129,37 @@ namespace nORM.Tests.Fuzzing
             return (norm, oracle);
         }
 
+        /// <summary>
+        /// INNER join followed by a GroupBy over the joined projection: <c>Join(...).GroupBy(x =&gt; x.P).Select(g
+        /// =&gt; key*1000 + g.Sum(c))</c>. Exercises the join→group-by combination (the surface where several past
+        /// fuzzer bugs lived): the group key comes from the outer side, the aggregate from the inner, and multiple
+        /// outers can contribute to one group. LINQ's identical pipeline is the oracle.
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunJoinGroupByAsync(
+            IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
+        {
+            using var ctx = Seed(parents, children);
+
+            // Project the group key and aggregate as SEPARATE members (SELECT P, SUM(C) GROUP BY P) and combine
+            // client-side. A computed SQL body containing the aggregate (`key*1000 + g.Sum(...)`) is a separate,
+            // known niche gap (groupby computed-body aggregate); this isolates the join→GroupBy pipeline itself.
+            var norm = (await ctx.Query<Parent>()
+                .Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.P, c.C })
+                .GroupBy(x => x.P)
+                .Select(g => new { K = g.Key, S = g.Sum(x => x.C) })
+                .ToListAsync())
+                .Select(x => x.K * 1000 + x.S).OrderBy(x => x).ToList();
+
+            var oracle = parents
+                .Join(children, p => p.Id, c => c.ParentId, (p, c) => new { p.P, c.C })
+                .GroupBy(x => x.P)
+                .Select(g => new { K = g.Key, S = g.Sum(x => x.C) })
+                .Select(x => x.K * 1000 + x.S)
+                .OrderBy(x => x).ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");
