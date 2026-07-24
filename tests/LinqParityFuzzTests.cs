@@ -262,6 +262,79 @@ public class LinqParityFuzzTests
         return paged;
     }
 
+    // ── Filtered-ordered fast-path fuzz ────────────────────────────────────────
+    // The main fuzz always appends `.ThenBy(r => r.Id)` (ApplyOrderedPaging), producing a COMPOUND order
+    // that bypasses the single-order filtered-ordered fast path (FastPathQueryExecutor) — so no ordered
+    // main-fuzz case ever exercised it, which is exactly how the decimal lexical-vs-numeric fast-path bug
+    // slipped through. This mode generates SIMPLE member-op-const predicates + a SINGLE OrderBy so that
+    // fast path IS hit, and checks filter-correctness (row set) and order-correctness (order-key values
+    // sorted numerically) SEPARATELY so tied keys don't cause false positives.
+    private static Expression SimpleLeaf(Random rng, ParameterExpression p) => rng.Next(7) switch
+    {
+        0 => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.IntVal)), Expression.Constant(rng.Next(-6, 7))),
+        // Multi-digit constants so the single-digit Amount row values expose any lexical-vs-numeric
+        // (TEXT-stored decimal) divergence: 3.25 < 10 is true numerically but "3.25" > "10" lexically.
+        1 => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.Amount)),
+                Expression.Constant(new[] { -100m, -20m, -10m, -1m, 0m, 1m, 9m, 10m, 20m, 100m }[rng.Next(10)] + rng.Next(4) * 0.25m)),
+        2 => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.Price)), Expression.Constant((double)rng.Next(-6, 7) + (rng.Next(2) * 0.5))),
+        3 => DateComparison(rng, p),
+        4 => rng.Next(2) == 0 ? (Expression)Expression.Property(p, nameof(Row.Flag)) : Expression.Not(Expression.Property(p, nameof(Row.Flag))),
+        5 => Expression.MakeBinary(ExpressionType.Equal, Expression.Property(p, nameof(Row.Name)), Expression.Constant(StringPool[rng.Next(StringPool.Length)])),
+        _ => Expression.MakeBinary(CompareOps[rng.Next(CompareOps.Length)], Expression.Property(p, nameof(Row.NullableInt)), Expression.Constant((int?)rng.Next(-4, 5), typeof(int?))),
+    };
+
+    // NOTE: executes via ToListAsync — the filtered-ordered-page fast path is reached only on the ASYNC
+    // execute path (NormQueryProvider.ExecuteAsync); the sync .ToList() path the rest of the fuzzer uses
+    // goes through a different (single-column) simple-query path, which is precisely why this class of
+    // fast-path bug was invisible to the fuzzer until now.
+    internal static async System.Threading.Tasks.Task RunFilteredOrderedFastPathFuzzAsync(DbContext ctx, int seed, int cases)
+    {
+        var rng = new Random(seed);
+        var orderKeys = new (string Prop, Type Type, Func<Row, IComparable> Sel)[]
+        {
+            (nameof(Row.Id), typeof(int), r => r.Id),
+            (nameof(Row.IntVal), typeof(int), r => r.IntVal),
+            (nameof(Row.Amount), typeof(decimal), r => r.Amount),
+            (nameof(Row.Price), typeof(double), r => r.Price),
+            (nameof(Row.Created), typeof(DateTime), r => r.Created),
+        };
+        for (var i = 0; i < cases; i++)
+        {
+            var p = Expression.Parameter(typeof(Row), "r");
+            var n = rng.Next(1, 4);
+            Expression body = SimpleLeaf(rng, p);
+            for (var j = 1; j < n; j++)
+                body = Expression.AndAlso(body, SimpleLeaf(rng, p));
+            var predicate = Expression.Lambda<Func<Row, bool>>(body, p);
+            var compiled = predicate.Compile();
+
+            var (prop, type, sel) = orderKeys[rng.Next(orderKeys.Length)];
+            var desc = rng.Next(2) == 0;
+            var kp = Expression.Parameter(typeof(Row), "r");
+            var keyLambda = Expression.Lambda(Expression.Property(kp, prop), kp);
+            IQueryable<Row> q = ctx.Query<Row>().Where(predicate);
+            q = q.Provider.CreateQuery<Row>(Expression.Call(
+                typeof(Queryable), desc ? nameof(Queryable.OrderByDescending) : nameof(Queryable.OrderBy),
+                new[] { typeof(Row), type }, q.Expression, Expression.Quote(keyLambda)));
+
+            List<Row> rows;
+            try { rows = await q.ToListAsync(); }
+            catch (NormUnsupportedFeatureException) { continue; }
+
+            var expectedIds = Rows.Where(compiled).Select(r => r.Id).OrderBy(x => x).ToList();
+            var actualIds = rows.Select(r => r.Id).OrderBy(x => x).ToList();
+            Assert.True(expectedIds.SequenceEqual(actualIds),
+                $"fast-path filter set mismatch (seed={seed} case={i}) order={prop} desc={desc}\npredicate: {predicate}\nexpected: [{string.Join(",", expectedIds)}] actual: [{string.Join(",", actualIds)}]");
+
+            for (var j = 1; j < rows.Count; j++)
+            {
+                var cmp = sel(rows[j - 1]).CompareTo(sel(rows[j]));
+                Assert.True(desc ? cmp >= 0 : cmp <= 0,
+                    $"fast-path order not numeric (seed={seed} case={i}) order={prop} desc={desc}\nkeys: [{string.Join(",", rows.Select(r => sel(r)))}]");
+            }
+        }
+    }
+
     /// <summary>
     /// Environment-directed seed sweep for building the release dry window: set
     /// NORM_LINQ_FUZZ_SWEEP to "start:count" (optionally "start:count:dop") to run that
@@ -340,6 +413,7 @@ public class LinqParityFuzzTests
         await SeedChildrenAsync(ctx);
         await SeedGrandsAsync(ctx);
         RunFuzz(ctx, seed, cases: 400);
+        await RunFilteredOrderedFastPathFuzzAsync(ctx, seed, cases: 200);
         RunJoinFuzz(ctx, seed, cases: 150);
         RunSelectManyFuzz(ctx, seed, cases: 120);
         RunNavFlattenFuzz(ctx, seed, cases: 120);

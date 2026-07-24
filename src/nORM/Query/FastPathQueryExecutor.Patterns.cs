@@ -175,6 +175,12 @@ namespace nORM.Query
                         if (StripQuotes(call.Arguments[1]) is not LambdaExpression orderLambda ||
                             orderLambda.Body is not MemberExpression orderMember)
                             return false;
+                        // Ordering by a decimal column must be NUMERIC. This fast path emits a raw
+                        // `ORDER BY col`, which on SQLite (decimals stored as TEXT) sorts LEXICALLY
+                        // ("24.50","429.00","79.99") — silently wrong. Defer decimal order keys to the
+                        // full translator, which emits the canonical numeric ordering.
+                        if ((Nullable.GetUnderlyingType(orderMember.Type) ?? orderMember.Type) == typeof(decimal))
+                            return false;
                         if (!TableMapping.TryGetMemberAccessPath(orderMember, out orderProperty))
                             return false;
                         orderDescending = call.Method.Name == nameof(Queryable.OrderByDescending);

@@ -85,4 +85,17 @@ public class DecimalRangeFilterOrderByCorrectnessTests
         Assert.Equal(noOrder.OrderBy(r => r.Price).Select(r => r.Id), withOrder.Select(r => r.Id));
         Assert.Equal(2, withOrder.Count);
     }
+
+    // Sibling of the filter bug: the filtered-ordered fast path emitted a raw `ORDER BY "Price"`.
+    // Decimals are TEXT on SQLite, so that sorts LEXICALLY ("24.50","429.00","79.99") not numerically
+    // (24.50, 79.99, 429.00) — a silent wrong-ordering. Ordering by a decimal column must be numeric.
+    [Fact]
+    public async Task Order_by_decimal_column_is_numeric_not_lexical()
+    {
+        using var ctx = NewCtx(); // Prices 79.99(1), 24.50(2), 429.00(3)
+        var asc = await ctx.Query<PriceRow>().Where(p => p.Id > 0).OrderBy(p => p.Price).ToListAsync();
+        Assert.Equal(new[] { 2, 1, 3 }, asc.Select(r => r.Id).ToArray());       // 24.50, 79.99, 429.00
+        var desc = await ctx.Query<PriceRow>().Where(p => p.Id > 0).OrderByDescending(p => p.Price).ToListAsync();
+        Assert.Equal(new[] { 3, 1, 2 }, desc.Select(r => r.Id).ToArray());
+    }
 }
