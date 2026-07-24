@@ -239,6 +239,34 @@ namespace nORM.Tests.Fuzzing
             return (norm, oracle);
         }
 
+        /// <summary>
+        /// INNER join → OrderBy → Take (top-N over a join). Projects <c>p.P*10000 + c.Id</c>, which is UNIQUE (the
+        /// child PK is unique and each child joins exactly one parent), so the ordering is total and Take is
+        /// deterministic — no tie ambiguity to desync the oracle. Returns the ORDERED top-<paramref name="take"/>.
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunJoinPagingAsync(
+            IReadOnlyList<Parent> parents, IReadOnlyList<Child> children, int skip, int take)
+        {
+            using var ctx = Seed(parents, children);
+
+            var norm = (await ctx.Query<Parent>()
+                .Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { V = p.P * 10000 + c.Id })
+                .OrderBy(x => x.V)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync())
+                .Select(x => x.V).ToList();
+
+            var oracle = parents
+                .Join(children, p => p.Id, c => c.ParentId, (p, c) => p.P * 10000 + c.Id)
+                .OrderBy(v => v)
+                .Skip(skip)
+                .Take(take)
+                .ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");

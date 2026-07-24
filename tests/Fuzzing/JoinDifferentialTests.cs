@@ -152,6 +152,35 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public async Task Join_then_orderby_paging_matches_oracle()
+        {
+            // Top-N over a join with a unique ordering key (P*10000 + child Id). Full order: P1×C1=100001,
+            // P1×C2=100002, P2×C3=200003 (P3 childless, C4 orphan excluded). Skip(1).Take(1) → [100002].
+            var (norm, oracle) = await JoinDifferential.RunJoinPagingAsync(Parents, Children, skip: 1, take: 1);
+            Assert.Equal(new[] { 100002 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
+        [Theory]
+        [InlineData(0, 2)]
+        [InlineData(1, 2)]
+        [InlineData(0, 100)]
+        [InlineData(5, 2)]
+        public async Task Coverage_sweep_join_then_paging_agrees_with_oracle(int skip, int take)
+        {
+            // Randomized join → OrderBy → Skip/Take across page windows; unique ordering key keeps it deterministic.
+            var failures = new List<string>();
+            for (var seed = 0; seed < 200; seed++)
+            {
+                var (parents, children, _, _) = JoinDifferential.Generate(seed);
+                var (norm, oracle) = await JoinDifferential.RunJoinPagingAsync(parents, children, skip, take);
+                if (!norm.SequenceEqual(oracle)) // ORDERED comparison — paging must preserve order
+                    failures.Add($"seed {seed} skip={skip} take={take}: nORM=[{string.Join(",", norm)}] oracle=[{string.Join(",", oracle)}]");
+            }
+            Assert.True(failures.Count == 0, "join→paging sweep divergences:\n" + string.Join("\n", failures.Take(10)));
+        }
+
+        [Fact]
         public async Task Coverage_sweep_join_then_distinct_agrees_with_oracle()
         {
             // Randomized join→Distinct; small domains make joined pairs collide. Tracks that dedup actually fires.
