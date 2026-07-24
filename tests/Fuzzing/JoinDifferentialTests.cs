@@ -83,6 +83,22 @@ namespace nORM.Tests.Fuzzing
             Assert.Equal(oracle, norm);
         }
 
+        [Fact]
+        public async Task Element_selector_groupby_parameterless_aggregate_in_computed_body_matches_oracle()
+        {
+            // GroupBy(key, elementSelector).Select(g => new { V = g.Key*1000 + g.Sum() }): the parameterless
+            // aggregate must take the element selector (C) as its operand within the computed SQL.
+            var children = new[]
+            {
+                new C { Id = 1, ParentId = 5, C = 1 }, new C { Id = 2, ParentId = 5, C = 2 },
+                new C { Id = 3, ParentId = 8, C = 4 }, new C { Id = 4, ParentId = 8, C = 6 },
+            };
+            var (norm, oracle) = await JoinDifferential.RunElementSelectorComputedAsync(children);
+            // group 5 → 5*1000 + Sum(1,2)=5003; group 8 → 8*1000 + Sum(4,6)=8010.
+            Assert.Equal(new[] { 5003, 8010 }, oracle);
+            Assert.Equal(oracle, norm);
+        }
+
         [Theory]
         [InlineData(0)] // Key*1000 + Sum
         [InlineData(1)] // Sum*10 + Count (two aggregates)

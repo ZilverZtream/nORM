@@ -79,9 +79,11 @@ security, and documentation.
   fallback now registers the grouping keys — the same binding the `HAVING` path uses — when
   the computed body references a group aggregate, so `Sum`/`Min`/`Max`/`Count`/`Average`
   translate to SQL aggregate functions within the computed SQL. Covers multiple aggregates
-  in one body (`g.Sum(x) * 10 + g.Count()`, `g.Max(x) - g.Min(x)`). The same shape over a
-  *joined* projection column (the aggregate operand comes from the inner side of a join)
-  needs joined-column resolution and remains a follow-up.
+  in one body (`g.Sum(x) * 10 + g.Count()`, `g.Max(x) - g.Min(x)`). Also covers an
+  element-selector grouping (`GroupBy(k, s => s.C).Select(g => g.Key * 1000 + g.Sum())`),
+  where the parameterless aggregate now takes the element selector as its operand within
+  the computed SQL. The same shape over a *joined* projection column (the aggregate operand
+  comes from the inner side of a join) needs joined-column resolution and remains a follow-up.
 - A `HAVING` (or its projected aggregate) over a set-operation-sourced `GroupBy`
   emitted invalid SQL. `q.Union/Concat/Intersect/Except(q2).GroupBy(k).Where(g =>
   g.Max(col) > n).Select(g => new { g.Key, V = g.Max(col) })` qualified the aggregate

@@ -216,6 +216,29 @@ namespace nORM.Tests.Fuzzing
             return (norm, oracle);
         }
 
+        /// <summary>
+        /// Element-selector GroupBy (<c>GroupBy(c =&gt; c.ParentId, c =&gt; c.C)</c>) with a PARAMETERLESS aggregate
+        /// inside an anon-wrapped COMPUTED body — <c>Select(g =&gt; new { V = g.Key*1000 + g.Sum() })</c>. The
+        /// parameterless <c>g.Sum()</c> must take the element selector's body (C) as its operand → SUM(C).
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunElementSelectorComputedAsync(IReadOnlyList<Child> children)
+        {
+            using var ctx = Seed(Array.Empty<Parent>(), children);
+
+            var norm = (await ctx.Query<Child>()
+                .GroupBy(c => c.ParentId, c => c.C)
+                .Select(g => new { V = g.Key * 1000 + g.Sum() })
+                .ToListAsync())
+                .Select(x => x.V).OrderBy(x => x).ToList();
+
+            var oracle = children
+                .GroupBy(c => c.ParentId, c => c.C)
+                .Select(g => g.Key * 1000 + g.Sum())
+                .OrderBy(x => x).ToList();
+
+            return (norm, oracle);
+        }
+
         private static DbContext Seed(IReadOnlyList<Parent> parents, IReadOnlyList<Child> children)
         {
             var cn = new SqliteConnection("Data Source=:memory:");

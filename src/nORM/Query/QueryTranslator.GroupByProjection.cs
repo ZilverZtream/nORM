@@ -247,7 +247,15 @@ namespace nORM.Query
                                 // an aggregate actually being present so plain computed-key members are unaffected.
                                 if (ReferencesGroupAggregate(arg, resultSelector.Parameters))
                                     foreach (var gp in resultSelector.Parameters)
+                                    {
                                         visitor.RegisterGroupingKey(gp, groupBySql);
+                                        // A group built with an element selector (GroupBy(key, s => s.C)) lets a
+                                        // parameterless/identity aggregate in the computed body — g.Sum() /
+                                        // g.Sum(x => x) — take the element selector's body as its operand
+                                        // (SUM(C)); mirrors the top-level computed-body path below.
+                                        if (_groupByElementSelector != null)
+                                            visitor.RegisterGroupingElementSelector(gp, _groupByElementSelector);
+                                    }
                                 string sql;
                                 try
                                 {
