@@ -141,8 +141,10 @@ namespace nORM.Tests.Fuzzing
             using var ctx = Seed(parents, children);
 
             // Project the group key and aggregate as SEPARATE members (SELECT P, SUM(C) GROUP BY P) and combine
-            // client-side. A computed SQL body containing the aggregate (`key*1000 + g.Sum(...)`) is a separate,
-            // known niche gap (groupby computed-body aggregate); this isolates the join→GroupBy pipeline itself.
+            // client-side. A computed SQL body embedding the aggregate over a JOINED projection column
+            // (`key*1000 + g.Sum(x=>x.C)` where x.C is the inner-side column) needs joined-column resolution
+            // beyond the single-table computed-body support and stays a separate follow-up; this isolates the
+            // join→GroupBy pipeline itself.
             var norm = (await ctx.Query<Parent>()
                 .Join(ctx.Query<Child>(), p => p.Id, c => c.ParentId, (p, c) => new { p.P, c.C })
                 .GroupBy(x => x.P)
@@ -157,6 +159,36 @@ namespace nORM.Tests.Fuzzing
                 .Select(x => x.K * 1000 + x.S)
                 .OrderBy(x => x).ToList();
 
+            return (norm, oracle);
+        }
+
+        /// <summary>
+        /// Single-table GroupBy with the aggregate embedded in a COMPUTED projection body — the documented
+        /// computed-body aggregate shape (no join). <paramref name="shape"/> selects the expression: 0 =
+        /// <c>Key*1000 + Sum</c>, 1 = <c>Sum*10 + Count</c> (two aggregates), 2 = <c>Max - Min</c> (two distinct
+        /// aggregates). Each nORM result must match the LINQ pipeline.
+        /// </summary>
+        public static async Task<(List<int> Norm, List<int> Oracle)> RunGroupComputedShapeAsync(IReadOnlyList<Child> children, int shape)
+        {
+            using var ctx = Seed(Array.Empty<Parent>(), children);
+            IQueryable<Child> q = ctx.Query<Child>();
+
+            List<int> norm; List<int> oracle;
+            switch (shape)
+            {
+                case 0:
+                    norm = (await q.GroupBy(c => c.ParentId).Select(g => new { V = g.Key * 1000 + g.Sum(c => c.C) }).ToListAsync()).Select(x => x.V).OrderBy(x => x).ToList();
+                    oracle = children.GroupBy(c => c.ParentId).Select(g => g.Key * 1000 + g.Sum(c => c.C)).OrderBy(x => x).ToList();
+                    break;
+                case 1:
+                    norm = (await q.GroupBy(c => c.ParentId).Select(g => new { V = g.Sum(c => c.C) * 10 + g.Count() }).ToListAsync()).Select(x => x.V).OrderBy(x => x).ToList();
+                    oracle = children.GroupBy(c => c.ParentId).Select(g => g.Sum(c => c.C) * 10 + g.Count()).OrderBy(x => x).ToList();
+                    break;
+                default:
+                    norm = (await q.GroupBy(c => c.ParentId).Select(g => new { V = g.Max(c => c.C) - g.Min(c => c.C) }).ToListAsync()).Select(x => x.V).OrderBy(x => x).ToList();
+                    oracle = children.GroupBy(c => c.ParentId).Select(g => g.Max(c => c.C) - g.Min(c => c.C)).OrderBy(x => x).ToList();
+                    break;
+            }
             return (norm, oracle);
         }
 

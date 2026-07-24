@@ -83,6 +83,25 @@ namespace nORM.Tests.Fuzzing
             Assert.Equal(oracle, norm);
         }
 
+        [Theory]
+        [InlineData(0)] // Key*1000 + Sum
+        [InlineData(1)] // Sum*10 + Count (two aggregates)
+        [InlineData(2)] // Max - Min (two distinct aggregates)
+        public async Task Single_table_groupby_with_computed_aggregate_body_matches_oracle(int shape)
+        {
+            // GroupBy with the aggregate INSIDE a computed body (e.g. g.Key*1000 + g.Sum(c=>c.C)). Previously threw
+            // NormUnsupportedFeatureException ("Method 'Sum' is not supported"); the grouped-projection fallback now
+            // registers grouping keys so the embedded aggregate translates within the computed SQL.
+            var children = new[]
+            {
+                new C { Id = 1, ParentId = 5, C = 1 }, new C { Id = 2, ParentId = 5, C = 2 },
+                new C { Id = 3, ParentId = 8, C = 4 }, new C { Id = 4, ParentId = 8, C = 6 },
+            };
+            var (norm, oracle) = await JoinDifferential.RunGroupComputedShapeAsync(children, shape);
+            Assert.NotEmpty(oracle); // teeth: a real computed result, not vacuous
+            Assert.Equal(oracle, norm);
+        }
+
         [Fact]
         public async Task Join_then_groupby_matches_oracle()
         {

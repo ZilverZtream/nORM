@@ -239,6 +239,15 @@ namespace nORM.Query
                                     _correlatedParams[resultSelector.Parameters[0]] = (_mapping, alias);
                                 var vctx = new VisitorContext(_ctx, _mapping, _provider, resultSelector.Parameters[0], alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
                                 var visitor = FastExpressionVisitorPool.Get(in vctx);
+                                // A computed projection body that embeds a group aggregate (e.g.
+                                // `g.Key * 1000 + g.Sum(x => x.C)`) reaches this fallback because `arg` is a
+                                // BinaryExpression, not a bare aggregate MethodCall. Register the grouping
+                                // parameters so the visitor's group-aggregate path emits SUM(...)/MIN(...)/etc.
+                                // within the computed SQL — the same registration the HAVING path uses. Guarded on
+                                // an aggregate actually being present so plain computed-key members are unaffected.
+                                if (ReferencesGroupAggregate(arg, resultSelector.Parameters))
+                                    foreach (var gp in resultSelector.Parameters)
+                                        visitor.RegisterGroupingKey(gp, groupBySql);
                                 string sql;
                                 try
                                 {
@@ -767,6 +776,38 @@ namespace nORM.Query
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(visitor);
             return sql;
+        }
+
+        // True when <paramref name="expr"/> contains an aggregate call (Sum/Min/Max/Average/Count/LongCount)
+        // over one of the grouping parameters — i.e. a group aggregate nested inside a larger (computed)
+        // projection body. Used to decide whether the fallback projection visitor needs grouping-key bindings.
+        private static bool ReferencesGroupAggregate(Expression? expr, System.Collections.ObjectModel.ReadOnlyCollection<ParameterExpression> groupParams)
+        {
+            switch (expr)
+            {
+                case null:
+                    return false;
+                case MethodCallExpression mc:
+                    if (mc.Method.Name is "Sum" or "Min" or "Max" or "Average" or "Count" or "LongCount"
+                        && mc.Arguments.Count >= 1 && mc.Arguments[0] is ParameterExpression gp && groupParams.Contains(gp))
+                        return true;
+                    if (ReferencesGroupAggregate(mc.Object, groupParams)) return true;
+                    foreach (var a in mc.Arguments)
+                        if (ReferencesGroupAggregate(a, groupParams)) return true;
+                    return false;
+                case BinaryExpression b:
+                    return ReferencesGroupAggregate(b.Left, groupParams) || ReferencesGroupAggregate(b.Right, groupParams);
+                case UnaryExpression u:
+                    return ReferencesGroupAggregate(u.Operand, groupParams);
+                case ConditionalExpression c:
+                    return ReferencesGroupAggregate(c.Test, groupParams)
+                        || ReferencesGroupAggregate(c.IfTrue, groupParams)
+                        || ReferencesGroupAggregate(c.IfFalse, groupParams);
+                case MemberExpression m:
+                    return ReferencesGroupAggregate(m.Expression, groupParams);
+                default:
+                    return false;
+            }
         }
 
         private string? TranslateGroupAggregateMethod(MethodCallExpression methodCall, string alias, string? groupBySql = null)
