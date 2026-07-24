@@ -106,33 +106,66 @@ public class LiveProviderDatabaseDropSafetyTests
         var live = LiveProviderFactory.OpenLive(kind);
         if (Skip.If(live is null, $"{kindStr} not configured")) return;
 
-        var (connection, _) = live!.Value;
+        var (connection, provider) = live!.Value;
         using (connection)
         {
-            var schema = connection.GetSchema("Tables");
-            Assert.NotNull(schema);
-
-            // Every row tagged as a system schema must be correctly identified.
-            foreach (DataRow row in schema.Rows)
+            // Guarantee at least one *user* table exists so the assertions below are
+            // deterministic on a shared CI database whose user tables may have just
+            // been dropped by a parallel scaffold/migration test. Npgsql's "Tables"
+            // collection excludes system schemas, so with no user tables GetSchema
+            // returns zero rows — the flake this probe removes.
+            const string probeTable = "LvDrpSafety_SchemaProbe";
+            var esc = provider.Escape(probeTable);
+            using (var setup = connection.CreateCommand())
             {
-                var s = row["TABLE_SCHEMA"]?.ToString();
-                var flagged = IsSystemSchema(kind, s);
-                if (flagged)
-                {
-                    // Verify the predicate is symmetric.
-                    Assert.True(IsSystemSchema(kind, s),
-                        $"Row TABLE_SCHEMA='{s}' was flagged then un-flagged (non-deterministic predicate).");
-                }
-                else
-                {
-                    Assert.False(IsSystemSchema(kind, s),
-                        $"Row TABLE_SCHEMA='{s}' was not flagged then flagged (non-deterministic predicate).");
-                }
+                setup.CommandText = $"DROP TABLE IF EXISTS {esc}";
+                setup.ExecuteNonQuery();
+                setup.CommandText = $"CREATE TABLE {esc} (Id INT NOT NULL)";
+                setup.ExecuteNonQuery();
             }
 
-            // At least one row exists — the connected database should have some tables.
-            Assert.True(schema.Rows.Count > 0,
-                $"Expected GetSchema('Tables') to return at least one row on {kindStr}.");
+            try
+            {
+                var schema = connection.GetSchema("Tables");
+                Assert.NotNull(schema);
+
+                var sawProbe = false;
+                // Every row tagged as a system schema must be correctly identified.
+                foreach (DataRow row in schema.Rows)
+                {
+                    var s = row["TABLE_SCHEMA"]?.ToString();
+                    var flagged = IsSystemSchema(kind, s);
+                    if (flagged)
+                    {
+                        // Verify the predicate is symmetric.
+                        Assert.True(IsSystemSchema(kind, s),
+                            $"Row TABLE_SCHEMA='{s}' was flagged then un-flagged (non-deterministic predicate).");
+                    }
+                    else
+                    {
+                        Assert.False(IsSystemSchema(kind, s),
+                            $"Row TABLE_SCHEMA='{s}' was not flagged then flagged (non-deterministic predicate).");
+                    }
+
+                    var name = row["TABLE_NAME"]?.ToString();
+                    if (string.Equals(name, probeTable, StringComparison.OrdinalIgnoreCase))
+                        sawProbe = true;
+                }
+
+                // The probe table we just created must be enumerated, so the schema
+                // is non-empty — deterministically, regardless of which database the
+                // live connection targets or what parallel tests dropped.
+                Assert.True(sawProbe,
+                    $"Expected GetSchema('Tables') to include the user probe table '{probeTable}' on {kindStr}.");
+                Assert.True(schema.Rows.Count > 0,
+                    $"Expected GetSchema('Tables') to return at least one row on {kindStr}.");
+            }
+            finally
+            {
+                using var teardown = connection.CreateCommand();
+                teardown.CommandText = $"DROP TABLE IF EXISTS {esc}";
+                teardown.ExecuteNonQuery();
+            }
         }
     }
 
