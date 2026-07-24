@@ -64,6 +64,11 @@ The consumer contract is just:
 </PropertyGroup>
 ```
 
+A minimal, runnable starting point you can copy is
+[`samples/nORM.NativeAot`](../samples/nORM.NativeAot) — a small product-catalog console app
+(tracked insert, runtime-LINQ read, tracked update) that publishes native with the contract
+above and nothing else.
+
 `eng/aot-smoke` is a committed proof: a minimal consumer with **no rooting** that
 publishes to a native binary and runs a scenario matrix — simple and parameterized
 reads, rich-type materialization (`long`/`double`/`bool`/`DateTime`/`Guid`), a direct

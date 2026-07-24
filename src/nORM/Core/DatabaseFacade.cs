@@ -445,6 +445,16 @@ namespace nORM.Core
         /// the wrapper is allowed. Passing <c>null</c> clears the current transaction (without disposing it).
         /// Because it accepts a provider-specific handle it is disallowed under strict provider mobility.
         /// </summary>
+        /// <remarks>
+        /// Contract: commit or roll back the enlisted transaction <b>through the returned wrapper</b>
+        /// (<see cref="DbContextTransaction.CommitAsync"/> / <see cref="DbContextTransaction.RollbackAsync"/>),
+        /// which keeps this context's tracked state consistent. If you instead commit or roll back the raw
+        /// <see cref="DbTransaction"/> handle <b>directly</b> (bypassing the wrapper), nORM cannot observe the
+        /// outcome — commit and rollback are indistinguishable from the context's tracked state — so you must
+        /// <b>discard this context afterwards and not reuse it</b> for further <c>SaveChanges</c>. This matches
+        /// Entity Framework Core's contract for externally-managed transactions; reusing a context after a
+        /// raw-handle rollback can silently skip still-pending inserts whose keys were already stamped.
+        /// </remarks>
         /// <param name="transaction">The externally-managed transaction to enlist, or <c>null</c> to clear.</param>
         /// <returns>A non-owning <see cref="DbContextTransaction"/> wrapper, or <c>null</c> when clearing.</returns>
         /// <exception cref="NormUsageException">A transaction is already active.</exception>

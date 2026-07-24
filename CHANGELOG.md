@@ -14,6 +14,19 @@ security, and documentation.
 
 ### Features
 
+- **Zero-ceremony NativeAOT** for the source-generated path. `[GenerateMaterializer]`
+  entities queried via the runtime LINQ API or `[CompileTimeQuery]` methods publish to a
+  self-contained native binary — reads and all write models (direct, tracked, bulk),
+  attribute-driven mapping, one-to-many and many-to-many `Include`, value converters, owned
+  types, DTO projections, and JSON path queries — with **no `<TrimmerRootAssembly>`, no
+  `[DynamicallyAccessedMembers]`, and no per-entity preservation**. The generator emits a
+  `[DynamicDependency]` that preserves exactly the metadata nORM reflects over. Consumer
+  contract is `<PublishAot>true</PublishAot>` plus `NoWarn` for the two annotated
+  `DbContext`-constructor diagnostics. Verified end-to-end by a 14-scenario native matrix
+  (`eng/aot-smoke`), guarded in CI by the **AOT Smoke** workflow, and demonstrated in
+  `samples/nORM.NativeAot`. See [`docs/aot-trimming.md`](docs/aot-trimming.md). The reflection
+  path (non-`[GenerateMaterializer]` entities, `DbContext.Query(string)`, runtime scaffolding)
+  is not AOT-supported and fails closed.
 - `DbSet<T>` (EF Core parity): `context.Set<T>()` returns a `DbSet<T>` — an `IQueryable<T>`
   that also exposes the change-tracking verbs (`Add`/`Remove`/`Update`/`Attach`/`Find`).
   Expose it as a computed context property (`public DbSet<User> Users => this.Set<User>();`)
@@ -52,6 +65,15 @@ security, and documentation.
   navigations to TPH-derived types, plus fluent `HasForeignKey` with an
   inherited key.
 
+### Fixes
+
+- A `decimal` range comparison (`<`, `>`, `<=`, `>=`) combined with `OrderBy` on
+  SQLite silently returned the wrong rows: the filtered-ordered fast path emitted a
+  raw `col < @p`, which for TEXT-stored decimals is a lexical string comparison
+  (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
+  which compares them numerically. Same predicate without `OrderBy` was already
+  correct.
+
 ### Performance
 
 - Fixed `SaveChanges` over-allocating the SQL buffer for small saves (batch size
@@ -79,3 +101,8 @@ security, and documentation.
 - Documented the fluent model-configuration verbs, context pooling, graph
   tracking, and the strongly-typed entry in `README.md` and
   `docs/change-tracking.md`.
+- Documented the NativeAOT zero-ceremony contract and boundaries in
+  `docs/aot-trimming.md`, with a runnable `samples/nORM.NativeAot` starting point.
+- Documented the external-transaction (`Database.UseTransaction`) contract in
+  `docs/transactions.md`: commit/rollback through the returned wrapper, or discard the
+  context after a raw-handle rollback (EF Core parity).

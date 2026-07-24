@@ -40,6 +40,22 @@ Commit and rollback use `CancellationToken.None` once completion begins. At that
 point cancellation cannot reliably distinguish "not committed" from "committed
 but acknowledgement failed".
 
+## External Transactions (`Database.UseTransaction`)
+
+`Database.UseTransaction(rawTransaction)` enlists the context in a `DbTransaction`
+begun by raw ADO.NET or another library on the same connection (EF Core parity). The
+context does **not** take ownership — disposing the wrapper or the context never
+disposes the caller's transaction.
+
+**Contract:** commit or roll back the enlisted transaction **through the returned
+wrapper** (`CommitAsync`/`RollbackAsync`); that keeps the context's tracked state
+consistent. If you commit or roll back the raw handle **directly** — bypassing the
+wrapper — nORM cannot observe the outcome (commit and rollback are indistinguishable
+from the context's tracked state), so you **must discard the context afterwards and
+not reuse it** for further `SaveChanges`. This is the same contract EF Core requires
+for externally-managed transactions; reusing a context after a raw-handle rollback can
+silently skip still-pending inserts whose keys were already stamped.
+
 ## Ambient TransactionScope
 
 `DbContextOptions.AmbientTransactionPolicy` controls behavior when

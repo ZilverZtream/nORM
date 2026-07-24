@@ -60,7 +60,7 @@ with hand-written ADO.NET on the hot path (see [Performance](#performance)).
 - **Temporal queries & versioning** with nORM-managed history and `AsOf(tag)`
 - **Migrations** with provider-correct DDL, advisory-locked concurrent deploys, and safe rename detection
 - **Operational features**: caching, retry policies, interceptors, JSON querying, window functions
-- **NativeAOT-ready source-generated path**: `[GenerateMaterializer]` entities with `[CompileTimeQuery]` methods read *and* write on a self-contained native binary with no trimmer rooting — the generator emits the metadata-preservation itself. The reflection path stays JIT-first with documented [AOT/trimming boundaries](docs/aot-trimming.md).
+- **NativeAOT-ready source-generated path**: `[GenerateMaterializer]` entities queried via the runtime LINQ API or `[CompileTimeQuery]` methods read *and* write on a self-contained native binary with no trimmer rooting — the generator emits the metadata-preservation itself. Runnable starting point: [`samples/nORM.NativeAot`](samples/nORM.NativeAot); full policy and boundaries in [AOT/trimming](docs/aot-trimming.md). The reflection path stays JIT-first.
 - **Bounded cache policy** with documented lifetimes, limits, and diagnostics ([cache policy](docs/cache-policy.md))
 - **Multi-database support**: SQL Server, PostgreSQL, SQLite, and MySQL
 - **Product-Proof Sample**: `samples/nORM.Sample.Store` is a provider-swappable tenant + temporal web app with a browser frontend, authenticated tenant flow, and a verification mode.
