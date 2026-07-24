@@ -95,7 +95,10 @@ security, and documentation.
   (equality) and the filtered-ordered fast path (equality, range, and order key). All
   read fast paths now defer `TimeSpan` predicates to the full translator, which
   normalizes both sides to fractional seconds; native `TIME`/`INTERVAL` providers are
-  unaffected.
+  unaffected. `TimeSpan` as an exact key (`GROUP BY`, `DISTINCT`, set-op dedup,
+  `SequenceEqual`, join equi-key) is likewise canonicalized (fraction zeros stripped from
+  the fractional part only, preserving the day separator) so equal durations in different
+  scales key together.
 - A `DateTimeOffset` column equality (`dtoCol == literal`) matched by stored TEXT
   instead of by UTC instant on the read fast paths. On SQLite a `DateTimeOffset` is
   stored as offset-suffixed TEXT, and a raw `col = @p` is a lexical compare: against

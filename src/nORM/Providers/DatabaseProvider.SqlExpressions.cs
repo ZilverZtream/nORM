@@ -271,6 +271,19 @@ namespace nORM.Providers
         internal virtual string? CanonicalTimeOnlyTextForExactCompare(string sql) => null;
 
         /// <summary>
+        /// Canonical <see cref="TimeSpan"/> TEXT for an EXACT KEY (GROUP BY / DISTINCT / dedup / join) on
+        /// providers that store TimeSpan as <c>'c'</c> TEXT (SQLite: <c>"[d.]hh:mm:ss[.fffffff]"</c>). The
+        /// same duration written with a different fraction scale (<c>"1.00:00:00.0000000"</c> vs
+        /// <c>"1.00:00:00"</c>) must key together, so trailing fraction zeros are stripped — but ONLY from a
+        /// real fractional part (the day-separator <c>.</c> and whole-second zeros must survive). The
+        /// canonical text still parses back as the TimeSpan, so it doubles as the selected key. Null means
+        /// the provider's native TIME/INTERVAL type already keys by value. Distinct from
+        /// <see cref="NormalizeTimeSpanForCompare"/> (numeric seconds — right for ordering/equality, but a
+        /// number does not materialize back as a TimeSpan group key).
+        /// </summary>
+        internal virtual string? CanonicalTimeSpanTextForExactCompare(string sql) => null;
+
+        /// <summary>
         /// The expression to use where a decimal participates as an exact KEY
         /// (GROUP BY, DISTINCT, set-op dedup): the canonical text when the provider
         /// needs it, otherwise the ordinary comparison normalization.
@@ -291,6 +304,7 @@ namespace nORM.Providers
             var t = Nullable.GetUnderlyingType(clrType) ?? clrType;
             if (t == typeof(decimal)) return ExactDecimalKeySql(sql);
             if (t == typeof(TimeOnly)) return CanonicalTimeOnlyTextForExactCompare(sql) ?? sql;
+            if (t == typeof(TimeSpan)) return CanonicalTimeSpanTextForExactCompare(sql) ?? sql;
             return sql;
         }
 

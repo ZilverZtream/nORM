@@ -439,13 +439,14 @@ namespace nORM.Query
             if (_mapping.TryGetColumnForMemberAccess(node, out var col))
             {
                 var memberType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
-                if (ExactDecimalProjectionKeys && (memberType == typeof(decimal) || memberType == typeof(TimeOnly)))
+                if (ExactDecimalProjectionKeys
+                    && (memberType == typeof(decimal) || memberType == typeof(TimeOnly) || memberType == typeof(TimeSpan)))
                 {
                     // Provider hook: SqliteProvider emits the canonical text (decimal: scale-insensitive
                     // exact dedup — TEXT storage where REAL would merge values beyond double precision;
-                    // TimeOnly: trailing fraction zeros stripped so the same time keys together), others
-                    // identity. DISTINCT / set-op arms need EXACT by-value dedup and the canonical text still
-                    // materializes as the original value.
+                    // TimeOnly/TimeSpan: trailing fraction zeros stripped so the same time/duration keys
+                    // together), others identity. DISTINCT / set-op arms need EXACT by-value dedup and the
+                    // canonical text still materializes as the original value.
                     sb.Append(_provider.ExactKeySql(col.EscCol, memberType));
                 }
                 else if (ForceOrdinalStringProjections && memberType == typeof(string)

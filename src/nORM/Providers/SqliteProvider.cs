@@ -229,6 +229,17 @@ namespace nORM.Providers
         internal override string? CanonicalTimeOnlyTextForExactCompare(string sql)
             => $"(CASE WHEN instr({sql}, '.') = 0 THEN {sql} ELSE rtrim(rtrim({sql}, '0'), '.') END)";
 
+        // SQLite stores TimeSpan as 'c' TEXT "[d.]hh:mm:ss[.fffffff]". A '.' can be the DAY separator, so
+        // the fraction-strip must fire only when there is a fractional part — i.e. a '.' AFTER the seconds
+        // colon. Walk past the two time-part colons (hh:mm:ss) and strip trailing zeros only if the
+        // remaining "ss[.fffffff]" contains a '.'; the day separator and whole-second zeros are preserved.
+        internal override string? CanonicalTimeSpanTextForExactCompare(string sql)
+        {
+            var afterFirstColon = $"substr({sql}, instr({sql}, ':') + 1)";
+            var afterSeconds = $"substr({afterFirstColon}, instr({afterFirstColon}, ':') + 1)";
+            return $"(CASE WHEN instr({afterSeconds}, '.') > 0 THEN rtrim(rtrim({sql}, '0'), '.') ELSE {sql} END)";
+        }
+
         /// <summary>
         /// SQLite stores TimeSpan as canonical 'c' TEXT ("d.hh:mm:ss.fffffff").
         /// Lex-comparison of the TEXT column gives wrong order for multi-day durations
