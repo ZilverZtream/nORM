@@ -138,6 +138,78 @@ namespace nORM.Tests.Fuzzing
         }
 
         [Fact]
+        public void Grouped_aggregates_with_a_having_filter_match_the_linq_oracle()
+        {
+            // HAVING over the same aggregate the group projects (GroupBy(A).Where(g => g.<agg>() <op> v)) must
+            // filter groups by the aggregate value, not by the key or post-materialization. Grouping by A (three
+            // rows at A=3, two derived-equal via ties elsewhere) gives groups of size 1..3 and distinct
+            // Sum/Min/Max, so a HAVING that keeps only some groups is a real discriminator. Every aggregate x
+            // every comparison must match the oracle — a dropped/kept-wrong group would diverge.
+            foreach (var agg in new[] { IrAggregate.Count, IrAggregate.Sum, IrAggregate.Min, IrAggregate.Max })
+            foreach (var op in new[] { IrCompare.Eq, IrCompare.Ne, IrCompare.Lt, IrCompare.Le, IrCompare.Gt, IrCompare.Ge })
+            {
+                var ir = new QueryIr
+                {
+                    Rows = Data,
+                    Steps = Array.Empty<IrStep>(),
+                    GroupBy = new IrGroupBy
+                    {
+                        Key = IrColumn.A, Aggregate = agg, AggregateColumn = IrColumn.B,
+                        Having = new IrHaving { Op = op, Value = 3 },
+                    },
+                };
+                var r = QueryIrDifferential.Execute(ir, seed: 3300);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+
+            // HAVING that keeps every group and HAVING that keeps none both round-trip (boundary results).
+            var keepsAll = new QueryIr
+            {
+                Rows = Data, Steps = Array.Empty<IrStep>(),
+                GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = IrAggregate.Count, Having = new IrHaving { Op = IrCompare.Ge, Value = 1 } },
+            };
+            var keepsNone = new QueryIr
+            {
+                Rows = Data, Steps = Array.Empty<IrStep>(),
+                GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = IrAggregate.Count, Having = new IrHaving { Op = IrCompare.Gt, Value = 100 } },
+            };
+            Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(keepsAll, seed: 3301).Outcome);
+            Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(keepsNone, seed: 3302).Outcome);
+            Assert.Contains("groupby+having", QueryIrDifferential.ExtractFeatures(keepsAll));
+
+            // HAVING composes with a leading Where and with a set-op source.
+            var whereThenHaving = new QueryIr
+            {
+                Rows = Data, Steps = new[] { IrStep.Where(IrColumn.B, IrCompare.Lt, 9) },
+                GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = IrAggregate.Sum, AggregateColumn = IrColumn.B, Having = new IrHaving { Op = IrCompare.Gt, Value = 4 } },
+            };
+            var setopThenHaving = new QueryIr
+            {
+                Rows = Data, Steps = Array.Empty<IrStep>(),
+                SetOp = new IrSetOp { Kind = IrSetOpKind.Union, RightWheres = new[] { IrStep.Where(IrColumn.A, IrCompare.Ge, 3) } },
+                GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = IrAggregate.Count, Having = new IrHaving { Op = IrCompare.Ge, Value = 2 } },
+            };
+            Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(whereThenHaving, seed: 3303).Outcome);
+            Assert.Equal(FuzzOutcome.Executed, QueryIrDifferential.Execute(setopThenHaving, seed: 3304).Outcome);
+
+            // A COLUMN aggregate (Sum/Min/Max) in a HAVING over a set-op source is the shape the fuzzer caught:
+            // the SELECT and HAVING aggregate columns must bind to the compound's derived-table wrap alias, not a
+            // phantom T{n} (which produced `no such column: T1.B`). Count() has no column operand so it hid the bug.
+            foreach (var kind in new[] { IrSetOpKind.Union, IrSetOpKind.Concat, IrSetOpKind.Intersect, IrSetOpKind.Except })
+            foreach (var agg in new[] { IrAggregate.Sum, IrAggregate.Min, IrAggregate.Max })
+            {
+                var ir = new QueryIr
+                {
+                    Rows = Data, Steps = Array.Empty<IrStep>(),
+                    SetOp = new IrSetOp { Kind = kind, RightWheres = new[] { IrStep.Where(IrColumn.A, IrCompare.Ge, 3) } },
+                    GroupBy = new IrGroupBy { Key = IrColumn.A, Aggregate = agg, AggregateColumn = IrColumn.B, Having = new IrHaving { Op = IrCompare.Gt, Value = 2 } },
+                };
+                var r = QueryIrDifferential.Execute(ir, seed: 3400);
+                Assert.True(r.Outcome == FuzzOutcome.Executed, $"[{ir.Describe()}] classified {r.Outcome}: {r.Detail}");
+            }
+        }
+
+        [Fact]
         public void Grouped_over_a_setop_matches_the_linq_oracle()
         {
             // GroupBy over each set operation must aggregate the combined rows and match the oracle (nORM wraps the

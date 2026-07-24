@@ -71,6 +71,14 @@ security, and documentation.
 
 ### Fixes
 
+- A `HAVING` (or its projected aggregate) over a set-operation-sourced `GroupBy`
+  emitted invalid SQL. `q.Union/Concat/Intersect/Except(q2).GroupBy(k).Where(g =>
+  g.Max(col) > n).Select(g => new { g.Key, V = g.Max(col) })` qualified the aggregate
+  column with a phantom `T{n}` table alias (`MAX("T1"."B")`) while the compound was
+  wrapped as a derived table under a different alias (`… AS "__wgb0"`), throwing
+  `no such column: T1.B`. Both the HAVING predicate and the projected aggregate now
+  bind their columns to the wrap alias, matching the `FROM` clause. `Count()` HAVING
+  was unaffected (no column operand). Found by the query-IR HAVING fuzzer.
 - A `decimal` range comparison (`<`, `>`, `<=`, `>=`) combined with `OrderBy` on
   SQLite silently returned the wrong rows: the filtered-ordered fast path emitted a
   raw `col < @p`, which for TEXT-stored decimals is a lexical string comparison

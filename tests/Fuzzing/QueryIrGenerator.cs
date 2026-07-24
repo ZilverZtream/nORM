@@ -87,7 +87,7 @@ namespace nORM.Tests.Fuzzing
             var setOp = ir.SetOp;
             var projection = ir.Projection;
             var groupBy = ir.GroupBy;
-            switch (rng.Next(9))
+            switch (rng.Next(10))
             {
                 case 0: steps.Add(NextWhere(rng)); break;
                 case 1: if (steps.Count > 0) steps.RemoveAt(rng.Next(steps.Count)); break;
@@ -109,6 +109,15 @@ namespace nORM.Tests.Fuzzing
                     groupBy = groupBy == null
                         ? new IrGroupBy { Key = Pick(rng, Columns), Aggregate = (IrAggregate)rng.Next(4), AggregateColumn = Pick(rng, Columns) }
                         : (rng.Next(3) == 0 ? null : groupBy with { Key = Pick(rng, Columns), Aggregate = (IrAggregate)rng.Next(4), AggregateColumn = Pick(rng, Columns) });
+                    break;
+                case 9: // toggle / reshape the HAVING filter on the grouping (a no-op when there is no grouping)
+                    if (groupBy != null)
+                        groupBy = groupBy with
+                        {
+                            Having = groupBy.Having == null || rng.Next(3) != 0
+                                ? new IrHaving { Op = Pick(rng, Compares), Value = rng.Next(0, 8) }
+                                : null,
+                        };
                     break;
             }
             // A set-op may coexist with a GroupBy (GroupBy over a compound); GroupBy stays exclusive with the

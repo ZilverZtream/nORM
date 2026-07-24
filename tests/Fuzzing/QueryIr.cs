@@ -55,7 +55,8 @@ namespace nORM.Tests.Fuzzing
             if (GroupBy is { } gb)
             {
                 var agg = gb.Aggregate == IrAggregate.Count ? "Count()" : $"{gb.Aggregate}({gb.AggregateColumn})";
-                return $"rows={Rows.Count} | {left}.GroupBy({gb.Key}).{agg}";
+                var having = gb.Having is { } h ? $".Having({agg}{IrStep.OpSym(h.Op)}{h.Value})" : "";
+                return $"rows={Rows.Count} | {left}.GroupBy({gb.Key}).{agg}{having}";
             }
             var body = SetOp == null
                 ? left
@@ -84,6 +85,18 @@ namespace nORM.Tests.Fuzzing
         public required IrColumn Key { get; init; }
         public IrAggregate Aggregate { get; init; } = IrAggregate.Count;
         public IrColumn AggregateColumn { get; init; } = IrColumn.A;   // aggregated column for Sum/Min/Max (ignored by Count)
+        public IrHaving? Having { get; init; }   // optional HAVING filter on the same aggregate value
+    }
+
+    /// <summary>
+    /// A HAVING filter on a grouping: <c>GroupBy(k).Where(g =&gt; g.&lt;Aggregate&gt;(...) &lt;Op&gt; Value)</c>. Uses the
+    /// SAME aggregate as the group's projection, so it exercises nORM's HAVING-clause generation over the
+    /// aggregate expression (not a post-materialization client filter).
+    /// </summary>
+    public sealed record IrHaving
+    {
+        public required IrCompare Op { get; init; }
+        public int Value { get; init; }
     }
 
     public enum IrSetOpKind { Union, Concat, Intersect, Except }
@@ -150,7 +163,7 @@ namespace nORM.Tests.Fuzzing
             _ => Kind.ToString(),
         };
 
-        private static string OpSym(IrCompare op) => op switch
+        internal static string OpSym(IrCompare op) => op switch
         {
             IrCompare.Eq => "==", IrCompare.Ne => "!=", IrCompare.Lt => "<",
             IrCompare.Le => "<=", IrCompare.Gt => ">", IrCompare.Ge => ">=", _ => "?",

@@ -195,8 +195,10 @@ namespace nORM.Tests.Fuzzing
                     _ => left,
                 };
             }
-            var grouped = rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile());
+            IEnumerable<IGrouping<int, IrRow>> grouped = rows.GroupBy(KeySelector(ir.GroupBy!.Key).Compile());
             var gb = ir.GroupBy!;
+            if (gb.Having is not null)
+                grouped = grouped.Where(BuildHavingPredicate(gb).Compile());
             return gb.Aggregate switch
             {
                 IrAggregate.Count => grouped.Select(g => Encode(g.Key, g.Count())),
@@ -247,6 +249,8 @@ namespace nORM.Tests.Fuzzing
             }
             var grouped = src.GroupBy(KeySelector(ir.GroupBy!.Key));
             var gb = ir.GroupBy!;
+            if (gb.Having is not null)
+                grouped = grouped.Where(BuildHavingPredicate(gb));
             var pairs = gb.Aggregate switch
             {
                 IrAggregate.Count => grouped.Select(g => new { g.Key, V = g.Count() }).ToList(),
@@ -496,6 +500,43 @@ namespace nORM.Tests.Fuzzing
             return Expression.Lambda<Func<IrRow, bool>>(body, p);
         }
 
+        // Build `g => g.<Aggregate>(...) <Op> Value` over an IGrouping, using the SAME aggregate the group's
+        // projection uses. The same tree is the LINQ-to-objects oracle and the nORM query (which lowers it to a
+        // HAVING clause), so a divergence is a real HAVING-translation bug. Aggregate calls bind to Enumerable
+        // (g is IEnumerable<IrRow>), matching what the C# compiler emits for `grouping.Count()` etc.
+        private static Expression<Func<IGrouping<int, IrRow>, bool>> BuildHavingPredicate(IrGroupBy gb)
+        {
+            var having = gb.Having!;
+            var g = Expression.Parameter(typeof(IGrouping<int, IrRow>), "g");
+            Expression agg;
+            if (gb.Aggregate == IrAggregate.Count)
+            {
+                agg = Expression.Call(typeof(Enumerable), nameof(Enumerable.Count), new[] { typeof(IrRow) }, g);
+            }
+            else
+            {
+                var r = Expression.Parameter(typeof(IrRow), "r");
+                var colSel = Expression.Lambda<Func<IrRow, int>>(Expression.Property(r, gb.AggregateColumn.ToString()), r);
+                agg = gb.Aggregate switch
+                {
+                    IrAggregate.Sum => Expression.Call(typeof(Enumerable), nameof(Enumerable.Sum), new[] { typeof(IrRow) }, g, colSel),
+                    IrAggregate.Min => Expression.Call(typeof(Enumerable), nameof(Enumerable.Min), new[] { typeof(IrRow), typeof(int) }, g, colSel),
+                    _ => Expression.Call(typeof(Enumerable), nameof(Enumerable.Max), new[] { typeof(IrRow), typeof(int) }, g, colSel),
+                };
+            }
+            var value = Expression.Constant(having.Value, typeof(int));
+            Expression cmp = having.Op switch
+            {
+                IrCompare.Eq => Expression.Equal(agg, value),
+                IrCompare.Ne => Expression.NotEqual(agg, value),
+                IrCompare.Lt => Expression.LessThan(agg, value),
+                IrCompare.Le => Expression.LessThanOrEqual(agg, value),
+                IrCompare.Gt => Expression.GreaterThan(agg, value),
+                _ => Expression.GreaterThanOrEqual(agg, value),
+            };
+            return Expression.Lambda<Func<IGrouping<int, IrRow>, bool>>(cmp, g);
+        }
+
         private static Expression<Func<IrRow, int>> KeySelector(IrColumn column)
         {
             var p = Expression.Parameter(typeof(IrRow), "r");
@@ -585,6 +626,7 @@ namespace nORM.Tests.Fuzzing
                 f.Add("groupby-" + ir.GroupBy.Aggregate.ToString().ToLowerInvariant());
                 if (kinds.Contains(IrStepKind.Where)) f.Add("groupby+where");
                 if (ir.SetOp is { } gso) { f.Add("groupby+setop"); f.Add("groupby+setop-" + gso.Kind.ToString().ToLowerInvariant()); }
+                if (ir.GroupBy.Having is { } gh) { f.Add("groupby+having"); f.Add("groupby+having-" + gh.Op.ToString().ToLowerInvariant()); }
             }
             if (ir.Rows.Count == 0) f.Add("empty-table");
             if (ir.Rows.Count == 1) f.Add("single-row");

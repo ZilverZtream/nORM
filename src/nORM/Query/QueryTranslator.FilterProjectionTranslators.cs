@@ -164,9 +164,13 @@ namespace nORM.Query
                     var isGrouping = t._groupBy.Count > 0;
                     if (!t._correlatedParams.TryGetValue(param, out var info))
                     {
-                        // After a derived-table wrap, reuse the alias that TranslateAfterTakeSkipWindow
-                        // set on _outerDerivedAlias — not a fresh T{counter} that doesn't exist in SQL.
-                        var alias = t._outerDerivedAlias ?? t.EscapeAlias("T" + t._joinCounter);
+                        // After a derived-table wrap, reuse the wrap's alias — not a fresh T{counter}
+                        // that doesn't exist in SQL. _outerDerivedAlias covers the Take/Skip window
+                        // wrap; _windowedGroupByAlias covers a GroupBy whose source is itself wrapped
+                        // as `FROM (compound) AS alias` (a set-op-sourced grouping). A HAVING aggregate
+                        // column (SUM/MIN/MAX over a real column) must bind to that wrap alias, else it
+                        // emits a phantom `T{counter}.Col` the compound result set has no such column for.
+                        var alias = t._outerDerivedAlias ?? t._windowedGroupByAlias ?? t.EscapeAlias("T" + t._joinCounter);
                         info = (t._mapping, alias);
                         t._correlatedParams[param] = info;
                     }
@@ -415,7 +419,11 @@ namespace nORM.Query
 
                     var sourceFromSql = QueryTranslator.ExtractSourceFromClause(t._sql.ToString());
                     var groupBySql = PooledStringBuilder.Join(t._groupBy);
-                    var alias = t._outerDerivedAlias ?? t.EscapeAlias("T" + t._joinCounter);
+                    // A set-op/windowed grouping wraps its source as `FROM (compound) AS _windowedGroupByAlias`
+                    // (see BuildGroupBySelectClause); the projected aggregate columns must bind to that same wrap
+                    // alias, not a fresh T{counter} the compound has no such column for. Mirrors the HAVING-alias
+                    // resolution — both surface when a Where(HAVING) sits between the GroupBy and the Select.
+                    var alias = t._outerDerivedAlias ?? t._windowedGroupByAlias ?? t.EscapeAlias("T" + t._joinCounter);
                     t._sql.Clear();
                     t._streamingGroupByKeySelector = null;
                     t.BuildGroupBySelectClause(groupProjection, groupBySql, alias, sourceFromSql);
