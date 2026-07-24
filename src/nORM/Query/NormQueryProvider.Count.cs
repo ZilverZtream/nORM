@@ -356,7 +356,14 @@ namespace nORM.Query
                     : constValue;
 
                 var paramName = _ctx.RawProvider.ParamPrefix + "p0";
-                whereClause = $" WHERE {column.EscCol} = {paramName}";
+                // C# string/char equality is ordinal; CI-collation providers (MySQL, SQL Server) fold case
+                // on a bare `=`, so Count(predicate) would count "ABC"/"AbC" that the full translator (and
+                // the sibling read fast paths) exclude. Apply the same sargable ordinal wrap here.
+                var colClrType = Nullable.GetUnderlyingType(column.Prop.PropertyType) ?? column.Prop.PropertyType;
+                whereClause = (colClrType == typeof(string) || colClrType == typeof(char))
+                              && _ctx.RawProvider.DefaultStringEqualityIsCaseInsensitive
+                    ? $" WHERE {_ctx.RawProvider.OrdinalStringEqualSql(column.EscCol, paramName)}"
+                    : $" WHERE {column.EscCol} = {paramName}";
 
                 if (populateParameters)
                 {

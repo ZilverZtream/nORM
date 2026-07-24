@@ -156,4 +156,16 @@ public class StringEqualityCaseSensitivityLiveTests
         var name = "abc";
         RunParity(kind, q => q.Where(x => x.Name == name).Select(x => x.Id).OrderBy(i => i).ToList());
     }
+
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
+    public void Count_predicate_equality_is_ordinal_on_live_server(string kind)
+    {
+        // Count(predicate) takes the direct-count fast path (TryBuildCountWhereClause), which must apply
+        // the same ordinal wrap as the full translator and the sibling read fast paths — a bare `=`
+        // counts "ABC"/"AbC" on CI-collation servers, so the count is 3 instead of the ordinal 1.
+        RunParity(kind, q => new List<int> { q.Count(x => x.Name == "abc") });
+    }
 }

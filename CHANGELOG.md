@@ -73,6 +73,12 @@ security, and documentation.
   (`"79.99" < "100"` is false). Such predicates now defer to the full translator,
   which compares them numerically. Same predicate without `OrderBy` was already
   correct.
+- `Count(x => x.Name == "abc")` counted case-insensitively on MySQL and SQL Server:
+  the direct-count fast path emitted a bare `col = @p`, which folds case under those
+  servers' default collation, so it counted `"ABC"`/`"AbC"` that C# ordinal equality
+  (and the full translator, and the sibling read fast paths) exclude — returning 3
+  where the correct answer is 1. The count fast path now applies the same sargable
+  ordinal wrap. Verified against live MySQL and SQL Server.
 - A `decimal` **equality** predicate (`col == value`) on SQLite could silently miss
   rows whose stored TEXT had a different trailing-zero scale (`"24.500"` is
   numerically equal to `24.5m` but lexically distinct). Every read fast path that
