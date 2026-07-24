@@ -43,6 +43,7 @@ public class FastPathFullTranslatorDifferentialTests
         public bool Flag { get; set; }
         public DateOnly Do { get; set; }
         [Column("T_o")] public TimeOnly To { get; set; }
+        public DateTime Dt { get; set; }
     }
 
     // Each row carries a NON-CANONICAL text form so a raw `col = @p` / `col < @p` on the fast path would
@@ -51,17 +52,20 @@ public class FastPathFullTranslatorDifferentialTests
     // different fractional formats; Dec has trailing-zero scales; Ts rows 5&6 are multi-day (lexical trap).
     // DateOnly rows are canonical "yyyy-MM-dd" (lexical == chronological). TimeOnly rows 1&2 are the same
     // time in canonical and extra-fraction TEXT ("12:00:00" vs "12:00:00.0000000") — the equality trap.
+    // Dt (plain DateTime) rows 1&2 are the same INSTANT in canonical and extra-fraction TEXT
+    // ("2026-05-25 12:00:00" vs "...12:00:00.0000000") — the fraction-scale equality/dedup trap that the
+    // "plain DateTime ruled out" false-negative missed (commit 66e384ce).
     private static readonly string SeedSql =
         "CREATE TABLE Diff_Test (Id INTEGER PRIMARY KEY, Dec TEXT NOT NULL, Dto TEXT NOT NULL, " +
         "Ts TEXT NOT NULL, Str TEXT NOT NULL, Num INTEGER NOT NULL, Flag INTEGER NOT NULL, " +
-        "Do TEXT NOT NULL, T_o TEXT NOT NULL);" +
-        "INSERT INTO Diff_Test (Id, Dec, Dto, Ts, Str, Num, Flag, Do, T_o) VALUES " +
-        "(1, '24.500',  '2026-05-25 12:30:45.123+00:00', '1.00:00:00',          'abc', 5,  1, '2026-05-25', '12:00:00')," +
-        "(2, '24.5',    '2026-05-25 14:30:45.123+02:00', '1.00:00:00.0000000',  'xyz', 5,  0, '2026-05-25', '12:00:00.0000000')," +
-        "(3, '100.00',  '2026-05-25 09:00:00.000+00:00', '2.00:00:00',          'abc', 10, 1, '2026-05-26', '13:30:00')," +
-        "(4, '79.99',   '2026-05-25 12:30:46.000+00:00', '0.12:00:00',          'def', 0,  0, '2026-05-24', '00:00:00')," +
-        "(5, '429.000', '2026-05-24 00:00:00.000+00:00', '10.00:00:00',         'ghi', 20, 1, '2026-05-25', '23:59:59')," +
-        "(6, '9.9',     '2026-05-26 23:59:59.999+00:00', '9.23:59:59',          'jkl', -3, 0, '2026-05-27', '06:15:00');";
+        "Do TEXT NOT NULL, T_o TEXT NOT NULL, Dt TEXT NOT NULL);" +
+        "INSERT INTO Diff_Test (Id, Dec, Dto, Ts, Str, Num, Flag, Do, T_o, Dt) VALUES " +
+        "(1, '24.500',  '2026-05-25 12:30:45.123+00:00', '1.00:00:00',          'abc', 5,  1, '2026-05-25', '12:00:00',          '2026-05-25 12:00:00')," +
+        "(2, '24.5',    '2026-05-25 14:30:45.123+02:00', '1.00:00:00.0000000',  'xyz', 5,  0, '2026-05-25', '12:00:00.0000000',  '2026-05-25 12:00:00.0000000')," +
+        "(3, '100.00',  '2026-05-25 09:00:00.000+00:00', '2.00:00:00',          'abc', 10, 1, '2026-05-26', '13:30:00',          '2026-05-25 13:00:00')," +
+        "(4, '79.99',   '2026-05-25 12:30:46.000+00:00', '0.12:00:00',          'def', 0,  0, '2026-05-24', '00:00:00',          '2026-05-24 08:30:00')," +
+        "(5, '429.000', '2026-05-24 00:00:00.000+00:00', '10.00:00:00',         'ghi', 20, 1, '2026-05-25', '23:59:59',          '2026-05-26 23:59:59')," +
+        "(6, '9.9',     '2026-05-26 23:59:59.999+00:00', '9.23:59:59',          'jkl', -3, 0, '2026-05-27', '06:15:00',          '2026-05-25 00:00:00.500');";
 
     // Predicates over the awkward types. Built as Expression<Func<DiffRow,bool>> so both the fast path
     // (Where / Where+OrderBy / Count) and the full translator (Where+Select) evaluate the same tree.
@@ -85,6 +89,8 @@ public class FastPathFullTranslatorDifferentialTests
         ("dateonly < 5-26",    r => r.Do < new DateOnly(2026, 5, 26)),
         ("timeonly == 12:00",  r => r.To == new TimeOnly(12, 0, 0)),
         ("timeonly < 13:00",   r => r.To < new TimeOnly(13, 0, 0)),
+        ("datetime == noon",   r => r.Dt == new DateTime(2026, 5, 25, 12, 0, 0)),
+        ("datetime < 1pm",     r => r.Dt < new DateTime(2026, 5, 25, 13, 0, 0)),
     };
 
     // The TRUE values the seeded TEXT represents (rows 1&2 share a decimal value, a DateTimeOffset instant,
@@ -94,12 +100,12 @@ public class FastPathFullTranslatorDifferentialTests
     // cannot — that was how the product-wide TimeOnly bug slipped a purely fast-path-vs-full-translator check).
     private static readonly DiffRow[] Reference =
     {
-        new() { Id = 1, Dec = 24.500m, Dto = new DateTimeOffset(2026, 5, 25, 12, 30, 45, 123, TimeSpan.Zero),      Ts = TimeSpan.FromDays(1),      Str = "abc", Num = 5,  Flag = true,  Do = new DateOnly(2026, 5, 25), To = new TimeOnly(12, 0, 0) },
-        new() { Id = 2, Dec = 24.5m,   Dto = new DateTimeOffset(2026, 5, 25, 14, 30, 45, 123, TimeSpan.FromHours(2)), Ts = TimeSpan.FromDays(1),    Str = "xyz", Num = 5,  Flag = false, Do = new DateOnly(2026, 5, 25), To = new TimeOnly(12, 0, 0) },
-        new() { Id = 3, Dec = 100.00m, Dto = new DateTimeOffset(2026, 5, 25, 9, 0, 0, 0, TimeSpan.Zero),           Ts = TimeSpan.FromDays(2),      Str = "abc", Num = 10, Flag = true,  Do = new DateOnly(2026, 5, 26), To = new TimeOnly(13, 30, 0) },
-        new() { Id = 4, Dec = 79.99m,  Dto = new DateTimeOffset(2026, 5, 25, 12, 30, 46, 0, TimeSpan.Zero),        Ts = TimeSpan.FromHours(12),    Str = "def", Num = 0,  Flag = false, Do = new DateOnly(2026, 5, 24), To = new TimeOnly(0, 0, 0) },
-        new() { Id = 5, Dec = 429.000m,Dto = new DateTimeOffset(2026, 5, 24, 0, 0, 0, 0, TimeSpan.Zero),           Ts = TimeSpan.FromDays(10),     Str = "ghi", Num = 20, Flag = true,  Do = new DateOnly(2026, 5, 25), To = new TimeOnly(23, 59, 59) },
-        new() { Id = 6, Dec = 9.9m,    Dto = new DateTimeOffset(2026, 5, 26, 23, 59, 59, 999, TimeSpan.Zero),      Ts = new TimeSpan(9, 23, 59, 59), Str = "jkl", Num = -3, Flag = false, Do = new DateOnly(2026, 5, 27), To = new TimeOnly(6, 15, 0) },
+        new() { Id = 1, Dec = 24.500m, Dto = new DateTimeOffset(2026, 5, 25, 12, 30, 45, 123, TimeSpan.Zero),      Ts = TimeSpan.FromDays(1),      Str = "abc", Num = 5,  Flag = true,  Do = new DateOnly(2026, 5, 25), To = new TimeOnly(12, 0, 0),  Dt = new DateTime(2026, 5, 25, 12, 0, 0) },
+        new() { Id = 2, Dec = 24.5m,   Dto = new DateTimeOffset(2026, 5, 25, 14, 30, 45, 123, TimeSpan.FromHours(2)), Ts = TimeSpan.FromDays(1),    Str = "xyz", Num = 5,  Flag = false, Do = new DateOnly(2026, 5, 25), To = new TimeOnly(12, 0, 0),  Dt = new DateTime(2026, 5, 25, 12, 0, 0) },
+        new() { Id = 3, Dec = 100.00m, Dto = new DateTimeOffset(2026, 5, 25, 9, 0, 0, 0, TimeSpan.Zero),           Ts = TimeSpan.FromDays(2),      Str = "abc", Num = 10, Flag = true,  Do = new DateOnly(2026, 5, 26), To = new TimeOnly(13, 30, 0), Dt = new DateTime(2026, 5, 25, 13, 0, 0) },
+        new() { Id = 4, Dec = 79.99m,  Dto = new DateTimeOffset(2026, 5, 25, 12, 30, 46, 0, TimeSpan.Zero),        Ts = TimeSpan.FromHours(12),    Str = "def", Num = 0,  Flag = false, Do = new DateOnly(2026, 5, 24), To = new TimeOnly(0, 0, 0),   Dt = new DateTime(2026, 5, 24, 8, 30, 0) },
+        new() { Id = 5, Dec = 429.000m,Dto = new DateTimeOffset(2026, 5, 24, 0, 0, 0, 0, TimeSpan.Zero),           Ts = TimeSpan.FromDays(10),     Str = "ghi", Num = 20, Flag = true,  Do = new DateOnly(2026, 5, 25), To = new TimeOnly(23, 59, 59), Dt = new DateTime(2026, 5, 26, 23, 59, 59) },
+        new() { Id = 6, Dec = 9.9m,    Dto = new DateTimeOffset(2026, 5, 26, 23, 59, 59, 999, TimeSpan.Zero),      Ts = new TimeSpan(9, 23, 59, 59), Str = "jkl", Num = -3, Flag = false, Do = new DateOnly(2026, 5, 27), To = new TimeOnly(6, 15, 0),  Dt = new DateTime(2026, 5, 25, 0, 0, 0, 500) },
     };
 
     private static DbContext NewCtx()
@@ -167,6 +173,7 @@ public class FastPathFullTranslatorDifferentialTests
     [InlineData("Num")]
     [InlineData("Dto")]
     [InlineData("Flag")]
+    [InlineData("Dt")]
     public async Task GroupBy_group_sizes_match_oracle(string column)
     {
         using var ctx = NewCtx();
@@ -181,6 +188,7 @@ public class FastPathFullTranslatorDifferentialTests
             case "Num": (nrm, oracle) = await GroupSizes(ctx, r => r.Num); break;
             case "Dto": (nrm, oracle) = await GroupSizes(ctx, r => r.Dto); break;
             case "Flag": (nrm, oracle) = await GroupSizes(ctx, r => r.Flag); break;
+            case "Dt": (nrm, oracle) = await GroupSizes(ctx, r => r.Dt); break;
             default: throw new ArgumentOutOfRangeException(nameof(column));
         }
         Assert.Equal(oracle, nrm);
@@ -202,6 +210,7 @@ public class FastPathFullTranslatorDifferentialTests
     [InlineData("Str")]
     [InlineData("Num")]
     [InlineData("Dto")]
+    [InlineData("Dt")]
     public async Task Distinct_count_matches_oracle(string column)
     {
         using var ctx = NewCtx();
@@ -215,6 +224,7 @@ public class FastPathFullTranslatorDifferentialTests
             case "Str": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Str }); break;
             case "Num": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Num }); break;
             case "Dto": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Dto }); break;
+            case "Dt": (nrm, oracle) = await DistinctCount(ctx, r => new { r.Dt }); break;
             default: throw new ArgumentOutOfRangeException(nameof(column));
         }
         Assert.Equal(oracle, nrm);
@@ -241,6 +251,7 @@ public class FastPathFullTranslatorDifferentialTests
     [InlineData("Do")]
     [InlineData("Dto")]
     [InlineData("Num")]
+    [InlineData("Dt")]
     public async Task OrderBy_is_by_value(string column)
     {
         using var ctx = NewCtx();
@@ -252,6 +263,7 @@ public class FastPathFullTranslatorDifferentialTests
             case "Do": await AssertOrderedByValue(ctx, r => r.Do); break;
             case "Dto": await AssertOrderedByValue(ctx, r => r.Dto); break;
             case "Num": await AssertOrderedByValue(ctx, r => r.Num); break;
+            case "Dt": await AssertOrderedByValue(ctx, r => r.Dt); break;
             default: throw new ArgumentOutOfRangeException(nameof(column));
         }
     }
