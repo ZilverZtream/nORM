@@ -24,6 +24,8 @@ BulkDeleteAsync
 BulkInsertAsync
 BulkUpdateAsync
 CanonicalDecimalTextForExactCompare
+CanonicalTimeOnlyTextForExactCompare
+CanonicalTimeSpanTextForExactCompare
 CanonicalizeDateTimeOffsetGroupKey
 Capabilities
 CastToVarchar
@@ -131,6 +133,7 @@ ReleaseSavepointAsync
 RequiresExplicitNullOrderingForNullableKeys
 RollbackToSavepointAsync
 StoredProcedureCommandType
+StoresDecimalAsText
 SupportsCommandGeneratedKeyRetrieval
 SupportsConventionKeyStoreGeneration
 SupportsFastPathPreparedCommandCache
@@ -166,6 +169,8 @@ BulkDeleteAsync
 BulkInsertAsync
 BulkUpdateAsync
 CanonicalDecimalTextForExactCompare
+CanonicalTimeOnlyTextForExactCompare
+CanonicalTimeSpanTextForExactCompare
 CanonicalizeDateTimeOffsetGroupKey
 Capabilities
 ClampNonNegativeLimitExpression
@@ -226,6 +231,7 @@ PrefersSyncExecution
 ReleaseSavepointAsync
 RollbackToSavepointAsync
 StoredProcedureCommandType
+StoresDecimalAsText
 SupportsConventionKeyStoreGeneration
 SupportsFastPathPreparedCommandCache
 SupportsNativeOrderedStringAggregate
