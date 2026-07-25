@@ -38,7 +38,8 @@ namespace nORM.Core
                     $"'{op}' can't be composed onto a FromSqlRaw/FromSqlInterpolated query: eager loading rebuilds " +
                     "the root query from the mapped table and would silently ignore the raw SQL and its filter. " +
                     "Materialise the raw query first (ToList) and load related data with a follow-up query, or " +
-                    "express the join in the raw SQL itself.");
+                    "express the join in the raw SQL itself.",
+                    NormUnsupportedReason.FromSqlRawCompositionUnsupported);
         }
 
         /// <summary>

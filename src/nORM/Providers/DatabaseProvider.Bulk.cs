@@ -191,7 +191,8 @@ namespace nORM.Providers
                 return BatchedUpdateAsync(ctx, m, e, ct);
             throw new NormUnsupportedFeatureException(
                 $"Bulk update is not supported by provider {Capabilities.ProviderName}. " +
-                "Use the standard SaveChanges path instead, or set DbContextOptions.UseBatchedBulkOps = true.");
+                "Use the standard SaveChanges path instead, or set DbContextOptions.UseBatchedBulkOps = true.",
+                NormUnsupportedReason.BulkOperationProviderUnsupported);
         }
 
         /// <summary>
@@ -207,7 +208,8 @@ namespace nORM.Providers
                 return BatchedDeleteAsync(ctx, m, e, ct);
             throw new NormUnsupportedFeatureException(
                 $"Bulk delete is not supported by provider {Capabilities.ProviderName}. " +
-                "Use the standard SaveChanges path instead, or set DbContextOptions.UseBatchedBulkOps = true.");
+                "Use the standard SaveChanges path instead, or set DbContextOptions.UseBatchedBulkOps = true.",
+                NormUnsupportedReason.BulkOperationProviderUnsupported);
         }
 
         /// <summary>

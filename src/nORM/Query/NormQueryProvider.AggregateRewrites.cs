@@ -380,12 +380,14 @@ namespace nORM.Query
                 catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
+                        $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.",
+                        NormUnsupportedReason.AggregateFoldAccumulatorTypeUnsupported);
                 }
                 return (comparableSeed.CompareTo(typedSqlValue) >= 0) == isMax ? seed : typedSqlValue;
             }
             throw new NormUnsupportedFeatureException(
-                $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
+                $"Aggregate min/max fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.",
+                NormUnsupportedReason.AggregateFoldAccumulatorTypeUnsupported);
         }
 
         private bool TryRewriteStringConcatAggregate<TResult>(
@@ -614,7 +616,8 @@ namespace nORM.Query
             if (accType == typeof(uint))    return (uint)System.Convert.ToUInt32(seed)    + (uint)System.Convert.ToUInt32(sumValue);
             if (accType == typeof(ulong))   return (ulong)System.Convert.ToUInt64(seed)   + (ulong)System.Convert.ToUInt64(sumValue);
             throw new NormUnsupportedFeatureException(
-                $"Aggregate sum-fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.");
+                $"Aggregate sum-fold accumulator type '{accType.Name}' is not supported by nORM's provider-mobile aggregate fold rewrite.",
+                NormUnsupportedReason.AggregateFoldAccumulatorTypeUnsupported);
         }
     }
 }

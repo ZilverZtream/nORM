@@ -43,7 +43,8 @@ namespace nORM.Query
                     "fetch after the principal materializer completes - incompatible with row-by-row " +
                     "streaming. Use `await query.ToListAsync()` to materialize the fully-loaded set " +
                     "in one round-trip, or remove the Include and reissue the child query manually " +
-                    "per principal if streaming is required.");
+                    "per principal if streaming is required.",
+                    NormUnsupportedReason.AsAsyncEnumerableIncludeUnsupported);
             if (plan.PostMaterializeTransform != null || plan.PostReverse)
             {
                 // Client-tail reshapes and tail paging operate on the COMPLETE materialized

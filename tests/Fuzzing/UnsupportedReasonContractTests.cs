@@ -12,11 +12,12 @@ namespace nORM.Tests.Fuzzing;
 
 /// <summary>
 /// Reason-code contract for <see cref="NormUnsupportedFeatureException"/> — the "code-derived support
-/// contract" from the fuzzing vision. Every throw-site in a CLASSIFIED source file must carry a stable
+/// contract" from the fuzzing vision. EVERY throw-site in src/nORM must carry a stable
 /// <see cref="NormUnsupportedReason"/> code. Without this, a throw-site that begins rejecting a shape which
 /// used to translate stays GREEN (an "unsupported" rejection has no test budget), silently eroding
 /// capability; a required, stable reason code makes that erosion visible to the fuzz support-contract.
-/// The scan is scoped to an append-only allowlist that grows as each query-path family is reason-coded.
+/// The scan covers the WHOLE production source tree (no allowlist): the moment a new throw-site is added
+/// without a code, this test fails — no per-file maintenance, no way to forget.
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public sealed class UnsupportedReasonContractTests
@@ -24,48 +25,16 @@ public sealed class UnsupportedReasonContractTests
     private static readonly string RepoRoot =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
 
-    // Files whose EVERY NormUnsupportedFeatureException throw has been assigned a reason code.
-    // APPEND-ONLY — removing a file would silently drop its capability-erosion coverage.
-    private static readonly string[] ClassifiedFiles =
-    {
-        "Query/ExpressionToSqlVisitor.MethodCallTranslators.String.cs",
-        "Query/ExpressionToSqlVisitor.MethodCallTranslators.cs",
-        "Query/ExpressionToSqlVisitor.MethodCallTranslators.Enumerable.cs",
-        "Query/ExpressionToSqlVisitor.NavigationSubqueries.cs",
-        "Query/ExpressionToSqlVisitor.Binary.cs",
-        "Query/ExpressionToSqlVisitor.ControlFlow.cs",
-        "Query/ExpressionToSqlVisitor.Members.cs",
-        "Query/SelectClauseVisitor.NavigationAggregates.cs",
-        "Query/SelectClauseVisitor.NavigationDistinctCount.cs",
-        "Query/SelectClauseVisitor.NavigationFirst.cs",
-        "Query/SelectClauseVisitor.Helpers.cs",
-        "Query/SelectClauseVisitor.MethodCalls.cs",
-        "Query/QueryTranslator.SequenceTailTranslators.cs",
-        "Query/QueryTranslator.IncludeTranslators.cs",
-        "Query/QueryTranslator.PagingTranslators.cs",
-        "Query/QueryTranslator.SetOperationTranslators.cs",
-        "Query/QueryTranslator.SequenceEqualTranslator.cs",
-        "Query/QueryTranslator.TerminalTranslators.cs",
-        "Query/QueryTranslator.GroupByProjection.cs",
-        "Query/QueryTranslator.FilterProjectionTranslators.cs",
-        "Query/QueryTranslator.SplitQueries.cs",
-        "Query/QueryTranslator.GroupJoins.cs",
-        "Query/QueryTranslator.TemporalScope.cs",
-        "Query/QueryTranslator.PlanGeneration.cs",
-        "Query/QueryTranslator.OrderByTranslator.cs",
-        "Query/QueryTranslator.Joins.cs",
-        "Query/QueryTranslator.GroupByClient.cs",
-        "Query/QueryTranslator.AggregateDelegates.cs",
-        "Providers/DatabaseProvider.SqlExpressions.cs",
-        "Query/BulkCudBuilder.cs",
-        "Query/NormQueryProvider.SyncCud.cs",
-        "Providers/PostgresProvider.Runtime.cs",
-        "Providers/MySqlProvider.Runtime.cs",
-        "Providers/SqlServerProvider.Regex.cs",
-        "Providers/DatabaseProvider.TemporalTenant.cs",
-        "Core/DbContext.TenantTemporal.cs",
-        "Core/DbContext.Connection.cs",
-    };
+    private static string SourceRoot => Path.Combine(RepoRoot, "src", "nORM");
+
+    // Every production .cs file, excluding build output. A throw-site anywhere here must carry a code.
+    private static IEnumerable<string> ProductionSourceFiles()
+        => Directory.EnumerateFiles(SourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(p =>
+            {
+                var norm = p.Replace('\\', '/');
+                return !norm.Contains("/obj/") && !norm.Contains("/bin/");
+            });
 
     private static ISet<string> CatalogCodeNames()
         => typeof(NormUnsupportedReason)
@@ -98,16 +67,14 @@ public sealed class UnsupportedReasonContractTests
     }
 
     [Fact]
-    public void Classified_throw_sites_all_carry_a_registered_reason_code()
+    public void Every_unsupported_throw_site_carries_a_registered_reason_code()
     {
         var catalog = CatalogCodeNames();
         var offenders = new List<string>();
+        var scanned = 0;
 
-        foreach (var rel in ClassifiedFiles)
+        foreach (var path in ProductionSourceFiles())
         {
-            var path = Path.Combine(RepoRoot, "src", "nORM", rel.Replace('/', Path.DirectorySeparatorChar));
-            Assert.True(File.Exists(path), $"classified file not found: {path}");
-
             var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetRoot();
             var creations = root.DescendantNodes()
                 .OfType<ObjectCreationExpressionSyntax>()
@@ -115,8 +82,10 @@ public sealed class UnsupportedReasonContractTests
 
             foreach (var creation in creations)
             {
+                scanned++;
                 var args = creation.ArgumentList?.Arguments;
                 var line = creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                var rel = Path.GetRelativePath(SourceRoot, path).Replace('\\', '/');
 
                 // The reason code is the 2nd argument and must be a NormUnsupportedReason.<Code> reference —
                 // written either unqualified (NormUnsupportedReason.X) or fully qualified
@@ -134,8 +103,11 @@ public sealed class UnsupportedReasonContractTests
             }
         }
 
+        // Guard against a broken glob silently passing by scanning nothing.
+        Assert.True(scanned > 100, $"expected the whole-codebase scan to find many throw-sites, found {scanned}");
+
         Assert.True(offenders.Count == 0,
-            "Every NormUnsupportedFeatureException in a classified file must carry a registered reason code:\n  " +
+            "Every NormUnsupportedFeatureException in src/nORM must carry a registered reason code:\n  " +
             string.Join("\n  ", offenders));
     }
 

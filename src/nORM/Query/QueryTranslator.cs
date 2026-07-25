@@ -361,7 +361,8 @@ namespace nORM.Query
             {
                 throw new NormUnsupportedFeatureException(
                     $"LINQ method '{_methodName}' is not supported by the nORM v1 query translator. " +
-                    "See docs/linq-support.md for the supported operator matrix.");
+                    "See docs/linq-support.md for the supported operator matrix.",
+                    NormUnsupportedReason.QueryableMethodUntranslatable);
             }
             return base.VisitMethodCall(node);
         }
@@ -631,7 +632,7 @@ namespace nORM.Query
                 ExpressionType.LessThanOrEqual => " <= ",
                 ExpressionType.AndAlso => " AND ",
                 ExpressionType.OrElse => " OR ",
-                _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Op '{node.NodeType}'"))
+                _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Op '{node.NodeType}'"), NormUnsupportedReason.BinaryOperatorUnsupported)
             });
             Visit(node.Right);
             _sql.Append(")");
@@ -689,7 +690,7 @@ namespace nORM.Query
                 _sql.Append(paramName);
                 return node;
             }
-            throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Member '{node.Member.Name}'"));
+            throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, $"Member '{node.Member.Name}'"), NormUnsupportedReason.MemberUntranslatable);
         }
     }
 }

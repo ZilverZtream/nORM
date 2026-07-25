@@ -215,6 +215,9 @@ namespace nORM.Core
         /// <summary>Projecting the same navigation collection into more than one member of a single projection is not supported.</summary>
         public const string CollectionProjectedMultipleMembers = "collection-projected-multiple-members";
 
+        /// <summary>An anonymous-type projection cannot populate a collection member whose type is not List-assignable.</summary>
+        public const string ProjectionCollectionMemberNotAssignable = "projection-collection-member-not-assignable";
+
         /// <summary>Ordered / top-N (OrderBy/Take/Skip) projection is not supported for owned or many-to-many collections.</summary>
         public const string OrderedProjectionOwnedM2mUnsupported = "ordered-projection-owned-m2m-unsupported";
 
@@ -302,5 +305,37 @@ namespace nORM.Core
 
         /// <summary>The configured native tenant security mode is not supported.</summary>
         public const string NativeTenantSecurityModeUnsupported = "native-tenant-security-mode-unsupported";
+
+        // ── Remaining scattered capabilities (aggregate fold, bulk, fast-path, compiled-query, facade) ──
+
+        /// <summary>An aggregate min/max/sum fold accumulator type is not supported by the provider-mobile fold rewrite.</summary>
+        public const string AggregateFoldAccumulatorTypeUnsupported = "aggregate-fold-accumulator-type-unsupported";
+
+        /// <summary>A DateTime.ParseExact format string is not supported in SQL translation.</summary>
+        public const string ParseExactFormatUnsupported = "parseexact-format-unsupported";
+
+        /// <summary>DateTime/TimeOnly subtraction is not supported by the active provider.</summary>
+        public const string DateTimeSubtractionUnsupported = "datetime-subtraction-unsupported";
+
+        /// <summary>A bulk update/delete operation is not supported by the active provider.</summary>
+        public const string BulkOperationProviderUnsupported = "bulk-operation-provider-unsupported";
+
+        /// <summary>AsAsyncEnumerable does not support Include (eager-load paths issue dependent queries).</summary>
+        public const string AsAsyncEnumerableIncludeUnsupported = "asasyncenumerable-include-unsupported";
+
+        /// <summary>A value-converter column used inside a computed projection has no correct SQL translation.</summary>
+        public const string ConverterColumnInComputedProjection = "converter-column-in-computed-projection";
+
+        /// <summary>CompileQuery does not support a top-level conditional (ternary) selecting between shapes.</summary>
+        public const string CompileQueryTopLevelConditionalUnsupported = "compilequery-toplevel-conditional-unsupported";
+
+        /// <summary>An operator cannot be composed onto a FromSqlRaw/FromSqlInterpolated query.</summary>
+        public const string FromSqlRawCompositionUnsupported = "fromsqlraw-composition-unsupported";
+
+        /// <summary>A feature violates the strict provider-mobility contract.</summary>
+        public const string StrictMobilityViolation = "strict-mobility-violation";
+
+        /// <summary>EnsureCreatedAsync does not support the active provider.</summary>
+        public const string EnsureCreatedProviderUnsupported = "ensurecreated-provider-unsupported";
     }
 }

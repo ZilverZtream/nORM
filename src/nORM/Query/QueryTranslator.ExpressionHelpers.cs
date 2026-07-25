@@ -216,7 +216,8 @@ namespace nORM.Query
                                 $"'{mc.Method.Name}' can't be composed onto a FromSqlRaw query yet. Supported: Where, " +
                                 "Select, OrderBy/ThenBy, Skip/Take, Distinct, and the scalar terminals (Count, Any, " +
                                 "First, Sum, …). For joins, GroupBy, Include, or set operators, materialise the raw " +
-                                "query first (ToList) and continue with LINQ-to-Objects, or express them in the SQL.");
+                                "query first (ToList) and continue with LINQ-to-Objects, or express them in the SQL.",
+                                nORM.Core.NormUnsupportedReason.FromSqlRawCompositionUnsupported);
                         // Instance operators keep the source as the receiver; static extensions keep it at Arguments[0].
                         expr = mc.Object ?? mc.Arguments[0];
                         break;

@@ -276,7 +276,8 @@ namespace nORM.Query
                     "or method call) can't be translated: SQL yields the stored representation and " +
                     "ConvertFromProvider can't be applied to the computed result, so the value would come back " +
                     "wrong. Project the column directly (e.g. Select(x => x.Col)) and compute the expression " +
-                    "client-side, or materialise the row first.");
+                    "client-side, or materialise the row first.",
+                    NormUnsupportedReason.ConverterColumnInComputedProjection);
         }
 
         private static bool SurfacesConverterInValuePosition(Expression? e, bool valuePosition, TableMapping mapping)

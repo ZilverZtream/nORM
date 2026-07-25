@@ -181,7 +181,7 @@ namespace nORM.Core
             if (!IsStrictProviderMobility)
                 return;
 
-            throw new NormUnsupportedFeatureException(ProviderMobilityTranslator.BuildStrictViolationMessage(feature));
+            throw new NormUnsupportedFeatureException(ProviderMobilityTranslator.BuildStrictViolationMessage(feature), NormUnsupportedReason.StrictMobilityViolation);
         }
 
         /// <summary>

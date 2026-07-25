@@ -268,7 +268,8 @@ namespace nORM.Internal
                     "Workaround: compile each branch into its own delegate and dispatch at the call site:\n" +
                     "    var asc  = Norm.CompileQuery((MyCtx ctx, int _) => ctx.Query<T>().OrderBy(k));\n" +
                     "    var desc = Norm.CompileQuery((MyCtx ctx, int _) => ctx.Query<T>().OrderByDescending(k));\n" +
-                    "    var rows = sortAsc ? await asc(ctx, 0) : await desc(ctx, 0);");
+                    "    var rows = sortAsc ? await asc(ctx, 0) : await desc(ctx, 0);",
+                    NormUnsupportedReason.CompileQueryTopLevelConditionalUnsupported);
             }
         }
 

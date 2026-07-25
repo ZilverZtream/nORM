@@ -533,7 +533,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeDifferenceSecondsSql(string endSql, string startSql)
             => throw new NormUnsupportedFeatureException(
-                $"DateTime subtraction is not supported by provider '{GetType().Name}'.");
+                $"DateTime subtraction is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeSubtractionUnsupported);
 
         /// <summary>
         /// Returns SQL evaluating `end - start` (both TimeOnly) as fractional seconds
@@ -546,7 +547,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetTimeOnlyDifferenceSecondsSql(string endSql, string startSql)
             => throw new NormUnsupportedFeatureException(
-                $"TimeOnly subtraction is not supported by provider '{GetType().Name}'.");
+                $"TimeOnly subtraction is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeSubtractionUnsupported);
 
         /// <summary>
         /// Translates a JSON path access expression for the provider.

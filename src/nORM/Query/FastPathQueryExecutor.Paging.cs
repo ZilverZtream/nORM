@@ -25,7 +25,7 @@ namespace nORM.Query
                 ExpressionType.GreaterThanOrEqual => ">=",
                 ExpressionType.LessThan => "<",
                 ExpressionType.LessThanOrEqual => "<=",
-                _ => throw new NormUnsupportedFeatureException($"Unsupported predicate operation '{operation}'.")
+                _ => throw new NormUnsupportedFeatureException($"Unsupported predicate operation '{operation}'.", NormUnsupportedReason.BinaryOperatorUnsupported)
             };
 
         /// <summary>

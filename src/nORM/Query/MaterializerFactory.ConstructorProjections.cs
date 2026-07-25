@@ -236,7 +236,8 @@ namespace nORM.Query
             if (!memberType.IsAssignableFrom(listType))
                 throw new nORM.Core.NormUnsupportedFeatureException(
                     $"An anonymous-type projection can't populate a '{memberType.Name}' collection member. Use " +
-                    ".ToList() for the projected collection, or project into a named type with a settable property.");
+                    ".ToList() for the projected collection, or project into a named type with a settable property.",
+                    nORM.Core.NormUnsupportedReason.ProjectionCollectionMemberNotAssignable);
             return Expression.New(listType);
         }
 

@@ -38,7 +38,8 @@ namespace nORM.Versioning
             var providerNative = context.Options.TemporalStorageMode == nORM.Configuration.TemporalStorageMode.ProviderNative;
             if (providerNative && !context.RawProvider.SupportsProviderNativeTemporalTables)
                 throw new NormUnsupportedFeatureException(
-                    $"{context.RawProvider.GetType().Name} does not support provider-native temporal tables.");
+                    $"{context.RawProvider.GetType().Name} does not support provider-native temporal tables.",
+                    NormUnsupportedReason.ProviderNativeTemporalUnsupported);
 
             // The sweep must version only REAL entity tables. GetAllMappings also yields projection types
             // (anonymous shapes, and named DTOs that pick up a convention 'Id' key) that the query pipeline

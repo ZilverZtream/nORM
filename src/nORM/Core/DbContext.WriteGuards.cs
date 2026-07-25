@@ -28,7 +28,8 @@ namespace nORM.Core
 
             throw new NormUnsupportedFeatureException(
                 $"{operation} for '{map.Type.Name}' is not supported because the entity is configured as read-only/query-only. " +
-                "Use Query<T>() or raw SQL query APIs for read access, and map a keyed writable table for generated writes.");
+                "Use Query<T>() or raw SQL query APIs for read access, and map a keyed writable table for generated writes.",
+                NormUnsupportedReason.WriteReadOnlyEntity);
         }
     }
 }

@@ -302,7 +302,8 @@ namespace nORM.Core
             MySqlProvider => new MySqlMigrationSqlGenerator(),
             _ => throw new NormUnsupportedFeatureException(
                 $"EnsureCreatedAsync does not support the provider '{_context.RawProvider.GetType().Name}'. " +
-                "Use migrations for custom providers.")
+                "Use migrations for custom providers.",
+                NormUnsupportedReason.EnsureCreatedProviderUnsupported)
         };
 
         private static IEnumerable<string> EnumerateUpStatements(MigrationSqlStatements statements)

@@ -149,7 +149,8 @@ namespace nORM.Providers
                         throw new NormUnsupportedFeatureException(
                             $"DateTime.ParseExact format \"{fmt}\" is not supported in SQL translation. " +
                             "Supported formats: yyyyMMdd, yyyy-MM-dd, yyyyMMddHHmmss, yyyy-MM-dd HH:mm:ss. " +
-                            "Other formats require materializing the column and parsing client-side.");
+                            "Other formats require materializing the column and parsing client-side.",
+                            NormUnsupportedReason.ParseExactFormatUnsupported);
                 }
             }
 
@@ -177,7 +178,8 @@ namespace nORM.Providers
                     throw new NormUnsupportedFeatureException(
                         "string.Replace(old, new, StringComparison) with an IgnoreCase mode is not supported -- " +
                         "SQLite REPLACE is case-sensitive and there's no portable case-insensitive substring " +
-                        "rewrite. Use a case-sensitive mode or post-materialize the column and Replace client-side.");
+                        "rewrite. Use a case-sensitive mode or post-materialize the column and Replace client-side.",
+                        NormUnsupportedReason.StringReplaceIgnoreCaseNotMobile);
                 }
                 return $"REPLACE({args[0]}, {args[1]}, {args[2]})";
             }
