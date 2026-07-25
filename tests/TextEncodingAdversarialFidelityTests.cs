@@ -101,6 +101,35 @@ public class TextEncodingAdversarialFidelityTests
             Assert.Equal(new[] { id }, q.Where(t => t.S == s).Select(t => t.Id).ToList());
     }
 
+    [Fact]
+    public async Task Adversarial_payloads_survive_a_tracked_update_round_trip()
+    {
+        // The UPDATE path binds the column value as a parameter independently of INSERT, so it is a
+        // distinct truncation surface: a row written benign then changed to an adversarial value via
+        // SaveChanges must persist the new value byte-exact, not silently truncate at a NUL.
+        var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var c = cn.CreateCommand())
+        {
+            c.CommandText = "CREATE TABLE TextAdvContract (Id INTEGER PRIMARY KEY, S TEXT NOT NULL);";
+            c.ExecuteNonQuery();
+        }
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        foreach (var (id, _, _) in Rows) await ctx.InsertAsync(new T { Id = id, S = "benign" });
+
+        var tracked = ((INormQueryable<T>)ctx.Query<T>()).OrderBy(t => t.Id).ToList();
+        for (int i = 0; i < tracked.Count; i++) tracked[i].S = Rows[i].S;
+        await ctx.SaveChangesAsync();
+
+        var back = ((INormQueryable<T>)ctx.Query<T>()).AsNoTracking().OrderBy(t => t.Id).ToList();
+        Assert.Equal(Rows.Length, back.Count);
+        for (int i = 0; i < Rows.Length; i++)
+            Assert.True(string.Equals(Rows[i].S, back[i].S, StringComparison.Ordinal),
+                $"payload '{Rows[i].Label}' corrupted on UPDATE round-trip: " +
+                $"wrote {Describe(Rows[i].S)} read {Describe(back[i].S)}");
+    }
+
     private static string Describe(string s) =>
         $"[{s.Length}] " + string.Join(" ", s.Select(ch => ((int)ch).ToString("X4")));
 }
