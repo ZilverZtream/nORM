@@ -237,11 +237,13 @@ namespace nORM.Core
 
             if (Options.NativeTenantSecurityMode != NativeTenantSecurityMode.SessionContext)
                 throw new NormUnsupportedFeatureException(
-                    $"Native tenant security mode '{Options.NativeTenantSecurityMode}' is not supported.");
+                    $"Native tenant security mode '{Options.NativeTenantSecurityMode}' is not supported.",
+                    NormUnsupportedReason.NativeTenantSecurityModeUnsupported);
 
             if (!_p.SupportsNativeTenantSessionContext)
                 throw new NormUnsupportedFeatureException(
-                    $"{_p.GetType().Name} does not support provider-native tenant session context.");
+                    $"{_p.GetType().Name} does not support provider-native tenant session context.",
+                    NormUnsupportedReason.ProviderNativeTenantUnsupported);
 
             var tenantId = GetRequiredTenantId("native tenant session context");
             var cacheKey = BuildNativeTenantSessionCacheKey(tenantId);
@@ -264,11 +266,13 @@ namespace nORM.Core
 
             if (Options.NativeTenantSecurityMode != NativeTenantSecurityMode.SessionContext)
                 throw new NormUnsupportedFeatureException(
-                    $"Native tenant security mode '{Options.NativeTenantSecurityMode}' is not supported.");
+                    $"Native tenant security mode '{Options.NativeTenantSecurityMode}' is not supported.",
+                    NormUnsupportedReason.NativeTenantSecurityModeUnsupported);
 
             if (!_p.SupportsNativeTenantSessionContext)
                 throw new NormUnsupportedFeatureException(
-                    $"{_p.GetType().Name} does not support provider-native tenant session context.");
+                    $"{_p.GetType().Name} does not support provider-native tenant session context.",
+                    NormUnsupportedReason.ProviderNativeTenantUnsupported);
 
             var tenantId = GetRequiredTenantId("native tenant session context");
             var cacheKey = BuildNativeTenantSessionCacheKey(tenantId);

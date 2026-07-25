@@ -62,6 +62,9 @@ public sealed class UnsupportedReasonContractTests
         "Providers/PostgresProvider.Runtime.cs",
         "Providers/MySqlProvider.Runtime.cs",
         "Providers/SqlServerProvider.Regex.cs",
+        "Providers/DatabaseProvider.TemporalTenant.cs",
+        "Core/DbContext.TenantTemporal.cs",
+        "Core/DbContext.Connection.cs",
     };
 
     private static ISet<string> CatalogCodeNames()

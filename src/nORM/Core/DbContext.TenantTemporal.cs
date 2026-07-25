@@ -745,7 +745,8 @@ namespace nORM.Core
             ThrowIfProviderNativeTemporalOperationalApi("Temporal pruning");
             if (pruneTags && Options.TenantProvider != null)
                 throw new NormUnsupportedFeatureException(
-                    "Temporal tags are global. Disable tenant mode or prune tags through an audited administrative context.");
+                    "Temporal tags are global. Disable tenant mode or prune tags through an audited administrative context.",
+                    NormUnsupportedReason.TemporalTagsGlobal);
 
             var cutoff = NormalizeTemporalCutoff(olderThan);
 
@@ -786,7 +787,8 @@ namespace nORM.Core
             throw new NormUnsupportedFeatureException(
                 $"{operation} uses nORM-managed history metadata. Provider-native temporal mode currently supports " +
                 "AsOf(DateTime), AsOf(tag), tag creation, and SQL Server native bootstrap; use nORM-managed temporal " +
-                "storage for provider-neutral history, diff, restore, and pruning APIs.");
+                "storage for provider-neutral history, diff, restore, and pruning APIs.",
+                NormUnsupportedReason.ProviderNativeTemporalUnsupported);
         }
 
         private async Task<int> PruneTemporalHistoryForMappingAsync(
@@ -819,18 +821,21 @@ namespace nORM.Core
         {
             if (map.KeyColumns.Length == 0)
                 throw new NormUnsupportedFeatureException(
-                    $"{operation} for '{map.Type.Name}' requires a mapped primary key.");
+                    $"{operation} for '{map.Type.Name}' requires a mapped primary key.",
+                    NormUnsupportedReason.TemporalOperationKeyRequirement);
             if (keyValues.Count != map.KeyColumns.Length)
                 throw new NormUnsupportedFeatureException(
                     $"{operation} for '{map.Type.Name}' requires {map.KeyColumns.Length} key value(s), " +
-                    $"but {keyValues.Count} were provided.");
+                    $"but {keyValues.Count} were provided.",
+                    NormUnsupportedReason.TemporalOperationKeyRequirement);
             for (var i = 0; i < map.KeyColumns.Length; i++)
             {
                 var keyCol = map.KeyColumns[i];
                 var keyType = keyCol.Prop.PropertyType;
                 if (keyValues[i] == null && Nullable.GetUnderlyingType(keyType) == null && keyType.IsValueType)
                     throw new NormUnsupportedFeatureException(
-                        $"{operation} for '{map.Type.Name}' requires non-null key value '{keyCol.Prop.Name}'.");
+                        $"{operation} for '{map.Type.Name}' requires non-null key value '{keyCol.Prop.Name}'.",
+                        NormUnsupportedReason.TemporalOperationKeyRequirement);
             }
         }
 

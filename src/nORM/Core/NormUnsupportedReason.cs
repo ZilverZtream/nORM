@@ -285,5 +285,22 @@ namespace nORM.Core
 
         /// <summary>Savepoints are not supported for the given transaction type.</summary>
         public const string SavepointsUnsupportedForTransactionType = "savepoints-unsupported-for-transaction-type";
+
+        // ── Temporal / multi-tenancy capabilities (DatabaseProvider.TemporalTenant, DbContext.TenantTemporal, DbContext.Connection) ──
+
+        /// <summary>The active provider does not support provider-native temporal tables / as-of queries, or the operation is unsupported in provider-native temporal mode.</summary>
+        public const string ProviderNativeTemporalUnsupported = "provider-native-temporal-unsupported";
+
+        /// <summary>The active provider does not support provider-native tenant session context / policy DDL.</summary>
+        public const string ProviderNativeTenantUnsupported = "provider-native-tenant-unsupported";
+
+        /// <summary>Temporal tags are global and cannot be pruned/scoped under tenant mode.</summary>
+        public const string TemporalTagsGlobal = "temporal-tags-global";
+
+        /// <summary>A temporal operation requires a mapped primary key with the right number of non-null key values.</summary>
+        public const string TemporalOperationKeyRequirement = "temporal-operation-key-requirement";
+
+        /// <summary>The configured native tenant security mode is not supported.</summary>
+        public const string NativeTenantSecurityModeUnsupported = "native-tenant-security-mode-unsupported";
     }
 }

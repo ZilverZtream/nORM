@@ -79,7 +79,8 @@ namespace nORM.Providers
         /// <param name="mapping">Mapped entity table.</param>
         public virtual string GenerateProviderNativeTemporalBootstrapSql(TableMapping mapping)
             => throw new NormUnsupportedFeatureException(
-                $"{GetType().Name} does not support provider-native temporal tables.");
+                $"{GetType().Name} does not support provider-native temporal tables.",
+                NormUnsupportedReason.ProviderNativeTemporalUnsupported);
 
         /// <summary>
         /// Converts an AsOf timestamp to the value actually bound for history-window comparison.
@@ -101,7 +102,8 @@ namespace nORM.Providers
         /// <param name="timestampParameterName">Bound timestamp parameter name.</param>
         public virtual string GetProviderNativeTemporalAsOfFromClause(TableMapping mapping, string timestampParameterName)
             => throw new NormUnsupportedFeatureException(
-                $"{GetType().Name} does not support provider-native temporal table as-of queries.");
+                $"{GetType().Name} does not support provider-native temporal table as-of queries.",
+                NormUnsupportedReason.ProviderNativeTemporalUnsupported);
 
         /// <summary>
         /// Gets whether this provider can store the current tenant ID in provider-native
@@ -116,7 +118,8 @@ namespace nORM.Providers
         /// <param name="tenantParameterName">Parameter name containing the current tenant ID.</param>
         public virtual string GetSetNativeTenantSessionContextSql(string sessionKey, string tenantParameterName)
             => throw new NormUnsupportedFeatureException(
-                $"{GetType().Name} does not support provider-native tenant session context.");
+                $"{GetType().Name} does not support provider-native tenant session context.",
+                NormUnsupportedReason.ProviderNativeTenantUnsupported);
 
         /// <summary>
         /// Generates optional provider-native RLS policy DDL for a mapped tenant table.
@@ -126,7 +129,8 @@ namespace nORM.Providers
         /// <param name="sessionKey">Provider session key that contains the current tenant ID.</param>
         public virtual string GenerateNativeTenantPolicySql(TableMapping mapping, string sessionKey)
             => throw new NormUnsupportedFeatureException(
-                $"{GetType().Name} does not support provider-native tenant policy DDL generation.");
+                $"{GetType().Name} does not support provider-native tenant policy DDL generation.",
+                NormUnsupportedReason.ProviderNativeTenantUnsupported);
 
         /// <summary>
         /// Generates optional provider-native DDL that removes nORM's tenant RLS
@@ -135,7 +139,8 @@ namespace nORM.Providers
         /// <param name="mapping">Mapped entity table.</param>
         public virtual string GenerateDropNativeTenantPolicySql(TableMapping mapping)
             => throw new NormUnsupportedFeatureException(
-                $"{GetType().Name} does not support provider-native tenant policy DDL generation.");
+                $"{GetType().Name} does not support provider-native tenant policy DDL generation.",
+                NormUnsupportedReason.ProviderNativeTenantUnsupported);
 
         /// <summary>
         /// Returns provider-specific SQL to create the temporal tags table if it does not exist.
