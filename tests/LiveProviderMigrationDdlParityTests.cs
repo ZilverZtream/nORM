@@ -478,6 +478,77 @@ public class LiveProviderMigrationDdlParityTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // DROP COLUMN over a column that carries a DEFAULT constraint.
+    // On SQL Server a defaulted column owns a system-named DEFAULT constraint that must be
+    // dropped BEFORE the column can be dropped. The generator does this with dynamic SQL —
+    // it looks the constraint name up at run time and executes the drop via EXEC(@var). The
+    // sibling DropColumn test drops a NON-defaulted column, so at run time that lookup returns
+    // NULL and the EXEC never fires; this test forces the EXEC path to actually run and drop a
+    // real constraint. If that dynamic drop is broken (e.g. the historic QUOTENAME-inside-EXEC
+    // syntax error, or a wrong constraint-name lookup) the subsequent DROP COLUMN fails with a
+    // dependency error, so this is an end-to-end guard, not just a parse check.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_DropDefaultedColumn_DropsConstraintAndColumn(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_DropDefaultedCol";
+
+        // SQLite < 3.35.0 does not support ALTER TABLE … DROP COLUMN.
+        if (kind == "sqlite")
+        {
+            try
+            {
+                Exec(db, "CREATE TABLE \"_ddl_probe_def\" (a INT, b INT)");
+                Exec(db, "ALTER TABLE \"_ddl_probe_def\" DROP COLUMN b");
+                ExecSafe(db, "DROP TABLE \"_ddl_probe_def\"");
+            }
+            catch { db.Dispose(); return; }
+        }
+
+        try
+        {
+            ResetTable(db, kind, table);
+            // "Score" carries a DEFAULT — on SQL Server this materializes a system-named
+            // DEFAULT constraint bound to the column, which the drop path must remove first.
+            var createWithDefault = kind switch
+            {
+                "sqlite"    => $"CREATE TABLE IF NOT EXISTS \"{table}\" (\"Id\" INTEGER PRIMARY KEY, \"Name\" TEXT NOT NULL, \"Score\" INTEGER NOT NULL DEFAULT 7)",
+                "sqlserver" => $"IF OBJECT_ID('{table}','U') IS NULL CREATE TABLE [{table}] ([Id] INT PRIMARY KEY, [Name] NVARCHAR(200) NOT NULL, [Score] INT NOT NULL DEFAULT 7)",
+                "mysql"     => $"CREATE TABLE IF NOT EXISTS `{table}` (`Id` INT PRIMARY KEY, `Name` VARCHAR(200) NOT NULL, `Score` INT NOT NULL DEFAULT 7)",
+                "postgres"  => $"CREATE TABLE IF NOT EXISTS \"{table}\" (\"Id\" INT PRIMARY KEY, \"Name\" VARCHAR(200) NOT NULL, \"Score\" INT NOT NULL DEFAULT 7)",
+                _           => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+            Exec(db, createWithDefault);
+            Assert.True(ColumnExists(db, table, "Score"), "Score must exist before drop");
+
+            var extTable = TableWithExtra(table);
+            var score    = extTable.Columns.First(c => c.Name == "Score");
+            var diff     = new SchemaDiff();
+            diff.DroppedColumns.Add((extTable, score));
+
+            // Must not throw: the dynamic default-constraint drop has to run and succeed so the
+            // column becomes droppable.
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            Assert.False(ColumnExists(db, table, "Score"),
+                $"[{kind}] Defaulted column Score should be gone after DROP COLUMN.");
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // Item 15 — CREATE TABLE via SchemaDiff AddedTables
     // ══════════════════════════════════════════════════════════════════════════
 
