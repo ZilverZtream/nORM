@@ -62,6 +62,48 @@ jobs:
           path: "**/*.trx"
           retention-days: 7
 
+  # Supply-chain gate: fail the build if any direct OR transitive package has a known vulnerability.
+  # Part of the "perfect security" bar — a newly-disclosed CVE in a dependency reds CI so it is handled
+  # promptly rather than shipping silently.
+  supply-chain:
+    name: Supply-chain (vulnerable packages)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore nORM.sln
+
+      - name: Scan for vulnerable packages (direct + transitive)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Scanning for known-vulnerable packages..."
+          output=$(dotnet list nORM.sln package --vulnerable --include-transitive 2>&1 || true)
+          echo "$output"
+          # Advisories found in the dependency graph, and the documented (no-upstream-fix) allowlist.
+          found=$(echo "$output" | grep -oE 'GHSA-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+' | sort -u || true)
+          allow=$(grep -oE 'GHSA-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+' eng/vulnerability-allowlist.txt | sort -u || true)
+          # Fail on any advisory that is NOT allowlisted.
+          unexpected=$(comm -23 <(printf '%s\n' "$found" | grep -v '^$' || true) <(printf '%s\n' "$allow" | grep -v '^$' || true) || true)
+          if [ -n "$unexpected" ]; then
+            echo "::error::Un-allowlisted vulnerable package advisories detected:"
+            echo "$unexpected"
+            echo "Fix them (bump the offending package) or, only if there is no upstream fix, add the GHSA id to eng/vulnerability-allowlist.txt with justification."
+            exit 1
+          fi
+          if [ -n "$found" ]; then
+            echo "Only allowlisted (no-upstream-fix) advisories present: $found"
+          else
+            echo "No known-vulnerable packages."
+          fi
+
   # P1 gate: live MySQL provider parity (ubuntu only, service container)
   # Gate 4.5 requirement: mandatory live provider matrix, no optional skip path
   # for core parity scenarios. The NORM_TEST_MYSQL env var activates live tests;

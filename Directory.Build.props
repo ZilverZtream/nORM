@@ -5,5 +5,9 @@
     <NormVersion>0.9.0</NormVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
+    <!-- Supply chain: emit a packages.lock.json per project so restores are reproducible and the exact
+         transitive dependency set is auditable in source control (the CI supply-chain job scans it for
+         known-vulnerable packages). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 </Project>

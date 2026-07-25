@@ -120,10 +120,18 @@ predicate; tenant value always parameterized; pooling resets tenant state).
 
 ## Residual / deferred (non-exploitable, tracked)
 
-- **Supply chain (Medium, process):** direct package references are current and
-  non-vulnerable, but there is no lockfile / central package management / `--vulnerable`
-  CI gate, so transitive versions float at restore time. Recommended as build-infra
-  hardening (reproducible restore + a vulnerable-package CI check).
+- **Supply chain (Medium, process) — mostly closed.** Added reproducible-restore lockfiles
+  (`RestorePackagesWithLockFile`, `packages.lock.json` committed per project) and a CI
+  `supply-chain` job that runs `dotnet list package --vulnerable --include-transitive` and
+  **fails the build on any advisory not in `eng/vulnerability-allowlist.txt`**. That gate
+  immediately surfaced **CVE-2025-6965 / GHSA-2m69-gcr7-jv3q** (High): the SQLite bundled by
+  `SQLitePCLRaw.lib.e_sqlite3` (transitive via `Microsoft.Data.Sqlite 8.0.x`) is < 3.50.2 and
+  can corrupt memory on a crafted aggregate query. **No fixed SQLitePCLRaw exists** (the whole
+  2.1.x line is affected); nORM now pins the newest available native bundle (2.1.11) as
+  best-effort and allowlists the advisory with justification (LOW nORM exposure — aggregate SQL
+  is generated from typed LINQ with parameterized values, not attacker-driven aggregate-term
+  counts). Re-check and bump when upstream ships SQLite 3.50.2+. Central Package Management (CPM)
+  remains a further optional step.
 - **Redaction/validation regexes (Low):** run without a `MatchTimeout`, but only over
   `MaxSqlLength`-bounded, mostly-generated text — no practical ReDoS. Hardening only.
 - **Temporal history-column type string (Low):** history-table DDL concatenates a
