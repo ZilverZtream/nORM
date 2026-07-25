@@ -142,6 +142,59 @@ public class TextEncodingAdversarialCrossProviderLiveTests
         }
     }
 
+    [Theory]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    [InlineData("sqlserver")]
+    public async Task Embedded_nul_round_trips_exactly_or_is_rejected_never_silently_truncated(string kind)
+    {
+        var (factory, provider, skip) = OpenLive(kind);
+        if (skip != null) return;
+
+        // "a\0b" — a native C-string terminator can truncate this to "a". Providers legitimately differ:
+        // SQLite/MySQL/SQL Server can store an embedded NUL; Postgres rejects NUL in text. The invariant
+        // nORM must uphold on EVERY engine is that there is NO SILENT TRUNCATION — the value either
+        // round-trips byte-exact or the write fails loudly. A wrote-"a\0b"-read-"a" is the data-loss bug.
+        var nul = Cp('a', 0x0000, 'b');
+
+        var table = kind == "postgres" ? "\"TextAdvXPNul_Test\"" : "TextAdvXPNul_Test";
+        var idCol = kind == "postgres" ? "\"Id\" INT PRIMARY KEY" : "Id INT PRIMARY KEY";
+        var sCol = kind switch
+        {
+            "sqlserver" => "S NVARCHAR(200) NOT NULL",
+            "mysql" => "S VARCHAR(200) CHARACTER SET utf8mb4 NOT NULL",
+            _ => "\"S\" VARCHAR(200) NOT NULL",
+        };
+
+        Exec(factory!, $"DROP TABLE IF EXISTS {table}");
+        Exec(factory!, $"CREATE TABLE {table} ({idCol}, {sCol})");
+        try
+        {
+            Exception? writeError = null;
+            try
+            {
+                using var ctx = new DbContext(factory!(), provider!);
+                await ctx.InsertAsync(new T { Id = 1, S = nul });
+            }
+            catch (Exception ex)
+            {
+                writeError = ex; // a loud rejection (e.g. Postgres refusing NUL in text) is acceptable.
+            }
+
+            if (writeError == null)
+            {
+                using var ctx = new DbContext(factory!(), provider!);
+                var back = ((INormQueryable<T>)ctx.Query<T>()).AsNoTracking().Single();
+                Assert.True(string.Equals(nul, back.S, StringComparison.Ordinal),
+                    $"[{kind}] embedded NUL SILENTLY TRUNCATED (data loss): wrote {Describe(nul)} read {Describe(back.S)}");
+            }
+        }
+        finally
+        {
+            Exec(factory!, $"DROP TABLE IF EXISTS {table}");
+        }
+    }
+
     private static string Describe(string s) =>
         $"[{s.Length}] " + string.Join(" ", s.Select(ch => ((int)ch).ToString("X4")));
 }
