@@ -896,7 +896,9 @@ Stored procedures and direct connection access are privileged paths. See
 [Raw SQL Security](docs/raw-sql-security.md) and
 [Stored Procedure Security](docs/stored-procedure-security.md). SQL diagnostics
 redact string literals and parameter values by default; see
-[Logging and Redaction](docs/logging-redaction.md).
+[Logging and Redaction](docs/logging-redaction.md). For the whole picture — trust
+boundaries, injection resistance, and the tenant/credential guarantees with the test
+that proves each — read the [Security Threat Model](docs/security-threat-model.md).
 Stable exception categories for query, provider, timeout, configuration, usage,
 unsupported-feature, and concurrency failures are documented in
 [Exception Taxonomy](docs/exception-taxonomy.md).
