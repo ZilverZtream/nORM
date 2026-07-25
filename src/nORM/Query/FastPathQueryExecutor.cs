@@ -370,11 +370,15 @@ namespace nORM.Query
         private static Func<System.Data.Common.DbDataReader, T> GetSyncMaterializer<T>(DbContext ctx) where T : class
         {
             var key = (typeof(T), ctx.GetMappingHash());
-            return (Func<System.Data.Common.DbDataReader, T>)_syncMaterializerCache.GetOrAdd(key, _ =>
+            // State-passing GetOrAdd overload: passing ctx as the factory argument avoids allocating a
+            // closure + delegate on every call (the factory expression is built before GetOrAdd decides
+            // whether to invoke it, so a capturing lambda allocates even on cache hits). Mirrors the
+            // allocation-free pattern already used by GetSqlTemplate below and the paging fast path.
+            return (Func<System.Data.Common.DbDataReader, T>)_syncMaterializerCache.GetOrAdd(key, static (_, context) =>
             {
-                var map = ctx.GetMapping(typeof(T));
+                var map = context.GetMapping(typeof(T));
                 return (Delegate)_materializer.CreateSyncMaterializer<T>(map);
-            });
+            }, ctx);
         }
 
         private static string GetSqlTemplate<T>(DbContext ctx) where T : class
