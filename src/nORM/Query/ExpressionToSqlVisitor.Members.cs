@@ -767,6 +767,11 @@ namespace nORM.Query
                 && TryGetConstantValue(patternExpr, out var raw)
                 && raw is string pattern)
             {
+                // InlinesConstantRegexArguments is SqlServer-only, where '\' is not a string escape, so
+                // '-doubling is a complete F1 escape. But TryGetConstantValue FOLDS closures, so a runtime
+                // pattern would be baked into the cached plan and replayed to other callers (F2) — reserve a
+                // fold-no-cache placeholder (document order: pattern follows the already-translated input).
+                ReserveUnusedIfClosure(patternExpr);
                 return "\'" + pattern.Replace("\'", "\'\'") + "\'";
             }
 
@@ -779,10 +784,25 @@ namespace nORM.Query
                 && TryGetConstantValue(replacementExpr, out var raw)
                 && raw is string replacement)
             {
+                ReserveUnusedIfClosure(replacementExpr);
                 return "\'" + replacement.Replace("\'", "\'\'") + "\'";
             }
 
             return GetSql(replacementExpr);
+        }
+
+        /// <summary>
+        /// Reserves a fold-no-cache <c>_unused</c> compiled-parameter placeholder when <paramref name="expr"/>
+        /// is a runtime (closure) value being inlined into SQL — so the plan is not reused across values
+        /// (F2 poisoning). A genuine compile-time constant is stable and needs none. Must be called in extractor
+        /// document order relative to the surrounding arguments.
+        /// </summary>
+        private void ReserveUnusedIfClosure(Expression expr)
+        {
+            if (expr is ConstantExpression) return;
+            var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+            _params[placeholder] = DBNull.Value;
+            _compiledParams.Add(placeholder);
         }
 
         private static bool TryGetConstantValue(Expression expr, out object? value)

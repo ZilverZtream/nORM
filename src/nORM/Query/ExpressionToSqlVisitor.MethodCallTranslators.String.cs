@@ -82,8 +82,10 @@ namespace nORM.Query
                         _params[placeholder] = DBNull.Value;
                         _compiledParams.Add(placeholder);
                     }
-                    var trimSet = new string(chars).Replace("'", "''");
-                    _sql.Append(sqlFn).Append('(').Append(recvSql).Append(", '").Append(trimSet).Append("')");
+                    // Provider-safe literal escaping (MySQL doubles the backslash); F2 fold-no-cache is already
+                    // handled above via the charsFromClosure `_unused` placeholder. Mirrors the SCV sibling.
+                    _sql.Append(sqlFn).Append('(').Append(recvSql).Append(", ")
+                        .Append(_provider.EscapeStringLiteral(new string(chars))).Append(')');
                     return node;
                 }
             }
@@ -193,6 +195,16 @@ namespace nORM.Query
                 var segments = TryParseSimpleFormatSegments(template);
                 if (segments != null)
                 {
+                    // Unlike the SCV sibling (which guards `is ConstantExpression`), this path folds the template
+                    // via TryGetConstantValue, so a RUNTIME (closure) template's literal segments would be baked
+                    // into the cached plan and replayed to other callers (F2). Reserve a fold-no-cache
+                    // placeholder in extractor document order (arg0 template before the arg parts).
+                    if (node.Arguments[0] is not ConstantExpression)
+                    {
+                        var tmplPlaceholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                        _params[tmplPlaceholder] = DBNull.Value;
+                        _compiledParams.Add(tmplPlaceholder);
+                    }
                     // Collect remaining args (one per argument expression). string.Format
                     // accepts `params object[]`, so the second argument may be a
                     // NewArrayExpression wrapping the parts - unwrap if so.
@@ -210,7 +222,7 @@ namespace nORM.Query
                         if (seg.IsLiteral)
                         {
                             if (seg.Literal!.Length > 0)
-                                parts.Add($"'{seg.Literal.Replace("'", "''")}'");
+                                parts.Add(_provider.EscapeStringLiteral(seg.Literal!)); // F1: MySQL-safe escape
                         }
                         else
                         {

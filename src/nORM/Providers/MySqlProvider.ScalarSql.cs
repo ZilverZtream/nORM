@@ -145,6 +145,9 @@ namespace nORM.Providers
                     return null;
                 if (c == '\'') sb.Append("''");
                 else if (c == '%') sb.Append("%%");
+                // MySQL treats '\' as a string-literal escape under its default sql_mode, so a lone backslash
+                // in the format would break out of the surrounding '...' literal. Double it.
+                else if (c == '\\') sb.Append("\\\\");
                 else sb.Append(c);
                 i++;
             }

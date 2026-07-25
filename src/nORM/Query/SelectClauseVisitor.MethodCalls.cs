@@ -345,6 +345,10 @@ namespace nORM.Query
                         && digits >= 0 && digits <= 17)
                     {
                         var recvSql = TranslateProjectionArg(node.Object);
+                        // A runtime (closure) format string is folded into the SQL — mark the plan fold-no-cache
+                        // (extractor order: after the receiver) so a later call with a different format cannot
+                        // reuse this one (F2). Mirrors the ETSV predicate sibling.
+                        MarkFoldNoCacheIfClosure(node.Arguments[0]);
                         sb.Append(_provider.FormatFixedDecimalSql(recvSql, digits));
                         return node;
                     }
@@ -361,6 +365,8 @@ namespace nORM.Query
                         || underlying == typeof(TimeOnly))
                     {
                         var recvSql = TranslateProjectionArg(node.Object);
+                        // A runtime (closure) format string is folded into the SQL — fold-no-cache (F2).
+                        MarkFoldNoCacheIfClosure(node.Arguments[0]);
                         // Provider hook: SqliteProvider uses strftime; SqlServer
                         // FORMAT('en-US'); Postgres to_char; MySQL DATE_FORMAT.
                         var formattedSql = _provider.FormatDateUsingDotNetPattern(recvSql, fmt);
