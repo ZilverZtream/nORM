@@ -156,6 +156,26 @@ public class LiveProviderMigrationDdlParityTests
         return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
     }
 
+    // True when a PostgreSQL index exists AND is partial (has a WHERE predicate → indpred IS NOT NULL).
+    private static bool PostgresPartialIndexExists(DbConnection cn, string indexName)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "SELECT COUNT(*) FROM pg_class c JOIN pg_index i ON i.indexrelid = c.oid " +
+            $"WHERE c.relname = '{indexName}' AND i.indpred IS NOT NULL";
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
+    // True when a PostgreSQL index exists AND is an expression/functional index (indexprs IS NOT NULL).
+    private static bool PostgresExpressionIndexExists(DbConnection cn, string indexName)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "SELECT COUNT(*) FROM pg_class c JOIN pg_index i ON i.indexrelid = c.oid " +
+            $"WHERE c.relname = '{indexName}' AND i.indexprs IS NOT NULL";
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
     // ── Base-table DDL (provider-specific CREATE TABLE) ──────────────────────
 
     private static string CreateBaseDdl(string kind, string table) => kind switch
@@ -676,6 +696,99 @@ public class LiveProviderMigrationDdlParityTests
             Assert.True(TableExists(db, table), $"[{kind}] table {table} should exist.");
             Assert.True(SqlServerFilteredIndexExists(db, table, ixName),
                 $"[{kind}] filtered index {ixName} should exist and carry a filter predicate.");
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CREATE a table carrying a PARTIAL index with an INCLUDE column (PostgreSQL). Same
+    // raw-filter-interpolation path as the SQL Server guard, on the provider where partial
+    // indexes are ubiquitous. Guard: the CREATE must execute AND the resulting index must be
+    // partial (pg_index.indpred IS NOT NULL). PostgreSQL 11+ (INCLUDE support).
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_CreateTableWithPartialIncludeIndex_IsValidAndPartial(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table  = "DdlParity_PartialIdx";
+        const string ixName = "IX_DdlParity_PartialIdx_Score";
+
+        try
+        {
+            ExecSafe(db, DropTableDdl(kind, table));
+
+            var t     = TableWithExtra(table);   // Id (PK), Name (NOT NULL), Score (nullable int)
+            var score = t.Columns.First(c => c.Name == "Score");
+            var name  = t.Columns.First(c => c.Name == "Name");
+            // Partial index on Score (WHERE "Score" > 0) that INCLUDEs Name. Filter is PG-quoted.
+            score.Indexes.Add(new ColumnIndexSchema { Name = ixName, Order = 0, FilterSql = "\"Score\" > 0" });
+            name.Indexes.Add(new ColumnIndexSchema { Name = ixName, IsIncluded = true });
+
+            var diff = new SchemaDiff();
+            diff.AddedTables.Add(t);
+
+            // Must not throw: the partial/INCLUDE index DDL has to be valid on a live server.
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            Assert.True(TableExists(db, table), $"[{kind}] table {table} should exist.");
+            Assert.True(PostgresPartialIndexExists(db, ixName),
+                $"[{kind}] partial index {ixName} should exist with a predicate.");
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CREATE a table carrying an EXPRESSION (functional) index (PostgreSQL). The generator
+    // emits `CREATE INDEX ... ON "T" (<expr>)` with the key expression interpolated raw —
+    // a distinct diff member (table.ExpressionIndexes) with no prior live coverage. Guard:
+    // the CREATE must execute AND the index must be a real expression index
+    // (pg_index.indexprs IS NOT NULL). SQL Server rejects expression indexes by design, so
+    // this is PostgreSQL (and, separately, SQLite).
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_CreateTableWithExpressionIndex_IsValidAndFunctional(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table  = "DdlParity_ExprIdx";
+        const string ixName = "IX_DdlParity_ExprIdx_LowerName";
+
+        try
+        {
+            ExecSafe(db, DropTableDdl(kind, table));
+
+            var t = TableWithExtra(table);
+            // Functional index on lower("Name"). The key expression is interpolated verbatim.
+            t.ExpressionIndexes.Add(new ExpressionIndexSchema
+            {
+                Name = ixName,
+                ExpressionSql = "lower(\"Name\")",
+            });
+
+            var diff = new SchemaDiff();
+            diff.AddedTables.Add(t);
+
+            // Must not throw: the expression index DDL has to be valid on a live server.
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            Assert.True(TableExists(db, table), $"[{kind}] table {table} should exist.");
+            Assert.True(PostgresExpressionIndexExists(db, ixName),
+                $"[{kind}] expression index {ixName} should exist as a functional index.");
         }
         finally
         {
