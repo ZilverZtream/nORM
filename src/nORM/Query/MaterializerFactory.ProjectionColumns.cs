@@ -422,6 +422,49 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Slice-1 detection of a GroupBy-projection member that materializes the GROUP's ELEMENTS into a
+        /// collection: <c>g.Select(x =&gt; &lt;element&gt;).ToList()</c> or the whole-element <c>g.ToList()</c>,
+        /// where the source is the grouping parameter (type <see cref="IGrouping{TKey,TElement}"/>). Returns
+        /// the element projection lambda via <paramref name="elementProjection"/> (null for <c>g.ToList()</c>).
+        /// Ordered / filtered / Take / Skip forms leave a MethodCall at the bottom and are intentionally NOT
+        /// matched here — they stay fail-loud until slice 2. Mirrors <see cref="IsShapedOrBareNavigationCollection"/>
+        /// but requires an IGrouping parameter at the bottom instead of a navigation-collection member.
+        /// </summary>
+        internal static bool IsGroupElementCollection(Expression arg, out LambdaExpression? elementProjection)
+        {
+            elementProjection = null;
+            if (arg is not MethodCallExpression term
+                || term.Arguments.Count != 1
+                || (term.Method.DeclaringType != typeof(Enumerable) && term.Method.DeclaringType != typeof(Queryable))
+                || term.Method.Name is not (nameof(Enumerable.ToList) or nameof(Enumerable.ToArray)))
+                return false;
+
+            var current = term.Arguments[0];
+            // Optional single Select(source, elementProjection).
+            if (current is MethodCallExpression selectCall
+                && selectCall.Arguments.Count == 2
+                && (selectCall.Method.DeclaringType == typeof(Enumerable) || selectCall.Method.DeclaringType == typeof(Queryable))
+                && selectCall.Method.Name == nameof(Enumerable.Select))
+            {
+                var projArg = selectCall.Arguments[1];
+                if (projArg is UnaryExpression { NodeType: ExpressionType.Quote } q) projArg = q.Operand;
+                if (projArg is not LambdaExpression projLambda) return false;
+                elementProjection = projLambda;
+                current = selectCall.Arguments[0];
+            }
+
+            // The bottom must be the grouping parameter itself (IGrouping<,>). An ordered/filtered/paged form
+            // leaves a MethodCallExpression here and is not matched (slice 1).
+            if (current is ParameterExpression p
+                && p.Type.IsGenericType
+                && p.Type.GetGenericTypeDefinition() == typeof(IGrouping<,>))
+                return true;
+
+            elementProjection = null;
+            return false;
+        }
+
+        /// <summary>
         /// Checks if a member expression represents a navigation collection property.
         /// </summary>
         private static bool IsNavigationCollection(MemberExpression memberExpr, TableMapping mapping)
