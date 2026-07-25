@@ -246,10 +246,14 @@ namespace nORM.Query
             // only the default, so defer to the full pipeline which honors the per-query force-tracking flag.
             if (ContainsAsTracking(expr))
                 return false;
+            // Resolve the mapping ONCE and reuse it for the discriminator guard and the per-pattern column
+            // checks below (it is a cached, stable object — GetMapping was previously called up to 3x per
+            // fast-path query). GetMapping is only needed past the cheap structural bails above.
+            var map = ctx.GetMapping(typeof(T));
             // TPH subtype root: the fast-path SQL builders below select/page over the shared base table
             // and emit NO discriminator predicate, so a subtype query would silently return sibling
             // subtypes (and materialize them as the wrong type). Defer to the full pipeline.
-            if (ctx.GetMapping(typeof(T)).DiscriminatorValue != null)
+            if (map.DiscriminatorValue != null)
                 return false;
 
             var cacheUnsupportedMiss = ShouldCacheUnsupportedListMiss(expr);
@@ -263,7 +267,6 @@ namespace nORM.Query
 
             if (IsSimpleWherePattern(expr, ctx.RawProvider.StoresDecimalAsText, out var whereInfo, out var takeCount))
             {
-                var map = ctx.GetMapping(typeof(T));
                 if (!map.ColumnsByName.ContainsKey(whereInfo.Property))
                     return false;
 
@@ -278,7 +281,6 @@ namespace nORM.Query
             if (ctx.Options.CommandInterceptors.Count == 0 &&
                 IsFilteredOrderedPagePattern(expr, ctx.RawProvider.StoresDecimalAsText, out var pageInfo))
             {
-                var map = ctx.GetMapping(typeof(T));
                 if (!HasFilteredOrderedPageColumns(map, pageInfo))
                     return false;
 
