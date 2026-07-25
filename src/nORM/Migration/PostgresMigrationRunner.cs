@@ -144,10 +144,11 @@ namespace nORM.Migration
                     return;
 
                 if (DateTime.UtcNow >= deadline)
-                    throw new TimeoutException(
+                    throw new NormTimeoutException(
                         $"Failed to acquire PostgreSQL migration advisory lock (key={_migrationOptions.PostgresAdvisoryLockKey}) " +
                         $"within {effectiveTimeout.TotalSeconds} seconds. " +
-                        "Another migration runner or stale session may be holding the lock.");
+                        "Another migration runner or stale session may be holding the lock.",
+                        sql: null, parameters: null, inner: null);
 
                 await Task.Delay(LockRetryDelayMs, ct).ConfigureAwait(false);
             }
