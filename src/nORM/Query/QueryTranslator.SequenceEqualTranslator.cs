@@ -22,13 +22,15 @@ namespace nORM.Query
                 if (node.Arguments.Count != 2)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "SequenceEqual comparer overloads are not provider-mobile; compare materialized sequences in CLR when a custom comparer is required.");
+                        "SequenceEqual comparer overloads are not provider-mobile; compare materialized sequences in CLR when a custom comparer is required.",
+                        NormUnsupportedReason.SequenceEqualComparerUnsupported);
                 }
 
                 if (ExtractOrderByKeys(node.Arguments[0]).Count == 0)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "SequenceEqual requires the queryable source to have an explicit OrderBy/ThenBy chain for provider-mobile sequence comparison.");
+                        "SequenceEqual requires the queryable source to have an explicit OrderBy/ThenBy chain for provider-mobile sequence comparison.",
+                        NormUnsupportedReason.RequiresExplicitOrdering);
                 }
 
                 if (TryTranslateLocalSequenceEqual(t, node, out var translated))
@@ -37,7 +39,8 @@ namespace nORM.Query
                 if (ExtractOrderByKeys(node.Arguments[1]).Count == 0)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "SequenceEqual requires the second queryable source to have an explicit OrderBy/ThenBy chain for provider-mobile sequence comparison.");
+                        "SequenceEqual requires the second queryable source to have an explicit OrderBy/ThenBy chain for provider-mobile sequence comparison.",
+                        NormUnsupportedReason.RequiresExplicitOrdering);
                 }
 
                 var leftPlan = t.TranslateInSubContext(node.Arguments[0], t._mapping, t._parameterManager.Index, t._joinCounter, t._recursionDepth + 1, out var leftMapping);
@@ -48,7 +51,8 @@ namespace nORM.Query
                 if (leftMapping.Columns.Length != rightMapping.Columns.Length)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "SequenceEqual requires both sources to project the same provider-mobile row shape.");
+                        "SequenceEqual requires both sources to project the same provider-mobile row shape.",
+                        NormUnsupportedReason.SequenceEqualRowShapeMismatch);
                 }
 
                 var leftAlias = t.EscapeAlias("__seql" + t._joinCounter++);
@@ -86,7 +90,8 @@ namespace nORM.Query
                     if (item is null)
                     {
                         throw new NormUnsupportedFeatureException(
-                            "SequenceEqual against a local sequence containing null rows is not provider-mobile; compare materialized sequences in CLR.");
+                            "SequenceEqual against a local sequence containing null rows is not provider-mobile; compare materialized sequences in CLR.",
+                            NormUnsupportedReason.SequenceEqualLocalNullRows);
                     }
                     rightRows.Add(item);
                 }

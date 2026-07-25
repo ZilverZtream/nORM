@@ -158,5 +158,41 @@ namespace nORM.Core
 
         /// <summary>OfType&lt;T&gt; targets a type that is not a [DiscriminatorValue]-mapped subtype of the source (no TPH discriminator).</summary>
         public const string OfTypeNonDiscriminatedSubtype = "oftype-non-discriminated-subtype";
+
+        /// <summary>An operation needs a deterministic row order but the source lacks an explicit OrderBy/ThenBy chain.</summary>
+        public const string RequiresExplicitOrdering = "requires-explicit-ordering";
+
+        // ── Paging: Skip/Take/SkipWhile/TakeWhile windows (QueryTranslator.PagingTranslators) ──
+
+        /// <summary>A paging argument (Skip/Take/ElementAt count) could not be bound to a parameter or literal.</summary>
+        public const string PagingArgumentUnbindable = "paging-argument-unbindable";
+
+        /// <summary>A paging operator requires a one-argument or index-aware predicate overload for provider-mobile SQL.</summary>
+        public const string PagingPredicateOverloadRequired = "paging-predicate-overload-required";
+
+        /// <summary>A paging tail operator composes only with a directly-preceding Take/Skip window, not across intervening operators.</summary>
+        public const string PagingTailRequiresAdjacentWindow = "paging-tail-requires-adjacent-window";
+
+        // ── Set operations: Union/Intersect/Except/Concat (QueryTranslator.SetOperationTranslators) ──
+
+        /// <summary>The set operation is unsupported in this shape.</summary>
+        public const string SetOpUnsupported = "setop-unsupported";
+
+        /// <summary>A set operation's second sequence must be built from captured state, not a row-derived query.</summary>
+        public const string SetOpSecondSequenceUnsupported = "setop-second-sequence-unsupported";
+
+        /// <summary>A set operation with a client-materialized sequence operator in either arm is not supported (SQL set semantics dedup by row).</summary>
+        public const string SetOpClientMaterializedArm = "setop-client-materialized-arm";
+
+        // ── SequenceEqual (QueryTranslator.SequenceEqualTranslator) ──
+
+        /// <summary>SequenceEqual comparer overloads are not provider-mobile.</summary>
+        public const string SequenceEqualComparerUnsupported = "sequenceequal-comparer-unsupported";
+
+        /// <summary>SequenceEqual requires both sources to project the same provider-mobile row shape.</summary>
+        public const string SequenceEqualRowShapeMismatch = "sequenceequal-row-shape-mismatch";
+
+        /// <summary>SequenceEqual against a local sequence containing null rows is not provider-mobile.</summary>
+        public const string SequenceEqualLocalNullRows = "sequenceequal-local-null-rows";
     }
 }

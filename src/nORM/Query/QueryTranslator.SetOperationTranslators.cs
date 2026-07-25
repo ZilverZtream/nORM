@@ -40,7 +40,8 @@ namespace nORM.Query
                         return reshapedSource;
                     ThrowIfClientTailReshapePending(t, node.Method.Name);
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.",
+                        NormUnsupportedReason.SequenceTailOverloadUnsupported);
                 }
                 // Distinct after a Take/Skip-windowed source — wrap as derived table so
                 // DISTINCT runs over only the windowed rows. Sister of the post-Take/Skip
@@ -413,7 +414,8 @@ namespace nORM.Query
             else
             {
                 throw new NormUnsupportedFeatureException(
-                    "Concat requires the second sequence to be built from captured state; a row-derived query has no translation.");
+                    "Concat requires the second sequence to be built from captured state; a row-derived query has no translation.",
+                    NormUnsupportedReason.SetOpSecondSequenceUnsupported);
             }
 
             var source = t.Visit(node.Arguments[0]);
@@ -466,7 +468,8 @@ namespace nORM.Query
                     nameof(Queryable.Intersect) => first.Intersect(second),
                     nameof(Queryable.Except) => first.Except(second),
                     _ => throw new NormUnsupportedFeatureException(
-                        string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
+                        string.Format(ErrorMessages.UnsupportedOperation, "Set operation"),
+                        NormUnsupportedReason.SetOpUnsupported)
                 };
                 var output = CreateRuntimeList(elementType, rows.Count + localItems.Count);
                 foreach (var value in combined)
@@ -542,7 +545,8 @@ namespace nORM.Query
                             $"{node.Method.Name} with a client-materialized sequence operator (Append, Prepend, Chunk, Zip, " +
                             "DefaultIfEmpty with a default value) in either arm is not supported: SQL set semantics dedup by " +
                             "column values while in-memory dedup compares references. Materialize both sequences first " +
-                            $"(e.g. ToListAsync) and use LINQ-to-Objects {node.Method.Name}.");
+                            $"(e.g. ToListAsync) and use LINQ-to-Objects {node.Method.Name}.",
+                            NormUnsupportedReason.SetOpClientMaterializedArm);
                     }
                     return TranslateClientConcat(t, node);
                 }
@@ -618,7 +622,8 @@ namespace nORM.Query
                     "Concat" => "UNION ALL",
                     "Intersect" => "INTERSECT",
                     "Except" => "EXCEPT",
-                    _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"))
+                    _ => throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "Set operation"),
+                        NormUnsupportedReason.SetOpUnsupported)
                 };
                 // A wrapped arm places the arm SELECT inside a derived table, where
                 // an unaliased expression column — the ordinal-collation wrap on a
@@ -785,7 +790,8 @@ namespace nORM.Query
                         return source;
                     ThrowIfClientTailReshapePending(t, node.Method.Name);
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.",
+                        NormUnsupportedReason.SequenceTailOverloadUnsupported);
                 }
                 var result = t.HandleSetOperation(node);
                 // EXISTS/IN SQL evaluates against server rows and would ignore a pending

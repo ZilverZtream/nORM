@@ -142,7 +142,8 @@ namespace nORM.Query
                     else
                     {
                         throw new NormUnsupportedFeatureException(
-                            "Skip argument could not be bound to a parameter or literal.");
+                            "Skip argument could not be bound to a parameter or literal.",
+                            NormUnsupportedReason.PagingArgumentUnbindable);
                     }
                     // Reset the existing take fields and emit (take - skip) as the new limit
                     // expression; pin the offset. The difference can be negative even with
@@ -201,23 +202,27 @@ namespace nORM.Query
                         return reshapedSource;
                     ThrowIfClientTailReshapePending(t, node.Method.Name);
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.",
+                        NormUnsupportedReason.SequenceTailOverloadUnsupported);
                 }
                 if (node.Arguments.Count != 2 || StripQuotes(node.Arguments[1]) is not LambdaExpression predicate)
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.");
+                        $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.",
+                        NormUnsupportedReason.PagingPredicateOverloadRequired);
                 }
                 if (predicate.Parameters.Count is not (1 or 2))
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.");
+                        $"{node.Method.Name} requires a one-argument or index-aware predicate overload for provider-mobile SQL translation.",
+                        NormUnsupportedReason.PagingPredicateOverloadRequired);
                 }
                 var orderKeys = ExtractOrderByKeys(node.Arguments[0]);
                 if (orderKeys.Count == 0)
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} requires an explicit OrderBy/ThenBy chain so provider-mobile SQL has a deterministic row sequence.");
+                        $"{node.Method.Name} requires an explicit OrderBy/ThenBy chain so provider-mobile SQL has a deterministic row sequence.",
+                        NormUnsupportedReason.RequiresExplicitOrdering);
                 }
 
                 var subPlan = t.TranslateInSubContext(
@@ -405,7 +410,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"{node.Method.Name} composes with a DIRECTLY preceding Take/Skip window; " +
                     "with other operators between the window and the tail operator, apply " +
-                    "TakeLast/SkipLast before any Take/Skip in the chain.");
+                    "TakeLast/SkipLast before any Take/Skip in the chain.",
+                    NormUnsupportedReason.PagingTailRequiresAdjacentWindow);
             }
 
             // Ensure we have something to reverse. When a wrapping operator (e.g.
@@ -525,7 +531,8 @@ namespace nORM.Query
             else
             {
                 throw new NormUnsupportedFeatureException(
-                    $"{node.Method.Name} argument could not be bound to a parameter or literal.");
+                    $"{node.Method.Name} argument could not be bound to a parameter or literal.",
+                    NormUnsupportedReason.PagingArgumentUnbindable);
             }
         }
 
