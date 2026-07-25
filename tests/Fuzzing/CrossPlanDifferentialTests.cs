@@ -34,7 +34,7 @@ namespace nORM.Tests.Fuzzing
                 var rows = QueryIrDifferential.BuildNormQueryable(ctx, ir).ToList();
                 return new Run(false, null, rows.Select(Key).OrderBy(x => x, StringComparer.Ordinal).ToList());
             }
-            catch (NormUnsupportedFeatureException nufe) { return new Run(true, "unsupported: " + nufe.Message.Split('.')[0], new()); }
+            catch (NormUnsupportedFeatureException nufe) { return new Run(true, "unsupported: " + (nufe.ReasonCode ?? "unclassified"), new()); }
         }
 
         private static async Task<Run> RunAsync(DbContext ctx, QueryIr ir)
@@ -44,7 +44,7 @@ namespace nORM.Tests.Fuzzing
                 var rows = await QueryIrDifferential.BuildNormQueryable(ctx, ir).ToListAsync();
                 return new Run(false, null, rows.Select(Key).OrderBy(x => x, StringComparer.Ordinal).ToList());
             }
-            catch (NormUnsupportedFeatureException nufe) { return new Run(true, "unsupported: " + nufe.Message.Split('.')[0], new()); }
+            catch (NormUnsupportedFeatureException nufe) { return new Run(true, "unsupported: " + (nufe.ReasonCode ?? "unclassified"), new()); }
         }
 
         [Fact]

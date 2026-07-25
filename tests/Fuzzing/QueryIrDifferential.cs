@@ -53,12 +53,14 @@ namespace nORM.Tests.Fuzzing
                 catch (NormUnsupportedFeatureException nufe)
                 {
                     // The IR only builds supported shapes, so a rejection is a capability gap to investigate,
-                    // not a healthy documented rejection. Recorded with a reason code the contract can allow later.
+                    // not a healthy documented rejection. Recorded with the throw-site's STABLE reason code
+                    // (not a message token) so the regression survives message rewording and the contract can
+                    // register it as an allowed rejection later.
                     return new FuzzCaseResult
                     {
                         Family = Family, Seed = seed, GeneratorVersion = GeneratorVersion,
                         Outcome = FuzzOutcome.UnexpectedlyRejected,
-                        ReasonCode = "query-ir/" + FirstUnsupportedToken(nufe.Message),
+                        ReasonCode = nufe.ReasonCode ?? "unclassified",
                         SerializedCase = serialized, Detail = nufe.Message,
                         Features = ExtractFeatures(ir),
                     };
@@ -148,7 +150,7 @@ namespace nORM.Tests.Fuzzing
                     {
                         Family = Family, Seed = seed, GeneratorVersion = GeneratorVersion,
                         Outcome = FuzzOutcome.UnexpectedlyRejected,
-                        ReasonCode = "query-ir/" + FirstUnsupportedToken(nufe.Message),
+                        ReasonCode = nufe.ReasonCode ?? "unclassified",
                         SerializedCase = serialized, Detail = nufe.Message, Features = ExtractFeatures(ir),
                     };
                 }
@@ -620,9 +622,6 @@ namespace nORM.Tests.Fuzzing
 
         private static string Render(IReadOnlyList<IrRow> rows) =>
             "[" + string.Join(",", rows.Select(r => $"({r.Id},{r.A},{r.B},{r.Name},{(r.N.HasValue ? r.N.ToString() : "null")})")) + "]";
-
-        private static string FirstUnsupportedToken(string message) =>
-            new string(message.TakeWhile(ch => char.IsLetterOrDigit(ch) || ch == ' ').ToArray()).Trim().Replace(' ', '-').ToLowerInvariant();
 
         private static FuzzCaseResult Fail(FuzzOutcome outcome, string detail, QueryIr ir, long seed, string serialized) => new()
         {

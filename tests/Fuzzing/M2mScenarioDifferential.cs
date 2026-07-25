@@ -77,7 +77,7 @@ namespace nORM.Tests.Fuzzing
                 {
                     Family = Family, Seed = seed, GeneratorVersion = GeneratorVersion,
                     Outcome = FuzzOutcome.UnexpectedlyRejected,
-                    ReasonCode = "m2m/" + nufe.GetType().Name,
+                    ReasonCode = nufe.ReasonCode ?? "unclassified",
                     SerializedCase = serialized, Detail = nufe.Message, Features = ExtractFeatures(scenario),
                 };
             }
