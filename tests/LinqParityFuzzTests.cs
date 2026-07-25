@@ -294,6 +294,7 @@ public class LinqParityFuzzTests
     internal static async System.Threading.Tasks.Task RunFilteredOrderedFastPathFuzzAsync(DbContext ctx, int seed, int cases)
     {
         var rng = new Random(seed);
+        var unsupported = 0;
         var orderKeys = new (string Prop, Type Type, Func<Row, IComparable> Sel)[]
         {
             (nameof(Row.Id), typeof(int), r => r.Id),
@@ -323,7 +324,7 @@ public class LinqParityFuzzTests
 
             List<Row> rows;
             try { rows = await q.ToListAsync(); }
-            catch (NormUnsupportedFeatureException) { continue; }
+            catch (NormUnsupportedFeatureException) { unsupported++; continue; }
 
             var expectedIds = Rows.Where(compiled).Select(r => r.Id).OrderBy(x => x).ToList();
             var actualIds = rows.Select(r => r.Id).OrderBy(x => x).ToList();
@@ -337,6 +338,12 @@ public class LinqParityFuzzTests
                     $"fast-path order not numeric (seed={seed} case={i}) order={prop} desc={desc}\nkeys: [{string.Join(",", rows.Select(r => sel(r)))}]");
             }
         }
+
+        // These are all simple Where + single-column OrderBy shapes that the fast path (or its general-path
+        // fallback) supports, so declines should be ~0. A gate — matching the other runners — turns a
+        // regression that makes the fast path decline everything from a silent vacuous pass into a failure.
+        Assert.True(unsupported < cases / 5,
+            $"{unsupported}/{cases} filtered-ordered fast-path shapes were declined as unsupported (seed {seed}).");
     }
 
     /// <summary>
