@@ -597,6 +597,26 @@ namespace nORM.Query
                 }
             }
 
+            // A Queryable/Enumerable First/Single/Last/ElementAt/ToList/ToArray reaching the generic
+            // fall-through is NOT a SQL function. The supported single-SCALAR correlated First/Single form is
+            // handled earlier (the scalar-subquery path returns before here), so one reaching this point pulls
+            // a whole ROW / entity (more than one column) — which has no single-SQL-value translation. The
+            // blind fall-through below would emit invalid SQL such as FIRSTORDEFAULT(...) that fails cryptically
+            // at the database; fail loud with an actionable message instead.
+            if (declType == typeof(Enumerable) || declType == typeof(Queryable))
+            {
+                var qm = node.Method.Name;
+                if (qm is nameof(Enumerable.First) or nameof(Enumerable.FirstOrDefault)
+                       or nameof(Enumerable.Single) or nameof(Enumerable.SingleOrDefault)
+                       or nameof(Enumerable.Last) or nameof(Enumerable.LastOrDefault)
+                       or nameof(Enumerable.ElementAt) or nameof(Enumerable.ElementAtOrDefault)
+                       or nameof(Enumerable.ToList) or nameof(Enumerable.ToArray))
+                    throw new NormUnsupportedFeatureException(
+                        $"The projection uses '{qm}' over a subquery that returns a whole row / entity (more than " +
+                        "one column), which nORM cannot translate to a single SQL value. Project a scalar first " +
+                        $"(e.g. .Select(x => x.Column).{qm}()), or restructure to a join / separate query.");
+            }
+
             sb.Append(methodNameUpper).Append('(');
             if (node.Arguments.Count > 1)
             {
