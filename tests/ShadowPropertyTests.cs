@@ -1068,11 +1068,16 @@ public class ShadowPropertyTests
     }
 
     [Fact]
-    public async Task SP11_ShadowProp_NotInShadow_OnMissingColumn_SkippedGracefully()
+    public async Task SP11_ShadowProp_OnMissingColumn_FailsLoudNotSilentlyWrong()
     {
-        // DB table does NOT have the shadow column; materialization should not throw.
-        // (SQLite may return the column name as a string literal rather than failing,
-        //  so we only assert that the query completes without exception and returns rows.)
+        // A declared shadow property maps to a real column that must exist in the table. When the
+        // column is ABSENT, the query must fail loud and name the column — identical to SqlServer,
+        // PostgreSQL, and MySQL (and to EF Core), which all surface the provider's "invalid column"
+        // error for schema drift. Older SQLite bundles compiled with double-quoted-strings (DQS)
+        // enabled masked this: they reinterpreted SELECT "Tenant" as the *string literal* 'Tenant'
+        // and returned that text as the shadow value for every row — silent data corruption. nORM
+        // now runs SQLite with strict DQS (the CVE-2025-6965 fix bundles SQLite 3.53+, DQS off by
+        // default), so a missing mapped column can no longer be silently swallowed on any provider.
         using var cn = CreateOpenDb("CREATE TABLE Article (Id INTEGER PRIMARY KEY AUTOINCREMENT, Title TEXT)");
         using (var cmd = cn.CreateCommand())
         {
@@ -1084,9 +1089,10 @@ public class ShadowPropertyTests
             OnModelCreating = mb => mb.Entity<Article>().Property<string>("Tenant")
         };
         using var ctx = new DbContext(cn, new SqliteProvider(), opts);
-        // Should not throw even when shadow column is absent from the DB table.
-        var articles = await ctx.Query<Article>().ToListAsync();
-        Assert.Single(articles);
-        Assert.Equal("Hello", articles[0].Title);
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => ctx.Query<Article>().ToListAsync());
+        // The failure must reference the missing column so it is actionable — not swallowed, and not
+        // a stray unrelated error.
+        Assert.Contains("Tenant", ex.ToString(), StringComparison.Ordinal);
     }
 }

@@ -33,6 +33,11 @@
            SQLite 3.53.3 (past the fix), and 3.0.4 is API-compatible with Microsoft.Data.Sqlite 8.0.0 (restore/
            build/runtime verified). Pin it to clear the advisory; this propagates to every consuming project. -->
       <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.4" />
+      <!-- Direct reference to the raw provider API so the scaffolder's schema reader can restore DQS_DML/DDL
+           on the connection before calling Microsoft.Data.Sqlite's GetSchemaTable, whose emitted SQL assumes
+           DQS (the 3.0.x native bundle defaults it off). nORM's own runtime SQL never relies on DQS, so this
+           accommodation is scoped to the driver's schema reader only. See DynamicEntityTableSchemaReader. -->
+      <PackageReference Include="SQLitePCLRaw.core" Version="3.0.4" />
       <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.7" />
       <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />

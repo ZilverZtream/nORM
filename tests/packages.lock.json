@@ -527,6 +527,7 @@
           "Microsoft.Extensions.ObjectPool": "[8.0.7, )",
           "Microsoft.SqlServer.TransactSql.ScriptDom": "[170.100.0, )",
           "SQLitePCLRaw.bundle_e_sqlite3": "[3.0.4, )",
+          "SQLitePCLRaw.core": "[3.0.4, )",
           "System.ComponentModel.Annotations": "[5.0.0, )",
           "System.IO.Hashing": "[8.0.0, )"
         }
