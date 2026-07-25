@@ -94,6 +94,38 @@ namespace nORM.Migration
         }
 
         /// <summary>
+        /// Builds a single self-contained T-SQL statement that drops the system-named DEFAULT constraint
+        /// bound to <paramref name="lookupColumnName"/> on <paramref name="tableName"/>, if one exists. SQL
+        /// Server names default constraints itself, so the name is unknown at author time: it is discovered
+        /// at run time from <c>sys.default_constraints</c> and dropped via dynamic SQL.
+        /// <para>
+        /// <c>EXEC(&lt;string&gt;)</c> accepts only string literals and variables joined with <c>+</c>; a
+        /// function call such as <c>QUOTENAME(@name)</c> placed directly inside <c>EXEC(...)</c> is a syntax
+        /// error ("Incorrect syntax near 'QUOTENAME'"). The constraint identifier is therefore QUOTENAME-
+        /// escaped while assigning a command variable (where function calls are legal), and that variable is
+        /// executed. QUOTENAME — not <c>'[' + @name + ']'</c> — keeps a constraint name containing a <c>]</c>
+        /// from breaking out of the delimited identifier.
+        /// </para>
+        /// </summary>
+        /// <param name="tableName">The table whose column's DEFAULT constraint is being dropped.</param>
+        /// <param name="lookupColumnName">The column whose bound DEFAULT constraint should be located and dropped.</param>
+        /// <param name="nameVar">Caller-supplied, length-safe T-SQL variable that receives the constraint
+        /// name. A sibling command variable is derived from it, so it must be unique within the batch.</param>
+        private static string DropDefaultConstraintIfExists(string tableName, string lookupColumnName, string nameVar)
+        {
+            // Derive a distinct, length-safe (<= 128 incl. '@') sibling variable to hold the ALTER statement.
+            var sqlVar = (nameVar.Length > 125 ? nameVar.Substring(0, 125) : nameVar) + "_s";
+            return
+                $"DECLARE {nameVar} NVARCHAR({ConstraintNameVarMaxLength}) = " +
+                $"(SELECT name FROM sys.default_constraints " +
+                $"WHERE parent_object_id=OBJECT_ID('{EscLiteral(tableName)}') " +
+                $"AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(lookupColumnName)}'); " +
+                $"DECLARE {sqlVar} NVARCHAR(MAX) = " +
+                $"N'ALTER TABLE {EscTable(tableName)} DROP CONSTRAINT ' + QUOTENAME({nameVar}); " +
+                $"IF {nameVar} IS NOT NULL EXEC({sqlVar});";
+        }
+
+        /// <summary>
         /// Builds a SQL Server column comment as an <c>sp_addextendedproperty</c> call registering an
         /// <c>MS_Description</c> at the SCHEMA/TABLE/COLUMN levels — SQL Server's native column comment
         /// mechanism. Every interpolated value is emitted as an <c>N'...'</c> literal with quotes doubled so
@@ -274,7 +306,7 @@ namespace nORM.Migration
                 var dropVar = $"@__drop_{new string(column.Name.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()}";
                 // Truncate to a safe length for a T-SQL variable name (max 128 chars including @).
                 if (dropVar.Length > 128) dropVar = dropVar.Substring(0, 128);
-                up.Add($"DECLARE {dropVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(column.Name)}') IF {dropVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT '+QUOTENAME({dropVar}))");
+                up.Add(DropDefaultConstraintIfExists(table.Name, column.Name, dropVar));
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
@@ -315,7 +347,7 @@ namespace nORM.Migration
                     {
                         // D: use sequential index for a deterministic, stable T-SQL variable name.
                         var upVar = $"@__df_{upAltIdx}";
-                        up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT '+QUOTENAME({upVar}))");
+                        up.Add(DropDefaultConstraintIfExists(table.Name, newCol.Name, upVar));
                     }
                     if (columnDefinitionChanged)
                     {
@@ -475,7 +507,7 @@ namespace nORM.Migration
                     {
                         // D: use sequential index for a deterministic, stable T-SQL variable name.
                         var downVar = $"@__df_{downAltIdx}";
-                        down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT '+QUOTENAME({downVar}))");
+                        down.Add(DropDefaultConstraintIfExists(table.Name, oldCol.Name, downVar));
                     }
                     if (columnDefinitionChanged)
                     {
