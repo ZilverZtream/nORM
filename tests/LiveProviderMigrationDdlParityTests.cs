@@ -626,6 +626,52 @@ public class LiveProviderMigrationDdlParityTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // ALTER COLUMN default rebind (SQL Server): changing a column's DEFAULT must drop the
+    // existing system-named DEFAULT constraint (dynamic EXEC — same helper as the drop path)
+    // and bind the new one. End-to-end guard: a row inserted without the column afterwards
+    // must pick up the NEW default, proving the old constraint was dropped and the new bound.
+    // SQL Server only — it is the provider that models defaults as droppable named constraints
+    // via dynamic SQL; the other providers alter defaults with plain ALTER COLUMN SET DEFAULT.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("sqlserver")]
+    public void LiveProvider_Migration_AlterColumnDefaultRebind_AppliesNewDefault(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_AlterDefault";
+
+        try
+        {
+            ResetTable(db, kind, table);
+            Exec(db, $"IF OBJECT_ID('{table}','U') IS NULL CREATE TABLE [{table}] " +
+                     $"([Id] INT PRIMARY KEY, [Name] NVARCHAR(200) NOT NULL, [Score] INT NOT NULL DEFAULT 7)");
+
+            var tbl    = new TableSchema { Name = table };
+            var oldCol = new ColumnSchema { Name = "Score", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "7" };
+            var newCol = new ColumnSchema { Name = "Score", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "9" };
+            var diff   = new SchemaDiff();
+            diff.AlteredColumns.Add((tbl, newCol, oldCol));
+
+            // Drops the existing system-named DEFAULT constraint (dynamic EXEC) and rebinds DEFAULT 9.
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            // A row inserted without Score must now pick up the NEW default (9).
+            Exec(db, $"INSERT INTO [{table}] ([Id],[Name]) VALUES (1,'a')");
+            using var q = db.CreateCommand();
+            q.CommandText = $"SELECT [Score] FROM [{table}] WHERE [Id]=1";
+            Assert.Equal(9, Convert.ToInt32(q.ExecuteScalar()));
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // Item 15 — CREATE TABLE via SchemaDiff AddedTables
     // ══════════════════════════════════════════════════════════════════════════
 
