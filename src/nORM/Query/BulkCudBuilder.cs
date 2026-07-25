@@ -298,6 +298,14 @@ namespace nORM.Query
                     throw new NormQueryException(
                         $"Cannot set the tenant column '{targetColumn.Name}' via ExecuteUpdate: it would move " +
                         "the matched rows into another tenant. A row's tenant is immutable under tenant isolation.");
+                // The TPH discriminator identifies the row's concrete subtype and is stamped only on insert.
+                // Setting it via ExecuteUpdate would relabel matched rows as a sibling subtype — reject it,
+                // mirroring the tracked write path and EF Core.
+                if (mapping.DiscriminatorColumn != null
+                    && string.Equals(targetColumn.Name, mapping.DiscriminatorColumn.Name, StringComparison.Ordinal))
+                    throw new NormQueryException(
+                        $"Cannot set the discriminator column '{targetColumn.Name}' via ExecuteUpdate: it " +
+                        "identifies the row's subtype and is immutable after insert.");
                 var column = targetColumn.EscCol;
 
                 var valueArg = StripQuotes(call.Arguments[1]);

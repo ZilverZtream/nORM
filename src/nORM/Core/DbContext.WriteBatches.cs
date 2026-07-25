@@ -377,6 +377,17 @@ namespace nORM.Core
                         "move the row out of the current tenant. Detach the entity to migrate it deliberately.");
                 }
 
+                // The TPH discriminator identifies the concrete subtype and is stamped once on insert. Changing
+                // it on a tracked entity would relabel the row as a sibling subtype — reject it loudly like a
+                // primary-key mutation (and matching EF Core), rather than silently ignoring the change now that
+                // the discriminator is excluded from UpdateColumns.
+                if (map.DiscriminatorColumn != null && entry.HasColumnValueChanged(map.DiscriminatorColumn))
+                {
+                    throw new InvalidOperationException(
+                        $"Discriminator column mutation detected on entity '{map.Type.Name}'. " +
+                        "The discriminator identifies the entity's subtype and cannot be changed after insert.");
+                }
+
                 // Partial-column UPDATE: the SAME setCols array feeds both the SQL builder and the parameter
                 // binder, keeping the positional @pN parameters aligned. See ComputeUpdateSetColumns.
                 var setCols = ComputeUpdateSetColumns(entry, map, updateColSet);

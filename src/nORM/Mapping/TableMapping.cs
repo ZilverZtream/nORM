@@ -390,7 +390,12 @@ namespace nORM.Mapping
             // trigger owns advancing the token value.
             ClientManagedConcurrencyToken = TimestampColumn != null && !p.SupportsNativeRowVersion
                 && IsAutoManageableTokenType(Nullable.GetUnderlyingType(TimestampColumn.Prop.PropertyType) ?? TimestampColumn.Prop.PropertyType);
-            UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated).ToArray();
+            // The TPH discriminator is identity-defining: ApplyDiscriminator stamps it once on INSERT and it
+            // identifies the row's concrete subtype. Like the key and the rowversion, it must never be written
+            // by an UPDATE — doing so would relabel the row as a sibling subtype (a masquerade). Exclude it so
+            // no UpdateColumns-based path (tracked partial update, direct update, bulk update) can emit it.
+            UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated
+                && !ReferenceEquals(c, DiscriminatorColumn)).ToArray();
 
             // Compute converter fingerprint for materializer cache differentiation
             int fp = 0;
