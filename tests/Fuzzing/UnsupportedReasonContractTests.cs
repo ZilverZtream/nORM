@@ -59,6 +59,9 @@ public sealed class UnsupportedReasonContractTests
         "Providers/DatabaseProvider.SqlExpressions.cs",
         "Query/BulkCudBuilder.cs",
         "Query/NormQueryProvider.SyncCud.cs",
+        "Providers/PostgresProvider.Runtime.cs",
+        "Providers/MySqlProvider.Runtime.cs",
+        "Providers/SqlServerProvider.Regex.cs",
     };
 
     private static ISet<string> CatalogCodeNames()
@@ -112,10 +115,11 @@ public sealed class UnsupportedReasonContractTests
                 var args = creation.ArgumentList?.Arguments;
                 var line = creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
 
-                // The reason code is the 2nd argument and must be a NormUnsupportedReason.<Code> reference.
+                // The reason code is the 2nd argument and must be a NormUnsupportedReason.<Code> reference —
+                // written either unqualified (NormUnsupportedReason.X) or fully qualified
+                // (nORM.Core.NormUnsupportedReason.X).
                 var codeArg = args is { Count: >= 2 } ? args.Value[1].Expression as MemberAccessExpressionSyntax : null;
-                if (codeArg is null
-                    || (codeArg.Expression as IdentifierNameSyntax)?.Identifier.Text != "NormUnsupportedReason")
+                if (codeArg is null || !RefersToReasonCatalog(codeArg.Expression))
                 {
                     offenders.Add($"{rel}:{line} — throw new NormUnsupportedFeatureException without a NormUnsupportedReason code");
                     continue;
@@ -137,5 +141,14 @@ public sealed class UnsupportedReasonContractTests
         IdentifierNameSyntax id => id.Identifier.Text,
         QualifiedNameSyntax q => q.Right.Identifier.Text,
         _ => null,
+    };
+
+    // The left side of a NormUnsupportedReason.<Code> access: an identifier (unqualified use) or a
+    // member access ending in NormUnsupportedReason (fully-qualified nORM.Core.NormUnsupportedReason).
+    private static bool RefersToReasonCatalog(ExpressionSyntax expression) => expression switch
+    {
+        IdentifierNameSyntax id => id.Identifier.Text == "NormUnsupportedReason",
+        MemberAccessExpressionSyntax member => member.Name.Identifier.Text == "NormUnsupportedReason",
+        _ => false,
     };
 }

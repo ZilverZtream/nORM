@@ -129,13 +129,15 @@ namespace nORM.Providers
                     // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
-                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
+                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.",
+                            NormUnsupportedReason.SavepointsUnsupportedForTransactionType, ex.InnerException);
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
                 }
             }
-            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.",
+                NormUnsupportedReason.SavepointsUnsupportedForTransactionType);
         }
 
         /// <summary>
@@ -168,13 +170,15 @@ namespace nORM.Providers
                     // does not support savepoints — map to NormUnsupportedFeatureException for a stable API.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
-                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
+                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.",
+                            NormUnsupportedReason.SavepointsUnsupportedForTransactionType, ex.InnerException);
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
                 }
             }
-            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.",
+                NormUnsupportedReason.SavepointsUnsupportedForTransactionType);
         }
 
         /// <summary>
@@ -207,13 +211,15 @@ namespace nORM.Providers
                     // does not support releasing savepoints — map to NormUnsupportedFeatureException.
                     if (ex.InnerException is NotSupportedException)
                         throw new NormUnsupportedFeatureException(
-                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.", ex.InnerException);
+                            $"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.",
+                            NormUnsupportedReason.SavepointsUnsupportedForTransactionType, ex.InnerException);
                     if (ex.InnerException != null)
                         throw ex.InnerException;
                     throw;
                 }
             }
-            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.");
+            throw new NormUnsupportedFeatureException($"Savepoints are not supported for transactions of type {transaction.GetType().FullName}.",
+                NormUnsupportedReason.SavepointsUnsupportedForTransactionType);
         }
     }
 }

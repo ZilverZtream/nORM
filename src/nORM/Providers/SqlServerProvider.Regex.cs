@@ -43,7 +43,8 @@ namespace nORM.Providers
                 "(literal text, ^/$ anchors, simple ASCII bracket classes, \\d, \\w). Workarounds: " +
                 "(a) deploy a CLR scalar function (RegExMatch) and call it via [SqlFunction], " +
                 "(b) rewrite the predicate as StartsWith/EndsWith/Contains/Like when the shape " +
-                "allows, or (c) materialise the rows first and filter in memory.");
+                "allows, or (c) materialise the rows first and filter in memory.",
+                NormUnsupportedReason.RegexProviderUnsupported);
         }
 
         /// <summary>
@@ -59,7 +60,8 @@ namespace nORM.Providers
             throw new NormUnsupportedFeatureException(
                 "Regex.IsMatch(..., RegexOptions.IgnoreCase) is not translatable on SQL Server " +
                 "for this pattern. nORM supports only a provider-mobile simple subset " +
-                "(literal text, ^/$ anchors, simple ASCII bracket classes, \\d, \\w).");
+                "(literal text, ^/$ anchors, simple ASCII bracket classes, \\d, \\w).",
+                NormUnsupportedReason.RegexProviderUnsupported);
         }
 
         private bool TryBuildSqlServerRegexMatchSql(string inputSql, string patternLiteral, bool ignoreCase, out string sql)
@@ -287,7 +289,8 @@ namespace nORM.Providers
                 "Regex.Replace is not translatable on SQL Server for this pattern/replacement. " +
                 "nORM supports only literal patterns with literal replacements. Workarounds: " +
                 "(a) deploy a CLR scalar function (RegExReplace) and call it via [SqlFunction], " +
-                "or (b) materialise the rows first and apply Regex.Replace in memory.");
+                "or (b) materialise the rows first and apply Regex.Replace in memory.",
+                NormUnsupportedReason.RegexProviderUnsupported);
         }
 
         /// <summary>
@@ -301,7 +304,8 @@ namespace nORM.Providers
 
             throw new NormUnsupportedFeatureException(
                 "Regex.Replace(..., RegexOptions.IgnoreCase) is not translatable on SQL Server " +
-                "for this pattern/replacement. nORM supports only literal patterns with literal replacements.");
+                "for this pattern/replacement. nORM supports only literal patterns with literal replacements.",
+                NormUnsupportedReason.RegexProviderUnsupported);
         }
 
         private bool TryBuildSqlServerRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral, bool ignoreCase, out string sql)

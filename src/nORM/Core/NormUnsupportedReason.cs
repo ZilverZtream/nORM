@@ -280,5 +280,10 @@ namespace nORM.Core
 
         /// <summary>A write operation targets an entity configured as read-only / query-only.</summary>
         public const string WriteReadOnlyEntity = "write-readonly-entity";
+
+        // ── Provider runtime capabilities (Providers/*Provider.Runtime) ──
+
+        /// <summary>Savepoints are not supported for the given transaction type.</summary>
+        public const string SavepointsUnsupportedForTransactionType = "savepoints-unsupported-for-transaction-type";
     }
 }
