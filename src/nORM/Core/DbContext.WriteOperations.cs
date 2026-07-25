@@ -925,6 +925,7 @@ namespace nORM.Core
                 NormValidator.ValidateBulkOperation(entityList, "insert");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
+                EnsureWritableMapping(map, "BulkInsertAsync");
                 foreach (var entity in entityList)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
@@ -955,6 +956,7 @@ namespace nORM.Core
                 NormValidator.ValidateBulkOperation(entityList, "update");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
+                EnsureWritableMapping(map, "BulkUpdateAsync");
                 foreach (var entity in entityList)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
@@ -982,6 +984,7 @@ namespace nORM.Core
                 NormValidator.ValidateBulkOperation(entityList, "delete");
                 await ctx.EnsureConnectionAsync(token).ConfigureAwait(false);
                 var map = GetMapping(typeof(T));
+                EnsureWritableMapping(map, "BulkDeleteAsync");
                 foreach (var entity in entityList)
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
