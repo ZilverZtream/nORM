@@ -29,6 +29,18 @@ classes without parsing provider messages.
 - Constrained relationship loading paths, including composite-key dependent
   includes and async streaming with Include/GroupJoin, also throw
   `NormUnsupportedFeatureException`.
+- **Migration schema generation** is the one deliberate exception to the rule above:
+  the provider migration SQL generators throw the framework `NotSupportedException`
+  (with an actionable message naming the provider limitation and the workaround) when
+  asked to emit schema a provider cannot express — e.g. `INCLUDE`/filtered/expression
+  indexes, `NULLS NOT DISTINCT`/`NULLS FIRST|LAST`, a computed column without
+  `ComputedColumnSql`, or a SQLite identity column that is not the single
+  `INTEGER PRIMARY KEY`. This is idiomatic (`NotSupportedException` = "this operation
+  is not supported") and is pinned by the per-provider migration-generator tests; it is
+  a design-time authoring error, distinct from the runtime query-path
+  `NormUnsupportedFeatureException`.
+- Argument validation on public APIs uses the standard `ArgumentException` /
+  `ArgumentNullException` / `ArgumentOutOfRangeException`, per .NET convention.
 
 ## Cancellation Cleanup Contract
 
