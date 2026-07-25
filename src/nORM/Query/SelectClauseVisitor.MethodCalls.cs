@@ -231,10 +231,19 @@ namespace nORM.Query
                     ignoreCase = true;
                 }
                 var receiverSql = TranslateProjectionArg(node.Object);
-                // A runtime (closure) pattern is inlined into the LIKE/ordinal SQL — mark the plan
-                // fold-no-cache so a later call with a different term cannot reuse this term (F2 poisoning).
-                MarkFoldNoCacheIfClosure(node.Arguments[0]);
-                sb.Append(EmitStringMatch(receiverSql, patternStr, node.Method.Name, ignoreCase));
+                if (node.Arguments[0] is ConstantExpression)
+                {
+                    // Compile-time constant: pre-fold the escaped pattern inline (stable value, plan stays cacheable).
+                    sb.Append(EmitStringMatch(receiverSql, patternStr, node.Method.Name, ignoreCase));
+                }
+                else
+                {
+                    // Runtime (closure) pattern: PARAMETERIZE it so no user value reaches SQL text — the LIKE
+                    // escaping + wildcard wrapping happen in SQL over the bound value (mirrors the WHERE path).
+                    // This closes the injection + NUL-truncation class and keeps the plan cacheable (no inline
+                    // value, so no fold-no-cache marker needed).
+                    sb.Append(EmitParameterizedStringMatch(receiverSql, node.Arguments[0], node.Method.Name, ignoreCase));
+                }
                 return node;
             }
 

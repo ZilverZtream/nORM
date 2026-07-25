@@ -88,7 +88,7 @@ namespace nORM.Providers
         /// the literal). Double the backslash first, then the quote. See <see cref="DatabaseProvider.EscapeStringLiteral"/>.
         /// </summary>
         public override string EscapeStringLiteral(string value)
-            => "'" + value.Replace("\\", "\\\\").Replace("'", "''") + "'";
+            => "'" + RejectNulInLiteral(value).Replace("\\", "\\\\").Replace("'", "''") + "'";
 
         /// <summary>
         /// MySQL's <c>/</c> always yields a DECIMAL (5/2 = 2.5) unlike C#'s truncating

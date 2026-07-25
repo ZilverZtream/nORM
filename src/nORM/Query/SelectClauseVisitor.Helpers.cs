@@ -495,6 +495,41 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Projection string-match for a RUNTIME (closure/variable) pattern: the pattern value is BOUND as a
+        /// parameter — never inlined into SQL text — and the LIKE escaping + %-wildcard wrapping happen in SQL
+        /// via the provider's runtime hooks. This mirrors the WHERE path's variable-pattern branch exactly, so a
+        /// user value can't reach the code channel (closes the F1 injection AND the NUL-truncation class), and
+        /// the plan stays cacheable (no inline value → no fold-no-cache marker needed). Compile-time constants
+        /// keep using <see cref="EmitStringMatch"/> (pre-folded, still cacheable). <paramref name="patternExpr"/>
+        /// is translated once through the projection channel, emitting the bound parameter.
+        /// </summary>
+        private string EmitParameterizedStringMatch(string receiverSql, Expression patternExpr, string methodName, bool ignoreCase)
+        {
+            if (!ignoreCase && _provider.UsesOrdinalStringMatchBypass)
+            {
+                var kind = methodName switch
+                {
+                    nameof(string.StartsWith) => nORM.Providers.OrdinalStringMatch.StartsWith,
+                    nameof(string.EndsWith) => nORM.Providers.OrdinalStringMatch.EndsWith,
+                    _ => nORM.Providers.OrdinalStringMatch.Contains,
+                };
+                // instr/substr consume the raw bound value directly (no LIKE wildcards to escape).
+                return _provider.GetOrdinalStringMatchSql(receiverSql, TranslateProjectionArg(patternExpr), kind);
+            }
+            var lhs = ignoreCase ? $"LOWER({receiverSql})" : _provider.ForceCaseSensitiveStringComparison(receiverSql);
+            var escapeChar = NormValidator.ValidateLikeEscapeChar(_provider.LikeEscapeChar);
+            var escapedSql = _provider.GetLikeEscapeSql(TranslateProjectionArg(patternExpr));
+            if (ignoreCase) escapedSql = $"LOWER({escapedSql})";
+            var concat = methodName switch
+            {
+                nameof(string.StartsWith) => _provider.GetConcatSql(escapedSql, "'%'"),
+                nameof(string.EndsWith) => _provider.GetConcatSql("'%'", escapedSql),
+                _ => _provider.GetConcatSql("'%'", _provider.GetConcatSql(escapedSql, "'%'")),
+            };
+            return $"({lhs} LIKE {concat} ESCAPE '{escapeChar}')";
+        }
+
+        /// <summary>
         /// When a runtime (closure) value is INLINED into projection SQL — a position that cannot take a bound
         /// parameter (a LIKE pattern wrapped with wildcards, an ordinal-match operand, a GROUP_CONCAT
         /// separator, a TRIM set) — reserve a fold-no-cache placeholder through the shared compiled-parameter

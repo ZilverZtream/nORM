@@ -137,6 +137,15 @@ predicate; tenant value always parameterized; pooling resets tenant state).
   `checked-latest=<ver>` and `checked=<YYYY-MM-DD>`, the gate rejects a bare justification (rule 2) and
   fails if the check is older than 90 days (rule 3), so a false "no fix" assertion can never pass CI
   again. Central Package Management (CPM) remains a further optional step.
+- **NUL byte in a runtime value (N2, CVE-2025-1094 class) — closed.** A runtime string operand in a
+  projection string-match (`a.Name.Contains/StartsWith/EndsWith(term)`) was inlined, and an embedded
+  U+0000 truncated the SQLite statement (fail-loud, no leak, but the last input→SQL-text path).
+  **Architectural fix (per the "parameterize, don't NUL-strip" directive):** those runtime operands are
+  now PARAMETERIZED — the LIKE escaping + `%`-wrapping happen in SQL over the bound value, mirroring the
+  WHERE path — so no user value reaches SQL text (also removes the fold-no-cache marker for that path;
+  compile-time constants stay pre-folded/cacheable). Where a value MUST be a literal (a GROUP_CONCAT /
+  `string.Join` separator, which MySQL requires be a literal), `EscapeStringLiteral` now rejects a NUL
+  loud rather than truncating. Tests: `ProjectionLikeParameterizationTests`.
 - **Redaction/validation regexes (Low):** run without a `MatchTimeout`, but only over
   `MaxSqlLength`-bounded, mostly-generated text — no practical ReDoS. Hardening only.
 - **Temporal history-column type string (Low):** history-table DDL concatenates a

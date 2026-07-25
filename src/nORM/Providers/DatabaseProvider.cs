@@ -68,7 +68,25 @@ namespace nORM.Providers
         /// there — a value such as <c>\'</c> would otherwise break out of the literal).
         /// </summary>
         public virtual string EscapeStringLiteral(string value)
-            => "'" + value.Replace("'", "''") + "'";
+            => "'" + RejectNulInLiteral(value).Replace("'", "''") + "'";
+
+        /// <summary>
+        /// A U+0000 (NUL) byte cannot be represented in a SQL string LITERAL: the native driver hands the
+        /// command text to a NUL-terminated C API (SQLite) which truncates the statement at the NUL. Every
+        /// runtime value that CAN be parameterized is (bound values carry NUL correctly); this guard fails loud
+        /// for the residual literal-only positions (e.g. a runtime GROUP_CONCAT separator, which MySQL requires
+        /// be a literal) rather than emitting a silently-truncated statement. Shared by all provider overrides.
+        /// </summary>
+        protected static string RejectNulInLiteral(string value)
+        {
+            if (value.IndexOf('\0') >= 0)
+                throw new nORM.Core.NormQueryException(
+                    "A string value contains a NUL (U+0000) character and is being used in a position that must " +
+                    "be a SQL string literal (e.g. a GROUP_CONCAT/string.Join separator). A NUL cannot be encoded " +
+                    "in a SQL literal — it would truncate the statement. Remove the NUL, or use a value that is " +
+                    "bound as a parameter (predicates and most projection operands already are).");
+            return value;
+        }
 
         /// <summary>
         /// The clause following <c>INSERT INTO table</c> that inserts a single all-default row (when
