@@ -40,6 +40,7 @@ DefaultStringEqualityIsCaseInsensitive
 DefaultValuesInsertClause
 Escape
 EscapeLikePattern
+EscapeStringLiteral
 FloatingToIntegralTruncatingSql
 ForceCaseSensitiveStringComparison
 FormatBooleanPredicate
@@ -444,6 +445,7 @@ CudWhereInSubqueryNeedsDoubleWrap
 DefaultStringEqualityIsCaseInsensitive
 DefaultValuesInsertClause
 Escape
+EscapeStringLiteral
 FloatingToIntegralTruncatingSql
 ForceCaseSensitiveStringComparison
 FormatDateUsingDotNetPattern

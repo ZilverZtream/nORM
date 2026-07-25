@@ -807,6 +807,7 @@ M:nORM.Providers.DatabaseProvider.CreateParameter(System.String,System.Object):S
 M:nORM.Providers.DatabaseProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.DatabaseProvider.Escape(System.String):System.String
 M:nORM.Providers.DatabaseProvider.EscapeLikePattern(System.String):System.String
+M:nORM.Providers.DatabaseProvider.EscapeStringLiteral(System.String):System.String
 M:nORM.Providers.DatabaseProvider.ForceCaseSensitiveStringComparison(System.String):System.String
 M:nORM.Providers.DatabaseProvider.FormatBooleanPredicate(System.String,System.Boolean):System.String
 M:nORM.Providers.DatabaseProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
@@ -906,6 +907,7 @@ M:nORM.Providers.MySqlProvider.BulkUpdateAsync``1(nORM.Core.DbContext,nORM.Mappi
 M:nORM.Providers.MySqlProvider.CreateParameter(System.String,System.Object):System.Data.Common.DbParameter
 M:nORM.Providers.MySqlProvider.CreateSavepointAsync(System.Data.Common.DbTransaction,System.String,System.Threading.CancellationToken):System.Threading.Tasks.Task
 M:nORM.Providers.MySqlProvider.Escape(System.String):System.String
+M:nORM.Providers.MySqlProvider.EscapeStringLiteral(System.String):System.String
 M:nORM.Providers.MySqlProvider.ForceCaseSensitiveStringComparison(System.String):System.String
 M:nORM.Providers.MySqlProvider.FormatDateUsingDotNetPattern(System.String,System.String):System.String
 M:nORM.Providers.MySqlProvider.FormatFixedDecimalSql(System.String,System.Int32):System.String
