@@ -39,7 +39,8 @@ namespace nORM.Query
                 }
                 throw new NormUnsupportedFeatureException(
                     $"{_provider.GetType().Name} does not implement {node.Method.Name}ToDateOnlySql; " +
-                    $"DateOnly.{node.Method.Name} in WHERE requires this provider hook.");
+                    $"DateOnly.{node.Method.Name} in WHERE requires this provider hook.",
+                    NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
             }
 
             return false;
@@ -72,7 +73,8 @@ namespace nORM.Query
                     if (arithSql0 != null) { _sql.Append(arithSql0); return true; }
                     throw new NormUnsupportedFeatureException(
                         $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +
-                        $"TimeOnly.{node.Method.Name} in WHERE requires this provider hook.");
+                        $"TimeOnly.{node.Method.Name} in WHERE requires this provider hook.",
+                        NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
                 }
                 if (TryGetConstantValue(node.Arguments[0], out var spanVal) && spanVal is TimeSpan span)
                 {
@@ -87,7 +89,8 @@ namespace nORM.Query
                     if (arithSql != null) { _sql.Append(arithSql); return true; }
                     throw new NormUnsupportedFeatureException(
                         $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +
-                        "TimeOnly.Add (constant TimeSpan) in WHERE requires this provider hook.");
+                        "TimeOnly.Add (constant TimeSpan) in WHERE requires this provider hook.",
+                        NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
                 }
                 else
                 {
@@ -96,7 +99,8 @@ namespace nORM.Query
                     if (arithSql != null) { _sql.Append(arithSql); return true; }
                     throw new NormUnsupportedFeatureException(
                         $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToTimeOnlySql; " +
-                        "TimeOnly.Add (TimeSpan column) in WHERE requires this provider hook.");
+                        "TimeOnly.Add (TimeSpan column) in WHERE requires this provider hook.",
+                        NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
                 }
             }
 
@@ -292,12 +296,14 @@ namespace nORM.Query
                         throw new NormUnsupportedFeatureException(
                             $"DateTime ToString(\"{dateFmt}\") in Where supports tokens yyyy yy MM dd HH mm ss " +
                             "with literal characters in between. Locale-aware tokens (MMM/MMMM/dddd/ddd) and " +
-                            "fractional/offset tokens are unavailable; materialize first and filter after .ToList().");
+                            "fractional/offset tokens are unavailable; materialize first and filter after .ToList().",
+                            NormUnsupportedReason.ToStringFormatUnsupported);
                     }
                 }
                 throw new NormUnsupportedFeatureException(
                     "ToString(formatString) in Where supports numeric \"F<N>\"/\"f<N>\" and DateTime tokens " +
-                    "yyyy/yy/MM/dd/HH/mm/ss. Materialize first and filter after .ToList() for other shapes.");
+                    "yyyy/yy/MM/dd/HH/mm/ss. Materialize first and filter after .ToList() for other shapes.",
+                    NormUnsupportedReason.ToStringFormatUnsupported);
             }
 
             return false;
@@ -520,7 +526,8 @@ namespace nORM.Query
                 if (node.Arguments.Count == 3)
                 {
                     if (!TryGetConstantValue(node.Arguments[1], out var ignoreCaseRaw) || ignoreCaseRaw is not bool ignoreCaseValue)
-                        throw new NormUnsupportedFeatureException("Enum.TryParse<T>(value, ignoreCase, out result) requires a constant or captured ignoreCase value.");
+                        throw new NormUnsupportedFeatureException("Enum.TryParse<T>(value, ignoreCase, out result) requires a constant or captured ignoreCase value.",
+                            NormUnsupportedReason.EnumTryParseIgnoreCaseNotConstant);
                     ignoreCase = ignoreCaseValue;
                 }
 
@@ -694,7 +701,8 @@ namespace nORM.Query
                 {
                     throw new NormUnsupportedFeatureException(
                         $"Custom SQL function '{node.Method.DeclaringType?.FullName}.{node.Method.Name}' is outside nORM's strict provider mobility contract. " +
-                        "Use built-in nORM functions with provider translations, or keep the custom SQL function in ProviderMobilityMode.Compatibility with per-provider evidence.");
+                        "Use built-in nORM functions with provider translations, or keep the custom SQL function in ProviderMobilityMode.Compatibility with per-provider evidence.",
+                        NormUnsupportedReason.CustomSqlFunctionStrictMobility);
                 }
                 var formatted = string.Format(custom.Format, argsArr);
                 _sql.Append(formatted);

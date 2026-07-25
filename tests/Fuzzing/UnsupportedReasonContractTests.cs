@@ -29,6 +29,7 @@ public sealed class UnsupportedReasonContractTests
     private static readonly string[] ClassifiedFiles =
     {
         "Query/ExpressionToSqlVisitor.MethodCallTranslators.String.cs",
+        "Query/ExpressionToSqlVisitor.MethodCallTranslators.cs",
     };
 
     private static ISet<string> CatalogCodeNames()

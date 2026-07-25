@@ -30,5 +30,19 @@ namespace nORM.Core
 
         /// <summary>The string method has no SQL translation on any provider.</summary>
         public const string StringMethodUntranslatable = "string-method-untranslatable";
+
+        // ── Method-call translation (ExpressionToSqlVisitor.MethodCallTranslators) ──
+
+        /// <summary>The active provider does not implement the DateOnly/TimeOnly translation hook this call needs.</summary>
+        public const string DateTimeFunctionProviderHookMissing = "datetime-function-provider-hook-missing";
+
+        /// <summary>A ToString(format) call uses format tokens with no SQL translation (e.g. locale-aware MMM/dddd).</summary>
+        public const string ToStringFormatUnsupported = "tostring-format-unsupported";
+
+        /// <summary>Enum.TryParse's ignoreCase argument was not a resolvable constant or captured value.</summary>
+        public const string EnumTryParseIgnoreCaseNotConstant = "enum-tryparse-ignorecase-not-constant";
+
+        /// <summary>A custom SQL function is rejected under the strict provider-mobility contract.</summary>
+        public const string CustomSqlFunctionStrictMobility = "custom-sql-function-strict-mobility";
     }
 }
