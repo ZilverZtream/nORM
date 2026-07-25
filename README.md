@@ -899,6 +899,8 @@ redact string literals and parameter values by default; see
 [Logging and Redaction](docs/logging-redaction.md). For the whole picture — trust
 boundaries, injection resistance, and the tenant/credential guarantees with the test
 that proves each — read the [Security Threat Model](docs/security-threat-model.md).
+The findings and fixes from the most recent adversarial audit are recorded in the
+[July 2026 Security Audit](docs/security-audit-2026-07.md).
 Stable exception categories for query, provider, timeout, configuration, usage,
 unsupported-feature, and concurrency failures are documented in
 [Exception Taxonomy](docs/exception-taxonomy.md).
