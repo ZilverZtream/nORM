@@ -221,6 +221,24 @@ namespace nORM.Query
                                     selectItems.Add(builder.ToString());
                                     PooledStringBuilder.Return(builder);
                                 }
+                                else
+                                {
+                                    // The projected member is a group METHOD that is not a scalar aggregate —
+                                    // e.g. materializing a group's elements into a collection
+                                    // (g.ToList() / g.Select(x => x.Y).ToList() / g.OrderBy(..).Take(n).ToList()).
+                                    // There is no single SQL column for it; previously this branch emitted
+                                    // nothing yet the materializer still expected the column, crashing with a
+                                    // cryptic ArgumentOutOfRange. Fail loud with a clear, actionable message.
+                                    var innerName = (aggregateCall.Method.Name is nameof(Enumerable.ToList)
+                                                        or nameof(Enumerable.ToArray))
+                                        ? "materializing a group's elements into a collection"
+                                        : $"the group operation '{aggregateCall.Method.Name}'";
+                                    throw new NormUnsupportedFeatureException(
+                                        $"GroupBy projection member '{memberName}' uses {innerName}, which nORM does not " +
+                                        "translate to SQL. Supported per-group operations are the scalar aggregates " +
+                                        "(Count/Sum/Min/Max/Average) and Key. To materialize each group's rows, project the " +
+                                        "key(s) and re-query the elements per key, or group in memory with AsEnumerable() first.");
+                                }
                             }
                             else if (arg is ParameterExpression groupCarry
                                      && resultSelector.Parameters.Contains(groupCarry)
