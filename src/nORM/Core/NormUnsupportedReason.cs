@@ -44,5 +44,31 @@ namespace nORM.Core
 
         /// <summary>A custom SQL function is rejected under the strict provider-mobility contract.</summary>
         public const string CustomSqlFunctionStrictMobility = "custom-sql-function-strict-mobility";
+
+        // ── Navigation / correlated-subquery aggregates (ExpressionToSqlVisitor.NavigationSubqueries) ──
+
+        /// <summary>Aggregating a navigation collection under AsOf is not supported (the aggregate reads the live table, not the historical era).</summary>
+        public const string CollectionAggregateUnderAsOf = "collection-aggregate-under-asof";
+
+        /// <summary>Aggregating an owned/many-to-many collection whose element has a composite key is not supported.</summary>
+        public const string CollectionAggregateCompositeKey = "collection-aggregate-composite-key";
+
+        /// <summary>All(...) over a navigation collection requires an explicit predicate.</summary>
+        public const string CollectionAllRequiresPredicate = "collection-all-requires-predicate";
+
+        /// <summary>An aggregate over a navigation collection requires a selector (e.g. x =&gt; x.Value).</summary>
+        public const string CollectionAggregateRequiresSelector = "collection-aggregate-requires-selector";
+
+        /// <summary>An aggregate over a correlated subquery requires a single scalar projection.</summary>
+        public const string CorrelatedAggregateRequiresScalarProjection = "correlated-aggregate-requires-scalar-projection";
+
+        /// <summary>A non-constant DefaultIfEmpty fallback over a correlated subquery is not supported.</summary>
+        public const string CorrelatedDefaultIfEmptyFallbackNotConstant = "correlated-defaultifempty-fallback-not-constant";
+
+        /// <summary>A correlated-subquery element/position operation (Last/ElementAt) requires an OrderBy.</summary>
+        public const string CorrelatedRequiresOrdering = "correlated-requires-ordering";
+
+        /// <summary>The correlated subquery's source shape (a windowing/reshaping operator) has no sound scalar-aggregate translation.</summary>
+        public const string CorrelatedSourceShapeUnsupported = "correlated-source-shape-unsupported";
     }
 }

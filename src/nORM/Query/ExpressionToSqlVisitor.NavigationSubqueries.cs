@@ -80,7 +80,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the {kind} collection '{navMember.Member.Name}' under AsOf isn't supported yet: the aggregate " +
                     "reads the live table, so it would reflect the current era, not the historical one. Load the collection " +
-                    "under AsOf and aggregate the result client-side.");
+                    "under AsOf and aggregate the result client-side.",
+                    NormUnsupportedReason.CollectionAggregateUnderAsOf);
             var parentAlias = info.Alias;
             // Resolve the element mapping, the subquery FROM source + alias, and the FK correlation to the owner.
             TableMapping elementMapping;
@@ -91,7 +92,8 @@ namespace nORM.Query
             {
                 if (mapping.KeyColumns.Length != 1)
                     throw new NormUnsupportedFeatureException(
-                        $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet.");
+                        $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet.",
+                        NormUnsupportedReason.CollectionAggregateCompositeKey);
                 elementMapping = _ctx.GetMapping(owned.OwnedType);
                 subAlias = _provider.Escape("__nav");
                 fromClause = $"{owned.EscTable} {subAlias}";
@@ -102,7 +104,8 @@ namespace nORM.Query
             {
                 if (jtm!.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
                     throw new NormUnsupportedFeatureException(
-                        $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet.");
+                        $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet.",
+                        NormUnsupportedReason.CollectionAggregateCompositeKey);
                 elementMapping = _ctx.GetMapping(jtm.RightType);
                 var jAlias = _provider.Escape("__m2mj");
                 subAlias = _provider.Escape("__m2mr");
@@ -130,7 +133,8 @@ namespace nORM.Query
                 // NULL semantics match the relation/owned All that already ships.
                 if (filter == null)
                     throw new NormUnsupportedFeatureException(
-                        $"All(...) over the {kind} collection '{navMember.Member.Name}' requires a predicate (e.g. x => x.Flag).");
+                        $"All(...) over the {kind} collection '{navMember.Member.Name}' requires a predicate (e.g. x => x.Flag).",
+                        NormUnsupportedReason.CollectionAllRequiresPredicate);
                 var negated = Expression.Lambda(Expression.Not(filter.Body), filter.Parameters[0]);
                 var allConditions = new List<string>(baseConditions)
                     { $"({TranslateCollectionSubqueryPredicate(negated, elementMapping, subAlias)})" };
@@ -159,7 +163,8 @@ namespace nORM.Query
             // Sum / Min / Max / Average with a selector over the element (Where(...).Sum(s => s.X) too).
             if (selector == null)
                 throw new NormUnsupportedFeatureException(
-                    $"{method}(...) over the {kind} collection '{navMember.Member.Name}' requires a selector (e.g. x => x.Value).");
+                    $"{method}(...) over the {kind} collection '{navMember.Member.Name}' requires a selector (e.g. x => x.Value).",
+                    NormUnsupportedReason.CollectionAggregateRequiresSelector);
             var selectorSql = TranslateCollectionSubqueryPredicate(selector, elementMapping, subAlias);
             var sqlAgg = method switch
             {
@@ -568,7 +573,8 @@ namespace nORM.Query
             if (HasTopLevelComma(head))
                 throw new NormUnsupportedFeatureException(
                     $"{aggregateName}() over a correlated subquery requires a single scalar projection; " +
-                    "project the value with Select(x => x.Member) first.");
+                    "project the value with Select(x => x.Member) first.",
+                    NormUnsupportedReason.CorrelatedAggregateRequiresScalarProjection);
             if (sqlAgg == "AVG")
                 head = _provider.AverageAggregateOperand(head, operandType);
 
@@ -577,7 +583,8 @@ namespace nORM.Query
                 && !QueryTranslator.TryRenderDefaultIfEmptyFallbackSql(defaultIfEmptyFallback, operandType, out defaultIfEmptyFallbackSql))
                 throw new NormUnsupportedFeatureException(
                     $"{aggregateName}() with a non-constant DefaultIfEmpty fallback over a correlated subquery is not " +
-                    "supported; use a constant fallback or restructure the query.");
+                    "supported; use a constant fallback or restructure the query.",
+                    NormUnsupportedReason.CorrelatedDefaultIfEmptyFallbackNotConstant);
 
             if (defaultIfEmptyFallbackSql != null)
                 _sql.Append("COALESCE(");
@@ -662,13 +669,15 @@ namespace nORM.Query
                 source = QueryTranslator.ReverseQueryableOrderings(source, out var hadOrdering);
                 if (!hadOrdering)
                     throw new NormUnsupportedFeatureException(
-                        $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.");
+                        $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.",
+                        NormUnsupportedReason.CorrelatedRequiresOrdering);
             }
             // ElementAt/ElementAtOrDefault: skip N rows then take one. An index into an unordered
             // set is undefined (and SQL Server's OFFSET/FETCH requires ORDER BY), so fail closed.
             if (indexExpr != null && !QueryTranslator.HasQueryableOrdering(source))
                 throw new NormUnsupportedFeatureException(
-                    $"{methodName}() over a correlated subquery requires an OrderBy — element position is undefined without an ordering.");
+                    $"{methodName}() over a correlated subquery requires an OrderBy — element position is undefined without an ordering.",
+                    NormUnsupportedReason.CorrelatedRequiresOrdering);
 
             source = ApplySubqueryRootFiltersWithFoldSignal(source);
             source = QueryCallMaterializer.Materialize(source);
@@ -683,7 +692,8 @@ namespace nORM.Query
             if (HasTopLevelComma(head))
                 throw new NormUnsupportedFeatureException(
                     $"{methodName}() over a correlated subquery requires a single scalar projection; " +
-                    "project the value with Select(x => x.Member) first.");
+                    "project the value with Select(x => x.Member) first.",
+                    NormUnsupportedReason.CorrelatedAggregateRequiresScalarProjection);
 
             // The offset (ElementAt) is a plain outer-context value; emit it after the subquery so
             // its closure slot, if any, follows the subquery's in document order.
@@ -720,7 +730,8 @@ namespace nORM.Query
                         throw new NormUnsupportedFeatureException(
                             $"{methodName}() over a correlated subquery supports Where/Select/OrderBy/Distinct sources; " +
                             $"'{mce.Method.Name}' windows or reshapes the subquery's rows and has no sound scalar-aggregate " +
-                            "form. Materialize the inner query first or restructure the aggregate.");
+                            "form. Materialize the inner query first or restructure the aggregate.",
+                            NormUnsupportedReason.CorrelatedSourceShapeUnsupported);
                 }
                 if (mce.Arguments.Count == 0) break;
                 current = mce.Arguments[0];

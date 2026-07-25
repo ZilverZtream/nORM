@@ -30,6 +30,7 @@ public sealed class UnsupportedReasonContractTests
     {
         "Query/ExpressionToSqlVisitor.MethodCallTranslators.String.cs",
         "Query/ExpressionToSqlVisitor.MethodCallTranslators.cs",
+        "Query/ExpressionToSqlVisitor.NavigationSubqueries.cs",
     };
 
     private static ISet<string> CatalogCodeNames()
