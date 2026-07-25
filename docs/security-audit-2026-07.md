@@ -120,18 +120,23 @@ predicate; tenant value always parameterized; pooling resets tenant state).
 
 ## Residual / deferred (non-exploitable, tracked)
 
-- **Supply chain (Medium, process) — mostly closed.** Added reproducible-restore lockfiles
+- **Supply chain (Medium, process) — closed.** Added reproducible-restore lockfiles
   (`RestorePackagesWithLockFile`, `packages.lock.json` committed per project) and a CI
   `supply-chain` job that runs `dotnet list package --vulnerable --include-transitive` and
-  **fails the build on any advisory not in `eng/vulnerability-allowlist.txt`**. That gate
-  immediately surfaced **CVE-2025-6965 / GHSA-2m69-gcr7-jv3q** (High): the SQLite bundled by
-  `SQLitePCLRaw.lib.e_sqlite3` (transitive via `Microsoft.Data.Sqlite 8.0.x`) is < 3.50.2 and
-  can corrupt memory on a crafted aggregate query. **No fixed SQLitePCLRaw exists** (the whole
-  2.1.x line is affected); nORM now pins the newest available native bundle (2.1.11) as
-  best-effort and allowlists the advisory with justification (LOW nORM exposure — aggregate SQL
-  is generated from typed LINQ with parameterized values, not attacker-driven aggregate-term
-  counts). Re-check and bump when upstream ships SQLite 3.50.2+. Central Package Management (CPM)
-  remains a further optional step.
+  **fails the build on any advisory not in `eng/vulnerability-allowlist.txt`**. The gate immediately
+  surfaced **CVE-2025-6965 / GHSA-2m69-gcr7-jv3q** (High): the SQLite bundled by
+  `SQLitePCLRaw.lib.e_sqlite3` (transitive via `Microsoft.Data.Sqlite 8.0.x`) is < 3.50.2 and can
+  corrupt memory on a crafted aggregate query.
+  **Round-2 correction (N1):** it was first allowlisted on the ASSERTED premise that "no fixed version
+  exists" — which was FALSE (a re-audit found `SQLitePCLRaw.bundle_e_sqlite3 3.0.4`, bundling SQLite
+  3.53.3, on nuget.org). A green gate shipping a real CVE is worse than no gate. **Fixed**: pinned
+  `SQLitePCLRaw.bundle_e_sqlite3 3.0.4` (verified: `dotnet list --vulnerable` reports no vulnerable
+  packages; SQLite 3.53.3 at runtime; build/tests green — the 3.0.x bump is API-compatible with
+  Microsoft.Data.Sqlite 8.0.0), and removed the allowlist entry. **Architectural hardening**: the
+  allowlist format and gate now REQUIRE machine-checkable verification metadata — an entry must record
+  `checked-latest=<ver>` and `checked=<YYYY-MM-DD>`, the gate rejects a bare justification (rule 2) and
+  fails if the check is older than 90 days (rule 3), so a false "no fix" assertion can never pass CI
+  again. Central Package Management (CPM) remains a further optional step.
 - **Redaction/validation regexes (Low):** run without a `MatchTimeout`, but only over
   `MaxSqlLength`-bounded, mostly-generated text — no practical ReDoS. Hardening only.
 - **Temporal history-column type string (Low):** history-table DDL concatenates a

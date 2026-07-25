@@ -28,13 +28,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
       <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-      <!-- Microsoft.Data.Sqlite 8.0.x pins SQLitePCLRaw 2.1.6. Pull the NEWEST available native bundle
-           (2.1.11) so consuming projects ship the most-patched e_sqlite3 (propagates via project refs).
-           NOTE: CVE-2025-6965 (bundled SQLite < 3.50.2, GHSA-2m69-gcr7-jv3q) affects the ENTIRE 2.1.x line
-           — no fixed SQLitePCLRaw exists yet — so this bump does not clear that advisory. It is tracked in
-           eng/vulnerability-allowlist.txt (low nORM exposure: the flaw needs a crafted aggregate query;
-           nORM emits parameterized aggregate SQL). Bump past 2.1.11 once upstream bundles SQLite 3.50.2+. -->
-      <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
+      <!-- Microsoft.Data.Sqlite 8.0.x pins SQLitePCLRaw 2.1.6, whose bundled native e_sqlite3 is affected by
+           CVE-2025-6965 (bundled SQLite < 3.50.2, GHSA-2m69-gcr7-jv3q). The SQLitePCLRaw 3.0.x line bundles
+           SQLite 3.53.3 (past the fix), and 3.0.4 is API-compatible with Microsoft.Data.Sqlite 8.0.0 (restore/
+           build/runtime verified). Pin it to clear the advisory; this propagates to every consuming project. -->
+      <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.4" />
       <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
       <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="8.0.7" />
       <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
