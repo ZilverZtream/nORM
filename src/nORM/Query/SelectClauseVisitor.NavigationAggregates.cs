@@ -178,15 +178,18 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the many-to-many collection '{navMember.Member.Name}' under AsOf isn't supported yet: the " +
                     "bridge table is read live, so the association set would reflect the current era, not the historical one. " +
-                    "Load the collection under AsOf and aggregate the result client-side.");
+                    "Load the collection under AsOf and aggregate the result client-side.",
+                    NormUnsupportedReason.CollectionAggregateUnderAsOf);
             if (jtm.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet. " +
-                    "Materialise the related items and aggregate them client-side.");
+                    "Materialise the related items and aggregate them client-side.",
+                    NormUnsupportedReason.CollectionAggregateCompositeKey);
             if (method is nameof(Queryable.All))
                 throw new NormUnsupportedFeatureException(
                     $"All(...) over the many-to-many collection '{navMember.Member.Name}' isn't supported yet. " +
-                    "Materialise the related items and evaluate it client-side.");
+                    "Materialise the related items and evaluate it client-side.",
+                    NormUnsupportedReason.CollectionAllInProjectionUnsupported);
 
             var rightMap = _ctx.GetMapping(jtm.RightType);
             var jtAlias = _provider.Escape("__m2mj");
@@ -227,10 +230,12 @@ namespace nORM.Query
             if (selBody is not MemberExpression selMember || selMember.Expression != selector!.Parameters[0])
                 throw new NormUnsupportedFeatureException(
                     $"{method}(...) over the many-to-many collection '{navMember.Member.Name}' requires a simple member selector " +
-                    "(e.g. t => t.Weight). Materialise the related items and aggregate them client-side for anything richer.");
+                    "(e.g. t => t.Weight). Materialise the related items and aggregate them client-side for anything richer.",
+                    NormUnsupportedReason.CollectionAggregateRequiresSelector);
             if (!rightMap.ColumnsByName.TryGetValue(selMember.Member.Name, out var col))
                 throw new NormUnsupportedFeatureException(
-                    $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the related entity '{jtm.RightType.Name}'.");
+                    $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the related entity '{jtm.RightType.Name}'.",
+                    NormUnsupportedReason.AggregateSelectorNotMappedColumn);
 
             var sqlAgg = method switch
             {
@@ -285,15 +290,18 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the owned collection '{navMember.Member.Name}' under AsOf isn't supported yet: the aggregate " +
                     "reads the live table, so it would count the current rows instead of the historical era. Load the owned " +
-                    "collection under AsOf and aggregate the result client-side.");
+                    "collection under AsOf and aggregate the result client-side.",
+                    NormUnsupportedReason.CollectionAggregateUnderAsOf);
             if (_mapping.KeyColumns.Length != 1)
                 throw new NormUnsupportedFeatureException(
                     $"Aggregating the owned collection '{navMember.Member.Name}' on an entity with a composite key isn't supported yet. " +
-                    "Materialise the owned items and aggregate them client-side.");
+                    "Materialise the owned items and aggregate them client-side.",
+                    NormUnsupportedReason.CollectionAggregateCompositeKey);
             if (method is nameof(Queryable.All))
                 throw new NormUnsupportedFeatureException(
                     $"All(...) over the owned collection '{navMember.Member.Name}' isn't supported yet. " +
-                    "Materialise the owned items and evaluate it client-side.");
+                    "Materialise the owned items and evaluate it client-side.",
+                    NormUnsupportedReason.CollectionAllInProjectionUnsupported);
 
             var ownerKey = _mapping.KeyColumns[0];
             var depAlias = _provider.Escape("__nav");
@@ -326,11 +334,13 @@ namespace nORM.Query
             if (selBody is not MemberExpression selMember || selMember.Expression != selector!.Parameters[0])
                 throw new NormUnsupportedFeatureException(
                     $"{method}(...) over the owned collection '{navMember.Member.Name}' requires a simple member selector " +
-                    "(e.g. l => l.Amount). Materialise the owned items and aggregate them client-side for anything richer.");
+                    "(e.g. l => l.Amount). Materialise the owned items and aggregate them client-side for anything richer.",
+                    NormUnsupportedReason.CollectionAggregateRequiresSelector);
             var col = owned.Columns.FirstOrDefault(c => c.Prop.Name == selMember.Member.Name);
             if (col == null)
                 throw new NormUnsupportedFeatureException(
-                    $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the owned collection '{navMember.Member.Name}'.");
+                    $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the owned collection '{navMember.Member.Name}'.",
+                    NormUnsupportedReason.AggregateSelectorNotMappedColumn);
 
             var sqlAgg = method switch
             {
@@ -576,7 +586,8 @@ namespace nORM.Query
                     var selSql = TryRenderDependentSelector(aggSelector.Body, aggSelector.Parameters[0], hop2Alias, hop2Rel.DependentType)
                         ?? RenderDependentSelectorViaSubVisitor(aggSelector, hop2Alias, hop2Rel.DependentType)
                         ?? throw new NormUnsupportedFeatureException(
-                            "Two-hop navigation aggregate (SelectMany(...).Sum/Min/Max/Average(...)) could not translate its selector to SQL.");
+                            "Two-hop navigation aggregate (SelectMany(...).Sum/Min/Max/Average(...)) could not translate its selector to SQL.",
+                            NormUnsupportedReason.NavAggregateSelectorUntranslatable);
                     var sqlAgg = methodName switch
                     {
                         nameof(Queryable.Sum) => "SUM",
@@ -891,7 +902,8 @@ namespace nORM.Query
                     $"{methodName}(...) over a navigation collection cannot aggregate a value-converter column: " +
                     "SUM/AVG combine the stored provider values and ConvertFromProvider does not distribute over " +
                     "that combination for a non-linear converter, so there is no correct result. Materialise the " +
-                    "collection and aggregate it client-side.");
+                    "collection and aggregate it client-side.",
+                    NormUnsupportedReason.NavAggregateValueConverterColumn);
         }
 
         private void EmitNavigationScalarAggregateSubquery(StringBuilder sb, string methodName, TableMapping.Relation relation, LambdaExpression selectorLambda, LambdaExpression? extraFilter = null)
@@ -919,7 +931,8 @@ namespace nORM.Query
                     "Navigation aggregate Select(c => …).Sum/Min/Max/Average in a projection could not translate the " +
                     "selector to SQL. Member selectors, reference-navigation chains (`c => c.Dept.Bonus`), nullable casts " +
                     "and computed arithmetic/conditional selectors are supported; anything requiring client evaluation " +
-                    "must aggregate after materialising or use `ClientEvaluationPolicy.Allow`.");
+                    "must aggregate after materialising or use `ClientEvaluationPolicy.Allow`.",
+                    NormUnsupportedReason.NavAggregateSelectorUntranslatable);
 
             var sqlAgg = methodName switch
             {
@@ -1038,7 +1051,8 @@ namespace nORM.Query
                 source = QueryTranslator.ReverseQueryableOrderings(source, out var hadOrdering);
                 if (!hadOrdering)
                     throw new NormUnsupportedFeatureException(
-                        $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.");
+                        $"{methodName}() over a correlated subquery requires an OrderBy — 'last' is undefined without an ordering.",
+                        NormUnsupportedReason.CorrelatedRequiresOrdering);
             }
 
             ReserveQueryRootClosureSlot(node.Arguments[0]);

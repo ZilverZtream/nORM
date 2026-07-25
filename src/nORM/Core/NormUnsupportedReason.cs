@@ -84,5 +84,19 @@ namespace nORM.Core
 
         /// <summary>A member access has no SQL translation in this context.</summary>
         public const string MemberUntranslatable = "member-untranslatable";
+
+        // ── Projection navigation aggregates (SelectClauseVisitor.*) ──
+
+        /// <summary>All(...) over a navigation collection inside a projection has no SQL translation.</summary>
+        public const string CollectionAllInProjectionUnsupported = "collection-all-in-projection-unsupported";
+
+        /// <summary>An aggregate selector references a member that is not a mapped column on the related/owned entity.</summary>
+        public const string AggregateSelectorNotMappedColumn = "aggregate-selector-not-mapped-column";
+
+        /// <summary>A navigation-aggregate selector (member/reference-chain/computed) could not be translated to SQL.</summary>
+        public const string NavAggregateSelectorUntranslatable = "nav-aggregate-selector-untranslatable";
+
+        /// <summary>SUM/AVG over a value-converter column has no correct result (ConvertFromProvider does not distribute over the aggregate).</summary>
+        public const string NavAggregateValueConverterColumn = "nav-aggregate-value-converter-column";
     }
 }

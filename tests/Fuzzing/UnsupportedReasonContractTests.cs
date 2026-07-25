@@ -35,6 +35,7 @@ public sealed class UnsupportedReasonContractTests
         "Query/ExpressionToSqlVisitor.Binary.cs",
         "Query/ExpressionToSqlVisitor.ControlFlow.cs",
         "Query/ExpressionToSqlVisitor.Members.cs",
+        "Query/SelectClauseVisitor.NavigationAggregates.cs",
     };
 
     private static ISet<string> CatalogCodeNames()
