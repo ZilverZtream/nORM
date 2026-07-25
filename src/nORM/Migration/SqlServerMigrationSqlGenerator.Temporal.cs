@@ -109,7 +109,7 @@ namespace nORM.Migration
         {
             var dropVar = $"@__drop_{new string(columnName.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()}";
             if (dropVar.Length > 128) dropVar = dropVar.Substring(0, 128);
-            stmts.Add($"DECLARE {dropVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(historyTable)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(columnName)}') IF {dropVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(historyTable)} DROP CONSTRAINT ['+{dropVar}+']')");
+            stmts.Add($"DECLARE {dropVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(historyTable)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(columnName)}') IF {dropVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(historyTable)} DROP CONSTRAINT '+QUOTENAME({dropVar}))");
             stmts.Add($"ALTER TABLE {EscTable(historyTable)} DROP COLUMN {Esc(columnName)}");
         }
     }

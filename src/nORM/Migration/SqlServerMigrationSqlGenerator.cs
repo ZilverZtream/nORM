@@ -274,7 +274,7 @@ namespace nORM.Migration
                 var dropVar = $"@__drop_{new string(column.Name.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()}";
                 // Truncate to a safe length for a T-SQL variable name (max 128 chars including @).
                 if (dropVar.Length > 128) dropVar = dropVar.Substring(0, 128);
-                up.Add($"DECLARE {dropVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(column.Name)}') IF {dropVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT ['+{dropVar}+']')");
+                up.Add($"DECLARE {dropVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(column.Name)}') IF {dropVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT '+QUOTENAME({dropVar}))");
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
@@ -315,7 +315,7 @@ namespace nORM.Migration
                     {
                         // D: use sequential index for a deterministic, stable T-SQL variable name.
                         var upVar = $"@__df_{upAltIdx}";
-                        up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT ['+{upVar}+']')");
+                        up.Add($"DECLARE {upVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(newCol.Name)}') IF {upVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT '+QUOTENAME({upVar}))");
                     }
                     if (columnDefinitionChanged)
                     {
@@ -475,7 +475,7 @@ namespace nORM.Migration
                     {
                         // D: use sequential index for a deterministic, stable T-SQL variable name.
                         var downVar = $"@__df_{downAltIdx}";
-                        down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT ['+{downVar}+']')");
+                        down.Add($"DECLARE {downVar} NVARCHAR({ConstraintNameVarMaxLength}) = (SELECT name FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID('{EscLiteral(table.Name)}') AND COL_NAME(parent_object_id,parent_column_id)='{EscLiteral(oldCol.Name)}') IF {downVar} IS NOT NULL EXEC('ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT '+QUOTENAME({downVar}))");
                     }
                     if (columnDefinitionChanged)
                     {
