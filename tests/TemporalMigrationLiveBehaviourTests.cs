@@ -99,6 +99,22 @@ public class TemporalMigrationLiveBehaviourTests
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
+    // Provider-agnostic column existence (INFORMATION_SCHEMA is supported by SQL Server, PostgreSQL, MySQL).
+    private static long ColumnCount(Func<DbConnection> factory, string table, string column)
+        => Scalar(factory, $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{table}' AND COLUMN_NAME='{column}'");
+
+    // Execute each migration statement as its own command (mirrors how DatabaseFacade applies them).
+    private static void ApplyAll(Func<DbConnection> factory, System.Collections.Generic.IEnumerable<string> statements)
+    {
+        foreach (var statement in statements)
+        {
+            using var cn = factory();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = statement;
+            cmd.ExecuteNonQuery();
+        }
+    }
+
     private static TableSchema Build(bool withW)
     {
         var t = new TableSchema { Name = "TmigLiveB", IsTemporal = true };
@@ -290,6 +306,88 @@ public class TemporalMigrationLiveBehaviourTests
             }
             Assert.True(Scalar(factory!, histCount) > preHist,
                 $"[{kind}] versioning must continue after the NOT NULL defaulted column was added.");
+        }
+        finally
+        {
+            ExecIgnore(factory!,
+                "DROP TABLE TmigLiveB_History", "DROP TABLE TmigLiveB",
+                "DROP FUNCTION IF EXISTS \"TmigLiveB_TemporalFunction\"()");
+        }
+    }
+
+    /// <summary>
+    /// The DOWN of a temporal ADD-COLUMN migration must remove the column from BOTH the main table and
+    /// its history mirror and regenerate the trigger for the reverted shape — so versioning keeps working
+    /// afterward. Live-only: <c>TemporalMigrationLiveBehaviourTests</c> otherwise applies only the Up path,
+    /// leaving the generator's Down statements (history DROP COLUMN via the dynamic default-drop helper +
+    /// trigger regen) unexecuted against a real server.
+    /// </summary>
+    [Theory]
+    [InlineData("sqlserver")]
+    [InlineData("postgres")]
+    [InlineData("mysql")]
+    public async Task Add_column_migration_down_removes_column_from_main_and_history(string kind)
+    {
+        var (factory, provider, generator, skip) = OpenLive(kind);
+        if (skip != null) return;
+        using (var probe = factory!())
+        {
+            var db = probe.Database;
+            if (db is "master" or "postgres" or "mysql" or "sys" or "model" or "msdb" or "tempdb")
+                return;
+        }
+
+        var tbl  = kind == "postgres" ? "\"TmigLiveB\"" : "TmigLiveB";
+        var hist = kind == "postgres" ? "\"TmigLiveB_History\"" : "TmigLiveB_History";
+        var histCount = kind == "postgres"
+            ? "SELECT COUNT(*) FROM \"TmigLiveB_History\""
+            : "SELECT COUNT(*) FROM TmigLiveB_History";
+
+        ExecIgnore(factory!,
+            $"DROP TABLE {hist}", $"DROP TABLE {tbl}",
+            "DROP FUNCTION IF EXISTS \"TmigLiveB_TemporalFunction\"()");
+        ExecIgnore(factory!, kind == "postgres"
+            ? "CREATE TABLE \"TmigLiveB\" (\"Id\" INT PRIMARY KEY, \"V\" INT NOT NULL)"
+            : $"CREATE TABLE {tbl} (Id INT PRIMARY KEY, V INT NOT NULL)");
+
+        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<RowV1>() };
+        opts.EnableTemporalVersioning();
+        await using (var ctx = new DbContext(factory!(), provider!, opts))
+        {
+            ctx.Add(new RowV1 { Id = 1, V = 1 });
+            await ctx.SaveChangesAsync();
+        }
+
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { Build(withW: false) } },
+            new SchemaSnapshot { Tables = { Build(withW: true) } });
+        var sql = generator!.GenerateSql(diff);
+
+        // Up: add W to main + history.
+        ApplyAll(factory!, (sql.PreTransactionUp ?? Enumerable.Empty<string>()).Concat(sql.Up).Concat(sql.PostTransactionUp ?? Enumerable.Empty<string>()));
+        Assert.Equal(1, ColumnCount(factory!, "TmigLiveB", "W"));
+        Assert.Equal(1, ColumnCount(factory!, "TmigLiveB_History", "W"));
+
+        try
+        {
+            // Down: remove W from main + history and regen the trigger for the (Id, V) shape.
+            ApplyAll(factory!, (sql.PreTransactionDown ?? Enumerable.Empty<string>()).Concat(sql.Down).Concat(sql.PostTransactionDown ?? Enumerable.Empty<string>()));
+
+            Assert.Equal(0, ColumnCount(factory!, "TmigLiveB", "W"));
+            Assert.Equal(0, ColumnCount(factory!, "TmigLiveB_History", "W"));
+
+            // Versioning still works on the reverted shape: a further update snapshots to history.
+            var before = Scalar(factory!, histCount);
+            using (var cn = factory!())
+            using (var cmd = cn.CreateCommand())
+            {
+                cmd.CommandText = kind == "postgres"
+                    ? "UPDATE \"TmigLiveB\" SET \"V\" = 5 WHERE \"Id\" = 1"
+                    : "UPDATE TmigLiveB SET V = 5 WHERE Id = 1";
+                Assert.Equal(1, cmd.ExecuteNonQuery());
+            }
+            Assert.True(Scalar(factory!, histCount) > before,
+                $"[{kind}] versioning must continue after the column was dropped by the Down migration.");
         }
         finally
         {
