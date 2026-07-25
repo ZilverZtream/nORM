@@ -533,8 +533,16 @@ namespace nORM.Query
                 {
                     case null:
                         return "NULL";
-                    case string s:
-                        return "'" + s.Replace("'", "''") + "'";
+                    // Strings are PARAMETERIZED, never inlined. Single-quote doubling alone is not a safe
+                    // literal escape on every provider: MySQL treats backslash as a string-literal escape
+                    // under its default sql_mode, so a value such as \' survives '-doubling and breaks out
+                    // of the literal. Binding the value (like the default: branch does for DateTime/Guid/…)
+                    // removes all provider-specific escaping ambiguity. This value is user/closure-reachable
+                    // via ExecuteUpdate(s => s.SetProperty(x => x.Col, x => x.Col + userInput)).
+                    case string:
+                        var strParam = _ctx.RawProvider.ParamPrefix + "u" + localParamIndex++;
+                        parameters[strParam] = value;
+                        return strParam;
                     case bool b:
                         return b ? _ctx.RawProvider.BooleanTrueLiteral : _ctx.RawProvider.BooleanFalseLiteral;
                     // Numeric types inline as valid, culture-invariant SQL literals.
