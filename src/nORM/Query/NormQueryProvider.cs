@@ -194,41 +194,46 @@ namespace nORM.Query
         /// - Removes unused semaphores to allow GC collection
         /// - Processes locks in batches to reduce iteration overhead
         /// </summary>
-        private static void CleanupCacheLocks(object? state)
-        {
-            const int MaxLocksToKeep = 1000;
-            const int CleanupBatchSize = 100;
+        private const int MaxCacheLocksToKeep = 1000;
 
-            if (_cacheLocks.Count <= MaxLocksToKeep)
+        private static void CleanupCacheLocks(object? state)
+            => DrainUnusedCacheLocks(_cacheLocks, MaxCacheLocksToKeep);
+
+        /// <summary>
+        /// Drains unused cache-lock semaphores down to <paramref name="maxToKeep"/> in a single pass.
+        /// Bounds the lock map against adversarial <c>.Cacheable()</c> key churn (distinct parameter values
+        /// produce distinct cache keys and therefore distinct semaphores): removing only a small fixed batch
+        /// per timer tick let churn add entries faster than cleanup could remove them, growing the map without
+        /// bound — a slow memory-exhaustion DoS. Removing to the threshold each tick keeps the map bounded at
+        /// roughly the threshold plus one interval's worth of new keys.
+        /// </summary>
+        /// <remarks>
+        /// Only locks with <c>CurrentCount == 1</c> (not held, no waiters) are removed, so an in-use lock is
+        /// never pulled out from under a populating thread — a later query with the same key simply GetOrAdds
+        /// a fresh one. Value-matching TryRemove avoids dropping a concurrently re-inserted semaphore for the
+        /// same key. Not disposed: a thread that captured a reference via GetOrAdd before removal can still
+        /// Wait/WaitAsync safely; GC collects it once all references drop (an uncontended SemaphoreSlim holds
+        /// no unmanaged handle).
+        /// </remarks>
+        internal static void DrainUnusedCacheLocks(ConcurrentDictionary<string, SemaphoreSlim> locks, int maxToKeep)
+        {
+            var overage = locks.Count - maxToKeep;
+            if (overage <= 0)
                 return;
 
-            var locksToRemove = new List<(string Key, SemaphoreSlim Semaphore)>(CleanupBatchSize);
-
-            foreach (var kvp in _cacheLocks)
+            var locksToRemove = new List<KeyValuePair<string, SemaphoreSlim>>(Math.Min(overage, locks.Count));
+            foreach (var kvp in locks)
             {
-                // Only remove locks that are not currently in use
                 if (kvp.Value.CurrentCount == 1)
                 {
-                    locksToRemove.Add((kvp.Key, kvp.Value));
-
-                    // Process in batches to avoid holding iterator too long
-                    if (locksToRemove.Count >= CleanupBatchSize)
+                    locksToRemove.Add(kvp);
+                    if (locksToRemove.Count >= overage)
                         break;
                 }
             }
 
-            // Remove in separate pass to avoid concurrent modification.
-            // Use value-matching TryRemove so we don't accidentally remove a
-            // concurrently re-inserted semaphore for the same key. Do NOT dispose -
-            // threads holding a reference obtained via GetOrAdd before this removal can
-            // still call Wait/WaitAsync safely on the semaphore. GC will collect it once
-            // all references drop. SemaphoreSlim only allocates its underlying event lazily
-            // (on contended WaitAsync); we checked CurrentCount == 1 (no waiters) so the
-            // event is not allocated and no unmanaged resources are held.
-            foreach (var (key, semaphore) in locksToRemove)
-            {
-                _cacheLocks.TryRemove(new KeyValuePair<string, SemaphoreSlim>(key, semaphore));
-            }
+            foreach (var kvp in locksToRemove)
+                locks.TryRemove(kvp);
         }
         private static int CalculateInitialPlanCacheSize()
             => CalculatePlanCacheSize(GC.GetGCMemoryInfo());
