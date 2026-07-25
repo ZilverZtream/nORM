@@ -549,6 +549,83 @@ public class LiveProviderMigrationDdlParityTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // ADD a computed / generated column (SQL Server AS (expr) PERSISTED; PostgreSQL /
+    // MySQL GENERATED ALWAYS AS (expr) STORED). Provider-idiomatic DDL that interpolates
+    // the expression raw and was otherwise unexercised live — verify it produces valid,
+    // executable DDL AND computes the right value (an invalid expression, wrong storage
+    // keyword, or mis-quoted identifier only surfaces against a real server). SQLite is
+    // excluded: it rejects ALTER TABLE ADD COLUMN for a STORED generated column by design.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_AddComputedColumn_AppearsAndComputes(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_ComputedCol";
+
+        try
+        {
+            ResetTable(db, kind, table);
+            Exec(db, CreateBaseDdl(kind, table));
+            // Seed a row so the STORED/PERSISTED computed column has data to compute over.
+            Exec(db, kind switch
+            {
+                "sqlserver" => $"INSERT INTO [{table}] ([Id],[Name]) VALUES (5,'x')",
+                "mysql"     => $"INSERT INTO `{table}` (`Id`,`Name`) VALUES (5,'x')",
+                "postgres"  => $"INSERT INTO \"{table}\" (\"Id\",\"Name\") VALUES (5,'x')",
+                _           => throw new ArgumentOutOfRangeException(nameof(kind))
+            });
+
+            // Doubled = Id * 2. The referenced identifier is quoted per provider —
+            // PostgreSQL folds unquoted identifiers to lower-case, so "Id" must be quoted.
+            var expr = kind switch
+            {
+                "sqlserver" => "[Id] * 2",
+                "mysql"     => "`Id` * 2",
+                "postgres"  => "\"Id\" * 2",
+                _           => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+            var computed = new ColumnSchema
+            {
+                Name = "Doubled",
+                ClrType = typeof(int).FullName!,
+                IsNullable = true,
+                ComputedColumnSql = expr,
+                IsStoredComputedColumn = true,
+            };
+            var tbl  = BaseTable(table);
+            var diff = new SchemaDiff();
+            diff.AddedColumns.Add((tbl, computed));
+
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            Assert.True(ColumnExists(db, table, "Doubled"),
+                $"[{kind}] computed column Doubled should exist after ADD.");
+
+            // The generated column must actually compute Id*2 = 10 for the seeded row.
+            using var q = db.CreateCommand();
+            q.CommandText = kind switch
+            {
+                "sqlserver" => $"SELECT [Doubled] FROM [{table}] WHERE [Id]=5",
+                "mysql"     => $"SELECT `Doubled` FROM `{table}` WHERE `Id`=5",
+                "postgres"  => $"SELECT \"Doubled\" FROM \"{table}\" WHERE \"Id\"=5",
+                _           => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+            Assert.Equal(10, Convert.ToInt32(q.ExecuteScalar()));
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // Item 15 — CREATE TABLE via SchemaDiff AddedTables
     // ══════════════════════════════════════════════════════════════════════════
 
