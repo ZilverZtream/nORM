@@ -827,7 +827,7 @@ namespace nORM.Query
                 $"Navigation filter side '{expr}' isn't a simple member access or constant — only `c.X op constant` is supported in a projection subquery.");
         }
 
-        private static string FormatLiteral(object? value)
+        private string FormatLiteral(object? value)
         {
             // Enums lower to their underlying integer so HasFlag / equality
             // projections work with closure-captured flag locals -- without this
@@ -839,7 +839,7 @@ namespace nORM.Query
             {
                 null => "NULL",
                 bool b => b ? "1" : "0",
-                string s => $"'{s.Replace("'", "''")}'",
+                string s => _provider.EscapeStringLiteral(s),
                 int or long or short or byte or sbyte or uint or ulong or ushort => value.ToString()!,
                 double d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 float f => f.ToString(System.Globalization.CultureInfo.InvariantCulture),

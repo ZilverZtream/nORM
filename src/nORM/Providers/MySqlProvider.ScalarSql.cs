@@ -83,6 +83,14 @@ namespace nORM.Providers
         public override char LikeEscapeChar => '!';
 
         /// <summary>
+        /// MySQL treats <c>\</c> as a string-literal escape under its default sql_mode, so doubling only the
+        /// single quote is not a safe escape (a value such as <c>\'</c> survives '-doubling and breaks out of
+        /// the literal). Double the backslash first, then the quote. See <see cref="DatabaseProvider.EscapeStringLiteral"/>.
+        /// </summary>
+        public override string EscapeStringLiteral(string value)
+            => "'" + value.Replace("\\", "\\\\").Replace("'", "''") + "'";
+
+        /// <summary>
         /// MySQL's <c>/</c> always yields a DECIMAL (5/2 = 2.5) unlike C#'s truncating
         /// <c>int / int</c>; <c>DIV</c> discards the fraction (truncating toward zero, matching
         /// C# for negative operands) so integer-typed division translates faithfully.

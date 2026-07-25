@@ -59,6 +59,18 @@ namespace nORM.Providers
         public virtual string BooleanFalseLiteral => "0";
 
         /// <summary>
+        /// Renders <paramref name="value"/> as a safely-escaped, single-quoted SQL string literal for this
+        /// provider. Values on the query and write paths are PARAMETERIZED, not literalized — this exists only
+        /// for the handful of structural sites that must inline a string (e.g. a compile-time separator or an
+        /// enum name in a CASE), as a defense-in-depth escaper so those sites cannot be turned into an injection
+        /// by a refactor. The default doubles the single quote; MySQL additionally doubles the backslash, which
+        /// it treats as a string-literal escape under its default sql_mode (plain '-doubling is insufficient
+        /// there — a value such as <c>\'</c> would otherwise break out of the literal).
+        /// </summary>
+        public virtual string EscapeStringLiteral(string value)
+            => "'" + value.Replace("'", "''") + "'";
+
+        /// <summary>
         /// The clause following <c>INSERT INTO table</c> that inserts a single all-default row (when
         /// every column is DB-generated). ANSI <c>DEFAULT VALUES</c> on SQLite/SQL Server/PostgreSQL;
         /// MySQL rejects that and overrides to <c>() VALUES ()</c>.

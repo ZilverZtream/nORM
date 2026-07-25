@@ -300,7 +300,7 @@ namespace nORM.Query
                 };
                 if (value != null)
                 {
-                    sb.Append('\'').Append(value.Replace("'", "''")).Append('\'');
+                    sb.Append(_provider.EscapeStringLiteral(value));
                     return node;
                 }
             }
