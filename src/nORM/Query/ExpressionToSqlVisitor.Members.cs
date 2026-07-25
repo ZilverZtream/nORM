@@ -57,7 +57,7 @@ namespace nORM.Query
                 };
                 if (typeNameLiteral != null)
                 {
-                    _sql.Append('\'').Append(typeNameLiteral.Replace("'", "''")).Append('\'');
+                    _sql.Append(_provider.EscapeStringLiteral(typeNameLiteral)); // type metadata (compile-time)
                     return node;
                 }
             }
@@ -517,7 +517,7 @@ namespace nORM.Query
             {
                 var name = Enum.GetName(enumType, underlying!) ?? underlying!.ToString()!;
                 sb.Append(" WHEN ").Append(columnSql).Append(" = ").Append(underlying)
-                  .Append(" THEN '").Append(name.Replace("'", "''")).Append('\'');
+                  .Append(" THEN ").Append(provider.EscapeStringLiteral(name));
             }
             sb.Append(" ELSE ").Append(provider.GetToStringSql(columnSql)).Append(" END)");
             return sb.ToString();
@@ -533,7 +533,7 @@ namespace nORM.Query
         /// to expect when the data is dirty; strict Parse callers should sanitize
         /// the column server-side first.
         /// </summary>
-        internal static string BuildStringToEnumCase(string columnSql, Type enumType)
+        internal static string BuildStringToEnumCase(DatabaseProvider provider, string columnSql, Type enumType)
         {
             var sb = new System.Text.StringBuilder();
             sb.Append("(CASE");
@@ -542,8 +542,8 @@ namespace nORM.Query
             foreach (var underlying in values)
             {
                 var name = Enum.GetName(enumType, underlying!) ?? underlying!.ToString()!;
-                sb.Append(" WHEN ").Append(columnSql).Append(" = '")
-                  .Append(name.Replace("'", "''")).Append("' THEN ").Append(underlying);
+                sb.Append(" WHEN ").Append(columnSql).Append(" = ")
+                  .Append(provider.EscapeStringLiteral(name)).Append(" THEN ").Append(underlying);
             }
             sb.Append(" ELSE NULL END)");
             return sb.ToString();

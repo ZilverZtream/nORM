@@ -46,13 +46,17 @@ namespace nORM.Query
                 // RCE), so walk NewArrayInit elements ourselves; for a foldable
                 // MemberExpression / single char we re-use TryGetConstantValue.
                 char[]? chars = null;
+                bool charsFromClosure = false;
                 if (node.Arguments[0].Type == typeof(char))
                 {
                     // Single-char overload: TrimEnd('x').
                     if (node.Arguments[0] is ConstantExpression singleConst && singleConst.Value is char singleCh)
                         chars = new[] { singleCh };
                     else if (QueryTranslator.TryGetConstantValue(node.Arguments[0], out var singleVal) && singleVal is char capturedCh)
+                    {
                         chars = new[] { capturedCh };
+                        charsFromClosure = true;
+                    }
                 }
                 else if (node.Arguments[0] is NewArrayExpression nae && nae.NodeType == ExpressionType.NewArrayInit)
                 {
@@ -75,6 +79,7 @@ namespace nORM.Query
                 else if (QueryTranslator.TryGetConstantValue(node.Arguments[0], out var arrVal) && arrVal is char[] capturedChars)
                 {
                     chars = capturedChars;
+                    charsFromClosure = true;
                 }
                 if (chars is { Length: > 0 })
                 {
@@ -88,8 +93,11 @@ namespace nORM.Query
                     Visit(node.Object);
                     var receiverSql = sb.ToString(receiverStart, sb.Length - receiverStart);
                     sb.Length = receiverStart;
-                    var trimSet = new string(chars).Replace("'", "''");
-                    sb.Append(sqlFn).Append('(').Append(receiverSql).Append(", '").Append(trimSet).Append("')");
+                    // A runtime (closure) trim set is inlined — mark the plan fold-no-cache (after the receiver,
+                    // in extractor document order) so a later call with a different set cannot reuse this one.
+                    if (charsFromClosure) ReserveFoldNoCachePlaceholder();
+                    sb.Append(sqlFn).Append('(').Append(receiverSql).Append(", ")
+                      .Append(_provider.EscapeStringLiteral(new string(chars))).Append(')');
                     return node;
                 }
             }
@@ -163,7 +171,10 @@ namespace nORM.Query
                 && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var joinSepVal)
                 && joinSepVal is string joinSep)
             {
-                var sepLit = $"'{joinSep.Replace("'", "''")}'";
+                var sepLit = _provider.EscapeStringLiteral(joinSep);
+                // The separator (arg0) precedes the value array (arg1) in document order; if it is a runtime
+                // (closure) value it is inlined, so mark the plan fold-no-cache before translating the elements.
+                MarkFoldNoCacheIfClosure(node.Arguments[0]);
                 if (joinArr.Expressions.Count == 0)
                 {
                     sb.Append("''");
@@ -220,6 +231,9 @@ namespace nORM.Query
                     ignoreCase = true;
                 }
                 var receiverSql = TranslateProjectionArg(node.Object);
+                // A runtime (closure) pattern is inlined into the LIKE/ordinal SQL — mark the plan
+                // fold-no-cache so a later call with a different term cannot reuse this term (F2 poisoning).
+                MarkFoldNoCacheIfClosure(node.Arguments[0]);
                 sb.Append(EmitStringMatch(receiverSql, patternStr, node.Method.Name, ignoreCase));
                 return node;
             }
@@ -433,8 +447,10 @@ namespace nORM.Query
                     {
                         if (seg.IsLiteral)
                         {
+                            // The template is a compile-time constant (guarded above), so these literal
+                            // segments are stable across executions — escape for F1, no fold-no-cache needed.
                             if (seg.Literal!.Length > 0)
-                                parts.Add($"'{seg.Literal.Replace("'", "''")}'");
+                                parts.Add(_provider.EscapeStringLiteral(seg.Literal!));
                         }
                         else
                         {

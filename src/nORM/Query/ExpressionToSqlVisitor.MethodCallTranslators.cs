@@ -152,7 +152,16 @@ namespace nORM.Query
                 && TryGetConstantValue(node.Arguments[0], out var joinSepVal)
                 && joinSepVal is string joinSep)
             {
-                var sepLit = $"'{joinSep.Replace("'", "''")}'";
+                // A runtime (closure) separator is inlined (the concat separator is a literal, not a bound
+                // parameter), so reserve a fold-no-cache placeholder in document order (arg0 before the arg1
+                // array) so a later call with a different separator cannot reuse this one. Escape provider-safely.
+                if (node.Arguments[0] is not ConstantExpression)
+                {
+                    var sepPlaceholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                    _params[sepPlaceholder] = DBNull.Value;
+                    _compiledParams.Add(sepPlaceholder);
+                }
+                var sepLit = _provider.EscapeStringLiteral(joinSep);
                 if (joinArr.Expressions.Count == 0)
                 {
                     _sql.Append("''");
@@ -482,7 +491,7 @@ namespace nORM.Query
                 && parseGenericArgs[0].IsEnum)
             {
                 var nameSql = GetSql(node.Arguments[0]);
-                _sql.Append(BuildStringToEnumCase(nameSql, parseGenericArgs[0]));
+                _sql.Append(BuildStringToEnumCase(_provider, nameSql, parseGenericArgs[0]));
                 return true;
             }
 
@@ -495,7 +504,7 @@ namespace nORM.Query
                 && parseEnumType.IsEnum)
             {
                 var nameSql = GetSql(node.Arguments[1]);
-                _sql.Append(BuildStringToEnumCase(nameSql, parseEnumType));
+                _sql.Append(BuildStringToEnumCase(_provider, nameSql, parseEnumType));
                 return true;
             }
 
@@ -528,7 +537,7 @@ namespace nORM.Query
                     {
                         if (i > 0) _sql.Append(", ");
                         var name = ignoreCase ? names[i].ToLowerInvariant() : names[i];
-                        _sql.Append('\'').Append(name.Replace("'", "''")).Append('\'');
+                        _sql.Append(_provider.EscapeStringLiteral(name)); // enum member name (compile-time metadata)
                     }
                     _sql.Append("))");
                 }

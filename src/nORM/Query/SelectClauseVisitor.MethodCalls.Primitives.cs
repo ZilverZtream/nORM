@@ -165,7 +165,7 @@ namespace nORM.Query
                 && genericArgs[0].IsEnum)
             {
                 var nameSql = TranslateProjectionArg(node.Arguments[0]);
-                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(nameSql, genericArgs[0]));
+                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(_provider, nameSql, genericArgs[0]));
                 return true;
             }
 
@@ -176,7 +176,7 @@ namespace nORM.Query
                 && enumType.IsEnum)
             {
                 var nameSql = TranslateProjectionArg(node.Arguments[1]);
-                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(nameSql, enumType));
+                sb.Append(ExpressionToSqlVisitor.BuildStringToEnumCase(_provider, nameSql, enumType));
                 return true;
             }
 

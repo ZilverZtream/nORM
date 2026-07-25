@@ -834,6 +834,7 @@ namespace nORM.Query
             //    separator is implicitly empty.
             MethodCallExpression? aggInner = null;
             string? aggSep = null;
+            bool aggSepFromClosure = false;
             if (methodCall.Method.DeclaringType == typeof(string))
             {
                 if (methodName == nameof(string.Join)
@@ -844,6 +845,9 @@ namespace nORM.Query
                 {
                     aggInner = aggInnerJ;
                     aggSep = aggSepS;
+                    // A runtime (closure) separator is folded and inlined into GROUP_CONCAT (the SEPARATOR must
+                    // be a literal — it cannot be a bound parameter), so it would poison the cached plan.
+                    aggSepFromClosure = methodCall.Arguments[0] is not ConstantExpression;
                 }
                 else if (methodName == nameof(string.Concat)
                          && methodCall.Arguments.Count == 1
@@ -875,7 +879,8 @@ namespace nORM.Query
                 foreach (var kvp in aggVisitor.GetParameters())
                     AddLiteralParameter(kvp.Key, kvp.Value);
                 FastExpressionVisitorPool.Return(aggVisitor);
-                var sepLit = $"'{aggSep.Replace("'", "''")}'";
+                if (aggSepFromClosure) _closureFoldedIntoSql = true;
+                var sepLit = _provider.EscapeStringLiteral(aggSep);
                 // For constant-key GroupBy (single-group aggregate, no GROUP BY emitted),
                 // route source OrderBy into the aggregate function when the provider supports
                 // native ordered-aggregate syntax (SQL Server WITHIN GROUP, Postgres / MySQL

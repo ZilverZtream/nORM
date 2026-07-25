@@ -476,7 +476,7 @@ namespace nORM.Query
                         nameof(string.EndsWith) => nORM.Providers.OrdinalStringMatch.EndsWith,
                         _ => nORM.Providers.OrdinalStringMatch.Contains,
                     };
-                    var patternLiteral = $"'{patternStr.Replace("'", "''")}'";
+                    var patternLiteral = _provider.EscapeStringLiteral(patternStr);
                     return _provider.GetOrdinalStringMatchSql(receiverSql, patternLiteral, kind);
                 }
                 receiverSql = _provider.ForceCaseSensitiveStringComparison(receiverSql);
@@ -491,7 +491,41 @@ namespace nORM.Query
                 _ => $"%{escaped}%",
             };
             var lhs = ignoreCase ? $"LOWER({receiverSql})" : receiverSql;
-            return $"({lhs} LIKE '{wrapped.Replace("'", "''")}' ESCAPE '{escapeChar}')";
+            return $"({lhs} LIKE {_provider.EscapeStringLiteral(wrapped)} ESCAPE '{escapeChar}')";
+        }
+
+        /// <summary>
+        /// When a runtime (closure) value is INLINED into projection SQL — a position that cannot take a bound
+        /// parameter (a LIKE pattern wrapped with wildcards, an ordinal-match operand, a GROUP_CONCAT
+        /// separator, a TRIM set) — reserve a fold-no-cache placeholder through the shared compiled-parameter
+        /// channel. The plan cache excludes closure values from its key, so a baked closure value would be
+        /// replayed to every later caller with a different value (cache poisoning / cross-caller leak);
+        /// <c>HasClosureFoldedIntoSql</c> recognizes the <c>_unused</c> placeholder and bypasses the cache so
+        /// each call re-translates against the live value. A genuine compile-time <see cref="ConstantExpression"/>
+        /// is stable across executions and needs no placeholder. Mirrors the WHERE path's <c>_unused</c> channel.
+        /// The placeholder must be reserved in extractor document order (after the receiver is translated) so the
+        /// compiled-parameter binder stays aligned.
+        /// </summary>
+        private void MarkFoldNoCacheIfClosure(Expression arg)
+        {
+            if (arg is ConstantExpression)
+                return;
+            ReserveFoldNoCachePlaceholder();
+        }
+
+        /// <summary>
+        /// Reserves the fold-no-cache <c>_unused</c> compiled-parameter placeholder unconditionally. Use when
+        /// the caller has already determined the inlined value came from a closure (e.g. a trim-char array
+        /// resolved via <c>TryGetConstantValue</c>, which is not a plain <see cref="ConstantExpression"/>).
+        /// Must be called in extractor document order (after the receiver / preceding args are translated).
+        /// </summary>
+        private void ReserveFoldNoCachePlaceholder()
+        {
+            if (SharedParams == null || SharedCompiledParams == null)
+                return;
+            var placeholder = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}_unused";
+            SharedParams[placeholder] = DBNull.Value;
+            SharedCompiledParams.Add(placeholder);
         }
     }
 }
