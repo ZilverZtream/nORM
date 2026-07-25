@@ -108,6 +108,17 @@ public class TemporalMigrationLiveBehaviourTests
         return t;
     }
 
+    // W as NOT NULL with a DEFAULT — on SQL Server the history-table mirror must emit
+    // ADD ... NOT NULL DEFAULT ... WITH VALUES so existing history rows are backfilled.
+    private static TableSchema BuildDefaultedW()
+    {
+        var t = new TableSchema { Name = "TmigLiveB", IsTemporal = true };
+        t.Columns.Add(new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true });
+        t.Columns.Add(new ColumnSchema { Name = "V", ClrType = typeof(int).FullName!, IsNullable = false });
+        t.Columns.Add(new ColumnSchema { Name = "W", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "7" });
+        return t;
+    }
+
     [Theory]
     [InlineData("sqlserver")]
     [InlineData("postgres")]
@@ -187,6 +198,98 @@ public class TemporalMigrationLiveBehaviourTests
             var v1 = Assert.Single(old);
             Assert.Equal(1, v1.V);
             Assert.Null(v1.W);
+        }
+        finally
+        {
+            ExecIgnore(factory!,
+                "DROP TABLE TmigLiveB_History", "DROP TABLE TmigLiveB",
+                "DROP FUNCTION IF EXISTS \"TmigLiveB_TemporalFunction\"()");
+        }
+    }
+
+    /// <summary>
+    /// Adding a NOT NULL column WITH a default to a temporal table must backfill the pre-existing
+    /// history rows. On SQL Server the history mirror emits <c>ADD ... NOT NULL DEFAULT (...) WITH
+    /// VALUES</c> — a clause only produced for a non-nullable defaulted column, so the sibling
+    /// (nullable) test never exercises it; PostgreSQL/MySQL backfill via plain <c>ADD ... DEFAULT</c>.
+    /// This is a live-only guard: a malformed history ADD only fails against a real server.
+    /// </summary>
+    [Theory]
+    [InlineData("sqlserver")]
+    [InlineData("postgres")]
+    [InlineData("mysql")]
+    public async Task Add_notnull_defaulted_column_backfills_history_and_keeps_versioning(string kind)
+    {
+        var (factory, provider, generator, skip) = OpenLive(kind);
+        if (skip != null) return;
+        using (var probe = factory!())
+        {
+            var db = probe.Database;
+            if (db is "master" or "postgres" or "mysql" or "sys" or "model" or "msdb" or "tempdb")
+                return;
+        }
+
+        var tbl  = kind == "postgres" ? "\"TmigLiveB\"" : "TmigLiveB";
+        var hist = kind == "postgres" ? "\"TmigLiveB_History\"" : "TmigLiveB_History";
+        var histCount = kind == "postgres"
+            ? "SELECT COUNT(*) FROM \"TmigLiveB_History\""
+            : "SELECT COUNT(*) FROM TmigLiveB_History";
+        var histWith7 = kind == "postgres"
+            ? "SELECT COUNT(*) FROM \"TmigLiveB_History\" WHERE \"W\" = 7"
+            : "SELECT COUNT(*) FROM TmigLiveB_History WHERE W = 7";
+
+        ExecIgnore(factory!,
+            $"DROP TABLE {hist}", $"DROP TABLE {tbl}",
+            "DROP FUNCTION IF EXISTS \"TmigLiveB_TemporalFunction\"()");
+        ExecIgnore(factory!, kind == "postgres"
+            ? "CREATE TABLE \"TmigLiveB\" (\"Id\" INT PRIMARY KEY, \"V\" INT NOT NULL)"
+            : $"CREATE TABLE {tbl} (Id INT PRIMARY KEY, V INT NOT NULL)");
+
+        var opts = new DbContextOptions { OnModelCreating = mb => mb.Entity<RowV1>() };
+        opts.EnableTemporalVersioning();
+        await using (var ctx = new DbContext(factory!(), provider!, opts))
+        {
+            ctx.Add(new RowV1 { Id = 1, V = 1 });
+            await ctx.SaveChangesAsync();
+            await Task.Delay(200);
+            var row = await ctx.Query<RowV1>().Where(r => r.Id == 1).FirstAsync();
+            row.V = 2;
+            await ctx.SaveChangesAsync();   // snapshots V=1 into history
+        }
+        var preHist = Scalar(factory!, histCount);
+        Assert.True(preHist >= 1, $"[{kind}] expected at least one pre-migration history row.");
+
+        // ADD COLUMN W INT NOT NULL DEFAULT 7 on a temporal table: main + history mirror + trigger regen.
+        var diff = SchemaDiffer.Diff(
+            new SchemaSnapshot { Tables = { Build(withW: false) } },
+            new SchemaSnapshot { Tables = { BuildDefaultedW() } });
+        var sql = generator!.GenerateSql(diff);
+        foreach (var statement in (sql.PreTransactionUp ?? Enumerable.Empty<string>()).Concat(sql.Up).Concat(sql.PostTransactionUp ?? Enumerable.Empty<string>()))
+        {
+            using var cn = factory!();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = statement;
+            cmd.ExecuteNonQuery();
+        }
+
+        try
+        {
+            // The pre-existing history rows must be backfilled with the new column's default (7) —
+            // WITH VALUES on SQL Server, ADD ... DEFAULT on PostgreSQL/MySQL.
+            Assert.True(Scalar(factory!, histWith7) >= preHist,
+                $"[{kind}] pre-migration history rows must be backfilled with the new column default (7).");
+
+            // Versioning still works: a further update snapshots another history row.
+            using (var cn = factory!())
+            using (var cmd = cn.CreateCommand())
+            {
+                cmd.CommandText = kind == "postgres"
+                    ? "UPDATE \"TmigLiveB\" SET \"V\" = 3 WHERE \"Id\" = 1"
+                    : "UPDATE TmigLiveB SET V = 3 WHERE Id = 1";
+                Assert.Equal(1, cmd.ExecuteNonQuery());
+            }
+            Assert.True(Scalar(factory!, histCount) > preHist,
+                $"[{kind}] versioning must continue after the NOT NULL defaulted column was added.");
         }
         finally
         {
