@@ -19,7 +19,7 @@ runners when options are supplied to the runner.
 | Cancellation | The caller cancellation token is passed to async hooks and command execution. Cancellation from the command path is treated as command failure and is rethrown. |
 | Sync APIs | Synchronous execution paths call the synchronous interceptor hooks. They do not block on async hooks. |
 | Transactions | Interceptors see the command after nORM has assigned the current transaction. Mutating transaction ownership is unsupported. |
-| Logging | `BaseDbCommandInterceptor` redacts SQL literals and does not log parameter values. Custom interceptors own their own redaction policy. |
+| Logging | `BaseDbCommandInterceptor` redacts SQL literals and does not log parameter values, and logs **identically on the sync and async paths** (its sync and async hooks share one logging core). Custom interceptors own their own redaction policy. |
 
 Command interceptors may change command text, timeout, parameters, and command
 type before execution. They should not change the connection, replace the active
@@ -30,6 +30,25 @@ For providers that prefer serialized synchronous execution on a shared
 connection, nORM serializes the actual command execution. Pre-execution hooks run
 before the serialization gate; post-execution hooks run after the command has
 completed.
+
+### Implement BOTH hook families (or a command-observing control fails open)
+
+`IDbCommandInterceptor` has two hook families: async (`*Async`) and sync. **A command-observing
+control — an audit log, a "record every write" trail, a "reject any command without a tenant
+predicate" policy guard — must implement the sync member of every hook it implements.** The sync
+default implementations are no-ops, and several execution paths run synchronously regardless of how
+the calling code awaits:
+
+- **SQLite** sets `PrefersSyncExecution`, so its commands run on the sync hooks;
+- the **small-query fast paths**, **compiled queries**, and **query-plan** paths execute
+  synchronously on every provider.
+
+A guard implemented on the async members alone therefore silently passes the majority of traffic on
+those paths — a security control that **fails open with no error**, which is worse than none. Either
+implement both members of each hook, or derive from `BaseDbCommandInterceptor`: its sync and async
+hooks delegate to one shared logging core, so the built-in redacted logging is emitted on **both**
+paths and a base-derived interceptor is path-agnostic by default. When you add behavior to a subclass,
+override **both** the sync and async member of the hook.
 
 ## SaveChanges Interceptors
 
