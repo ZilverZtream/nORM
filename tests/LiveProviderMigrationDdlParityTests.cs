@@ -146,6 +146,16 @@ public class LiveProviderMigrationDdlParityTests
         return string.Equals(val, "YES", StringComparison.OrdinalIgnoreCase);
     }
 
+    // True when a SQL Server index exists AND carries a filter predicate (has_filter = 1).
+    private static bool SqlServerFilteredIndexExists(DbConnection cn, string table, string indexName)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            $"SELECT COUNT(*) FROM sys.indexes " +
+            $"WHERE name='{indexName}' AND object_id=OBJECT_ID('{table}') AND has_filter=1";
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
     // ── Base-table DDL (provider-specific CREATE TABLE) ──────────────────────
 
     private static string CreateBaseDdl(string kind, string table) => kind switch
@@ -617,6 +627,55 @@ public class LiveProviderMigrationDdlParityTests
                 _           => throw new ArgumentOutOfRangeException(nameof(kind))
             };
             Assert.Equal(10, Convert.ToInt32(q.ExecuteScalar()));
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CREATE a table carrying a FILTERED index with an INCLUDE column (SQL Server). The
+    // generator emits `CREATE INDEX ... ([key]) INCLUDE ([inc]) WHERE <filter>` where the
+    // filter predicate is interpolated raw and the include columns are escaped — provider-
+    // idiomatic DDL with no prior live coverage from the generator. Guard: the CREATE must
+    // execute (a malformed INCLUDE/WHERE only fails live) AND the resulting index must
+    // actually carry a filter (sys.indexes.has_filter = 1). SQL Server only: it is the
+    // provider that supports INCLUDE plus filtered indexes; PostgreSQL partial/expression
+    // indexes are a separate follow-up with different introspection.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("sqlserver")]
+    public void LiveProvider_Migration_CreateTableWithFilteredIncludeIndex_IsValidAndFiltered(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table  = "DdlParity_FilteredIdx";
+        const string ixName = "IX_DdlParity_FilteredIdx_Score";
+
+        try
+        {
+            ExecSafe(db, DropTableDdl(kind, table));
+
+            var t     = TableWithExtra(table);   // Id (PK), Name (NOT NULL), Score (nullable int)
+            var score = t.Columns.First(c => c.Name == "Score");
+            var name  = t.Columns.First(c => c.Name == "Name");
+            // Filtered index on Score (WHERE [Score] > 0) that INCLUDEs Name.
+            score.Indexes.Add(new ColumnIndexSchema { Name = ixName, Order = 0, FilterSql = "[Score] > 0" });
+            name.Indexes.Add(new ColumnIndexSchema { Name = ixName, IsIncluded = true });
+
+            var diff = new SchemaDiff();
+            diff.AddedTables.Add(t);
+
+            // Must not throw: the INCLUDE/WHERE index DDL has to be valid on a live server.
+            ApplyStatements(db, Generator(kind).GenerateSql(diff).Up);
+
+            Assert.True(TableExists(db, table), $"[{kind}] table {table} should exist.");
+            Assert.True(SqlServerFilteredIndexExists(db, table, ixName),
+                $"[{kind}] filtered index {ixName} should exist and carry a filter predicate.");
         }
         finally
         {
