@@ -49,13 +49,24 @@ namespace nORM.Core
         /// </summary>
         private string BuildConventionDefaultInsertSql(TableMapping map, Column[] cols)
         {
+            // Invariant per mapping+provider — build once and reuse, instead of re-projecting/joining the
+            // column and parameter lists and re-interpolating on every insert (this is the benchmarked
+            // Insert_Single default-key shape). Benign race: concurrent builders produce the same string.
+            if (map.ConventionDefaultInsertSql is { } cached)
+                return cached;
             var prefix = _p.GetIdentityRetrievalPrefix(map);
             var fragment = _p.GetIdentityRetrievalString(map);
+            string sql;
             if (cols.Length == 0)
-                return $"INSERT INTO {map.EscTable}{prefix} {_p.DefaultValuesInsertClause}{fragment}";
-            var colNames = string.Join(", ", cols.Select(c => c.EscCol));
-            var valParams = string.Join(", ", cols.Select(c => _p.ParamPrefix + c.PropName));
-            return $"INSERT INTO {map.EscTable} ({colNames}){prefix} VALUES ({valParams}){fragment}";
+                sql = $"INSERT INTO {map.EscTable}{prefix} {_p.DefaultValuesInsertClause}{fragment}";
+            else
+            {
+                var colNames = string.Join(", ", cols.Select(c => c.EscCol));
+                var valParams = string.Join(", ", cols.Select(c => _p.ParamPrefix + c.PropName));
+                sql = $"INSERT INTO {map.EscTable} ({colNames}){prefix} VALUES ({valParams}){fragment}";
+            }
+            map.ConventionDefaultInsertSql = sql;
+            return sql;
         }
 
         /// <summary>

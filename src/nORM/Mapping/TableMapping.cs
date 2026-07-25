@@ -88,6 +88,15 @@ namespace nORM.Mapping
         /// </summary>
         internal Column[] InsertColumnsWithoutConventionKey { get; }
 
+        /// <summary>
+        /// Lazily-cached INSERT SQL for the store-generated convention-key default-value run (key column
+        /// omitted + identity-retrieval clause). The text is invariant for this mapping's provider, so it is
+        /// built once instead of re-joined/interpolated on every insert. A mapping instance belongs to a single
+        /// DbContext (and therefore one provider), so caching the provider-specific SQL here is sound; a benign
+        /// race just recomputes the same string.
+        /// </summary>
+        internal string? ConventionDefaultInsertSql;
+
         /// <summary>Gets the set of columns included in update statements.</summary>
         public Column[] UpdateColumns { get; }
 
