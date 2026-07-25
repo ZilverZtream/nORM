@@ -379,6 +379,14 @@ namespace nORM.Tests.Fuzzing
         }
 
         private static IEnumerable<IrRow> RunNorm(DbContext ctx, QueryIr ir)
+            => BuildNormQueryable(ctx, ir).ToList();
+
+        /// <summary>
+        /// Builds the nORM <see cref="IQueryable{IrRow}"/> for a case WITHOUT executing it, so a cross-plan
+        /// differential can run the SAME query through multiple terminals (sync <c>ToList</c> = general translator
+        /// path, async <c>ToListAsync</c> = the async-only fast path, compiled queries, …) and assert they agree.
+        /// </summary>
+        internal static IQueryable<IrRow> BuildNormQueryable(DbContext ctx, QueryIr ir)
         {
             IQueryable<IrRow> Filter(IReadOnlyList<IrStep> steps)
             {
@@ -408,7 +416,7 @@ namespace nORM.Tests.Fuzzing
             q = ApplyOrderingQueryable(q, ir);
             foreach (var s in ir.Steps.Where(s => s.Kind == IrStepKind.Skip)) q = q.Skip(s.Count);
             foreach (var s in ir.Steps.Where(s => s.Kind == IrStepKind.Take)) q = q.Take(s.Count);
-            return q.ToList();
+            return q;
         }
 
         private static IEnumerable<IrRow> ApplyOrdering(IEnumerable<IrRow> q, QueryIr ir)
@@ -575,7 +583,7 @@ namespace nORM.Tests.Fuzzing
 
         // ─── data / comparison ──────────────────────────────────────────────
 
-        private static DbContext CreateSeededContext(IReadOnlyList<IrRow> rows)
+        internal static DbContext CreateSeededContext(IReadOnlyList<IrRow> rows)
         {
             var cn = new SqliteConnection("Data Source=:memory:");
             cn.Open();
