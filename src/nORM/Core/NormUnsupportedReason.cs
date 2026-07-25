@@ -141,5 +141,22 @@ namespace nORM.Core
 
         /// <summary>Zip over two database queries requires an explicit OrderBy/ThenBy chain so positional pairing is deterministic.</summary>
         public const string ZipRequiresOrdering = "zip-requires-ordering";
+
+        // ── Include / ThenInclude and OfType/Cast (QueryTranslator.IncludeTranslators) ──
+
+        /// <summary>An Include/ThenInclude navigation shape is unsupported (only plain, filtered, or ordered/top-N are).</summary>
+        public const string IncludeShapeUnsupported = "include-shape-unsupported";
+
+        /// <summary>A filtered or ordered/top-N Include on a many-to-many navigation is not supported.</summary>
+        public const string IncludeM2mFilterOrderUnsupported = "include-m2m-filter-order-unsupported";
+
+        /// <summary>OrderBy/Take/Skip on a reference navigation is meaningless (it loads a single related entity) and is not supported.</summary>
+        public const string IncludeReferenceNavOrderingMeaningless = "include-reference-nav-ordering-meaningless";
+
+        /// <summary>An OfType/Cast call requires a generic type argument.</summary>
+        public const string MethodRequiresGenericTypeArgument = "method-requires-generic-type-argument";
+
+        /// <summary>OfType&lt;T&gt; targets a type that is not a [DiscriminatorValue]-mapped subtype of the source (no TPH discriminator).</summary>
+        public const string OfTypeNonDiscriminatedSubtype = "oftype-non-discriminated-subtype";
     }
 }

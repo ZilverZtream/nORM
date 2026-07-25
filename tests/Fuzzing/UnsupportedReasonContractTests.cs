@@ -41,6 +41,7 @@ public sealed class UnsupportedReasonContractTests
         "Query/SelectClauseVisitor.Helpers.cs",
         "Query/SelectClauseVisitor.MethodCalls.cs",
         "Query/QueryTranslator.SequenceTailTranslators.cs",
+        "Query/QueryTranslator.IncludeTranslators.cs",
     };
 
     private static ISet<string> CatalogCodeNames()

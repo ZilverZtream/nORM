@@ -80,7 +80,8 @@ namespace nORM.Query
             if (ordering != null && ordering.Keys.Count == 0)
                 throw new NormUnsupportedFeatureException(
                     "Skip/Take on an included collection needs an OrderBy to make the result deterministic, e.g. " +
-                    "Include(b => b.Posts.OrderBy(p => p.Id).Take(3)). A non-constant Take/Skip is also unsupported.");
+                    "Include(b => b.Posts.OrderBy(p => p.Id).Take(3)). A non-constant Take/Skip is also unsupported.",
+                    NormUnsupportedReason.CollectionPagingRequiresOrderBy);
             if (body is UnaryExpression orderConvert)
                 body = orderConvert.Operand;
             if (body is MethodCallExpression whereCall
@@ -97,7 +98,8 @@ namespace nORM.Query
             if (body is not MemberExpression member)
                 throw new NormUnsupportedFeatureException(
                     "Include/ThenInclude supports a plain navigation, a filtered navigation ('nav.Where(pred)'), " +
-                    "and an ordered / top-N navigation ('nav.OrderBy(k).Take(n)'). This shape is not supported.");
+                    "and an ordered / top-N navigation ('nav.OrderBy(k).Take(n)'). This shape is not supported.",
+                    NormUnsupportedReason.IncludeShapeUnsupported);
             return member;
         }
 
@@ -205,11 +207,13 @@ namespace nORM.Query
                                 if (includeFilter != null)
                                     throw new NormUnsupportedFeatureException(
                                         $"A filtered Include on the many-to-many navigation '{propName}' is not supported. " +
-                                        "Filter after materialization, or model the relationship as an explicit join entity.");
+                                        "Filter after materialization, or model the relationship as an explicit join entity.",
+                                        NormUnsupportedReason.IncludeM2mFilterOrderUnsupported);
                                 if (includeOrdering != null)
                                     throw new NormUnsupportedFeatureException(
                                         $"An ordered / top-N Include on the many-to-many navigation '{propName}' is not supported. " +
-                                        "Order after materialization instead.");
+                                        "Order after materialization instead.",
+                                        NormUnsupportedReason.IncludeM2mFilterOrderUnsupported);
                                 t._m2mIncludes.Add(new M2MIncludePlan(jtm));
                                 t.TrackMapping(jtm.RightType);
                             }
@@ -218,7 +222,8 @@ namespace nORM.Query
                                 if (includeOrdering != null)
                                     throw new NormUnsupportedFeatureException(
                                         $"OrderBy/Take/Skip on the reference navigation '{propName}' is meaningless (it loads a single " +
-                                        "related entity) and is not supported.");
+                                        "related entity) and is not supported.",
+                                        NormUnsupportedReason.IncludeReferenceNavOrderingMeaningless);
                                 var plan = new IncludePlan(new List<TableMapping.Relation> { refRelation });
                                 plan.Filters.Add(RenderIncludeFilter(t, refRelation, includeFilter, 0));
                                 plan.Orderings.Add(null);
@@ -270,7 +275,8 @@ namespace nORM.Query
                                 if (includeOrdering != null)
                                     throw new NormUnsupportedFeatureException(
                                         $"OrderBy/Take/Skip on the reference navigation '{propName}' is meaningless (it loads a single " +
-                                        "related entity) and is not supported.");
+                                        "related entity) and is not supported.",
+                                        NormUnsupportedReason.IncludeReferenceNavOrderingMeaningless);
                                 lastInclude.Path.Add(refRelation);
                                 lastInclude.Filters.Add(RenderIncludeFilter(t, refRelation, includeFilter, levelIndex));
                                 lastInclude.Orderings.Add(null);
@@ -413,7 +419,8 @@ namespace nORM.Query
                 if (targetElement == null)
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} requires a generic type argument.");
+                        $"{node.Method.Name} requires a generic type argument.",
+                        NormUnsupportedReason.MethodRequiresGenericTypeArgument);
                 }
                 // Cast / OfType collapse to an identity pass-through at the SQL layer when
                 // the target type matches the source element type (or is a reference-type
@@ -455,7 +462,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"{node.Method.Name}<{targetElement.Name}>() on IQueryable<{sourceElement.Name}> cannot be translated to SQL: " +
                     $"{targetElement.Name} is not a subtype of {sourceElement.Name} with a [DiscriminatorValue] attribute, " +
-                    "or the base type has no [DiscriminatorColumn]. Project explicitly with Select(...) instead.");
+                    "or the base type has no [DiscriminatorColumn]. Project explicitly with Select(...) instead.",
+                    NormUnsupportedReason.OfTypeNonDiscriminatedSubtype);
             }
         }
 
