@@ -404,7 +404,10 @@ namespace nORM.Query
 
             // Outer Add: (prefix) + elemExpr. elemExpr must not reference acc.
             var elemExpr = outerAdd.Right;
-            if (ReferencesParameter(elemExpr, accParam)) throw new InvalidOperationException("DBG-SC3: elemExpr refs acc");
+            // The element expression referencing the accumulator is not the recognized
+            // string-concat fold shape — bail so the caller falls back to the general
+            // aggregate path (never surface an internal debug marker to the user).
+            if (ReferencesParameter(elemExpr, accParam)) return false;
 
             // prefix is either `acc` (no separator) OR Add(acc, sepExpr).
             string sep;
@@ -421,7 +424,9 @@ namespace nORM.Query
             }
             else
             {
-                throw new InvalidOperationException($"DBG-SC4: outerAdd.Left shape unexpected: type={outerAdd.Left.GetType().Name} nodeType={outerAdd.Left.NodeType} body=[{outerAdd.Left}]");
+                // outerAdd.Left is neither `acc` nor `Add(acc, separator)` — not the
+                // recognized string-concat fold; bail to the general aggregate path.
+                return false;
             }
 
             // Synthesize: groupedSource.GroupBy(_ => 1).Select(g => string.Join(sep, g.Select(<proj>))).FirstOrDefault()
@@ -465,7 +470,7 @@ namespace nORM.Query
                     var fn = p1.GetGenericArguments()[0];
                     return fn.IsGenericType && fn.GetGenericArguments().Length == 2;
                 });
-            if (groupByMethod == null) throw new InvalidOperationException("DBG-SC6: groupByMethod is null");
+            if (groupByMethod == null) return false;
             var groupByCall = Expression.Call(groupByMethod.MakeGenericMethod(sourceGenArg, typeof(int)), groupedSource, Expression.Quote(groupKeyLambda));
 
             // Inside the result selector: g.Select(<projLambda>) - Enumerable.Select
@@ -479,7 +484,7 @@ namespace nORM.Query
                     // Want Func<TSource, TResult>, NOT Func<TSource, int, TResult>.
                     return p1.IsGenericType && p1.GetGenericTypeDefinition() == typeof(Func<,>);
                 });
-            if (enumerableSelect == null) throw new InvalidOperationException("DBG-SC7: enumerableSelect is null");
+            if (enumerableSelect == null) return false;
             var gParam = Expression.Parameter(iGroupingType, "g");
             // Enumerable.Select takes a Func, but Expression.Lambda<Func<...>>(...) decays
             // implicitly. Pass the LambdaExpression directly.
@@ -490,7 +495,7 @@ namespace nORM.Query
 
             // string.Join(string, IEnumerable<string>)
             var stringJoinMethod = typeof(string).GetMethod(nameof(string.Join), new[] { typeof(string), typeof(System.Collections.Generic.IEnumerable<string>) });
-            if (stringJoinMethod == null) throw new InvalidOperationException("DBG-SC8: stringJoinMethod null");
+            if (stringJoinMethod == null) return false;
             var joinCall = Expression.Call(stringJoinMethod, Expression.Constant(sep), innerSelectCall);
 
             // Wrap in Select(g => new { V = string.Join(...) }) - the existing
@@ -513,7 +518,7 @@ namespace nORM.Query
                     var fn = p1.GetGenericArguments()[0];
                     return fn.IsGenericType && fn.GetGenericArguments().Length == 2;
                 });
-            if (queryableSelect == null) throw new InvalidOperationException("DBG-SC9: queryableSelect null");
+            if (queryableSelect == null) return false;
             var outerSelectCall = Expression.Call(
                 queryableSelect.MakeGenericMethod(iGroupingType, anonType),
                 groupByCall,
