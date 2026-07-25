@@ -643,6 +643,13 @@ namespace nORM.Providers
             pragmaCmd.ExecuteNonQuery();
         }
 
+        // The regexp/regexp_replace UDFs run a .NET Regex per row over an application-supplied pattern.
+        // A catastrophic-backtracking pattern (e.g. (a+)+$) would otherwise spin the SQLite worker thread
+        // indefinitely — a ReDoS. Bound every evaluation: a legitimate per-row column match completes in
+        // microseconds, so a 1s ceiling only ever trips on a pathological pattern, which then fails loud
+        // (RegexMatchTimeoutException surfaces as a query error) instead of hanging.
+        private static readonly TimeSpan RegexUdfMatchTimeout = TimeSpan.FromSeconds(1);
+
         private static void RegisterProviderFunctions(DbConnection connection)
         {
             if (connection is not SqliteConnection sqlite)
@@ -650,13 +657,14 @@ namespace nORM.Providers
 
             sqlite.CreateFunction<string?, string?, bool>(
                 "regexp",
-                static (pattern, input) => pattern is not null && input is not null && Regex.IsMatch(input, pattern),
+                static (pattern, input) => pattern is not null && input is not null
+                    && Regex.IsMatch(input, pattern, RegexOptions.None, RegexUdfMatchTimeout),
                 isDeterministic: true);
             sqlite.CreateFunction<string?, string?, string?, string?>(
                 "regexp_replace",
                 static (input, pattern, replacement) => input is null || pattern is null
                     ? input
-                    : Regex.Replace(input, pattern, replacement ?? string.Empty),
+                    : Regex.Replace(input, pattern, replacement ?? string.Empty, RegexOptions.None, RegexUdfMatchTimeout),
                 isDeterministic: true);
 
             // Full-precision decimal ordering: SQLite stores decimal as canonical TEXT, and lexical
