@@ -149,7 +149,8 @@ namespace nORM.Query
                         if (!TryResolveStringCompareMode(node.Arguments[2], out ignoreCase, out forceCaseSensitive))
                         {
                             throw new NormUnsupportedFeatureException(
-                                "string.Compare comparison mode must be a constant or captured bool/StringComparison value.");
+                                "string.Compare comparison mode must be a constant or captured bool/StringComparison value.",
+                                NormUnsupportedReason.StringComparisonModeNotConstant);
                         }
                         ReserveCompiledParamSlotIfClosure(this, node.Arguments[2]);
                     }
@@ -162,7 +163,8 @@ namespace nORM.Query
                 else
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"Overload of {node.Method.Name} with {node.Arguments.Count} arguments is not supported.");
+                        $"Overload of {node.Method.Name} with {node.Arguments.Count} arguments is not supported.",
+                        NormUnsupportedReason.StringMethodOverload);
                 }
                 if (ignoreCase)
                 {
@@ -314,7 +316,8 @@ namespace nORM.Query
                 if (!TryResolveStringCompareMode(node.Arguments[1], out var ignoreCase, out var forceCaseSensitive))
                 {
                     throw new NormUnsupportedFeatureException(
-                        "string.IndexOf comparison mode must be a constant or captured StringComparison value.");
+                        "string.IndexOf comparison mode must be a constant or captured StringComparison value.",
+                        NormUnsupportedReason.StringComparisonModeNotConstant);
                 }
                 ReserveCompiledParamSlotIfClosure(this, node.Arguments[1]);
                 var haystack = GetSql(node.Object);
@@ -338,7 +341,8 @@ namespace nORM.Query
                     _sql.Append(indexOfSql);
                     return node;
                 }
-                throw new NormUnsupportedFeatureException("string.IndexOf(value, StringComparison) is not supported by this provider.");
+                throw new NormUnsupportedFeatureException("string.IndexOf(value, StringComparison) is not supported by this provider.",
+                    NormUnsupportedReason.StringFunctionProviderUnsupported);
             }
             if (node.Object != null
                 && node.Method.Name == nameof(string.Replace)
@@ -348,14 +352,16 @@ namespace nORM.Query
                 if (!TryResolveStringCompareMode(node.Arguments[2], out var ignoreCase, out _))
                 {
                     throw new NormUnsupportedFeatureException(
-                        "string.Replace comparison mode must be a constant or captured StringComparison value.");
+                        "string.Replace comparison mode must be a constant or captured StringComparison value.",
+                        NormUnsupportedReason.StringComparisonModeNotConstant);
                 }
                 ReserveCompiledParamSlotIfClosure(this, node.Arguments[2]);
                 if (ignoreCase)
                 {
                     throw new NormUnsupportedFeatureException(
                         "string.Replace(old, new, StringComparison) with an ignore-case mode is not provider-mobile: " +
-                        "native REPLACE primitives do not preserve .NET's case-insensitive replacement semantics on every provider.");
+                        "native REPLACE primitives do not preserve .NET's case-insensitive replacement semantics on every provider.",
+                        NormUnsupportedReason.StringReplaceIgnoreCaseNotMobile);
                 }
                 var source = GetSql(node.Object);
                 var oldValue = GetSql(node.Arguments[0]);
@@ -370,7 +376,8 @@ namespace nORM.Query
                     _sql.Append(replaceSql);
                     return node;
                 }
-                throw new NormUnsupportedFeatureException("string.Replace(old, new, StringComparison) is not supported by this provider.");
+                throw new NormUnsupportedFeatureException("string.Replace(old, new, StringComparison) is not supported by this provider.",
+                    NormUnsupportedReason.StringFunctionProviderUnsupported);
             }
             // string.Remove / string.Insert -- no single SQL primitive, but both compose from
             // Substring + concatenation. Remove(i) = s[..i]; Remove(i,c) = s[..i] + s[i+c..];
@@ -419,7 +426,8 @@ namespace nORM.Query
                 _sql.Append(fn);
                 return node;
             }
-            throw new NormUnsupportedFeatureException($"String method '{node.Method.Name}' is not supported.");
+            throw new NormUnsupportedFeatureException($"String method '{node.Method.Name}' is not supported.",
+                NormUnsupportedReason.StringMethodUntranslatable);
         }
     }
 }
