@@ -57,6 +57,7 @@ public sealed class UnsupportedReasonContractTests
         "Query/QueryTranslator.GroupByClient.cs",
         "Query/QueryTranslator.AggregateDelegates.cs",
         "Providers/DatabaseProvider.SqlExpressions.cs",
+        "Query/BulkCudBuilder.cs",
     };
 
     private static ISet<string> CatalogCodeNames()

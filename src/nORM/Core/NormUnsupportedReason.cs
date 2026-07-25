@@ -246,5 +246,28 @@ namespace nORM.Core
 
         /// <summary>A DateTimeOffset operation (ToOffset/LocalDateTime/UTC-instant comparison) is not supported by the active provider.</summary>
         public const string DateTimeOffsetOperationUnsupported = "datetimeoffset-operation-unsupported";
+
+        // ── Bulk ExecuteUpdate/ExecuteDelete (Query/BulkCudBuilder) ──
+
+        /// <summary>ExecuteUpdate/ExecuteDelete requires query-shape metadata that was not available.</summary>
+        public const string ExecuteUpdateRequiresQueryMetadata = "executeupdate-requires-query-metadata";
+
+        /// <summary>ExecuteUpdate/ExecuteDelete does not support grouped or aggregated source queries.</summary>
+        public const string ExecuteUpdateGroupedUnsupported = "executeupdate-grouped-unsupported";
+
+        /// <summary>A SetProperty value expression could not be evaluated or is an unsupported shape/node.</summary>
+        public const string SetPropertyValueUnsupported = "setproperty-value-unsupported";
+
+        /// <summary>A SetProperty target member is not a mapped column on the entity.</summary>
+        public const string SetPropertyTargetNotMappedColumn = "setproperty-target-not-mapped-column";
+
+        /// <summary>A method call inside a SetProperty value is not translatable on the active provider.</summary>
+        public const string SetPropertyMethodUntranslatable = "setproperty-method-untranslatable";
+
+        /// <summary>A predicate operator inside a SetProperty conditional value is not supported.</summary>
+        public const string SetPropertyConditionalPredicateUnsupported = "setproperty-conditional-predicate-unsupported";
+
+        /// <summary>A navigation-aggregate subquery inside a bulk ExecuteUpdate SetProperty has an unsupported shape.</summary>
+        public const string BulkNavAggregateUnsupported = "bulk-nav-aggregate-unsupported";
     }
 }

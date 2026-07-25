@@ -33,14 +33,16 @@ namespace nORM.Query
         public void ValidateCudPlan(BulkCudQueryShape? shape)
         {
             if (shape == null)
-                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.",
+                    NormUnsupportedReason.ExecuteUpdateRequiresQueryMetadata);
 
             // Ordering and Distinct never change an entity query's row set (rows are
             // key-unique), and paged shapes resolve their window through a keyed
             // subquery — only genuine reshapes (grouping) remain unsupported here;
             // joined shapes route through the joined builder before this check.
             if (shape.HasGroupBy || shape.HasHaving || shape.HasJoins)
-                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped or aggregated queries.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete does not support grouped or aggregated queries.",
+                    NormUnsupportedReason.ExecuteUpdateGroupedUnsupported);
         }
 
         /// <summary>
@@ -328,7 +330,8 @@ namespace nORM.Query
                         {
                             throw new NormUnsupportedFeatureException(
                                 "The SetProperty value could not be evaluated. Provide a literal, a captured value, " +
-                                "or an Expression<Func<T, TProperty>> over the row's own columns.", ex);
+                                "or an Expression<Func<T, TProperty>> over the row's own columns.",
+                                NormUnsupportedReason.SetPropertyValueUnsupported, ex);
                         }
                         if (literalValue != null && targetColumn.Converter != null)
                             literalValue = targetColumn.Converter.ConvertToProvider(literalValue);
@@ -361,7 +364,8 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(
                         "ExecuteUpdate set values must be a literal/captured constant or an " +
                         "Expression<Func<T, TProperty>> evaluated server-side. The given expression " +
-                        "could not be reduced to either form.");
+                        "could not be reduced to either form.",
+                        NormUnsupportedReason.SetPropertyValueUnsupported);
                 }
                 call = call.Object as MethodCallExpression;
             }
@@ -432,7 +436,8 @@ namespace nORM.Query
                     case MemberExpression me when TableMapping.TryGetMemberAccessRoot(me, out var rootParam) && rootParam == rowParam:
                         if (!mapping.TryGetColumnForMemberAccess(me, out var col))
                             throw new NormUnsupportedFeatureException(
-                                $"Member '{me.Member.Name}' is not a mapped column on '{mapping.TableName}'.");
+                                $"Member '{me.Member.Name}' is not a mapped column on '{mapping.TableName}'.",
+                                NormUnsupportedReason.SetPropertyTargetNotMappedColumn);
                         return col.EscCol;
 
                     case ConstantExpression ce:
@@ -458,7 +463,8 @@ namespace nORM.Query
                         var fnSql = _ctx.RawProvider.TranslateFunction(mc.Method.Name, dt, fnArgs);
                         if (fnSql == null)
                             throw new NormUnsupportedFeatureException(
-                                $"{dt.Name}.{mc.Method.Name}({mc.Arguments.Count} args) is not translatable on provider {_ctx.RawProvider.GetType().Name}.");
+                                $"{dt.Name}.{mc.Method.Name}({mc.Arguments.Count} args) is not translatable on provider {_ctx.RawProvider.GetType().Name}.",
+                                NormUnsupportedReason.SetPropertyMethodUntranslatable);
                         return fnSql;
 
                     case BinaryExpression be:
@@ -499,7 +505,8 @@ namespace nORM.Query
                             _ => throw new NormUnsupportedFeatureException(
                                 $"Binary operator '{be.NodeType}' has no portable SQL equivalent inside a " +
                                 "SetProperty value expression. For Power, use `Math.Pow(x, n)` which lowers " +
-                                "to the provider's POWER / POW function."),
+                                "to the provider's POWER / POW function.",
+                                NormUnsupportedReason.BinaryOperatorUnsupported),
                         };
                         return $"({Render(be.Left, valuePosition: false)} {op} {Render(be.Right, valuePosition: false)})";
 
@@ -508,7 +515,8 @@ namespace nORM.Query
                         if (nORM.Query.QueryTranslator.TryGetConstantValue(captured, out var capturedValue))
                             return RenderLiteral(capturedValue, valuePosition);
                         throw new NormUnsupportedFeatureException(
-                            $"Cannot resolve '{captured.Member.Name}' in a SetProperty value expression.");
+                            $"Cannot resolve '{captured.Member.Name}' in a SetProperty value expression.",
+                            NormUnsupportedReason.SetPropertyValueUnsupported);
 
                     case MethodCallExpression navAgg
                         when (navAgg.Method.DeclaringType == typeof(Enumerable) || navAgg.Method.DeclaringType == typeof(Queryable))
@@ -526,7 +534,8 @@ namespace nORM.Query
 
                     default:
                         throw new NormUnsupportedFeatureException(
-                            $"Expression node {e.NodeType} is not supported inside a SetProperty value expression.");
+                            $"Expression node {e.NodeType} is not supported inside a SetProperty value expression.",
+                            NormUnsupportedReason.SetPropertyValueUnsupported);
                 }
             }
 
@@ -590,7 +599,8 @@ namespace nORM.Query
                             ExpressionType.AndAlso or ExpressionType.And => "AND",
                             ExpressionType.OrElse or ExpressionType.Or => "OR",
                             _ => throw new NormUnsupportedFeatureException(
-                                $"Predicate operator {pb.NodeType} is not supported inside a SetProperty conditional."),
+                                $"Predicate operator {pb.NodeType} is not supported inside a SetProperty conditional.",
+                        NormUnsupportedReason.SetPropertyConditionalPredicateUnsupported),
                         };
                         if (pop is "AND" or "OR")
                             return $"({RenderPredicate(pb.Left)} {pop} {RenderPredicate(pb.Right)})";
@@ -626,7 +636,8 @@ namespace nORM.Query
                     nameof(Enumerable.Max) => "MAX",
                     nameof(Enumerable.Average) => "AVG",
                     _ => throw new NormUnsupportedFeatureException(
-                        $"Aggregate '{navAgg.Method.Name}' over navigation collection '{navAggMember.Member.Name}' is not supported."),
+                        $"Aggregate '{navAgg.Method.Name}' over navigation collection '{navAggMember.Member.Name}' is not supported.",
+                        NormUnsupportedReason.BulkNavAggregateUnsupported),
                 };
 
                 string agg;
@@ -640,13 +651,15 @@ namespace nORM.Query
                         agg = $"COUNT(CASE WHEN {RenderDependentPredicate(countPred.Body, countPred.Parameters[0], dependent, depAlias)} THEN 1 END)";
                     else
                         throw new NormUnsupportedFeatureException(
-                            $"Count over '{navAggMember.Member.Name}' has an unsupported argument shape.");
+                            $"Count over '{navAggMember.Member.Name}' has an unsupported argument shape.",
+                            NormUnsupportedReason.BulkNavAggregateUnsupported);
                 }
                 else
                 {
                     if (navAgg.Arguments.Count < 2 || StripQuotes(navAgg.Arguments[^1]) is not LambdaExpression selector)
                         throw new NormUnsupportedFeatureException(
-                            $"Aggregate '{navAgg.Method.Name}' over '{navAggMember.Member.Name}' requires a mapped-column selector.");
+                            $"Aggregate '{navAgg.Method.Name}' over '{navAggMember.Member.Name}' requires a mapped-column selector.",
+                            NormUnsupportedReason.BulkNavAggregateUnsupported);
                     var operand = RenderDependentOperand(selector.Body, selector.Parameters[0], dependent, depAlias);
                     // C# Average over ints is a double; SQL Server's AVG(int) truncates to int,
                     // so its provider hook casts integral operands to FLOAT (identity elsewhere) —
@@ -662,7 +675,8 @@ namespace nORM.Query
 
                 if (relation.ForeignKeys.Count != relation.PrincipalKeys.Count || relation.ForeignKeys.Count == 0)
                     throw new NormUnsupportedFeatureException(
-                        $"Relationship '{navAggMember.Member.Name}' has no usable key columns for a navigation-aggregate subquery.");
+                        $"Relationship '{navAggMember.Member.Name}' has no usable key columns for a navigation-aggregate subquery.",
+                        NormUnsupportedReason.BulkNavAggregateUnsupported);
 
                 var conds = new List<string>(relation.ForeignKeys.Count + 1);
                 for (var i = 0; i < relation.ForeignKeys.Count; i++)
@@ -689,7 +703,8 @@ namespace nORM.Query
                     case MemberExpression me when TableMapping.TryGetMemberAccessRoot(me, out var root) && root == depParam:
                         if (!dependent.TryGetColumnForMemberAccess(me, out var dcol))
                             throw new NormUnsupportedFeatureException(
-                                $"Aggregate selector member '{me.Member.Name}' is not a mapped column on '{dependent.TableName}'.");
+                                $"Aggregate selector member '{me.Member.Name}' is not a mapped column on '{dependent.TableName}'.",
+                                NormUnsupportedReason.AggregateSelectorNotMappedColumn);
                         return $"{alias}.{dcol.EscCol}";
 
                     case MemberExpression captured when nORM.Query.QueryTranslator.TryGetConstantValue(captured, out var capturedValue):
@@ -711,13 +726,15 @@ namespace nORM.Query
                             ExpressionType.Divide => "/",
                             ExpressionType.Modulo => "%",
                             _ => throw new NormUnsupportedFeatureException(
-                                $"Operator '{be.NodeType}' is not supported inside a navigation-aggregate selector."),
+                                $"Operator '{be.NodeType}' is not supported inside a navigation-aggregate selector.",
+                                NormUnsupportedReason.BulkNavAggregateUnsupported),
                         };
                         return $"({RenderDependentOperand(be.Left, depParam, dependent, alias)} {op} {RenderDependentOperand(be.Right, depParam, dependent, alias)})";
 
                     default:
                         throw new NormUnsupportedFeatureException(
-                            $"Selector expression '{e}' inside a navigation aggregate is not translatable; use a mapped column or arithmetic over mapped columns.");
+                            $"Selector expression '{e}' inside a navigation aggregate is not translatable; use a mapped column or arithmetic over mapped columns.",
+                        NormUnsupportedReason.BulkNavAggregateUnsupported);
                 }
             }
 
@@ -741,7 +758,8 @@ namespace nORM.Query
                             ExpressionType.AndAlso or ExpressionType.And => "AND",
                             ExpressionType.OrElse or ExpressionType.Or => "OR",
                             _ => throw new NormUnsupportedFeatureException(
-                                $"Predicate operator '{pb.NodeType}' is not supported inside a navigation-aggregate Count."),
+                                $"Predicate operator '{pb.NodeType}' is not supported inside a navigation-aggregate Count.",
+                                NormUnsupportedReason.BulkNavAggregateUnsupported),
                         };
                         if (pop is "AND" or "OR")
                             return $"({RenderDependentPredicate(pb.Left, depParam, dependent, alias)} {pop} {RenderDependentPredicate(pb.Right, depParam, dependent, alias)})";
@@ -753,7 +771,8 @@ namespace nORM.Query
 
                     default:
                         throw new NormUnsupportedFeatureException(
-                            $"Predicate '{p}' inside a navigation-aggregate Count is not translatable.");
+                            $"Predicate '{p}' inside a navigation-aggregate Count is not translatable.",
+                        NormUnsupportedReason.BulkNavAggregateUnsupported);
                 }
             }
         }
