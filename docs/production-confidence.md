@@ -76,12 +76,18 @@ gate that enforces it is green on a clean tree. Status is honest as of this writ
 - **A+ criterion:** Adverse conditions degrade cleanly — connection loss, timeouts,
   cancellation, high concurrency, large payloads, hostile inputs — with no data-race,
   deadlock, or pathological allocation cliff.
-- **Evidence:** `Category=…Stress` / `AdversarialConcurrency` suites, adaptive
-  timeout, cancellation-honoring `SaveChangesAsync`, bounded caches, the write-path
-  allocation work. Live gate exercises real round-trips.
-- **Status: A** — broad stress coverage exists; A+ requires one deliberate
-  adversarial sweep per subsystem (not just the standing suites) recorded per
-  release.
+- **Evidence:** the per-subsystem adversarial hostile-conditions record
+  [adversarial-hostile-conditions.md](adversarial-hostile-conditions.md) (C1–C10:
+  fidelity, query, write, OCC, bulk, migration, temporal, tenant, cache, retry — each
+  with proving tests + reproduce command), the `Category=…Stress` /
+  `AdversarialConcurrency` suites, the coverage-guided fuzzers, adaptive timeout,
+  cancellation-honoring `SaveChangesAsync`, bounded caches, the write-path allocation
+  work. Live gate exercises real round-trips.
+- **Status: A/A+** — the deliberate per-subsystem adversarial sweep is now recorded in
+  the artifact above (and a genuine gap it surfaced — adversarial text/encoding write
+  fidelity across all four providers, incl. embedded-NUL no-silent-truncation — was
+  filled). Keep the record re-verified per release; the guiding invariant is no silent
+  data loss and no silent wrong result.
 
 ### D. Security
 - **A+ criterion:** Injection-resistant by construction (parameterized everywhere,
@@ -175,7 +181,9 @@ is blocked on maturity, external users, or time; it is all engineering we contro
 - [ ] **A — per-release correctness gate.** Fresh differential/oracle seed sweep on
       the release commit with zero new kills, recorded in the release evidence.
 - [ ] **C — adversarial sweep per subsystem.** One deliberate hostile-condition pass
-      per subsystem (not just the standing stress suites), recorded.
+      per subsystem (not just the standing stress suites), recorded — delivered as
+      [adversarial-hostile-conditions.md](adversarial-hostile-conditions.md) (C1–C10);
+      box left for final per-release sign-off.
 - [ ] **D — security artifact.** A single threat-model + injection-resistance write-up
       a security reviewer can read end to end.
 - [ ] **E — exception-taxonomy completeness.** Prove every failure path maps to a
