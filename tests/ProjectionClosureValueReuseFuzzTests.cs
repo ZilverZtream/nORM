@@ -93,6 +93,14 @@ public sealed class ProjectionClosureValueReuseFuzzTests
             _ => r.Name.EndsWith(term, StringComparison.Ordinal),
         })).ToList();
 
+    private static char[] RandChars(ref Rng rng)
+    {
+        var len = 1 + rng.Next(2);
+        var cs = new char[len];
+        for (var i = 0; i < len; i++) cs[i] = Alphabet[rng.Next(Alphabet.Length)];
+        return cs;
+    }
+
     private static void RunSeed(int seed)
     {
         var (ctx, oracle) = Seed(seed);
@@ -114,6 +122,18 @@ public sealed class ProjectionClosureValueReuseFuzzTests
                 // Back to term1 to catch a plan that cached term2 on the second call.
                 Assert.Equal(Oracle(oracle, shape, term1), RunNorm(ctx, shape, term1));
             }
+
+            // TrimEnd(chars): a runtime char SET is inlined into RTRIM(col, '...') — the other per-row F1/F2
+            // fold-no-cache path. Re-run the same shape with two distinct char sets vs the in-memory oracle.
+            List<(int, string)> Trim(char[] cs) => ctx.Query<Row>().OrderBy(r => r.Id)
+                .Select(r => new { r.Id, T = r.Name.TrimEnd(cs) }).ToList().Select(x => (x.Id, x.T)).ToList();
+            List<(int, string)> TrimOracle(char[] cs) => oracle.OrderBy(r => r.Id)
+                .Select(r => (r.Id, r.Name.TrimEnd(cs))).ToList();
+            var cs1 = RandChars(ref rng);
+            var cs2 = RandChars(ref rng);
+            Assert.Equal(TrimOracle(cs1), Trim(cs1));
+            Assert.Equal(TrimOracle(cs2), Trim(cs2)); // different set — a poisoned plan would reuse cs1
+            Assert.Equal(TrimOracle(cs1), Trim(cs1));
         }
     }
 
