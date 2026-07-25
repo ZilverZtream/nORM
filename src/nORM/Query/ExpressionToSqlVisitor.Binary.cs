@@ -283,7 +283,8 @@ namespace nORM.Query
                 }
                 throw new NormUnsupportedFeatureException(
                     $"{_provider.GetType().Name} does not implement AddTimeSpanColumnToDateTimeSql; " +
-                    "DateTime/Offset +/- TimeSpan column arithmetic in WHERE requires this provider hook.");
+                    "DateTime/Offset +/- TimeSpan column arithmetic in WHERE requires this provider hook.",
+                    NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
             }
             // DateTime/DateTimeOffset + constant TimeSpan -- folds the rhs span via
             // TryGetConstantValue (closure MemberExpression carrying a TimeSpan value)
@@ -323,7 +324,8 @@ namespace nORM.Query
                 }
                 throw new NormUnsupportedFeatureException(
                     $"{_provider.GetType().Name} does not implement AddSecondsToDateTimeSql; " +
-                    "DateTime + constant TimeSpan arithmetic requires this provider hook.");
+                    "DateTime + constant TimeSpan arithmetic requires this provider hook.",
+                    NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
             }
 
             // Decimal comparisons / arithmetic on TEXT-stored decimal columns
@@ -591,7 +593,8 @@ namespace nORM.Query
                 _ => throw new NormUnsupportedFeatureException(
                     $"Binary operator '{node.NodeType}' has no portable SQL equivalent. " +
                     "For Power, use `Math.Pow(x, n)` which lowers to the provider's " +
-                    "POWER / POW function.")
+                    "POWER / POW function.",
+                    NormUnsupportedReason.BinaryOperatorUnsupported)
             });
             Visit(node.Right);
             _sql.Append(")");

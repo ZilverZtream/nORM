@@ -391,7 +391,8 @@ namespace nORM.Query
             if (!IsTranslatableMethod(node.Method))
                 throw new NormUnsupportedFeatureException(
                     $"Method '{node.Method.Name}' cannot be translated to SQL by the nORM v1 query translator. " +
-                    "See docs/linq-support.md for the supported method matrix.");
+                    "See docs/linq-support.md for the supported method matrix.",
+                    NormUnsupportedReason.MethodUntranslatable);
             if (!_suppressNullCheck && RequiresNullCheck(node))
             {
                 return TranslateWithNullCheck(node);
@@ -430,7 +431,8 @@ namespace nORM.Query
             {
                 return node;
             }
-            throw new NormUnsupportedFeatureException($"Method '{node.Method.Name}' is not supported.");
+            throw new NormUnsupportedFeatureException($"Method '{node.Method.Name}' is not supported.",
+                NormUnsupportedReason.MethodUntranslatable);
         }
     }
 }

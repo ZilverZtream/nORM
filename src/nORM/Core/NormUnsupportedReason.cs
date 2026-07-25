@@ -70,5 +70,19 @@ namespace nORM.Core
 
         /// <summary>The correlated subquery's source shape (a windowing/reshaping operator) has no sound scalar-aggregate translation.</summary>
         public const string CorrelatedSourceShapeUnsupported = "correlated-source-shape-unsupported";
+
+        // ── General expression translation (ExpressionToSqlVisitor.Binary/ControlFlow/Enumerable/Members) ──
+
+        /// <summary>A binary operator (e.g. Power) has no portable SQL equivalent.</summary>
+        public const string BinaryOperatorUnsupported = "binary-operator-unsupported";
+
+        /// <summary>A method call has no SQL translation in the nORM query translator.</summary>
+        public const string MethodUntranslatable = "method-untranslatable";
+
+        /// <summary>A LINQ query operator (Queryable method) has no SQL translation in this context.</summary>
+        public const string QueryableMethodUntranslatable = "queryable-method-untranslatable";
+
+        /// <summary>A member access has no SQL translation in this context.</summary>
+        public const string MemberUntranslatable = "member-untranslatable";
     }
 }

@@ -452,7 +452,8 @@ namespace nORM.Query
                         return node;
                     }
                     default:
-                        throw new NormUnsupportedFeatureException($"Queryable method '{node.Method.Name}' is not supported.");
+                        throw new NormUnsupportedFeatureException($"Queryable method '{node.Method.Name}' is not supported.",
+                            NormUnsupportedReason.QueryableMethodUntranslatable);
                 }
             }
 

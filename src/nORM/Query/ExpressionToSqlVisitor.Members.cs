@@ -197,7 +197,8 @@ namespace nORM.Query
                     return node;
                 }
             }
-            throw new NormUnsupportedFeatureException($"Member '{node.Member.Name}' is not supported in this context.");
+            throw new NormUnsupportedFeatureException($"Member '{node.Member.Name}' is not supported in this context.",
+                NormUnsupportedReason.MemberUntranslatable);
         }
         private bool TryEmitReferenceNavigationScalar(MemberExpression node)
         {
