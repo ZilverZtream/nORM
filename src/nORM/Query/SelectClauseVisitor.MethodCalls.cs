@@ -540,7 +540,8 @@ namespace nORM.Query
                 }
                 if (timeArith != null) { sb.Append(timeArith); return node; }
                 throw new NormUnsupportedFeatureException(
-                    $"{_provider.GetType().Name} does not implement the TimeOnly arithmetic hook required for TimeOnly.{node.Method.Name} in a projection.");
+                    $"{_provider.GetType().Name} does not implement the TimeOnly arithmetic hook required for TimeOnly.{node.Method.Name} in a projection.",
+                    NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
             }
 
             fallthrough:
@@ -629,7 +630,8 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(
                         $"The projection uses '{qm}' over a subquery that returns a whole row / entity (more than " +
                         "one column), which nORM cannot translate to a single SQL value. Project a scalar first " +
-                        $"(e.g. .Select(x => x.Column).{qm}()), or restructure to a join / separate query.");
+                        $"(e.g. .Select(x => x.Column).{qm}()), or restructure to a join / separate query.",
+                        NormUnsupportedReason.CorrelatedSubqueryReturnsRow);
             }
 
             sb.Append(methodNameUpper).Append('(');

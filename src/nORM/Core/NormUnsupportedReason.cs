@@ -98,5 +98,28 @@ namespace nORM.Core
 
         /// <summary>SUM/AVG over a value-converter column has no correct result (ConvertFromProvider does not distribute over the aggregate).</summary>
         public const string NavAggregateValueConverterColumn = "nav-aggregate-value-converter-column";
+
+        // ── Projection navigation First/Last, paging & ordering (SelectClauseVisitor.NavigationFirst/Helpers/MethodCalls) ──
+
+        /// <summary>A navigation First/Last selector or order key could not be translated to SQL.</summary>
+        public const string NavFirstSelectorUntranslatable = "nav-first-selector-untranslatable";
+
+        /// <summary>First/Last over a navigation collection under AsOf is not supported (reads the live table, not the historical era).</summary>
+        public const string CollectionFirstUnderAsOf = "collection-first-under-asof";
+
+        /// <summary>First/Last over a navigation collection whose element has a composite key is not supported.</summary>
+        public const string CollectionFirstCompositeKey = "collection-first-composite-key";
+
+        /// <summary>Skip/Take on a projected collection requires an OrderBy to be deterministic.</summary>
+        public const string CollectionPagingRequiresOrderBy = "collection-paging-requires-orderby";
+
+        /// <summary>Only a simple property ordering key is supported on an ordered projected collection (no computed/composite keys).</summary>
+        public const string CollectionOrderingKeyNotSimple = "collection-ordering-key-not-simple";
+
+        /// <summary>Ordering an included collection by a value-converter column is not supported (stored order may differ from model order).</summary>
+        public const string CollectionOrderingValueConverter = "collection-ordering-value-converter";
+
+        /// <summary>A projected correlated subquery returns a whole row/entity (multiple columns) where a single scalar is required.</summary>
+        public const string CorrelatedSubqueryReturnsRow = "correlated-subquery-returns-row";
     }
 }

@@ -83,11 +83,13 @@ namespace nORM.Query
                 if (QueryTranslator.HasActiveTemporalScope)
                     throw new NormUnsupportedFeatureException(
                         $"Distinct-count over the many-to-many collection '{selNav.Member.Name}' under AsOf isn't supported yet: " +
-                        "the bridge table is read live. Load the collection under AsOf and evaluate it client-side.");
+                        "the bridge table is read live. Load the collection under AsOf and evaluate it client-side.",
+                        NormUnsupportedReason.CollectionAggregateUnderAsOf);
                 if (jtm.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
                     throw new NormUnsupportedFeatureException(
                         $"Distinct-count over the many-to-many collection '{selNav.Member.Name}' with a composite key isn't supported yet. " +
-                        "Materialise the related items and evaluate it client-side.");
+                        "Materialise the related items and evaluate it client-side.",
+                        NormUnsupportedReason.CollectionAggregateCompositeKey);
                 var rightMap = _ctx.GetMapping(jtm.RightType);
                 var jtAlias = _provider.Escape("__m2mj");
                 elementAlias = _provider.Escape("__m2mr");
@@ -103,11 +105,13 @@ namespace nORM.Query
                 if (QueryTranslator.HasActiveTemporalScope)
                     throw new NormUnsupportedFeatureException(
                         $"Distinct-count over the owned collection '{selNav.Member.Name}' under AsOf isn't supported yet: the aggregate " +
-                        "reads the live table. Load the owned collection under AsOf and evaluate it client-side.");
+                        "reads the live table. Load the owned collection under AsOf and evaluate it client-side.",
+                        NormUnsupportedReason.CollectionAggregateUnderAsOf);
                 if (_mapping.KeyColumns.Length != 1)
                     throw new NormUnsupportedFeatureException(
                         $"Distinct-count over the owned collection '{selNav.Member.Name}' on an entity with a composite key isn't supported yet. " +
-                        "Materialise the owned items and evaluate it client-side.");
+                        "Materialise the owned items and evaluate it client-side.",
+                        NormUnsupportedReason.CollectionAggregateCompositeKey);
                 elementAlias = _provider.Escape("__nav");
                 elementType = owned.OwnedType;
                 QueryTranslator.RecordReferencedTable(owned.TableName);
@@ -126,7 +130,8 @@ namespace nORM.Query
                 var selectorSql = TryRenderDependentSelector(selectorLambda.Body, selectorLambda.Parameters[0], elementAlias, elementType)
                     ?? RenderDependentSelectorViaSubVisitor(selectorLambda, elementAlias, elementType)
                     ?? throw new NormUnsupportedFeatureException(
-                        "Distinct-count over a navigation collection could not translate its selector to SQL.");
+                        "Distinct-count over a navigation collection could not translate its selector to SQL.",
+                        NormUnsupportedReason.NavAggregateSelectorUntranslatable);
                 // NULL-aware: SQL COUNT(DISTINCT) drops NULLs but C# Distinct().Count() counts null as one
                 // value. Re-add the null group iff any NULL is present (non-null column => COUNT(*)==COUNT(col)
                 // => adds 0), so nullable and reference selectors count correctly instead of undercounting.

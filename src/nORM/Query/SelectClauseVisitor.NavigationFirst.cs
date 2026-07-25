@@ -166,7 +166,8 @@ namespace nORM.Query
                 TryRenderDependentSelector(lambda.Body, lambda.Parameters[0], depAlias, depType)
                 ?? RenderDependentSelectorViaSubVisitor(lambda, depAlias, depType)
                 ?? throw new NormUnsupportedFeatureException(
-                    "First/FirstOrDefault over a navigation collection could not translate its selector/order key to SQL.");
+                    "First/FirstOrDefault over a navigation collection could not translate its selector/order key to SQL.",
+                    NormUnsupportedReason.NavFirstSelectorUntranslatable);
 
             var selectorSql = RenderChild(selectorLambda);
 
@@ -244,11 +245,13 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"First/Last over the many-to-many collection '{navMember.Member.Name}' under AsOf isn't supported yet: the " +
                     "bridge table is read live, so the association set would reflect the current era, not the historical one. " +
-                    "Load the collection under AsOf and evaluate it client-side.");
+                    "Load the collection under AsOf and evaluate it client-side.",
+                    NormUnsupportedReason.CollectionFirstUnderAsOf);
             if (jtm.LeftKeyColumns.Count != 1 || jtm.RightKeyColumns.Count != 1)
                 throw new NormUnsupportedFeatureException(
                     $"First/Last over the many-to-many collection '{navMember.Member.Name}' with a composite key isn't supported yet. " +
-                    "Materialise the related items and evaluate it client-side.");
+                    "Materialise the related items and evaluate it client-side.",
+                    NormUnsupportedReason.CollectionFirstCompositeKey);
 
             // Last/LastOrDefault = First of the reversed ordering.
             if (node.Method.Name is nameof(Queryable.Last) or nameof(Queryable.LastOrDefault))
@@ -268,7 +271,8 @@ namespace nORM.Query
                 ?? RenderDependentSelectorViaSubVisitor(lambda, rightAlias, jtm.RightType)
                 ?? throw new NormUnsupportedFeatureException(
                     $"First/Last over the many-to-many collection '{navMember.Member.Name}' could not translate its " +
-                    "selector/order key to SQL. Materialise the related items and evaluate it client-side.");
+                    "selector/order key to SQL. Materialise the related items and evaluate it client-side.",
+                    NormUnsupportedReason.NavFirstSelectorUntranslatable);
 
             var selectorSql = RenderRight(selectorLambda);
 

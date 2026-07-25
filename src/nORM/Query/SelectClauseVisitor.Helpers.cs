@@ -188,7 +188,8 @@ namespace nORM.Query
             if (spec != null && spec.Keys.Count == 0)
                 throw new NormUnsupportedFeatureException(
                     "Skip/Take on a projected collection needs an OrderBy to make the result deterministic, " +
-                    "e.g. 'o.Lines.OrderBy(l => l.Id).Take(3).ToList()'.");
+                    "e.g. 'o.Lines.OrderBy(l => l.Id).Take(3).ToList()'.",
+                    NormUnsupportedReason.CollectionPagingRequiresOrderBy);
 
             ordering = spec;
             return true;
@@ -333,13 +334,15 @@ namespace nORM.Query
                 if (body is not MemberExpression me || me.Expression != key.KeySelector.Parameters[0])
                     throw new NormUnsupportedFeatureException(
                         "Only a simple property ordering key is supported on an ordered collection, e.g. " +
-                        "'o.Lines.OrderBy(l => l.Date)'. Computed or composite ordering keys are not supported.");
+                        "'o.Lines.OrderBy(l => l.Date)'. Computed or composite ordering keys are not supported.",
+                        NormUnsupportedReason.CollectionOrderingKeyNotSimple);
                 if (me.Member.DeclaringType != null && _ctx != null
                     && _ctx.GetMapping(me.Member.DeclaringType).ColumnsByName.TryGetValue(me.Member.Name, out var col)
                     && col.Converter != null)
                     throw new NormUnsupportedFeatureException(
                         "Ordering an included collection by a value-converter column is not supported — the stored " +
-                        "representation may not preserve the model order. Order after materialization instead.");
+                        "representation may not preserve the model order. Order after materialization instead.",
+                        NormUnsupportedReason.CollectionOrderingValueConverter);
 
                 var keySql = RenderFilterSide(body, key.KeySelector.Parameters[0], alias);
                 keySql = CoerceCollectionOrderKeySql(keySql, body.Type);
