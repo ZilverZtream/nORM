@@ -187,7 +187,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"GroupBy key references navigation property '{finder.FoundNavigation}', which this query shape " +
                     "would have to group client-side over entities whose navigations are not loaded. Group by the " +
-                    "foreign-key column (e.g. the '...Id' property) instead, or restructure with an explicit join.");
+                    "foreign-key column (e.g. the '...Id' property) instead, or restructure with an explicit join.",
+                    NormUnsupportedReason.GroupByKeyReferencesNavigation);
         }
 
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("Runtime LINQ translation can build generic types and delegates at runtime; not NativeAOT-compatible. See docs/aot-trimming.md.")]

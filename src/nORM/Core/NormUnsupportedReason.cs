@@ -194,5 +194,43 @@ namespace nORM.Core
 
         /// <summary>SequenceEqual against a local sequence containing null rows is not provider-mobile.</summary>
         public const string SequenceEqualLocalNullRows = "sequenceequal-local-null-rows";
+
+        // ── Remaining QueryTranslator families (terminal, group-by, joins, split, temporal, order) ──
+
+        /// <summary>ElementAt/ElementAtOrDefault requires a constant integer index.</summary>
+        public const string ElementAtIndexNotConstant = "elementat-index-not-constant";
+
+        /// <summary>A GroupBy projection member uses an operation nORM cannot translate to SQL.</summary>
+        public const string GroupByProjectionMemberUnsupported = "groupby-projection-member-unsupported";
+
+        /// <summary>A per-group projection (g.Xxx(...)) translates only as an ordered scalar chain (Where/OrderBy/aggregate).</summary>
+        public const string GroupByProjectionScalarChainOnly = "groupby-projection-scalar-chain-only";
+
+        /// <summary>An operation (Where/OrderBy) applied after a Take/Skip window that is not syntactically visible would silently apply to the full table.</summary>
+        public const string OperationAfterInvisibleWindow = "operation-after-invisible-window";
+
+        /// <summary>The query projection requires client-side evaluation — it contains an expression with no SQL translation.</summary>
+        public const string ProjectionRequiresClientEval = "projection-requires-client-eval";
+
+        /// <summary>Projecting the same navigation collection into more than one member of a single projection is not supported.</summary>
+        public const string CollectionProjectedMultipleMembers = "collection-projected-multiple-members";
+
+        /// <summary>Ordered / top-N (OrderBy/Take/Skip) projection is not supported for owned or many-to-many collections.</summary>
+        public const string OrderedProjectionOwnedM2mUnsupported = "ordered-projection-owned-m2m-unsupported";
+
+        /// <summary>A Join/GroupJoin over a `.Distinct()` outer source of an unsupported shape is not supported.</summary>
+        public const string JoinDistinctOuterUnsupported = "join-distinct-outer-unsupported";
+
+        /// <summary>A GroupJoin inner key has no mapped column and the entity declares no primary key to use as the match probe.</summary>
+        public const string GroupJoinInnerKeyNoColumn = "groupjoin-inner-key-no-column";
+
+        /// <summary>A query cannot combine two different AsOf timestamps in one statement.</summary>
+        public const string MultipleAsOfTimestamps = "multiple-asof-timestamps";
+
+        /// <summary>A many-to-many navigation cannot be combined with AsOf (the association table is not versioned).</summary>
+        public const string M2mWithAsOfUnsupported = "m2m-with-asof-unsupported";
+
+        /// <summary>A GroupBy key references a navigation property that would require client-side grouping over unloaded navigations.</summary>
+        public const string GroupByKeyReferencesNavigation = "groupby-key-references-navigation";
     }
 }

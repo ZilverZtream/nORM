@@ -89,7 +89,8 @@ namespace nORM.Query
                         return source;
                     ThrowIfClientTailReshapePending(t, node.Method.Name);
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.",
+                        NormUnsupportedReason.SequenceTailOverloadUnsupported);
                 }
                 var result = t.HandleAllOperation(node);
                 // NOT EXISTS SQL evaluates against server rows and would ignore a pending

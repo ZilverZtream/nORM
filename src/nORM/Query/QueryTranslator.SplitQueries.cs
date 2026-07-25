@@ -40,7 +40,8 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(
                         $"Projecting the navigation collection '{c.Name}' into more than one member of a single " +
                         "projection isn't supported yet — the shaped-collection loads would collide and silently " +
-                        "drop one. Project each navigation at most once, or load them in separate queries.");
+                        "drop one. Project each navigation at most once, or load them in separate queries.",
+                        NormUnsupportedReason.CollectionProjectedMultipleMembers);
 
             // A collection PROJECTION under AsOf reconstructs its children at the timestamp through the child
             // load's as-of FROM source (see FetchChildrenBatch/BuildDependentFromSource): the {Table}_History
@@ -126,7 +127,8 @@ namespace nORM.Query
                 if (ordering.OrderBySql != null && (owned != null || m2m != null))
                     throw new NormUnsupportedFeatureException(
                         "Ordered / top-N projection (OrderBy/Take/Skip) is not yet supported for owned or " +
-                        "many-to-many collections — only for relationship navigations. Order after materialization.");
+                        "many-to-many collections — only for relationship navigations. Order after materialization.",
+                        NormUnsupportedReason.OrderedProjectionOwnedM2mUnsupported);
 
                 // A closure-capturing element projection is applied client-side; baking it into a cached
                 // delegate would replay the first execution's captured value. Mark the plan non-cacheable so

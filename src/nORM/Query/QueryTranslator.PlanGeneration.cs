@@ -652,7 +652,8 @@ namespace nORM.Query
                     throw new NormUnsupportedFeatureException(
                         "A many-to-many navigation cannot be combined with AsOf (whether via Include or a shaped " +
                         "projection): the association table is not versioned, so the association membership at the " +
-                        "requested timestamp is unknown. Query the historical entities without the many-to-many navigation.");
+                        "requested timestamp is unknown. Query the historical entities without the many-to-many navigation.",
+                        NormUnsupportedReason.M2mWithAsOfUnsupported);
                 QueryPlanValidator.Validate(plan, _t._provider);
                 return plan;
             }

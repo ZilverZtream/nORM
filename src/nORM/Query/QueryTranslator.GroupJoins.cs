@@ -90,7 +90,8 @@ namespace nORM.Query
                         "GroupJoin over this `.Distinct()` outer source isn't supported yet. nORM supports " +
                         "`Select(...).Distinct().GroupJoin(...)` outers; this shape is more complex. Workarounds: " +
                         "(1) materialize the distinct keys first and project the right-side groups via Contains; " +
-                        "(2) push the GroupJoin through first and apply DISTINCT to the result.");
+                        "(2) push the GroupJoin through first and apply DISTINCT to the result.",
+                        NormUnsupportedReason.JoinDistinctOuterUnsupported);
                 }
             }
             if (gjOuterFromOverride == null && groupJoinOuterIsEntity)
@@ -320,7 +321,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"GroupJoin inner key over '{innerMapping.Type.Name}' has no mapped column, and the entity declares " +
                     "no primary key to use as the LEFT-JOIN match probe. Add [Key] or a fluent HasKey to the inner " +
-                    "entity, or use a plain column as the inner key.");
+                    "entity, or use a plain column as the inner key.",
+                    NormUnsupportedReason.GroupJoinInnerKeyNoColumn);
 
             // A composed projected outer materializes the ENTITY, so the runtime key
             // selector must be the entity-composed one, not the projection-typed original.

@@ -237,7 +237,8 @@ namespace nORM.Query
                                         $"GroupBy projection member '{memberName}' uses {innerName}, which nORM does not " +
                                         "translate to SQL. Supported per-group operations are the scalar aggregates " +
                                         "(Count/Sum/Min/Max/Average) and Key. To materialize each group's rows, project the " +
-                                        "key(s) and re-query the elements per key, or group in memory with AsEnumerable() first.");
+                                        "key(s) and re-query the elements per key, or group in memory with AsEnumerable() first.",
+                                        NormUnsupportedReason.GroupByProjectionMemberUnsupported);
                                 }
                             }
                             else if (arg is ParameterExpression groupCarry
@@ -281,7 +282,8 @@ namespace nORM.Query
                                 }
                                 catch (NormUnsupportedFeatureException ex)
                                 {
-                                    throw new NormUnsupportedFeatureException($"Grouped projection member '{memberName}' could not be translated from expression '{arg}'. {ex.Message}", ex);
+                                    throw new NormUnsupportedFeatureException($"Grouped projection member '{memberName}' could not be translated from expression '{arg}'. {ex.Message}",
+                                        NormUnsupportedReason.GroupByProjectionMemberUnsupported, ex);
                                 }
                                 builder = PooledStringBuilder.Rent();
                                 builder.Append(sql).Append(" AS ").Append(_provider.Escape(memberName));
@@ -573,7 +575,8 @@ namespace nORM.Query
                         "First/FirstOrDefault/Last/LastOrDefault/ElementAt projecting a scalar member. " +
                         "`Single`/`SingleOrDefault` cannot honor their throw-on-multiple contract in SQL. " +
                         "For whole-entity results or other shapes, project the group elements with " +
-                        "`g.ToList()` (when streaming is acceptable) and apply the operation client-side.");
+                        "`g.ToList()` (when streaming is acceptable) and apply the operation client-side.",
+                        NormUnsupportedReason.GroupByProjectionScalarChainOnly);
                 default:
                     return null;
             }

@@ -131,7 +131,8 @@ namespace nORM.Query
                         || clientPredicate.Parameters.Count != 1)
                     {
                         throw new NormUnsupportedFeatureException(
-                            "Where after a client-materialized sequence operator supports only a one-argument predicate.");
+                            "Where after a client-materialized sequence operator supports only a one-argument predicate.",
+                            NormUnsupportedReason.SequenceTailOverloadUnsupported);
                     }
                     t.AppendClientTailFilter(clientPredicate);
                     return source;
@@ -147,7 +148,8 @@ namespace nORM.Query
                         "Where applied after a Take/Skip window that is not syntactically visible in the query spine " +
                         "would silently filter the full table before the window applies. Materialize the window first " +
                         "and filter client-side: " +
-                        "`var top = await q.OrderBy(Id).Take(3).ToListAsync(); var filtered = top.Where(r => r.Active).ToList();`");
+                        "`var top = await q.OrderBy(Id).Take(3).ToListAsync(); var filtered = top.Where(r => r.Active).ToList();`",
+                        NormUnsupportedReason.OperationAfterInvisibleWindow);
                 }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression lambda)
                 {
@@ -376,7 +378,8 @@ namespace nORM.Query
                                 "rewrite using SQL-translatable primitives. If you really need client-side " +
                                 "evaluation of the projection, set " +
                                 "`DbContextOptions.ClientEvaluationPolicy = ClientEvaluationPolicy.Warn` or " +
-                                "`.Allow`. Warn logs each occurrence; Allow runs silently.");
+                                "`.Allow`. Warn logs each occurrence; Allow runs silently.",
+                                NormUnsupportedReason.ProjectionRequiresClientEval);
                         }
 
                         pendingProjection = serverProjection;

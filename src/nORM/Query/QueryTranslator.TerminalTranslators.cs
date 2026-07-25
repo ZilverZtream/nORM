@@ -36,7 +36,8 @@ namespace nORM.Query
                 }
                 else
                 {
-                    throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"));
+                    throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"),
+                        NormUnsupportedReason.ElementAtIndexNotConstant);
                 }
                 t._take = 1;
                 var pNameEa = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
@@ -92,7 +93,8 @@ namespace nORM.Query
                 }
                 else
                 {
-                    throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"));
+                    throw new NormUnsupportedFeatureException(string.Format(ErrorMessages.UnsupportedOperation, "ElementAt without constant integer index"),
+                        NormUnsupportedReason.ElementAtIndexNotConstant);
                 }
 
                 t._take = 1;
@@ -550,7 +552,8 @@ namespace nORM.Query
                         return reshapedSource;
                     ThrowIfClientTailReshapePending(t, node.Method.Name);
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                        $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.",
+                        NormUnsupportedReason.SequenceTailOverloadUnsupported);
                 }
                 // Count after Take/Skip-windowed source — count only the windowed rows.
                 // Sister of the post-Take/Skip family (3040f49 / e0f1397 / 99a02ce /

@@ -67,7 +67,8 @@ namespace nORM.Query
             {
                 if (active.Timestamp != ts)
                     throw new NormUnsupportedFeatureException(
-                        "A query cannot combine two different AsOf timestamps in one statement.");
+                        "A query cannot combine two different AsOf timestamps in one statement.",
+                        NormUnsupportedReason.MultipleAsOfTimestamps);
                 return;
             }
             var timeParamName = _provider.ParamPrefix + "p" + _parameterManager.GetNextIndex();

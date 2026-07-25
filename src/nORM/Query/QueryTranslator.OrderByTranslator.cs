@@ -193,7 +193,8 @@ namespace nORM.Query
                         "OrderBy applied after a Take/Skip window that is not syntactically visible in the query spine " +
                         "would silently sort the full table before the window applies. Materialize the window first " +
                         "and resort client-side: " +
-                        "`var top = await q.OrderByDescending(Score).Take(3).ToListAsync(); var sorted = top.OrderBy(x => x.Name).ToList();`");
+                        "`var top = await q.OrderByDescending(Score).Take(3).ToListAsync(); var sorted = top.OrderBy(x => x.Name).ToList();`",
+                        NormUnsupportedReason.OperationAfterInvisibleWindow);
                 }
                 if (QueryTranslator.StripQuotes(node.Arguments[1]) is LambdaExpression keySelector)
                 {

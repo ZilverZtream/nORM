@@ -61,7 +61,8 @@ namespace nORM.Query
                         "`var keys = await ctx.Query<L>().Select(l => l.Code).Distinct().ToListAsync();` " +
                         "then `ctx.Query<R>().Where(r => keys.Contains(r.Code)).ToListAsync()`; " +
                         "(2) push the join through first and apply DISTINCT to the result: " +
-                        "`ctx.Query<L>().Join(ctx.Query<R>(), l => l.Code, r => r.Code, (l, r) => new {...}).Distinct()`.");
+                        "`ctx.Query<L>().Join(ctx.Query<R>(), l => l.Code, r => r.Code, (l, r) => new {...}).Distinct()`.",
+                        NormUnsupportedReason.JoinDistinctOuterUnsupported);
                 }
 
                 _mapping = distinctOuter.Mapping;

@@ -45,6 +45,17 @@ public sealed class UnsupportedReasonContractTests
         "Query/QueryTranslator.PagingTranslators.cs",
         "Query/QueryTranslator.SetOperationTranslators.cs",
         "Query/QueryTranslator.SequenceEqualTranslator.cs",
+        "Query/QueryTranslator.TerminalTranslators.cs",
+        "Query/QueryTranslator.GroupByProjection.cs",
+        "Query/QueryTranslator.FilterProjectionTranslators.cs",
+        "Query/QueryTranslator.SplitQueries.cs",
+        "Query/QueryTranslator.GroupJoins.cs",
+        "Query/QueryTranslator.TemporalScope.cs",
+        "Query/QueryTranslator.PlanGeneration.cs",
+        "Query/QueryTranslator.OrderByTranslator.cs",
+        "Query/QueryTranslator.Joins.cs",
+        "Query/QueryTranslator.GroupByClient.cs",
+        "Query/QueryTranslator.AggregateDelegates.cs",
     };
 
     private static ISet<string> CatalogCodeNames()
