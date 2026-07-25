@@ -1,5 +1,12 @@
 # nORM v1.0 Blocker Developer Spec
 
+> **⚠ Superseded — historical.** This spec predates the [`RELEASE.md`](../RELEASE.md)
+> reset to `0.9.0`, which disowned the `1.0.0-rc.4`–`rc.6` tags as prematurely cut.
+> References below to `1.0.0-rc.N` gate runs or packages are **historical evidence
+> against a superseded RC line**, not a current release candidate. The authoritative
+> release policy is in [`../RELEASE.md`](../RELEASE.md); the intrinsic-quality (A+)
+> bar for `0.9.x` is in [`production-confidence.md`](production-confidence.md).
+
 Date: 2026-06-10
 
 This spec is a fresh v1.0 readiness audit of the current working tree. It is

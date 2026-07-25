@@ -1,8 +1,16 @@
 # v1 Issue Map
 
-This is the current v1 blocker map. It tracks the fresh 40-item audit from
-2026-05-22 and intentionally does not use a blanket "Done" status for work that
-still needs release evidence.
+> **⚠ Superseded — historical.** This map predates the [`RELEASE.md`](../RELEASE.md)
+> reset to `0.9.0`, which disowned the `1.0.0-rc.4`–`rc.6` tags as prematurely cut.
+> Any "Verified" row below that cites a `1.0.0-rc.N` gate run or package is
+> **historical evidence against a superseded RC line**, not proof of a current
+> release candidate. The authoritative release policy and the real 1.0 bar live in
+> [`../RELEASE.md`](../RELEASE.md); the intrinsic-quality (A+) bar for `0.9.x` is in
+> [`production-confidence.md`](production-confidence.md).
+
+This is a historical v1 blocker map from the fresh 40-item audit dated 2026-05-22.
+It intentionally does not use a blanket "Done" status for work that still needs
+release evidence.
 
 ## Status Values
 

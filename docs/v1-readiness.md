@@ -1,5 +1,13 @@
 # nORM v1.0 Readiness Checklist
 
+> **⚠ Superseded — historical.** The `1.0.0-rc.3` packages and gate evidence recorded
+> below predate the [`RELEASE.md`](../RELEASE.md) reset to `0.9.0`, which disowned the
+> `1.0.0-rc.4`–`rc.6` tags as prematurely cut. Treat every `1.0.0-rc.N` artifact and
+> gate run here as **historical evidence against a superseded RC line**, not a current
+> release candidate. The authoritative release policy and the real 1.0 bar are in
+> [`../RELEASE.md`](../RELEASE.md); the intrinsic-quality (A+) bar for `0.9.x` is in
+> [`production-confidence.md`](production-confidence.md).
+
 This checklist defines the release-hardening work that must be complete before a
 public v1.0 package is cut.
 
