@@ -269,5 +269,16 @@ namespace nORM.Core
 
         /// <summary>A navigation-aggregate subquery inside a bulk ExecuteUpdate SetProperty has an unsupported shape.</summary>
         public const string BulkNavAggregateUnsupported = "bulk-nav-aggregate-unsupported";
+
+        // ── Write-path CUD (Query/NormQueryProvider.SyncCud) ──
+
+        /// <summary>A bulk write (ExecuteUpdate/Delete) cannot be combined with AsOf — writes target the live table.</summary>
+        public const string WriteWithAsOfUnsupported = "write-with-asof-unsupported";
+
+        /// <summary>ExecuteUpdate/Delete over an ordered or paged query requires key columns on the entity.</summary>
+        public const string ExecuteUpdateOrderedPagedRequiresKeys = "executeupdate-ordered-paged-requires-keys";
+
+        /// <summary>A write operation targets an entity configured as read-only / query-only.</summary>
+        public const string WriteReadOnlyEntity = "write-readonly-entity";
     }
 }

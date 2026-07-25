@@ -211,7 +211,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"{operation} over a client-materialized query shape (Append, Prepend, Chunk, Zip, DefaultIfEmpty " +
                     "with a default value, streaming GroupBy, or group-join results) has no set-based SQL " +
-                    "equivalent. Express the target rows with Where(...) instead.");
+                    "equivalent. Express the target rows with Where(...) instead.",
+                    NormUnsupportedReason.SequenceTailAfterClientOperator);
             }
         }
 
@@ -223,16 +224,19 @@ namespace nORM.Query
             if (plan.AsOfTimestamp.HasValue)
                 throw new NormUnsupportedFeatureException(
                     $"{operation} cannot be combined with AsOf: writes target the live table, " +
-                    "not a historical snapshot.");
+                    "not a historical snapshot.",
+                    NormUnsupportedReason.WriteWithAsOfUnsupported);
         }
 
         private static void ValidateJoinedCudShape(BulkCudQueryShape? shape)
         {
             if (shape == null)
-                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.");
+                throw new NormUnsupportedFeatureException("ExecuteUpdate/Delete requires query-shape metadata.",
+                    NormUnsupportedReason.ExecuteUpdateRequiresQueryMetadata);
             if (shape.HasGroupBy || shape.HasHaving)
                 throw new NormUnsupportedFeatureException(
-                    "ExecuteUpdate/Delete with a join does not support grouped or aggregated queries.");
+                    "ExecuteUpdate/Delete with a join does not support grouped or aggregated queries.",
+                    NormUnsupportedReason.ExecuteUpdateGroupedUnsupported);
         }
 
         /// <summary>
@@ -249,7 +253,8 @@ namespace nORM.Query
             if (mapping.KeyColumns.Length == 0)
                 throw new NormUnsupportedFeatureException(
                     $"ExecuteUpdate/Delete over an ordered or paged query requires key columns on '{mapping.Type.Name}' " +
-                    "to resolve the target rows.");
+                    "to resolve the target rows.",
+                    NormUnsupportedReason.ExecuteUpdateOrderedPagedRequiresKeys);
 
             var innerSql = QueryTranslator.RemoveTrailingOrderByUnlessPaged(planSql);
             var pkCols = mapping.KeyColumns.Select(k => k.EscCol).ToArray();
@@ -404,7 +409,8 @@ namespace nORM.Query
 
             throw new NormUnsupportedFeatureException(
                 $"{operation} for '{mapping.Type.Name}' is not supported because the entity is configured as read-only/query-only. " +
-                "Use Query<T>() or raw SQL query APIs for read access, and map a keyed writable table for generated writes.");
+                "Use Query<T>() or raw SQL query APIs for read access, and map a keyed writable table for generated writes.",
+                NormUnsupportedReason.WriteReadOnlyEntity);
         }
     }
 }
