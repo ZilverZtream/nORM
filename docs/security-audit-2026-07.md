@@ -157,6 +157,13 @@ regressions.
 | F7 | Low | Threat-model T1 evidence overstated ("only two interpolated CommandText sites") | **Fixed** | this doc + `security-threat-model.md` | — |
 | F8 | Low | `"SCRIPT"` dangerous-pattern was a substring → rejected `script_id`/`transcript` | **Fixed** | `df413b2d` | `RawSqlDenylistAndIdentifierTests` |
 
+**F1/F2 completeness sweep (`39f7c217`).** A follow-up adversarial audit of every inline-literal site found
+FIVE siblings the first pass missed (the ETSV↔SCV asymmetry recurred, and `TryGetConstantValue` guards named
+"constant" silently admit closures): the ETSV trim set (F1), ETSV `string.Format` segments (F1+F2), ETSV
+SqlServer regex pattern/replacement (F2), the SCV `ToString(format)` projection (F2), and the MySQL
+date-format hook's raw backslash (F1). All fixed with fail-first/run-and-diff regressions
+(`FormatClosureValueReuseTests` + the trim shape added to the reuse fuzzer).
+
 The F1/F2 fix mirrors the WHERE path: values in positions that accept a bound parameter are parameterized;
 values in literal-only positions (LIKE-with-wildcards, GROUP_CONCAT `SEPARATOR`, TRIM set) are escaped via
 `EscapeStringLiteral` AND mark the plan fold-no-cache (`HasClosureFoldedIntoSql`) so a runtime value is never
