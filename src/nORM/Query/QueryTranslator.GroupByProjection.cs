@@ -517,10 +517,13 @@ namespace nORM.Query
             if (whereSql == null)
                 return null;
 
-            // The subquery re-scans the grouped table, so the entity's global filters (soft-delete,
-            // tenant) must be repeated inside it — the outer GROUP BY is filtered by ApplyGlobalFilters
-            // but this correlated subquery is not, so a soft-deleted "latest" row would otherwise leak.
-            var globalFilter = GlobalFilterFragment.Combine(_ctx, _mapping.Type);
+            // The subquery re-scans the grouped table, so the entity's global filters (soft-delete) AND the
+            // tenant predicate must be repeated inside it — the outer GROUP BY is filtered by ApplyGlobalFilters
+            // but this correlated subquery is not, so a soft-deleted or cross-tenant "latest" row would
+            // otherwise win the ordering and leak. CombineWithTenant applies the tenant equality EXPLICITLY
+            // here rather than relying on it incidentally riding in _groupOrderedFirstSourceWheres below — so
+            // tenant isolation of the greatest-N-per-group re-scan is defense-in-depth, not accidental.
+            var globalFilter = GlobalFilterFragment.CombineWithTenant(_ctx, _mapping.Type);
             if (globalFilter != null)
             {
                 var filterSql = TranslateAgainstSubAlias(globalFilter.Body, globalFilter.Parameters[0], subAlias);
