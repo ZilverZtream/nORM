@@ -24,7 +24,8 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"{methodName} after a client-materialized sequence operator (Append, Prepend, Chunk, Zip, " +
                     "DefaultIfEmpty with a default value) would evaluate against server rows, not the reshaped " +
-                    "sequence. Materialize the query first (e.g. ToListAsync) and evaluate in memory.");
+                    "sequence. Materialize the query first (e.g. ToListAsync) and evaluate in memory.",
+                    NormUnsupportedReason.SequenceTailAfterClientOperator);
             }
         }
 
@@ -73,7 +74,8 @@ namespace nORM.Query
                     || predicateLambda.Parameters.Count != 1)
                 {
                     throw new NormUnsupportedFeatureException(
-                        $"{node.Method.Name} over a client-materialized sequence supports only a one-argument predicate.");
+                        $"{node.Method.Name} over a client-materialized sequence supports only a one-argument predicate.",
+                        NormUnsupportedReason.SequenceTailOverloadUnsupported);
                 }
                 var elementType = CurrentPostMaterializeElementType ?? predicateLambda.Parameters[0].Type;
                 var rowArg = Expression.Parameter(typeof(object), "row");
@@ -327,7 +329,8 @@ namespace nORM.Query
                 return source;
             ThrowIfClientTailReshapePending(t, node.Method.Name);
             throw new NormUnsupportedFeatureException(
-                $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.");
+                $"{node.Method.Name} after a client-materialized sequence operator has no in-memory equivalent overload.",
+                NormUnsupportedReason.SequenceTailOverloadUnsupported);
         }
 
         /// <summary>
@@ -464,7 +467,8 @@ namespace nORM.Query
                         size = captured;
                     else
                         throw new NormUnsupportedFeatureException(
-                            "Chunk requires a constant or captured int size; a column-derived size has no SQL translation.");
+                            "Chunk requires a constant or captured int size; a column-derived size has no SQL translation.",
+                            NormUnsupportedReason.ChunkSizeNotConstant);
                 }
                 if (size < 1)
                     throw new ArgumentOutOfRangeException(nameof(size), size,
@@ -510,7 +514,8 @@ namespace nORM.Query
                     if (HasParameterReference(node.Arguments[1]))
                         throw new NormUnsupportedFeatureException(
                             $"{node.Method.Name} requires a constant or captured element; a row-derived element has no SQL translation. " +
-                            $"Materialize the query first (e.g. ToListAsync) and use LINQ-to-Objects {node.Method.Name}.");
+                            $"Materialize the query first (e.g. ToListAsync) and use LINQ-to-Objects {node.Method.Name}.",
+                            NormUnsupportedReason.SequenceElementNotConstant);
                     element = Expression.Lambda(node.Arguments[1]).Compile().DynamicInvoke();
                 }
 
@@ -626,7 +631,8 @@ namespace nORM.Query
                 {
                     throw new NormUnsupportedFeatureException(
                         "Zip requires a constant or captured local second sequence, or a second database query. " +
-                        "Materialize the query first (e.g. ToListAsync) and use LINQ-to-Objects Zip for other shapes.");
+                        "Materialize the query first (e.g. ToListAsync) and use LINQ-to-Objects Zip for other shapes.",
+                        NormUnsupportedReason.ZipSecondSequenceUnsupported);
                 }
 
                 var source = t.Visit(node.Arguments[0]);
@@ -661,7 +667,8 @@ namespace nORM.Query
                 if (ExtractOrderByKeys(node.Arguments[0]).Count == 0)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "Zip over two database queries requires the first source to have an explicit OrderBy/ThenBy chain so positional pairing is deterministic.");
+                        "Zip over two database queries requires the first source to have an explicit OrderBy/ThenBy chain so positional pairing is deterministic.",
+                        NormUnsupportedReason.ZipRequiresOrdering);
                 }
 
                 // Queryable.Zip inlines the second queryable's expression tree, so the
@@ -681,13 +688,15 @@ namespace nORM.Query
                 else
                 {
                     throw new NormUnsupportedFeatureException(
-                        "Zip requires the second database query to be built from captured state; a row-derived query has no translation.");
+                        "Zip requires the second database query to be built from captured state; a row-derived query has no translation.",
+                        NormUnsupportedReason.ZipSecondSequenceUnsupported);
                 }
 
                 if (ExtractOrderByKeys(secondQuery.Expression).Count == 0)
                 {
                     throw new NormUnsupportedFeatureException(
-                        "Zip over two database queries requires the second source to have an explicit OrderBy/ThenBy chain so positional pairing is deterministic.");
+                        "Zip over two database queries requires the second source to have an explicit OrderBy/ThenBy chain so positional pairing is deterministic.",
+                        NormUnsupportedReason.ZipRequiresOrdering);
                 }
 
                 var source = t.Visit(node.Arguments[0]);

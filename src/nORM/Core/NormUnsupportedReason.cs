@@ -121,5 +121,25 @@ namespace nORM.Core
 
         /// <summary>A projected correlated subquery returns a whole row/entity (multiple columns) where a single scalar is required.</summary>
         public const string CorrelatedSubqueryReturnsRow = "correlated-subquery-returns-row";
+
+        // ── Client-materialized sequence tails: Append/Prepend/Chunk/Zip (QueryTranslator.SequenceTailTranslators) ──
+
+        /// <summary>A method after a client-materialized sequence operator (Append/Prepend/Chunk/Zip/DefaultIfEmpty) would evaluate against server rows, not the reshaped sequence.</summary>
+        public const string SequenceTailAfterClientOperator = "sequence-tail-after-client-operator";
+
+        /// <summary>A method over a client-materialized sequence has no supported overload here (e.g. only a one-argument predicate, or no in-memory equivalent).</summary>
+        public const string SequenceTailOverloadUnsupported = "sequence-tail-overload-unsupported";
+
+        /// <summary>Chunk requires a constant or captured int size; a column-derived size has no SQL translation.</summary>
+        public const string ChunkSizeNotConstant = "chunk-size-not-constant";
+
+        /// <summary>An Append/Prepend/Contains element must be a constant or captured value; a row-derived element has no SQL translation.</summary>
+        public const string SequenceElementNotConstant = "sequence-element-not-constant";
+
+        /// <summary>Zip's second source must be a constant/captured local sequence or a captured-state database query (not a row-derived query).</summary>
+        public const string ZipSecondSequenceUnsupported = "zip-second-sequence-unsupported";
+
+        /// <summary>Zip over two database queries requires an explicit OrderBy/ThenBy chain so positional pairing is deterministic.</summary>
+        public const string ZipRequiresOrdering = "zip-requires-ordering";
     }
 }
