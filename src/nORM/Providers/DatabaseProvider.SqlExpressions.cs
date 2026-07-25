@@ -621,7 +621,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetRegexMatchSql(string inputSql, string patternLiteral)
             => throw new NormUnsupportedFeatureException(
-                $"Regex.IsMatch is not supported by provider '{GetType().Name}'.");
+                $"Regex.IsMatch is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.RegexProviderUnsupported);
 
         /// <summary>
         /// Returns SQL evaluating <c>Regex.Replace(input, pattern, replacement)</c>.
@@ -633,7 +634,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetRegexReplaceSql(string inputSql, string patternLiteral, string replacementLiteral)
             => throw new NormUnsupportedFeatureException(
-                $"Regex.Replace is not supported by provider '{GetType().Name}'.");
+                $"Regex.Replace is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.RegexProviderUnsupported);
 
         /// <summary>
         /// Whether a constant <c>Regex.IsMatch</c> / <c>Regex.Replace</c> pattern or replacement
@@ -695,7 +697,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql)
             => throw new NormUnsupportedFeatureException(
-                $"DateTime(year, month, day) with column args is not supported by provider '{GetType().Name}'.");
+                $"DateTime(year, month, day) with column args is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeCtorColumnArgsUnsupported);
 
         /// <summary>
         /// 6-arg DATETIME-from-parts variant covering
@@ -704,7 +707,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql)
             => throw new NormUnsupportedFeatureException(
-                $"DateTime(year, month, day, hour, minute, second) with column args is not supported by provider '{GetType().Name}'.");
+                $"DateTime(year, month, day, hour, minute, second) with column args is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeCtorColumnArgsUnsupported);
 
         /// <summary>
         /// 7-arg DATETIME-from-parts variant covering
@@ -713,7 +717,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeFromPartsSql(string yearSql, string monthSql, string daySql, string hourSql, string minuteSql, string secondSql, string millisecondSql)
             => throw new NormUnsupportedFeatureException(
-                $"DateTime(year, month, day, hour, minute, second, millisecond) with column args is not supported by provider '{GetType().Name}'.");
+                $"DateTime(year, month, day, hour, minute, second, millisecond) with column args is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeCtorColumnArgsUnsupported);
 
         /// <summary>
         /// Per-provider DATE-from-parts primitive for translating
@@ -721,7 +726,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateOnlyFromPartsSql(string yearSql, string monthSql, string daySql)
             => throw new NormUnsupportedFeatureException(
-                $"DateOnly(year, month, day) with column args is not supported by provider '{GetType().Name}'.");
+                $"DateOnly(year, month, day) with column args is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeCtorColumnArgsUnsupported);
 
         /// <summary>
         /// Per-provider TIME-from-parts primitive for translating
@@ -729,7 +735,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql)
             => throw new NormUnsupportedFeatureException(
-                $"TimeOnly(hour, minute, second) with column args is not supported by provider '{GetType().Name}'.");
+                $"TimeOnly(hour, minute, second) with column args is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeCtorColumnArgsUnsupported);
 
         /// <summary>
         /// 4-arg TIME-from-parts variant covering
@@ -738,7 +745,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetTimeOnlyFromPartsSql(string hourSql, string minuteSql, string secondSql, string millisecondSql)
             => throw new NormUnsupportedFeatureException(
-                $"TimeOnly(hour, minute, second, millisecond) with column args is not supported by provider '{GetType().Name}'.");
+                $"TimeOnly(hour, minute, second, millisecond) with column args is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeCtorColumnArgsUnsupported);
 
         /// <summary>
         /// Adds N seconds (a SQL fragment) to a TimeOnly SQL expression.
@@ -814,7 +822,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetTimeSpanColumnSecondsSql(string timeSpanColumnSql)
             => throw new NormUnsupportedFeatureException(
-                $"TimeSpan column arithmetic is not supported by provider '{GetType().Name}'.");
+                $"TimeSpan column arithmetic is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.TimeSpanColumnArithmeticUnsupported);
 
         /// <summary>
         /// Returns SQL evaluating <paramref name="dtoSql"/> (a DateTimeOffset column or
@@ -827,7 +836,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeOffsetWithOffsetSql(string dtoSql, TimeSpan offset)
             => throw new NormUnsupportedFeatureException(
-                $"DateTimeOffset.ToOffset is not supported by provider '{GetType().Name}'.");
+                $"DateTimeOffset.ToOffset is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeOffsetOperationUnsupported);
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as the wall-clock DateTime at
@@ -841,7 +851,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeOffsetLocalDateTimeSql(string dtoSql, TimeSpan localOffset)
             => throw new NormUnsupportedFeatureException(
-                $"DateTimeOffset.LocalDateTime is not supported by provider '{GetType().Name}'.");
+                $"DateTimeOffset.LocalDateTime is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeOffsetOperationUnsupported);
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as the integer count of seconds
@@ -851,7 +862,8 @@ namespace nORM.Providers
         /// </summary>
         public virtual string GetDateTimeOffsetUtcEpochSecondsSql(string dtoSql)
             => throw new NormUnsupportedFeatureException(
-                $"DateTimeOffset UTC-instant comparison is not supported by provider '{GetType().Name}'.");
+                $"DateTimeOffset UTC-instant comparison is not supported by provider '{GetType().Name}'.",
+                NormUnsupportedReason.DateTimeOffsetOperationUnsupported);
 
         /// <summary>
         /// SQL evaluating <paramref name="dtoSql"/> as milliseconds since the Unix

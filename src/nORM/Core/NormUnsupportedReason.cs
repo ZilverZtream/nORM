@@ -232,5 +232,19 @@ namespace nORM.Core
 
         /// <summary>A GroupBy key references a navigation property that would require client-side grouping over unloaded navigations.</summary>
         public const string GroupByKeyReferencesNavigation = "groupby-key-references-navigation";
+
+        // ── Provider SQL-expression capabilities (Providers/DatabaseProvider.SqlExpressions) ──
+
+        /// <summary>Regex.IsMatch/Replace is not supported by the active provider.</summary>
+        public const string RegexProviderUnsupported = "regex-provider-unsupported";
+
+        /// <summary>A DateTime/DateOnly/TimeOnly constructor with column (non-constant) arguments is not supported by the active provider.</summary>
+        public const string DateTimeCtorColumnArgsUnsupported = "datetime-ctor-column-args-unsupported";
+
+        /// <summary>TimeSpan column arithmetic is not supported by the active provider.</summary>
+        public const string TimeSpanColumnArithmeticUnsupported = "timespan-column-arithmetic-unsupported";
+
+        /// <summary>A DateTimeOffset operation (ToOffset/LocalDateTime/UTC-instant comparison) is not supported by the active provider.</summary>
+        public const string DateTimeOffsetOperationUnsupported = "datetimeoffset-operation-unsupported";
     }
 }
