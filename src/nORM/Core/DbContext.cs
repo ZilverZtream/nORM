@@ -67,9 +67,11 @@ namespace nORM.Core
         private readonly ConcurrentDictionary<Type, TableMapping> _m = new();
         /// <summary>Per-context fast-path SQL template cache. Keyed by entity type; stores provider+model-specific SELECT templates.</summary>
         internal readonly ConcurrentDictionary<Type, string> FastPathSqlCache = new();
-        /// <summary>Pre-compiled regex for identifier validation. Matches word characters and spaces only.</summary>
+        /// <summary>Pre-compiled regex for identifier validation. Matches word characters and the literal
+        /// space only — NOT the whole \s class, which admits newlines/tabs (embedded statement breaks that the
+        /// threat model's "rejects statement breaks" claim requires be denied).</summary>
         private static readonly System.Text.RegularExpressions.Regex s_safeIdentifierRegex =
-            new(@"^[\w\s]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+            new(@"^[\w ]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
         /// <summary>
         /// SP1: Strict output-parameter name validator. Allows only letters, digits, and
         /// underscores (no spaces, no dots). Spaces/dots accepted by IsSafeIdentifier would

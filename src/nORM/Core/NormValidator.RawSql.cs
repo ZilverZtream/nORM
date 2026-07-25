@@ -17,11 +17,16 @@ namespace nORM.Core
         /// Dangerous SQL patterns that indicate system-level commands or file operations.
         /// Checked against the uppercased SQL input in <see cref="ValidateRawSql"/>.
         /// </summary>
-        private static readonly string[] DangerousPatterns =
-        {
-            "XP_CMDSHELL", "SP_CONFIGURE", "OPENROWSET", "OPENDATASOURCE",
-            "INTO OUTFILE", "LOAD_FILE", "SCRIPT", "EXECUTE IMMEDIATE"
-        };
+        // Matched at WORD BOUNDARIES (not as raw substrings) so a legitimate identifier that merely contains
+        // one of these (e.g. `script_id`, `transcript`, `description`) is not rejected — a false positive that
+        // pushes developers toward unsafe workarounds. `\s+` between tokens also tolerates whitespace variants.
+        // A bounded MatchTimeout guards against pathological input.
+        private static readonly System.Text.RegularExpressions.Regex DangerousPatternRegex =
+            new(@"\b(XP_CMDSHELL|SP_CONFIGURE|OPENROWSET|OPENDATASOURCE|INTO\s+OUTFILE|LOAD_FILE|SCRIPT|EXECUTE\s+IMMEDIATE)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                | System.Text.RegularExpressions.RegexOptions.CultureInvariant
+                | System.Text.RegularExpressions.RegexOptions.Compiled,
+                TimeSpan.FromSeconds(1));
 
         /// <summary>
         /// Statement types allowed through the TSQL AST allowlist in <see cref="IsSafeRawSql"/>.
@@ -52,11 +57,9 @@ namespace nORM.Core
 
             var upperSql = sql.ToUpperInvariant();
 
-            foreach (var pattern in DangerousPatterns)
-            {
-                if (upperSql.Contains(pattern))
-                    throw new ArgumentException($"SQL contains dangerous pattern: {pattern}");
-            }
+            var dangerousMatch = DangerousPatternRegex.Match(sql);
+            if (dangerousMatch.Success)
+                throw new ArgumentException($"SQL contains dangerous pattern: {dangerousMatch.Value.ToUpperInvariant()}");
 
             if (parameters != null && parameters.Count > MaxParameterCount)
                 throw new ArgumentException($"Parameter count {parameters.Count} exceeds maximum of {MaxParameterCount}");
@@ -99,7 +102,7 @@ namespace nORM.Core
         {
             ArgumentNullException.ThrowIfNull(provider);
 
-            var normalized = NormalizeSql(sql);
+            var normalized = NormalizeSql(sql, provider);
             if (!IsSafeRawNonQuerySql(normalized))
             {
                 throw new NormUsageException(
@@ -450,10 +453,23 @@ namespace nORM.Core
         ///   INSERT\nINTO users    → "insert into users"
         ///   DROP\u00A0TABLE       → "drop table"
         /// </summary>
-        internal static string NormalizeSql(string sql)
+        internal static string NormalizeSql(string sql, DatabaseProvider? provider = null)
         {
             if (string.IsNullOrEmpty(sql))
                 return string.Empty;
+
+            // Comment semantics differ by engine and the normalizer MUST match the TARGET engine, or the
+            // validator analyzes different SQL than the server executes (a filter bypass):
+            //  - Nested block comments (/* /* */ */) are a PostgreSQL / T-SQL extension. MySQL and SQLite
+            //    close at the FIRST */, so nesting there would swallow text those engines execute.
+            //  - MySQL/MariaDB EXECUTE the body of a /*! ... */ (and /*!NNNNN ... */) conditional comment, so
+            //    the body must be kept for analysis, not stripped as an inert comment.
+            // Unknown provider (null) is treated conservatively: non-nesting + keep versioned bodies, so the
+            // normalizer never strips more than the strictest engine would.
+            // MySQL and SQLite close a block comment at the FIRST */ (no nesting); PostgreSQL, SQL Server,
+            // and an unspecified provider use the nesting extension. Only MySQL/MariaDB execute /*! ... */.
+            bool nestsBlockComments = provider is not (MySqlProvider or SqliteProvider);
+            bool honorVersionedComments = provider is MySqlProvider;
 
             var sb = new StringBuilder(sql.Length);
             int i = 0;
@@ -478,11 +494,22 @@ namespace nORM.Core
                 //   SEL/**/ECT → SELECT (accepted as DML-safe)
                 if (i + 1 < len && sql[i] == '/' && sql[i + 1] == '*')
                 {
+                    // MySQL conditional comment /*! ... */ (optionally /*!NNNNN ...): the server EXECUTES the
+                    // body, so drop only the markers and let the body flow into normal analysis. The closing
+                    // */ is skipped by the standalone-*/ handler below.
+                    if (honorVersionedComments && i + 2 < len && sql[i + 2] == '!')
+                    {
+                        i += 3;
+                        while (i < len && sql[i] >= '0' && sql[i] <= '9') i++;
+                        if (!lastWasSpace) { sb.Append(' '); lastWasSpace = true; }
+                        continue;
+                    }
                     i += 2;
                     int depth = 1;
                     while (i < len && depth > 0)
                     {
-                        if (i + 1 < len && sql[i] == '/' && sql[i + 1] == '*')
+                        // Only PostgreSQL / T-SQL nest; on MySQL/SQLite the first */ closes the whole comment.
+                        if (nestsBlockComments && i + 1 < len && sql[i] == '/' && sql[i + 1] == '*')
                         {
                             depth++;
                             i += 2;
@@ -498,6 +525,15 @@ namespace nORM.Core
                         }
                     }
                     // No space added — adjacent tokens merge (DR/**/OP → DROP)
+                    continue;
+                }
+
+                // Standalone */ — e.g. the terminator of a MySQL /*! ... */ whose body we kept above. Skip it
+                // (a bare */ is not executable content) so it does not leak into the normalized keyword stream.
+                if (i + 1 < len && sql[i] == '*' && sql[i + 1] == '/')
+                {
+                    i += 2;
+                    if (!lastWasSpace) { sb.Append(' '); lastWasSpace = true; }
                     continue;
                 }
 
@@ -575,8 +611,9 @@ namespace nORM.Core
 
         private static bool IsSafeRawSqlUncached(string sql, DatabaseProvider? provider)
         {
-            // Normalize BEFORE keyword checks to defeat comment/whitespace obfuscation.
-            var normalized = NormalizeSql(sql);
+            // Normalize BEFORE keyword checks to defeat comment/whitespace obfuscation. Pass the provider so
+            // comment semantics (nesting, MySQL /*! executable comments) match the target engine.
+            var normalized = NormalizeSql(sql, provider);
 
             // Keyword denylist is always applied first for all providers.
             if (!IsSafeByKeywords(normalized)) return false;
@@ -771,6 +808,17 @@ namespace nORM.Core
                 ContainsDeniedKeyword(normalizedSql, "use"))
                 return false;
 
+            // SQLite dangerous FUNCTIONS are single identifier tokens whose internal '_' joins them into one
+            // word, so the token-level keyword checks above (e.g. "load") never match them. Deny them by their
+            // full function name, and deny the pragma_* table-valued function family (schema disclosure through
+            // a gate meant to block PRAGMA) by token prefix.
+            if (ContainsDeniedKeyword(normalizedSql, "load_extension") ||
+                ContainsDeniedKeyword(normalizedSql, "readfile") ||
+                ContainsDeniedKeyword(normalizedSql, "writefile") ||
+                ContainsDeniedKeyword(normalizedSql, "fts3_tokenizer") ||
+                ContainsDeniedTokenPrefix(normalizedSql, "pragma_"))
+                return false;
+
             // Reject stacked queries — semicolon separating statements
             // A single trailing semicolon is acceptable, but a semicolon followed by
             // any non-whitespace content indicates a stacked query.
@@ -807,6 +855,23 @@ namespace nORM.Core
 
                 idx += keyword.Length;
             }
+        }
+
+        /// <summary>
+        /// Returns true if the normalized SQL contains a TOKEN that STARTS with <paramref name="prefix"/>
+        /// (i.e. the prefix appears at a word boundary). Used to deny an entire function family such as the
+        /// SQLite <c>pragma_*</c> table-valued functions where the full name varies but the prefix is fixed.
+        /// </summary>
+        private static bool ContainsDeniedTokenPrefix(string normalizedSql, string prefix)
+        {
+            int idx = 0;
+            while ((idx = normalizedSql.IndexOf(prefix, idx, StringComparison.Ordinal)) >= 0)
+            {
+                if (idx == 0 || IsWordBoundary(normalizedSql[idx - 1]))
+                    return true;
+                idx += prefix.Length;
+            }
+            return false;
         }
 
         /// <summary>
