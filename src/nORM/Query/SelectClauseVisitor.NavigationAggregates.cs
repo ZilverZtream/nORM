@@ -362,6 +362,12 @@ namespace nORM.Query
                     operandSql = _provider.AverageAggregateOperand(operandSql, selector.Body.Type);
                 aggCall = $"{sqlAgg}({operandSql})";
             }
+            // Enumerable.Sum over an empty owned collection is 0, not NULL. A non-nullable projection target
+            // coerces the SQL NULL to 0, but a nullable target surfaces it as a wrong `null`; COALESCE so both
+            // agree with LINQ. Only Sum gets the 0 fallback; Min/Max/Average over empty stay NULL. Mirrors the
+            // other nav-aggregate emit paths.
+            if (sqlAgg == "SUM")
+                aggCall = $"COALESCE({aggCall}, 0)";
             sb.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(owned.EscTable).Append(' ').Append(depAlias)
               .Append(" WHERE ").Append(whereSql).Append(')');
             return true;
