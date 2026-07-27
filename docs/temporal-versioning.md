@@ -63,8 +63,9 @@ history, checks current-row visibility, and writes through tenant-scoped
 generated paths, so a tenant cannot restore another tenant's row by key.
 
 Tag names must be non-empty and no longer than 200 characters. That length is
-the cross-provider v1 contract because SQL Server stores tag names in
-`NVARCHAR(200)`.
+the cross-provider v1 contract. SQL Server stores tag names in `NVARCHAR(450)`
+(MySQL `VARCHAR(450)`); the 200-character tag-name limit is enforced by the tag
+API, independently of the storage column width.
 
 `AsOf` requires a constant `DateTime` or constant tag string in the query
 expression. Unsupported dynamic temporal expressions fail during translation.

@@ -79,8 +79,10 @@ norm database update --connection "..." --provider sqlserver --assembly ./bin/De
 Applies all pending migrations from the assembly to the target database.
 `--connection`, `--provider` (`sqlserver`, `sqlite`, `postgres`, `mysql`, or the
 matching EF Core provider package name), and `--assembly` are all required.
-Concurrent deploys are safe: every runner serializes behind a provider advisory
-lock (`sp_getapplock` / `pg_try_advisory_lock` / `GET_LOCK`), re-reads the
+Concurrent deploys are safe: every runner serializes before applying migrations —
+SQL Server / PostgreSQL / MySQL behind a provider advisory lock (`sp_getapplock` /
+`pg_try_advisory_lock` / `GET_LOCK`) and SQLite via a `Serializable` (`BEGIN
+EXCLUSIVE`) transaction — re-reads the
 pending list after acquiring it, and records applied versions in the
 `__NormMigrationsHistory` table, so two deployers applying the same migration
 run it exactly once. When nothing is pending the command reports that and
