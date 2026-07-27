@@ -600,7 +600,21 @@ namespace nORM.Internal
         {
             if (gate == null)
             {
-                var reader = command.ExecuteReader(behavior);
+                DbDataReader reader;
+                try
+                {
+                    reader = command.ExecuteReader(behavior);
+                }
+                catch
+                {
+                    // The sync fast path marks the command's lifetime transferred BEFORE calling this, so its own
+                    // catch will not dispose the command; dispose it here on the throw path so a failed
+                    // ExecuteReader (bad SQL, locked DB, constraint) does not leak the command. Mirrors the
+                    // gate != null branch below.
+                    if (disposeCommandWithReader)
+                        command.Dispose();
+                    throw;
+                }
                 return disposeCommandWithReader
                     ? new SerializedDbDataReader(reader, null, command, holdGateUntilDispose: true)
                     : reader;

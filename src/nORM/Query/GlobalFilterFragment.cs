@@ -66,9 +66,11 @@ namespace nORM.Query
             var combined = Combine(ctx, entityType);
             if (ctx.Options.TenantProvider == null)
                 return combined;
-            TableMapping map;
-            try { map = ctx.GetMapping(entityType); }
-            catch { return combined; }
+            // Do NOT swallow a GetMapping failure: silently returning without the tenant predicate would drop the
+            // tenant filter and expose cross-tenant rows. GetMapping is deterministic for a resolved entity type,
+            // so it does not throw for a valid model; if it ever did, failing loud is the correct (fail-closed)
+            // behavior for a security boundary.
+            var map = ctx.GetMapping(entityType);
             if (map.TenantColumn is not { } tenantCol)
                 return combined;
 
@@ -142,9 +144,10 @@ namespace nORM.Query
         /// </summary>
         private static Expression? SubtypeDiscriminatorPredicate(DbContext ctx, Type entityType, ref ParameterExpression? param)
         {
-            TableMapping map;
-            try { map = ctx.GetMapping(entityType); }
-            catch { return null; }
+            // As with the tenant predicate, do not swallow a GetMapping failure: dropping the TPH discriminator
+            // predicate would let a sibling subtype (sharing the base table) materialize as the wrong type. Fail
+            // loud instead of silently returning an unfiltered query.
+            var map = ctx.GetMapping(entityType);
             if (map.DiscriminatorValue is not { } discriminatorValue || map.DiscriminatorColumn is not { } discriminatorColumn)
                 return null;
 
