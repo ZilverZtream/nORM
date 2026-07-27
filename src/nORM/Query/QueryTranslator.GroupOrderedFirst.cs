@@ -438,5 +438,18 @@ namespace nORM.Query
             return combined;
         }
 
+        /// <summary>
+        /// AND-combines two optional group predicate lambdas (a peeled <c>g.Where(...)</c> source filter and a
+        /// direct aggregate predicate) into one, rebinding the second onto the first's parameter. Returns the
+        /// non-null one when only one is present, or null when both are. Used by the filtered Count/Any forms.
+        /// </summary>
+        private LambdaExpression? CombineGroupFilters(LambdaExpression? a, LambdaExpression? b)
+        {
+            if (a == null) return b;
+            if (b == null) return a;
+            var reboundB = new nORM.Internal.ParameterReplacer(b.Parameters[0], a.Parameters[0]).Visit(b.Body)!;
+            return Expression.Lambda(Expression.AndAlso(a.Body, reboundB), a.Parameters[0]);
+        }
+
     }
 }

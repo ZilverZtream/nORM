@@ -501,37 +501,41 @@ namespace nORM.Query
                 case "Count":
                 case "LongCount":
                     {
-                        // 1-arg `g.Count()` - COUNT(*). 2-arg `g.Count(predicate)` (extension
-                        // method form Enumerable.Count(source, predicate) puts the lambda at [1])
-                        // must apply the predicate: COUNT(CASE WHEN <pred> THEN 1 ELSE NULL END)
-                        // - NULL excluded by SQL count semantics, matching .NET behaviour.
-                        var predicate = ExtractAggregatePredicate(methodCall);
-                        if (predicate == null) return "COUNT(*)";
-                        var predSql = TranslateGroupPredicateBody(predicate, alias);
+                        // 1-arg `g.Count()` - COUNT(*). `g.Count(predicate)` and/or a filtered source
+                        // `g.Where(f).Count()` must apply the filter: COUNT(CASE WHEN <f AND pred> THEN 1 ELSE
+                        // NULL END) - NULL excluded by SQL count semantics, matching .NET. The source Where(...)
+                        // is AND-combined with the direct predicate (the Sum/Avg path already peels the source).
+                        var filter = CombineGroupFilters(ExtractAggregateSourceFilter(methodCall), ExtractAggregatePredicate(methodCall));
+                        if (filter == null) return "COUNT(*)";
+                        var predSql = TranslateGroupPredicateBody(filter, alias);
                         return $"COUNT(CASE WHEN {predSql} THEN 1 ELSE NULL END)";
                     }
                 case "Any":
                     {
-                        // 1-arg `g.Any()` - CAST(COUNT(*) > 0 AS INT) but in a grouped projection
-                        // the group is guaranteed non-empty so it's always true - emit literal `1`.
-                        // 2-arg `g.Any(predicate)` - `MAX(CASE WHEN pred THEN 1 ELSE 0 END) = 1`.
-                        // SQLite returns 0/1; the materializer coerces to bool. Matches .NET
-                        // Enumerable.Any semantics (true when -1 row satisfies the predicate).
-                        var predicate = ExtractAggregatePredicate(methodCall);
-                        if (predicate == null) return "1";
-                        var predSql = TranslateGroupPredicateBody(predicate, alias);
+                        // 1-arg `g.Any()` on an unfiltered group is always true (a group is non-empty) - emit
+                        // `1`. `g.Any(predicate)` and/or `g.Where(f).Any()` - `MAX(CASE WHEN <f AND pred> THEN 1
+                        // ELSE 0 END) = 1`, true when >=1 row satisfies the combined filter. SQLite returns 0/1;
+                        // the materializer coerces to bool.
+                        var filter = CombineGroupFilters(ExtractAggregateSourceFilter(methodCall), ExtractAggregatePredicate(methodCall));
+                        if (filter == null) return "1";
+                        var predSql = TranslateGroupPredicateBody(filter, alias);
                         return $"(MAX(CASE WHEN {predSql} THEN 1 ELSE 0 END) = 1)";
                     }
                 case "All":
                     {
-                        // `g.All(predicate)` - `MIN(CASE WHEN pred THEN 1 ELSE 0 END) = 1`. True
-                        // only when every row in the group satisfies the predicate (one false
-                        // row pulls the MIN to 0). An empty group would yield NULL but groups
-                        // by definition are non-empty, so the comparison stays well-defined.
+                        // `g.All(predicate)` - `MIN(CASE WHEN pred THEN 1 ELSE 0 END) = 1`, true only when every
+                        // row satisfies the predicate. For a filtered source `g.Where(f).All(pred)` the predicate
+                        // only applies to rows matching f; rows failing f are vacuously satisfied (contribute 1),
+                        // so guard: MIN(CASE WHEN f THEN (CASE WHEN pred THEN 1 ELSE 0 END) ELSE 1 END) = 1.
+                        // (f is NOT AND-combined into pred - All over Where(f) is not All(f AND pred).)
                         var predicate = ExtractAggregatePredicate(methodCall);
                         if (predicate == null) return "1";
                         var predSql = TranslateGroupPredicateBody(predicate, alias);
-                        return $"(MIN(CASE WHEN {predSql} THEN 1 ELSE 0 END) = 1)";
+                        var sourceFilter = ExtractAggregateSourceFilter(methodCall);
+                        if (sourceFilter == null)
+                            return $"(MIN(CASE WHEN {predSql} THEN 1 ELSE 0 END) = 1)";
+                        var filterSql = TranslateGroupPredicateBody(sourceFilter, alias);
+                        return $"(MIN(CASE WHEN {filterSql} THEN (CASE WHEN {predSql} THEN 1 ELSE 0 END) ELSE 1 END) = 1)";
                     }
                 case "Sum":
                     return EmitGroupAggregateWithOptionalFilter(methodCall, alias, "SUM", "0",
