@@ -42,7 +42,10 @@ namespace nORM.Scaffolding
                         continue;
 
                     var key = primaryKeyColumns[0];
-                    if (key.Type.Contains("INT", StringComparison.OrdinalIgnoreCase))
+                    // Only an EXACTLY-INTEGER single-column PK aliases the store-generated rowid; BIGINT /
+                    // INT / SMALLINT / etc. are app-assigned despite their INTEGER affinity. Contains("INT")
+                    // wrongly flagged them, emitting [DatabaseGenerated(Identity)] on an app-assigned key.
+                    if (string.Equals(key.Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase))
                     {
                         var tableKey = TableKey(table.Schema, table.Name);
                         result[tableKey] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { key.Name };

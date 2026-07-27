@@ -27,8 +27,12 @@ namespace nORM.Scaffolding
             }
 
             var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
+            // A single-column PK aliases the store-generated rowid ONLY when its declared type is EXACTLY
+            // INTEGER (case-insensitive). BIGINT / INT / SMALLINT / etc. have INTEGER affinity but are NOT
+            // the rowid alias — they are app-assigned — so Contains("INT") wrongly flagged them. Matches
+            // the migration generator's rule.
             if (primaryKeyColumns.Length == 1
-                && primaryKeyColumns[0].Type.Contains("INT", StringComparison.OrdinalIgnoreCase))
+                && string.Equals(primaryKeyColumns[0].Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase))
             {
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { primaryKeyColumns[0].Name };
             }
