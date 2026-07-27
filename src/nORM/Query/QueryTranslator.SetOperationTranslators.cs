@@ -804,14 +804,49 @@ namespace nORM.Query
 
 
 
+        // Query-config passthrough operators that visit their source without rewriting the FROM or the
+        // compound structure — they leave _sql holding the bare set-op compound. A set operation followed
+        // by one of these and then Where/Distinct/Select still needs the derived-table wrap, so the wrap
+        // gate must see THROUGH them to the underlying set operation.
+        private static readonly System.Collections.Generic.HashSet<string> SetOpTransparentOperators =
+            new(System.StringComparer.Ordinal)
+            {
+                "AsNoTracking", "AsNoTrackingWithIdentityResolution", "AsTracking", "AsSplitQuery",
+                "IgnoreQueryFilters", "TagWith", "Cast", "Cacheable"
+            };
+
         /// <summary>
-        /// True when <paramref name="e"/> is a set-operation call (Union / Concat / Intersect / Except).
-        /// A set-op fills <c>_sql</c> with the bare compound; a projection or DISTINCT applied after it must
-        /// wrap that compound as a derived table (as Where already does) or its effect is silently lost.
+        /// True when <paramref name="e"/> is a set-operation call (Union / Concat / Intersect / Except),
+        /// looking THROUGH any query-config passthrough operators between it and the caller. A set-op fills
+        /// <c>_sql</c> with the bare compound; a Where / projection / DISTINCT applied after it must wrap that
+        /// compound as a derived table or its effect is silently lost.
         /// </summary>
         private static bool IsSetOperationCall(Expression e)
-            => e is MethodCallExpression m
-               && m.Method.Name is "Union" or "Concat" or "Intersect" or "Except";
+        {
+            while (true)
+            {
+                // Strip cast/quote wrappers: an (INormQueryable<T>) cast inserts a Convert node between a
+                // passthrough (or the caller) and the underlying set-op call.
+                while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked or ExpressionType.Quote } u)
+                    e = u.Operand;
+                if (e is not MethodCallExpression m)
+                    return false;
+                if (m.Method.Name is "Union" or "Concat" or "Intersect" or "Except")
+                    return true;
+                if (SetOpTransparentOperators.Contains(m.Method.Name))
+                {
+                    // A passthrough's source may be the instance receiver (INormQueryable instance method)
+                    // or Arguments[0] (IQueryable extension) — mirror the passthrough translators.
+                    var src = m.Object ?? (m.Arguments.Count >= 1 ? m.Arguments[0] : null);
+                    if (src != null)
+                    {
+                        e = src;
+                        continue;
+                    }
+                }
+                return false;
+            }
+        }
 
         /// <summary>
         /// True when a set-operation element type (an anonymous or DTO shape) exposes

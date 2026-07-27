@@ -106,9 +106,11 @@ namespace nORM.Query
                 // `<left SQL> <SETOP> <right SQL>`), then wrap as `SELECT * FROM (...) AS T0`
                 // and let the rest of Where translation emit the predicate against T0 — which
                 // is the alias the predicate visitor naturally uses for the element parameter.
+                // Detect the set-op THROUGH any query-config passthrough (AsNoTracking / AsSplitQuery /
+                // IgnoreQueryFilters / TagWith / Cast / Cacheable) between it and this Where — visiting the
+                // passthrough source still fills _sql with the bare compound, so the wrap must still fire.
                 bool wrappedSetOp = false;
-                if (node.Arguments[0] is MethodCallExpression setOpSource
-                    && setOpSource.Method.Name is "Union" or "Concat" or "Intersect" or "Except")
+                if (IsSetOperationCall(node.Arguments[0]))
                 {
                     t.Visit(node.Arguments[0]);
                     var innerSql = t._sql.ToString();
