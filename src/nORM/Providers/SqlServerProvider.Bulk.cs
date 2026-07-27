@@ -173,9 +173,11 @@ namespace nORM.Providers
         {
             // This helper stages rows into the bulk-UPDATE temp table (its only caller). Key columns
             // MUST be staged — even a DB-generated identity key — because the UPDATE joins the target
-            // to the staging table on the key. Excluding a DB-generated key left the staged key NULL,
-            // so the join matched nothing and every update was silently discarded (lost update).
-            var insertableCols = m.Columns.Where(c => !c.IsDbGenerated || c.IsKey).ToList();
+            // to the staging table on the key. The rowversion/[Timestamp] token MUST be staged too: the
+            // OCC join also matches on it, and a scaffolded rowversion is DB-generated
+            // ([DatabaseGenerated(Computed)]), so excluding it left the staged token NULL and the join
+            // matched nothing — every update silently discarded (lost update).
+            var insertableCols = m.Columns.Where(c => !c.IsDbGenerated || c.IsKey || c.IsTimestamp).ToList();
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
 
