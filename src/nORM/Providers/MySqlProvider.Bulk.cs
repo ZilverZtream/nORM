@@ -232,15 +232,18 @@ namespace nORM.Providers
 
         /// <summary>
         /// Stages rows into the bulk-UPDATE temp table INCLUDING key columns — even a DB-generated
-        /// identity key — so the UPDATE ... JOIN correlates the target to the staging table on the key.
-        /// The shared bulk-insert path excludes DB-generated columns (correct for a real insert, where
-        /// the DB assigns them); reusing it here left the staged key NULL, so the join matched nothing
-        /// and every update was silently discarded.
+        /// identity key — and the concurrency token, so the UPDATE ... JOIN correlates the target to the
+        /// staging table on the key AND (for OCC) the token. The shared bulk-insert path excludes
+        /// DB-generated columns (correct for a real insert, where the DB assigns them); reusing it here left
+        /// the staged key/token NULL, so the join matched nothing and every update was silently discarded.
+        /// A DB-generated timestamp token (the idiomatic MySQL TIMESTAMP(6) ON UPDATE) must be staged too —
+        /// matching SQL Server and PostgreSQL — since a non-auto-manageable token doesn't route through the
+        /// row-by-row path.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Bulk staging reflects over entity members; trimming may remove the required members.")]
         private async Task StageForBulkUpdateAsync<T>(DbContext ctx, TableMapping m, string tempTable, IEnumerable<T> entities, CancellationToken ct) where T : class
         {
-            var cols = m.Columns.Where(c => !c.IsDbGenerated || c.IsKey).ToList();
+            var cols = m.Columns.Where(c => !c.IsDbGenerated || c.IsKey || c.IsTimestamp).ToList();
             var list = entities.ToList();
             if (list.Count == 0 || cols.Count == 0) return;
 
