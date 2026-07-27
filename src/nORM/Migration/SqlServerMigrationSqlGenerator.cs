@@ -93,6 +93,14 @@ namespace nORM.Migration
             return s.Replace("'", "''");
         }
 
+        // A distinct, length-safe (<= 128 incl. '@') T-SQL variable name derived from a column name, used to
+        // hold the discovered default-constraint name in DropDefaultConstraintIfExists.
+        private static string DropConstraintVarName(string columnName)
+        {
+            var v = $"@__drop_{new string(columnName.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()}";
+            return v.Length > 128 ? v.Substring(0, 128) : v;
+        }
+
         /// <summary>
         /// Builds a single self-contained T-SQL statement that drops the system-named DEFAULT constraint
         /// bound to <paramref name="lookupColumnName"/> on <paramref name="tableName"/>, if one exists. SQL
@@ -303,10 +311,7 @@ namespace nORM.Migration
             }
             foreach (var (table, column) in diff.DroppedColumns)
             {
-                var dropVar = $"@__drop_{new string(column.Name.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant()}";
-                // Truncate to a safe length for a T-SQL variable name (max 128 chars including @).
-                if (dropVar.Length > 128) dropVar = dropVar.Substring(0, 128);
-                up.Add(DropDefaultConstraintIfExists(table.Name, column.Name, dropVar));
+                up.Add(DropDefaultConstraintIfExists(table.Name, column.Name, DropConstraintVarName(column.Name)));
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
             }
 
@@ -467,7 +472,13 @@ namespace nORM.Migration
                     down.Add($"ALTER TABLE {EscTable(table.Name)} DROP CONSTRAINT {Esc(GetUniqueConstraintName(table, column))}");
             }
             foreach (var (table, column) in diff.AddedColumns)
+            {
+                // A column added in UP-6 with a DEFAULT (mandatory for a NOT NULL add) binds a separate
+                // default-constraint object; a bare DROP COLUMN fails while it depends (Msg 5074). Drop the
+                // constraint first, exactly as UP-3 does for a forward DROP COLUMN.
+                down.Add(DropDefaultConstraintIfExists(table.Name, column.Name, DropConstraintVarName(column.Name)));
                 down.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(column.Name)}");
+            }
 
             // DOWN-3: Drop tables that were created in UP-5.
             foreach (var table in diff.AddedTables)
@@ -488,6 +499,11 @@ namespace nORM.Migration
                 {
                     if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
                     {
+                        // If the current column is a plain (non-computed) column it may carry a default
+                        // constraint; drop it before DROP COLUMN so the rollback doesn't fail (Msg 5074). A
+                        // computed column can't have a default, so the guard is skipped there.
+                        if (!IsComputedColumn(newCol))
+                            down.Add(DropDefaultConstraintIfExists(table.Name, newCol.Name, DropConstraintVarName(newCol.Name)));
                         down.Add($"ALTER TABLE {EscTable(table.Name)} DROP COLUMN {Esc(newCol.Name)}");
                         if (IsComputedColumn(oldCol))
                             down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildComputedColumnDefinition(oldCol)}");

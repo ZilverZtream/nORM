@@ -969,6 +969,58 @@ public class LiveProviderMigrationDdlParityTests
         }
     }
 
+    // DOWN migration reverses ADD COLUMN when the added column carries a DEFAULT. On SQL Server the inline
+    // DEFAULT binds a separate default-constraint object, and a bare DROP COLUMN in the rollback fails while
+    // it depends (Msg 5074). The DOWN must drop the constraint first (as the forward DROP COLUMN already does).
+    [Theory]
+    [InlineData("sqlite")]
+    [InlineData("sqlserver")]
+    [InlineData("mysql")]
+    [InlineData("postgres")]
+    public void LiveProvider_Migration_DownReverses_AddColumnWithDefault(string kind)
+    {
+        var (cn, skip) = Open(kind);
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_DownAddDefault";
+
+        if (kind == "sqlite")
+        {
+            try
+            {
+                Exec(db, "CREATE TABLE \"_ddl_probe3\" (a INT, b INT)");
+                Exec(db, "ALTER TABLE \"_ddl_probe3\" DROP COLUMN b");
+                ExecSafe(db, "DROP TABLE \"_ddl_probe3\"");
+            }
+            catch { db.Dispose(); return; }
+        }
+
+        try
+        {
+            ResetTable(db, kind, table);
+            Exec(db, CreateBaseDdl(kind, table));
+            var baseTable = BaseTable(table);
+            // NOT NULL column with a DEFAULT (mandatory for a NOT NULL add) — the default binds a constraint
+            // object on SQL Server that the rollback's DROP COLUMN must drop first.
+            var status = new ColumnSchema { Name = "Status", ClrType = typeof(int).FullName!, IsNullable = false, DefaultValue = "7" };
+            var diff = new SchemaDiff();
+            diff.AddedColumns.Add((baseTable, status));
+            var sql = Generator(kind).GenerateSql(diff);
+
+            ApplyStatements(db, sql.Up);
+            Assert.True(ColumnExists(db, table, "Status"), $"[{kind}] UP: Status must exist");
+
+            ApplyStatements(db, sql.Down);   // BUG on SqlServer: bare DROP COLUMN failed (Msg 5074)
+            Assert.False(ColumnExists(db, table, "Status"),
+                $"[{kind}] DOWN: Status should be removed after rollback.");
+        }
+        finally
+        {
+            ExecSafe(cn, DropTableDdl(kind, table));
+            db.Dispose();
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // Item 15 — DOWN migration reverses CREATE TABLE
     // ══════════════════════════════════════════════════════════════════════════
