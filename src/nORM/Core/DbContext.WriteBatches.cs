@@ -279,7 +279,28 @@ namespace nORM.Core
         {
             var changed = entry.GetChangedColumns();
             if (changed.Length == 0)
+            {
+                // No scalar column is flagged changed. This happens for (a) a pure association (many-to-many /
+                // owned) edit — change detection marks the owner Modified via HasManyToManyChanges /
+                // HasOwnedCollectionChanges — and (b) a forced ctx.Update / State=Modified on an entity whose
+                // snapshot equals its current values. Only (a) must skip the scalar UPDATE: rewriting the full row
+                // there would clobber a concurrent writer with the loaded (stale) values (a lost update), and EF
+                // Core emits no principal UPDATE for a skip-navigation-only change. A forced update must still
+                // write the full row, so fall through for (b).
+                if (entry.HasManyToManyChanges() || entry.HasOwnedCollectionChanges())
+                {
+                    // Association-only: value-diff the mutable columns (current vs the attach snapshot, evaluated
+                    // here at UPDATE-build time so a reference-nav FK reassigned by fixup after change detection is
+                    // visible). An empty result means only the association changed -> emit no scalar UPDATE; a
+                    // reassigned FK shows up by value and is written.
+                    List<Column>? valueChanged = null;
+                    foreach (var c in map.UpdateColumns)
+                        if (entry.HasColumnValueChanged(c))
+                            (valueChanged ??= new List<Column>()).Add(c);
+                    return (IReadOnlyList<Column>?)valueChanged ?? Array.Empty<Column>();
+                }
                 return map.UpdateColumns;
+            }
             var filtered = new List<Column>(changed.Length);
             foreach (var c in changed)
                 if (updateColSet.Contains(c)) filtered.Add(c);
@@ -327,6 +348,11 @@ namespace nORM.Core
             // Allowlist of columns eligible for the SET clause (mutable: non-key, non-timestamp,
             // non-db-generated). Built once per batch since the mapping is constant.
             var updateColSet = new HashSet<Column>(map.UpdateColumns);
+            // Entries whose only change is a pure association (M2M/owned) edit have no changed scalar column and
+            // emit no UPDATE; track the ones that actually produce a statement so the OUTPUT-token reader, the
+            // OCC rowcount check, and the deferred token-snapshot all align to the emitted statements, not the
+            // full batch.
+            var emitted = new List<EntityEntry>(batch.Count);
 
             foreach (var entry in batch)
             {
@@ -391,6 +417,9 @@ namespace nORM.Core
                 // Partial-column UPDATE: the SAME setCols array feeds both the SQL builder and the parameter
                 // binder, keeping the positional @pN parameters aligned. See ComputeUpdateSetColumns.
                 var setCols = ComputeUpdateSetColumns(entry, map, updateColSet);
+                if (setCols.Count == 0)
+                    continue; // pure association (M2M/owned) edit: no scalar column changed -> emit no UPDATE
+                emitted.Add(entry);
 
                 AppendUpdateBatch(sql, map, setCols, paramIndex);
                 sql.Append(';');
@@ -398,6 +427,8 @@ namespace nORM.Core
                     entity,
                     WriteOperation.Update, paramIndex, entry.OriginalToken, setCols);
             }
+            if (emitted.Count == 0)
+                return 0; // every entry in this batch was an association-only edit; nothing to UPDATE
             cmd.CommandText = sql.ToString();
             cmd.CommandTimeout = ToSecondsClamped(GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.Update, cmd.CommandText));
             if (batch.Count > 1 && _p.SupportsPreparedBatchCommands)
@@ -419,14 +450,14 @@ namespace nORM.Core
                     if (await reader.ReadAsync(ct).ConfigureAwait(false))
                     {
                         var tokenValue = reader.GetValue(0);
-                        var updatedEntity = batch[entryIndex].Entity;
+                        var updatedEntity = emitted[entryIndex].Entity;
                         if (updatedEntity != null && tokenValue != DBNull.Value)
                             map.TimestampColumn.Setter(updatedEntity, tokenValue);
                         updated++;
                     }
                     entryIndex++;
                 }
-                while (await reader.NextResultAsync(ct).ConfigureAwait(false) && entryIndex < batch.Count);
+                while (await reader.NextResultAsync(ct).ConfigureAwait(false) && entryIndex < emitted.Count);
             }
             else
             {
@@ -440,10 +471,10 @@ namespace nORM.Core
             // actually changed). Disambiguate with a SELECT-then-verify: query for rows that
             // still carry the original token. If all tokens still match, it was a same-value
             // update with no conflict. If any token is missing, it's a genuine stale-row conflict.
-            if (map.TimestampColumn != null && updated != batch.Count)
+            if (map.TimestampColumn != null && updated != emitted.Count)
             {
                 if (Provider.UseAffectedRowsSemantics)
-                    await VerifyUpdateOccAsync(cmd, map, batch, ct).ConfigureAwait(false);
+                    await VerifyUpdateOccAsync(cmd, map, emitted, ct).ConfigureAwait(false);
                 else
                     throw new DbConcurrencyException("A concurrency conflict occurred. The row may have been modified or deleted by another user.");
             }
@@ -459,7 +490,7 @@ namespace nORM.Core
             if (deferAccept && map.TimestampColumn != null)
             {
                 var tc = map.TimestampColumn;
-                foreach (var entry in batch)
+                foreach (var entry in emitted)
                     if (entry.Entity is { } e)
                     {
                         var current = tc.Getter(e);
