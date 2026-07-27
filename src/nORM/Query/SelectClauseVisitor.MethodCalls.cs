@@ -323,10 +323,21 @@ namespace nORM.Query
                         && (sc is StringComparison.OrdinalIgnoreCase
                                 or StringComparison.InvariantCultureIgnoreCase
                                 or StringComparison.CurrentCultureIgnoreCase);
+                    string eq;
                     if (ignoreCase)
-                        sb.Append("(LOWER(").Append(lhsSql).Append(") = LOWER(").Append(rhsSql).Append("))");
+                        eq = $"(LOWER({lhsSql}) = LOWER({rhsSql}))";
+                    // Ordinal comparison: providers whose default collation folds case need the sargable
+                    // ordinal wrap so a projected Ordinal Equals stays case-sensitive (mirrors the WHERE side).
+                    else if (_provider.DefaultStringEqualityIsCaseInsensitive)
+                        eq = _provider.OrdinalStringEqualSql(lhsSql, rhsSql);
                     else
-                        sb.Append('(').Append(lhsSql).Append(" = ").Append(rhsSql).Append(')');
+                        eq = $"({lhsSql} = {rhsSql})";
+                    // string.Equals(a, b, StringComparison) is null-safe: Equals(null, null, ...) is TRUE. A
+                    // bare `a = b` is UNKNOWN when either operand is NULL and would materialize the both-NULL
+                    // projection as false; add the both-NULL case explicitly (a non-null literal operand makes
+                    // its IS NULL test a harmless constant-false). Mirrors the WHERE-side EmitEqualityPredicate.
+                    sb.Append('(').Append(eq)
+                        .Append(" OR (").Append(lhsSql).Append(" IS NULL AND ").Append(rhsSql).Append(" IS NULL))");
                     return node;
                 }
             }
