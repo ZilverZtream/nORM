@@ -11,8 +11,11 @@ procedure body, inject tenant predicates, or prove that a procedure is read-only
 - Raw SQL command text, `EXEC ...` text, whitespace-separated command text, and
   stacked statements are rejected by stored procedure APIs.
 - SQLite exposes stored procedure APIs as `CommandType.Text` because SQLite does
-  not have stored procedures. In that provider mode, nORM applies the same
-  read-only raw query gate used by `FromSqlRawAsync<T>`.
+  not have stored procedures. In that provider mode the result-set stored-proc APIs
+  apply the same read-only raw query gate used by `FromSqlRawAsync<T>`; the
+  `...NonQuery...` variants apply the non-query gate, which permits a single
+  INSERT/UPDATE/DELETE (matching their purpose) while still rejecting DDL, `EXEC`,
+  and stacked statements.
 - Output parameter names must start with a letter or underscore and contain only
   letters, digits, and underscores.
 
