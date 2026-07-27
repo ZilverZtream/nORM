@@ -7,18 +7,18 @@ The list is enforced by `NamespacePolicyContractTests`.
 
 | Namespace | Support Tier | Purpose |
 | --- | --- | --- |
-| `nORM.Configuration` | Stable user API | `DbContextOptions`, `EntityTypeBuilder<T>`, `ModelBuilder`, `ClientEvaluationPolicy`, ambient-transaction policy enums |
-| `nORM.Core` | Stable user API | `DbContext`, `ChangeTracker`, `EntityEntry`, `EntityState`, `QueryTrackingBehavior`, `NormException` and the rest of the public exception taxonomy, async/sync extension helpers |
-| `nORM.Mapping` | Stable user API | Attributes and primitives: `[Key]`, `[Column]`, `[RenameColumn]`, `IValueConverter`, `OwnedCollectionNavigation`, mapping primitives consumers compose against |
+| `nORM.Configuration` | Stable user API | `DbContextOptions`, `EntityTypeBuilder<T>`, `ModelBuilder`, `ClientEvaluationPolicy`, `OwnedCollectionNavigation`, ambient-transaction policy enums |
+| `nORM.Core` | Stable user API | `DbContext`, `ChangeTracker`, `EntityEntry`, `EntityState`, `QueryTrackingBehavior`, `NormException` and the rest of the public exception taxonomy, `INormQueryable<T>` and the query extension methods (`Include`, `ThenInclude`, `AsSplitQuery`, async/sync extension helpers) |
+| `nORM.Mapping` | Stable user API | Attributes and primitives: `[Key]`, `[Column]`, `[RenameColumn]`, `IValueConverter`, mapping primitives consumers compose against |
 | `nORM.Migration` | Stable user API + provider API | `Migration`, provider-specific runners (`SqlServerMigrationRunner`, `PostgresMigrationRunner`, ...), `MigrationOptions`, schema diff types |
 | `nORM.Providers` | Stable provider API | `DatabaseProvider` and its subclasses, `ProviderCapabilities`, `IDbParameterFactory` |
-| `nORM.Query` | Stable user API | `INormQueryable<T>`, query extension methods (Include, ThenInclude, AsSplitQuery, etc.) |
+| `nORM.Query` | Stable user API | `NormFunctions`, `SqlFunctionAttribute`, `OptimizedSqlBuilder` (query-building helpers). Note: `INormQueryable<T>` and the `Include`/`ThenInclude`/`AsSplitQuery` extensions live in `nORM.Core`. |
 | `nORM.Execution` | Stable user API | `AdaptiveTimeoutManager` and operational primitives |
 | `nORM.Navigation` | Stable user API | Lazy-loading proxy / navigation primitives |
 | `nORM.SourceGeneration` | Stable user API (compile-time integration) | `CompiledMaterializerStore`, `[GenerateMaterializer]`, `[CompileTimeQuery]` |
 | `nORM.Scaffolding` | Stable tooling | `DatabaseScaffolder`, `DynamicEntityTypeGenerator`, `ScaffoldOptions` (bounded v1 scaffolding contract; see `docs/scaffolding.md`) |
 | `nORM.Enterprise` | Stable provider API | Enterprise integration extension points; opt-in |
-| `nORM.Internal` | **Deprecated namespace, tracked for v1.x relocation** | Existing public types here remain reachable for compatibility. New types must NOT be added; existing entries (e.g., `ConcurrentLruCache<T, TValue>`, `ParameterOptimizer`) are scheduled for relocation to `nORM.Caching` / `nORM.Diagnostics` in a v1.x release with type forwarders. |
+| `nORM.Internal` | **Deprecated namespace, tracked for v1.x relocation** | Existing public types here remain reachable for compatibility. New types must NOT be added; the one remaining public entry, `ParameterOptimizer`, is scheduled for relocation to `nORM.Diagnostics` in a v1.x release with a type forwarder. (`ConcurrentLruCache<T, TValue>` was internalized during API-freeze prep and is no longer public.) |
 | `Microsoft.Extensions.Logging` | Stable user API (extension methods) | Hosts `DbContextLoggingExtensions` (and any future `Microsoft.Extensions.*` extensions) per the standard convention of registering extension methods under the namespace of the type they extend. |
 | `Microsoft.Extensions.DependencyInjection` | Stable user API (extension methods) | Hosts `NormServiceCollectionExtensions` (`AddNorm`, `AddNormFactory`) so nORM registers on `IServiceCollection` for ASP.NET Core / generic-host apps, per the standard convention of registering DI extension methods under this namespace. |
 
@@ -36,7 +36,6 @@ The list is enforced by `NamespacePolicyContractTests`.
 
 | Current Location | Target Location | Status |
 | --- | --- | --- |
-| `nORM.Internal.ConcurrentLruCache<T, TValue>` | `nORM.Caching.ConcurrentLruCache<T, TValue>` | Planned for v1.1 with type forwarder for v1.0 compatibility |
 | `nORM.Internal.ParameterOptimizer` | `nORM.Diagnostics.ParameterOptimizer` | Planned for v1.1 with type forwarder for v1.0 compatibility |
 
 Type forwarders preserve binary compatibility for v1.0 consumers; the new locations become the

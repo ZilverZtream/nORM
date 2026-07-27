@@ -146,6 +146,7 @@ drivers, must be referenced directly by the application. See
 Applications that need restricted dynamic code should avoid dynamic table queries
 and runtime scaffolding. Prefer explicit entity types, source-generated
 materializers, and generated compile-time query methods, and preserve entity
-metadata as shown above. The remaining work for zero-ceremony NativeAOT — dropping
-the `<TrimmerRootAssembly>` requirement — is source-generated write accessors so
-the write path stops reflecting over entity properties.
+metadata as shown above. Zero-ceremony NativeAOT (no `<TrimmerRootAssembly>` required)
+already ships: the source generator emits per-entity write accessors and the write
+path prefers them over reflection (see `GeneratedAccessors` / `Column` getter+setter),
+so no manual trimmer roots are needed for source-generated entities.

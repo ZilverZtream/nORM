@@ -88,9 +88,12 @@ explicitly. Calling it manually is supported for diagnostic tooling.
 
 ## Notification Tracking
 
-- Entities implementing `INotifyPropertyChanged` are tracked without snapshot diffing: every
-  property change immediately marks the entity as `Modified`. This is faster for high-churn
-  entities but requires the entity type to implement the interface correctly.
+- Entities implementing `INotifyPropertyChanged` are tracked reactively: a `PropertyChanged`
+  notification updates the entry's per-column change flags immediately, avoiding a full
+  scan of every property at `SaveChanges`. The value is still diffed against the original
+  snapshot, so setting a property and then restoring it to its original value leaves the
+  entity `Unchanged` (no spurious UPDATE). This is faster for high-churn entities but
+  requires the entity type to raise `PropertyChanged` correctly.
 - Mixed notification + snapshot tracking in the same context is supported; the tracker chooses
   per entity based on interface detection.
 
