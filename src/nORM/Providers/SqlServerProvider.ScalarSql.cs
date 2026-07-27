@@ -52,6 +52,14 @@ namespace nORM.Providers
         /// <summary>SQL Server uses NVARCHAR(MAX) for unbounded textual conversion.</summary>
         public override string GetToStringSql(string innerSql) => $"CAST({innerSql} AS NVARCHAR(MAX))";
 
+        /// <summary>
+        /// SQL Server's <c>%</c> rejects float operands ("float and int are incompatible in the modulo
+        /// operator"). Emit the C# double remainder as <c>a - b * trunc(a/b)</c>; ROUND(x, 0, 1) truncates
+        /// toward zero. NULLIF guards divide-by-zero (yielding NULL, as MySQL's <c>%</c> does).
+        /// </summary>
+        public override string GetFloatingPointModuloSql(string left, string right)
+            => $"({left} - {right} * ROUND({left} / NULLIF({right}, 0), 0, 1))";
+
         /// <summary>SQL Server uses BIT (0/1) as its boolean type; BOOLEAN is not valid SQL Server syntax.</summary>
         public override string GetBoolCastSql(string innerSql) => $"CAST({innerSql} AS BIT)";
 

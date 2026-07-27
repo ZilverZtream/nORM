@@ -156,6 +156,14 @@ namespace nORM.Providers
         public override string GetBitwiseXorSql(string left, string right) => $"(({left} | {right}) - ({left} & {right}))";
 
         /// <summary>
+        /// SQLite's <c>%</c> converts both operands to INTEGER, so a float modulo silently truncates. Emit
+        /// the C# double remainder as <c>a - b * CAST(a/b AS INTEGER)</c> (CAST to INTEGER truncates toward
+        /// zero); NULLIF guards divide-by-zero.
+        /// </summary>
+        public override string GetFloatingPointModuloSql(string left, string right)
+            => $"({left} - {right} * CAST({left} / NULLIF({right}, 0) AS INTEGER))";
+
+        /// <summary>
         /// SQLite stores DateTime as TEXT; lex compare on raw ISO strings with mixed
         /// timezone offsets ('+02:00' vs 'Z') silently mis-orders rows because the offset
         /// suffix dominates the comparison. <c>datetime(...)</c> parses any ISO format

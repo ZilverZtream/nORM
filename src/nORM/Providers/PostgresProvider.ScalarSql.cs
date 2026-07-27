@@ -166,6 +166,14 @@ namespace nORM.Providers
         /// <summary>PostgreSQL uses `#` (not `^`) for integer XOR — `^` would be exponentiation.</summary>
         public override string GetBitwiseXorSql(string left, string right) => $"({left} # {right})";
 
+        /// <summary>
+        /// PostgreSQL has no <c>%</c> operator for double precision ("operator does not exist:
+        /// double precision % integer"). Emit the C# double remainder as <c>a - b * trunc(a/b)</c>
+        /// (trunc toward zero); NULLIF guards divide-by-zero.
+        /// </summary>
+        public override string GetFloatingPointModuloSql(string left, string right)
+            => $"({left} - {right} * TRUNC({left} / NULLIF({right}, 0)))";
+
         /// <summary>PostgreSQL supports ON CONFLICT DO NOTHING for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
             => $"INSERT INTO {escTable} ({escC1}, {escC2}) VALUES ({p1}, {p2}) ON CONFLICT DO NOTHING";

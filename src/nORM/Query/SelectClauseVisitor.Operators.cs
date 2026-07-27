@@ -429,6 +429,20 @@ namespace nORM.Query
                   .Append(") & ~(").Append(xorLeftSql).Append(" & ").Append(xorRightSql).Append("))");
                 return node;
             }
+            // Floating-point modulo (projection side): SQL Server / PostgreSQL have no float `%` and SQLite's
+            // `%` truncates operands to integer. Route the double/float remainder through the provider hook,
+            // mirroring the WHERE-side (ExpressionToSqlVisitor.VisitBinary) so both paths agree.
+            if (node.NodeType == ExpressionType.Modulo)
+            {
+                var modResultType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
+                if (modResultType == typeof(double) || modResultType == typeof(float))
+                {
+                    var modLeftSql = TranslateProjectionArg(node.Left);
+                    var modRightSql = TranslateProjectionArg(node.Right);
+                    sb.Append(_provider.GetFloatingPointModuloSql(modLeftSql, modRightSql));
+                    return node;
+                }
+            }
             // A comparison against a value-converter column must bind the converter's PROVIDER value,
             // not the raw model value: `p.Status == Status.Active` projected as a bool would otherwise
             // emit `Status = 1` against a column storing 'Active' and be false for every row. Mirror

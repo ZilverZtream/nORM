@@ -236,6 +236,22 @@ namespace nORM.Query
                 return node;
             }
 
+            // Floating-point modulo needs provider-specific SQL: SQL Server and PostgreSQL have no float `%`
+            // (a runtime error) and SQLite's `%` truncates operands to integer (silently wrong). Route the
+            // double/float remainder through the provider hook. (Decimal modulo is handled by the decimal
+            // path below; integer modulo keeps the portable `%`.)
+            if (node.NodeType == ExpressionType.Modulo)
+            {
+                var modResultType = Nullable.GetUnderlyingType(node.Type) ?? node.Type;
+                if (modResultType == typeof(double) || modResultType == typeof(float))
+                {
+                    var modLeftSql = GetSql(node.Left);
+                    var modRightSql = GetSql(node.Right);
+                    _sql.Append(_provider.GetFloatingPointModuloSql(modLeftSql, modRightSql));
+                    return node;
+                }
+            }
+
             // C# `+` on string operands is concatenation, not arithmetic. The
             // generic `+ ` emit below produces SQL numeric addition which on
             // SQLite coerces TEXT to 0 (silent "0" results for every row).

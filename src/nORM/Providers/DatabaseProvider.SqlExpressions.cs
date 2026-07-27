@@ -190,6 +190,16 @@ namespace nORM.Providers
         public virtual string GetBitwiseXorSql(string left, string right) => $"({left} ^ {right})";
 
         /// <summary>
+        /// Returns SQL for a floating-point modulo — C#'s double/float remainder <c>a % b</c>. MySQL's
+        /// <c>%</c> already computes the float remainder, so the base emits it directly. SQL Server and
+        /// PostgreSQL have no float <c>%</c> operator (a runtime error), and SQLite's <c>%</c> truncates BOTH
+        /// operands to integer (silently wrong), so those providers override with the
+        /// <c>a - b * trunc(a / b)</c> rewrite (trunc toward zero → the remainder takes the dividend's sign,
+        /// matching C#).
+        /// </summary>
+        public virtual string GetFloatingPointModuloSql(string left, string right) => $"({left} % {right})";
+
+        /// <summary>
         /// Wraps a SQL operand for chronological DateTime comparison. SQL Server / Postgres /
         /// MySQL all have native DATETIME types whose comparison operators are timezone- and
         /// offset-aware, so the default is identity. SQLite stores DateTime as TEXT and
