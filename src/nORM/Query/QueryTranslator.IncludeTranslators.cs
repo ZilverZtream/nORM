@@ -39,14 +39,40 @@ namespace nORM.Query
             {
                 return null;
             }
-            if (principalMap.KeyColumns.Length != 1)
+
+            if (principalMap.KeyColumns.Length == 1)
+            {
+                var fk = ExpressionToSqlVisitor.FindReferenceNavForeignKey(ownerMap, prop.Name, principalType, principalMap);
+                if (fk == null)
+                    return null;
+
+                return new TableMapping.Relation(prop, principalType, fk, principalMap.KeyColumns[0], false);
+            }
+
+            // Composite-key principal (e.g. Line.Order where Order's key is {TenantId, OrderId}). The
+            // reference-include roles are inverted: the loaded principal's key columns are matched against the
+            // owner's foreign-key columns. Reuse the configured relationship the principal already holds back to
+            // this owner (its collection/inverse side carries the ordered composite column mapping) and invert it.
+            TableMapping.Relation? composite = null;
+            foreach (var rel in principalMap.Relations.Values)
+            {
+                if (rel.DependentType == ownerMap.Type
+                    && rel.ForeignKeys.Count == principalMap.KeyColumns.Length
+                    && rel.PrincipalKeys.Count == principalMap.KeyColumns.Length)
+                {
+                    if (composite != null)
+                        return null; // two relationships from the principal to this owner — genuinely ambiguous
+                    composite = rel;
+                }
+            }
+            if (composite == null)
                 return null;
 
-            var fk = ExpressionToSqlVisitor.FindReferenceNavForeignKey(ownerMap, prop.Name, principalType, principalMap);
-            if (fk == null)
-                return null;
-
-            return new TableMapping.Relation(prop, principalType, fk, principalMap.KeyColumns[0], false);
+            // Inverted for the reference direction: the "principal keys" read from the owner rows are the
+            // dependent FK columns; the "foreign keys" matched in the loaded principal table are the principal's
+            // own key columns. Order is preserved from the configured relationship (FK[i] <-> PrincipalKey[i]).
+            return new TableMapping.Relation(prop, principalType,
+                principalKeys: composite.ForeignKeys, foreignKeys: composite.PrincipalKeys, cascadeDelete: false);
         }
 
         /// <summary>
