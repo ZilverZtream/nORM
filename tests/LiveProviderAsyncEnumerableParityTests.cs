@@ -154,7 +154,9 @@ public class LiveProviderAsyncEnumerableParityTests
                     {
                     }
                 });
-                Assert.Contains("AsAsyncEnumerable does not support Include", ex.Message, StringComparison.Ordinal);
+                // Actionable message: names the constraint (Include) and the supported alternative (ToListAsync).
+                Assert.Contains("Include", ex.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("ToListAsync", ex.Message, StringComparison.OrdinalIgnoreCase);
             }
             finally
             {

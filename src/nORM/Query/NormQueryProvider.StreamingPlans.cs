@@ -37,13 +37,23 @@ namespace nORM.Query
             cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
             cmd.CommandText = plan.Sql;
             BindPlanParameters(cmd, plan, paramValues);
-            if (plan.Includes.Count > 0)
+            // A query that eager-loads a nested collection cannot stream row-by-row: the collection is filled
+            // by a dependent fetch that runs only AFTER the full root set is materialized (batched by root
+            // key). That covers an Include, a collection projection / split query (plan.DependentQueries — a
+            // Select whose body materializes a child collection) and a many-to-many navigation
+            // (plan.M2MIncludes). Previously only plan.Includes was guarded, so the other two silently fell
+            // through to the row-by-row loop below and yielded roots with EMPTY collections (silent data
+            // loss). Fail loud instead — the same reason EF Core cannot stream split queries — so the
+            // streaming memory contract is never silently broken.
+            if (plan.Includes.Count > 0 || plan.DependentQueries is { Count: > 0 } || plan.M2MIncludes is { Count: > 0 })
                 throw new NormUnsupportedFeatureException(
-                    "AsAsyncEnumerable does not support Include. Eager-load paths issue a dependent " +
-                    "fetch after the principal materializer completes - incompatible with row-by-row " +
-                    "streaming. Use `await query.ToListAsync()` to materialize the fully-loaded set " +
-                    "in one round-trip, or remove the Include and reissue the child query manually " +
-                    "per principal if streaming is required.",
+                    "AsAsyncEnumerable cannot stream a query that eager-loads a nested collection - an " +
+                    "Include, a collection projection (a Select whose body builds a child collection, e.g. " +
+                    "`.Select(a => new { a.Books })`), or a many-to-many navigation. Those collections are " +
+                    "populated by a dependent fetch that runs after the root set is fully materialized, which " +
+                    "is incompatible with row-by-row streaming. Use `await query.ToListAsync()` to materialize " +
+                    "the fully-loaded set in one pass, or drop the eager-loaded collection and reissue the " +
+                    "child query per root if streaming is required.",
                     NormUnsupportedReason.AsAsyncEnumerableIncludeUnsupported);
             if (plan.PostMaterializeTransform != null || plan.PostReverse)
             {
