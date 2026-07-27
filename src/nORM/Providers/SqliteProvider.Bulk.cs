@@ -379,8 +379,8 @@ namespace nORM.Providers
                             {
                                 var kp = $"{ParamPrefix}p{paramIndex++}";
                                 var tp = $"{ParamPrefix}p{paramIndex++}";
-                                cmd.AddParam(kp, keyCol.Getter(entity));
-                                cmd.AddParam(tp, tc.Getter(entity));
+                                cmd.AddParam(kp, ToProviderValue(keyCol, keyCol.Getter(entity)));
+                                cmd.AddParam(tp, ToProviderValue(tc, tc.Getter(entity)));
                                 rowConds.Add($"({keyCol.EscCol} = {kp} AND ({tc.EscCol} = {tp} OR ({tc.EscCol} IS NULL AND {tp} IS NULL)))");
                             }
                             cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE ({string.Join(" OR ", rowConds)}){tenantSuffix}";
@@ -392,7 +392,7 @@ namespace nORM.Providers
                             {
                                 var paramName = $"{ParamPrefix}p{paramIndex++}";
                                 paramNames.Add(paramName);
-                                cmd.AddParam(paramName, keyCol.Getter(entity));
+                                cmd.AddParam(paramName, ToProviderValue(keyCol, keyCol.Getter(entity)));
                             }
                             cmd.CommandText = $"DELETE FROM {m.EscTable} WHERE {keyCol.EscCol} IN ({string.Join(",", paramNames)}){tenantSuffix}";
                         }
@@ -432,11 +432,11 @@ namespace nORM.Providers
                         cmd.Parameters.Clear();
                         foreach (var col in m.KeyColumns)
                         {
-                            cmd.AddParam(ParamPrefix + col.PropName, col.Getter(entity));
+                            cmd.AddParam(ParamPrefix + col.PropName, ToProviderValue(col, col.Getter(entity)));
                         }
                         if (m.TimestampColumn != null)
                         {
-                            cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, m.TimestampColumn.Getter(entity));
+                            cmd.AddParam(ParamPrefix + m.TimestampColumn.PropName, ToProviderValue(m.TimestampColumn, m.TimestampColumn.Getter(entity)));
                         }
                         if (hasTenant)
                         {
