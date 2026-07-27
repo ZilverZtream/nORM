@@ -243,18 +243,19 @@ namespace nORM.Core
                 currentTransaction = transaction!;
             }
 
+            int recordsAffected = 0;
+            var committedSuccessfully = false;
             try
             {
-                var recordsAffected = await ExecuteWriteCommandAsync(entity, map, operation, currentTransaction, ct).ConfigureAwait(false);
+                recordsAffected = await ExecuteWriteCommandAsync(entity, map, operation, currentTransaction, ct).ConfigureAwait(false);
                 if (ownsTransaction)
                 {
                     // Signal that the commit is about to run: a failure from here on has an unknown
                     // outcome and must not be retried, or the write could be duplicated.
                     onCommitAttempted?.Invoke();
                     await currentTransaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                    SyncTrackerAfterDirectWrite(entity, map, operation);
+                    committedSuccessfully = true;
                 }
-                return recordsAffected;
             }
             catch (Exception originalEx)
             {
@@ -282,6 +283,15 @@ namespace nORM.Core
                 if (ownedTransaction != null)
                     await ownedTransaction.DisposeAsync().ConfigureAwait(false);
             }
+
+            // Sync tracker state AFTER the commit and OUTSIDE the try/catch. A throw here - a faulting entity
+            // getter during snapshot capture - must NOT reach the catch above: doing so would roll back (or
+            // try to) the already-committed transaction and surface a durable write as an AggregateException
+            // while leaving the tracker un-advanced (so the next save re-issues the write). Mirrors the
+            // SaveChangesInternalAsync accept-phase hoist. Only runs when we own the tx and it committed.
+            if (committedSuccessfully)
+                SyncTrackerAfterDirectWrite(entity, map, operation);
+            return recordsAffected;
         }
         private async Task<int> ExecuteFastInsert<T>(T entity, TableMapping map, CancellationToken ct, DbTransaction? transaction) where T : class
         {
