@@ -792,9 +792,7 @@ namespace nORM.Query
                 var notOperandType = Nullable.GetUnderlyingType(node.Operand.Type) ?? node.Operand.Type;
                 if (notOperandType == typeof(bool))
                 {
-                    sb.Append("NOT (");
-                    Visit(node.Operand);
-                    sb.Append(')');
+                    EmitProjectionNegation(node.Operand);
                 }
                 else
                 {
@@ -805,6 +803,90 @@ namespace nORM.Query
                 return node;
             }
             return base.VisitUnary(node);
+        }
+
+        /// <summary>
+        /// Null-aware negation of a boolean operand in a projection, mirroring the WHERE-side EmitNegation so
+        /// three-valued logic matches C#: (int?)null &gt; 5 is false, so !(null &gt; 5) must be TRUE. A bare
+        /// NOT(...) stays UNKNOWN for a NULL operand and the enclosing CASE falls to its ELSE (the wrong
+        /// branch). Push the negation to the comparison leaves (De Morgan for &amp;&amp;/||) and OR in an IS NULL
+        /// rescue for each nullable operand of a relational comparison. Leaves are emitted through this
+        /// visitor's own Visit so column aliasing stays consistent with the rest of the projection.
+        /// </summary>
+        private void EmitProjectionNegation(Expression operand)
+        {
+            var sb = EnsureBuilder();
+            operand = StripBoolConvertForNegation(operand);
+            switch (operand)
+            {
+                case UnaryExpression { NodeType: ExpressionType.Not } inner: // !!x == x
+                    Visit(StripBoolConvertForNegation(inner.Operand));
+                    return;
+                case BinaryExpression { NodeType: ExpressionType.AndAlso } and:
+                    sb.Append('(');
+                    EmitProjectionNegation(and.Left);
+                    sb.Append(" OR ");
+                    EmitProjectionNegation(and.Right);
+                    sb.Append(')');
+                    return;
+                case BinaryExpression { NodeType: ExpressionType.OrElse } orElse:
+                    sb.Append('(');
+                    EmitProjectionNegation(orElse.Left);
+                    sb.Append(" AND ");
+                    EmitProjectionNegation(orElse.Right);
+                    sb.Append(')');
+                    return;
+                // !(a == b) == a != b (and vice versa): route back through the binary visitor so its
+                // existing null expansion applies, matching the WHERE-side approach.
+                case BinaryExpression { NodeType: ExpressionType.Equal } eq:
+                    Visit(Expression.NotEqual(eq.Left, eq.Right));
+                    return;
+                case BinaryExpression { NodeType: ExpressionType.NotEqual } ne:
+                    Visit(Expression.Equal(ne.Left, ne.Right));
+                    return;
+                case BinaryExpression
+                {
+                    NodeType: ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                        or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                } rel:
+                    sb.Append("(NOT(");
+                    Visit(rel);
+                    sb.Append(')');
+                    AppendNullRescueForNegation(rel.Left);
+                    AppendNullRescueForNegation(rel.Right);
+                    sb.Append(')');
+                    return;
+                default:
+                    sb.Append("NOT (");
+                    Visit(operand);
+                    sb.Append(')');
+                    return;
+            }
+        }
+
+        private void AppendNullRescueForNegation(Expression operand)
+        {
+            var t = operand.Type;
+            var couldBeNull = !t.IsValueType || Nullable.GetUnderlyingType(t) != null;
+            // A non-null constant literal can never be NULL, so no rescue is needed. (Over-rescuing a
+            // nullable non-null column is harmless — its IS NULL is always false — but skip the pointless
+            // clause for constants.)
+            if (operand is ConstantExpression { Value: not null } && Nullable.GetUnderlyingType(t) == null)
+                couldBeNull = false;
+            if (!couldBeNull)
+                return;
+            var sb = EnsureBuilder();
+            sb.Append(" OR (");
+            Visit(operand);
+            sb.Append(" IS NULL)");
+        }
+
+        private static Expression StripBoolConvertForNegation(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u
+                   && (u.Type == typeof(bool) || u.Type == typeof(bool?)))
+                e = u.Operand;
+            return e;
         }
 
         protected override Expression VisitMemberInit(MemberInitExpression node)
