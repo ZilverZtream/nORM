@@ -51,8 +51,18 @@ namespace nORM.Core
                     TableMapping? childMapping = null;
                     foreach (var child in collection)
                     {
-                        if (child == null || ChangeTracker.GetEntryOrDefault(child) != null)
+                        if (child == null)
                             continue;
+                        if (ChangeTracker.GetEntryOrDefault(child) != null)
+                        {
+                            // Already tracked — e.g. ctx.Add(child) then principal.Children.Add(child) without
+                            // setting the child's FK/reference nav. Fixup still owes it the principal's key:
+                            // fill an UNSET FK from the principal's already-assigned key (a deliberately-set
+                            // FK is left alone — FK edit outranks stale nav). A default/DB-generated principal
+                            // key is skipped here and propagated post-insert by PropagateGeneratedKeyToChildren.
+                            PropagateAssignedPrincipalKeyToUnsetFk(relation, principal, child);
+                            continue;
+                        }
 
                         childMapping ??= GetMapping(relation.DependentType);
                         var childEntry = ChangeTracker.Track(child, EntityState.Added, childMapping);
@@ -74,6 +84,26 @@ namespace nORM.Core
             // collection was loaded but is now absent is either reparented (moved into
             // another loaded collection) or disassociated. Gated on a load-time snapshot.
             ReconcileLoadedCollections();
+        }
+
+        /// <summary>
+        /// Fills an already-tracked child's UNSET foreign key from the principal's ASSIGNED key when the
+        /// child sits in the principal's collection navigation. Skips a principal whose key is still default
+        /// (DB-generated, propagated post-insert instead) and a child whose FK is already non-default (set
+        /// deliberately — FK edit outranks stale nav). Composite keys are handled per component.
+        /// </summary>
+        private static void PropagateAssignedPrincipalKeyToUnsetFk(TableMapping.Relation relation, object principal, object child)
+        {
+            for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
+            {
+                var principalKey = relation.PrincipalKeys[i].Getter(principal);
+                if (ChangeTracker.IsDefaultKeyValue(principalKey, relation.PrincipalKeys[i].Prop.PropertyType))
+                    continue;
+                var fkCol = relation.ForeignKeys[i];
+                if (!ChangeTracker.IsDefaultKeyValue(fkCol.Getter(child), fkCol.Prop.PropertyType))
+                    continue;
+                fkCol.Setter(child, principalKey);
+            }
         }
 
         /// <summary>
