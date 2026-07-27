@@ -196,6 +196,9 @@ namespace nORM.Core
             _modelBuilder = new ModelBuilder();
             Options.OnModelCreating?.Invoke(_modelBuilder);
             OnModelCreating(_modelBuilder);
+            // Mirror bidirectional many-to-many joins onto the related type so editing the inverse navigation
+            // persists. Runs after all configuration, before any mapping is built lazily.
+            _modelBuilder.FinalizeInverseManyToMany();
             Database = new DatabaseFacade(this);
             _executionStrategy = Options.RetryPolicy != null
                 ? new RetryingExecutionStrategy(this, Options.RetryPolicy)

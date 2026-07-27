@@ -10,9 +10,17 @@ using nORM.Mapping;
 
 namespace nORM.Configuration
 {
+    // Write access to a configuration's many-to-many list that is independent of the generic
+    // EntityTypeBuilder<TEntity> nesting, so ModelBuilder.FinalizeInverseManyToMany can register a mirror
+    // join on any type's configuration regardless of the closed generic that produced it.
+    internal interface IManyToManyConfigurationSink
+    {
+        void AddManyToMany(ManyToManyConfiguration config);
+    }
+
     public partial class EntityTypeBuilder<TEntity> where TEntity : class
     {
-        internal class MappingConfiguration : IEntityTypeConfiguration
+        internal class MappingConfiguration : IEntityTypeConfiguration, IManyToManyConfigurationSink
         {
             public string? TableName { get; private set; }
             public string? SchemaName { get; private set; }

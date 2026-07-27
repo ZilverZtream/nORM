@@ -141,5 +141,60 @@ namespace nORM.Configuration
         /// <returns>An enumerable collection of configured entity types.</returns>
         internal IEnumerable<Type> GetConfiguredEntityTypes()
             => _configurations.Keys;
+
+        /// <summary>
+        /// Registers the inverse side of every bidirectional many-to-many relationship. When a relationship is
+        /// configured with an inverse navigation — <c>HasMany(p =&gt; p.Tags).WithMany(t =&gt; t.Posts)</c> — only
+        /// the declaring type carries the join configuration, so editing the inverse navigation (<c>tag.Posts</c>)
+        /// would be a silent no-op. This mirrors the join onto the related type's configuration (swapping the
+        /// left/right sides) so each type builds its own join mapping and the change-detection / sync path
+        /// handles either navigation. Run once after OnModelCreating, before any mapping is built. Idempotent:
+        /// a relationship whose related type already declares a join for the same table (both sides configured,
+        /// or a prior mirror) is left untouched.
+        /// </summary>
+        internal void FinalizeInverseManyToMany()
+        {
+            // Snapshot: adding a config for a not-yet-configured related type mutates _configurations.
+            foreach (var (declaringType, config) in _configurations.ToList())
+            {
+                foreach (var m2m in config.ManyToManyRelationships)
+                {
+                    if (string.IsNullOrEmpty(m2m.RelatedNavPropertyName))
+                        continue; // declaring-side-only relationship — nothing to mirror
+
+                    if (!_configurations.TryGetValue(m2m.RelatedType, out var relatedConfig))
+                    {
+                        relatedConfig = new EntityTypeBuilder<object>.MappingConfiguration();
+                        _configurations[m2m.RelatedType] = relatedConfig;
+                    }
+
+                    // Skip when the related type already declares a join for this table (both sides configured
+                    // explicitly, or a mirror already added).
+                    if (relatedConfig.ManyToManyRelationships.Any(x =>
+                            string.Equals(x.JoinTableName, m2m.JoinTableName, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    var mirror = new ManyToManyConfiguration(
+                        m2m.RelatedNavPropertyName!, // the inverse navigation becomes the related type's nav
+                        declaringType,               // …pointing back at the declaring type
+                        m2m.JoinTableName,
+                        m2m.RightFkColumn,           // swap the join-table FK columns
+                        m2m.LeftFkColumn,
+                        m2m.NavPropertyName)         // …whose inverse is the declaring type's nav
+                    {
+                        JoinTableSchema = m2m.JoinTableSchema,
+                        LeftFkColumns = m2m.RightFkColumns,
+                        RightFkColumns = m2m.LeftFkColumns,
+                        LeftKeyProperties = m2m.RightKeyProperties,
+                        RightKeyProperties = m2m.LeftKeyProperties,
+                        LeftOnDelete = m2m.RightOnDelete,
+                        LeftOnUpdate = m2m.RightOnUpdate,
+                        RightOnDelete = m2m.LeftOnDelete,
+                        RightOnUpdate = m2m.LeftOnUpdate,
+                    };
+                    ((IManyToManyConfigurationSink)relatedConfig).AddManyToMany(mirror);
+                }
+            }
+        }
     }
 }
