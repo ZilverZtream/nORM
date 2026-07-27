@@ -33,8 +33,10 @@ explicitly. Calling it manually is supported for diagnostic tooling.
 - `ctx.Attach(entity)` inserts the entity into the identity map with state `Unchanged` and
   captures the current property values as the snapshot. Subsequent mutations promote it to
   `Modified` at `SaveChanges` time.
-- `ctx.Attach(entity)` validates: the entity must not already be tracked under a conflicting
-  PK. The PK must be readable (no shadow-only key).
+- `ctx.Attach(entity)` adds the entity in the `Unchanged` state; if an instance with the same PK
+  is already tracked, Attach resolves to the existing entry rather than throwing (the
+  conflicting-PK guard applies to `Add`/`Update`, i.e. `Added`/`Modified`). The PK must be
+  readable (no shadow-only key).
 - `ctx.Detach(entity)` removes the entity from the identity map and discards its snapshot.
   Pending mutations against the detached instance are lost.
 
@@ -45,9 +47,10 @@ explicitly. Calling it manually is supported for diagnostic tooling.
   `UPDATE`/`DELETE` WHERE predicate uses `OriginalKey`, so a silent PK change would corrupt the
   write.
 - For composite keys, mutating *any* PK component is treated as a PK mutation.
-- DB-generated default keys (`0`/`Guid.Empty`/empty string) are NOT considered "set" until
-  `SaveChanges` populates them; they are a separate identity-map state and don't collide with
-  pre-existing rows.
+- DB-generated default keys (`null`, `0` for integer types, `Guid.Empty`) are NOT considered
+  "set" until `SaveChanges` populates them; they are a separate identity-map state and don't
+  collide with pre-existing rows. Note a `string` key is treated as assigned whenever it is
+  non-null (including `""`), so DB-generated string keys should be left `null` before insert.
 
 ## Immutable Entities and Constructor-Bound Properties
 
