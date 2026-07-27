@@ -26,7 +26,8 @@ namespace nORM.Core
             var queue = new Queue<EntityEntry>();
             foreach (var e in ChangeTracker.Entries)
                 if (e.Entity != null && e.State != EntityState.Deleted
-                    && (e.Mapping.Relations.Count > 0 || e.Mapping.ReferenceNavigations.Length > 0))
+                    && (e.Mapping.Relations.Count > 0 || e.Mapping.ReferenceNavigations.Length > 0
+                        || e.Mapping.ManyToManyJoins.Count > 0))
                     queue.Enqueue(e);
             if (queue.Count == 0)
                 return;
@@ -77,6 +78,19 @@ namespace nORM.Core
                     }
                 }
 
+                // Many-to-many (skip) navigations: a NEW related entity added to the collection WITHOUT
+                // ctx.Add — post.Tags.Add(new Tag{...}) — must be tracked (and thus inserted) so the deferred
+                // join-table sync links it by its hydrated key instead of a default 0 (a lost entity + broken
+                // join row). Only untracked entities are tracked here; already-tracked ones flow through the
+                // association sync. Walk whichever side this entry owns the collection nav for.
+                foreach (var join in entry.Mapping.ManyToManyJoins)
+                {
+                    if (join.LeftType == entry.Mapping.Type)
+                        TrackUntrackedManyToManyRelated(join.LeftCollectionGetter(principal), join.RightType, queue);
+                    if (join.RightCollectionGetter != null && join.RightType == entry.Mapping.Type)
+                        TrackUntrackedManyToManyRelated(join.RightCollectionGetter(principal), join.LeftType, queue);
+                }
+
                 FixupReferenceNavigations(entry, queue);
             }
 
@@ -84,6 +98,47 @@ namespace nORM.Core
             // collection was loaded but is now absent is either reparented (moved into
             // another loaded collection) or disassociated. Gated on a load-time snapshot.
             ReconcileLoadedCollections();
+        }
+
+        /// <summary>
+        /// Tracks (as Added) each untracked entity in a many-to-many collection navigation so it is inserted
+        /// and its key hydrated before the deferred join-table sync flushes — otherwise a new related entity
+        /// added straight to the skip navigation is silently lost and its join row written with a default key.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup resolves dependent mappings via reflection; trimming may remove the required members.")]
+        private void TrackUntrackedManyToManyRelated(System.Collections.IList? related, Type relatedType, Queue<EntityEntry> queue)
+        {
+            if (related == null)
+                return;
+            TableMapping? relatedMapping = null;
+            foreach (var item in related)
+            {
+                if (item == null || ChangeTracker.GetEntryOrDefault(item) != null)
+                    continue;
+                relatedMapping ??= GetMapping(relatedType);
+                // Only a NEW entity (all key components default/unset) is inserted. An untracked entity with a
+                // SET key is an EXISTING row that the join sync links by key — inserting it would duplicate
+                // (and a client-keyed new entity must be ctx.Add'd explicitly, since a set key is ambiguous).
+                if (!HasAllDefaultKeyValues(item, relatedMapping))
+                    continue;
+                var itemEntry = ChangeTracker.Track(item, EntityState.Added, relatedMapping);
+                if (itemEntry.Mapping.Relations.Count > 0
+                    || itemEntry.Mapping.ReferenceNavigations.Length > 0
+                    || itemEntry.Mapping.ManyToManyJoins.Count > 0)
+                    queue.Enqueue(itemEntry);
+            }
+        }
+
+        /// <summary>True when every key column of <paramref name="entity"/> holds its default/unset value —
+        /// i.e. the entity is new (never persisted) rather than an existing row referenced by key.</summary>
+        private static bool HasAllDefaultKeyValues(object entity, TableMapping mapping)
+        {
+            if (mapping.KeyColumns.Length == 0)
+                return false;
+            foreach (var key in mapping.KeyColumns)
+                if (!ChangeTracker.IsDefaultKeyValue(key.Getter(entity), key.Prop.PropertyType))
+                    return false;
+            return true;
         }
 
         /// <summary>
