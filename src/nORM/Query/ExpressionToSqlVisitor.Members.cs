@@ -514,14 +514,104 @@ namespace nORM.Query
             // enum-array instantiation NativeAOT cannot provide); the returned values are
             // already underlying-typed so no Convert.ChangeType round-trip is needed.
             var values = Enum.GetValuesAsUnderlyingType(enumType);
+            // Exact-match cascade: an exactly-defined value (single OR composite) renders as its member
+            // name, and for a [Flags] enum a defined composite (e.g. ReadWrite=3) wins over decomposing
+            // into its parts — Enum.ToString picks the composite first — which the exact match preserves.
             foreach (var underlying in values)
             {
                 var name = Enum.GetName(enumType, underlying!) ?? underlying!.ToString()!;
                 sb.Append(" WHEN ").Append(columnSql).Append(" = ").Append(underlying)
                   .Append(" THEN ").Append(provider.EscapeStringLiteral(name));
             }
-            sb.Append(" ELSE ").Append(provider.GetToStringSql(columnSql)).Append(" END)");
+
+            // A [Flags] enum whose non-zero members are all single-bit (the canonical form) renders a
+            // combined value that is NOT itself a defined member as the ", "-joined member names in
+            // ascending value order — Enum.ToString's flags formatting — rather than the underlying
+            // integer. Compose that here; non-flags enums (and any value carrying bits outside the known
+            // flags, which .NET also renders numerically) keep the numeric CAST fallback.
+            if (TryBuildSingleBitFlagsDecomposition(provider, columnSql, enumType, out var flagsDecomp, out var knownMask))
+            {
+                // Value 0 with no named zero member -> "0" (a named zero member already matched above and
+                // wins). Then: a value with bits outside every defined flag can't be named -> numeric,
+                // matching .NET's leftover-bits fallback. (col & knownMask) <> col detects such bits
+                // without the type-width-dependent complement of the mask.
+                sb.Append(" WHEN ").Append(columnSql).Append(" = 0 THEN ").Append(provider.GetToStringSql(columnSql));
+                sb.Append(" WHEN (").Append(columnSql).Append(" & ").Append(knownMask).Append(") <> ")
+                  .Append(columnSql).Append(" THEN ").Append(provider.GetToStringSql(columnSql));
+                sb.Append(" ELSE ").Append(flagsDecomp);
+            }
+            else
+            {
+                sb.Append(" ELSE ").Append(provider.GetToStringSql(columnSql));
+            }
+            sb.Append(" END)");
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Builds the SQL that renders a canonical [Flags] enum value as its ", "-joined member names
+        /// (Enum.ToString's flags formatting) when every non-zero member is a single bit. Returns false —
+        /// leaving callers on the numeric fallback — for non-flags enums, empty enums, or enums with
+        /// composite (multi-bit) members, whose formatting is order-dependent (subtractive) and not
+        /// expressible as a flat CASE; those keep exact-match correctness and a numeric fallback (never a
+        /// silently-wrong partial name). The separator is emitted only after a smaller flag has already
+        /// matched, so the output carries no leading/trailing ", " and needs no substring trimming.
+        /// </summary>
+        private static bool TryBuildSingleBitFlagsDecomposition(DatabaseProvider provider, string columnSql,
+            Type enumType, out string decomposition, out long knownMask)
+        {
+            decomposition = "";
+            knownMask = 0;
+            if (!enumType.IsDefined(typeof(FlagsAttribute), inherit: false))
+                return false;
+
+            var raw = Enum.GetValuesAsUnderlyingType(enumType);
+            var flags = new SortedSet<long>();
+            foreach (var v in raw)
+            {
+                long u;
+                try { u = Convert.ToInt64(v!); }
+                catch (OverflowException) { return false; } // ulong member > long.MaxValue — bail to numeric
+                if (u == 0) continue;
+                // A negative underlying (top bit set) is not a power of two in two's complement, so the
+                // check below rejects it and we fall back to numeric rather than mis-masking a signed bit.
+                if ((u & (u - 1)) != 0) return false;        // more than one bit set -> composite member
+                flags.Add(u);
+            }
+            if (flags.Count == 0) return false;
+
+            long mask = 0;
+            foreach (var f in flags) mask |= f;
+
+            var pieces = new List<string>();
+            long smallerMask = 0;
+            foreach (var f in flags) // ascending (SortedSet<long>)
+            {
+                var name = Enum.GetName(enumType, Convert.ChangeType(f, Enum.GetUnderlyingType(enumType)))
+                           ?? f.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var matched = $"({columnSql} & {f}) = {f}";
+                string thenExpr;
+                if (smallerMask == 0)
+                {
+                    thenExpr = provider.EscapeStringLiteral(name);
+                }
+                else
+                {
+                    var withSep = provider.EscapeStringLiteral(", " + name);
+                    var withoutSep = provider.EscapeStringLiteral(name);
+                    thenExpr = $"(CASE WHEN ({columnSql} & {smallerMask}) <> 0 THEN {withSep} ELSE {withoutSep} END)";
+                }
+                pieces.Add($"(CASE WHEN {matched} THEN {thenExpr} ELSE {provider.EscapeStringLiteral(string.Empty)} END)");
+                smallerMask |= f;
+            }
+
+            var result = pieces[0];
+            for (int i = 1; i < pieces.Count; i++)
+                result = provider.GetConcatSql(result, pieces[i]);
+
+            decomposition = result;
+            knownMask = mask;
+            return true;
         }
 
         /// <summary>

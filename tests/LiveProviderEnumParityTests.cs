@@ -81,6 +81,18 @@ public sealed class LiveProviderEnumParityTests
                     .Select(r => r.Id)
                     .ToArray();
                 Assert.Equal(new[] { 3, 4 }, readAdminIds.ToArray());
+
+                // [Flags] ToString: a combined value renders as its ", "-joined member names, matching
+                // Enum.ToString, not the underlying integer. Exercises the flags decomposition SQL
+                // (nested CASE + provider CONCAT) on every live provider. Perms seed: 1,3,5,7,4.
+                var permNames = await ctx.Query<EnumParityRow>()
+                    .OrderBy(r => r.Id)
+                    .Select(r => new { r.Id, Name = r.Perms.ToString() })
+                    .ToListAsync();
+                Assert.Equal(
+                    new[] { LivePerm.Read, (LivePerm)3, (LivePerm)5, (LivePerm)7, LivePerm.Admin }
+                        .Select(p => p.ToString()).ToArray(),
+                    permNames.Select(r => r.Name).ToArray());
             }
             finally
             {
