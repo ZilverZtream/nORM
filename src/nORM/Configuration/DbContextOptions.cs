@@ -353,8 +353,12 @@ namespace nORM.Configuration
         public bool UsePreciseChangeTracking { get; set; }
 
         /// <summary>
-        /// Gets or sets a value determining whether entities should be marked as
-        /// tracked eagerly upon materialization.
+        /// Gets or sets a value determining whether entities should be marked as tracked eagerly upon
+        /// materialization. Regardless of this setting, a tracked <see cref="nORM.Core.EntityState.Unchanged"/>
+        /// entity always captures its change-tracking baseline (original values) at load time, because
+        /// detecting a later edit requires a snapshot taken before that edit — deferring it would silently
+        /// drop edits. To avoid tracking overhead entirely for read-only queries, use <c>AsNoTracking()</c>
+        /// (which creates no change-tracking entry at all) rather than disabling this option.
         /// </summary>
         public bool EagerChangeTracking { get; set; } = true;
 

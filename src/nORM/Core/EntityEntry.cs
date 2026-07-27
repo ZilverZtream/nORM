@@ -924,6 +924,21 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Captures the change-tracking baseline (original scalar values + hashes, the timestamp/OCC token,
+        /// and any loaded association snapshots) at LOAD time, for an entity tracked as
+        /// <see cref="EntityState.Unchanged"/>.
+        /// </summary>
+        /// <remarks>
+        /// Correctness-critical for change detection: a plain-POCO edit is only detectable by diffing the
+        /// current entity against a snapshot taken BEFORE the edit. Deferring the snapshot to the first
+        /// <c>DetectChanges</c> (which runs at SaveChanges time — after the edit) captures the ALREADY-EDITED
+        /// values as the "original", so the diff finds no change and the UPDATE is silently dropped (a silent
+        /// lost update). Truly read-only loads that want zero tracking overhead should use
+        /// <c>AsNoTracking()</c>, which creates no entry at all.
+        /// </remarks>
+        internal void CaptureLoadTimeBaseline() => UpgradeToFullTracking();
+
+        /// <summary>
         /// Captures the current property values and hash codes as the baseline for
         /// detecting future modifications.
         /// </summary>

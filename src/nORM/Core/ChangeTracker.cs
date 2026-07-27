@@ -254,8 +254,16 @@ namespace nORM.Core
         /// <returns>A lazily-initialized <see cref="EntityEntry"/> instance.</returns>
         private EntityEntry CreateLazyEntry(object entity, TableMapping mapping)
         {
-            // Minimal entry that defers property change setup
-            return new EntityEntry(entity, EntityState.Unchanged, mapping, _options, this, lazy: true);
+            // A tracked Unchanged entity may still be edited and saved. Detecting a plain-POCO edit requires
+            // an original-value snapshot taken BEFORE the edit, so the baseline MUST be captured at load:
+            // deferring it to the first DetectChanges (at SaveChanges time) captures the already-edited values
+            // as the "original", the diff finds no change, and the UPDATE is silently dropped (a silent lost
+            // update). The delegate/hash SHAPE is still shared per-mapping, so this only allocates the small
+            // per-entity snapshot; genuinely read-only loads that want zero tracking overhead should use
+            // AsNoTracking(), which creates no entry at all.
+            var entry = new EntityEntry(entity, EntityState.Unchanged, mapping, _options, this, lazy: true);
+            entry.CaptureLoadTimeBaseline();
+            return entry;
         }
 
         /// <summary>
