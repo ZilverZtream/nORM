@@ -196,7 +196,11 @@ namespace nORM.Migration
 
             // UP-4: Alter existing columns.
             foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
+            {
+                foreach (var idCol in oldPkCols.Where(static c => c.IsIdentity))
+                    up.Add(StripAutoIncrementModify(table, idCol));
                 up.Add($"ALTER TABLE {EscTable(table.Name)} DROP PRIMARY KEY");
+            }
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
@@ -222,7 +226,11 @@ namespace nORM.Migration
                     up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, newCol)}");
             }
             foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
+            {
                 up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, newPkCols)}");
+                foreach (var idCol in newPkCols.Where(static c => c.IsIdentity))
+                    up.Add(RestoreAutoIncrementModify(table, idCol));
+            }
 
             // UP-5: Create new tables (including inline FK constraints).
             foreach (var table in diff.AddedTables)
@@ -344,7 +352,11 @@ namespace nORM.Migration
 
             // DOWN-4: Reverse column alterations from UP-4.
             foreach (var (table, _, newPkCols) in primaryKeyChanges.Where(static change => change.NewPrimaryKeyColumns.Length > 0))
+            {
+                foreach (var idCol in newPkCols.Where(static c => c.IsIdentity))
+                    down.Add(StripAutoIncrementModify(table, idCol));
                 down.Add($"ALTER TABLE {EscTable(table.Name)} DROP PRIMARY KEY");
+            }
             foreach (var (table, newCol, oldCol) in diff.AlteredColumns)
             {
                 if (IsComputedColumn(newCol) || IsComputedColumn(oldCol))
@@ -368,7 +380,11 @@ namespace nORM.Migration
                     down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, oldCol)}");
             }
             foreach (var (table, oldPkCols, _) in primaryKeyChanges.Where(static change => change.OldPrimaryKeyColumns.Length > 0))
+            {
                 down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildPrimaryKeyConstraintSql(table, oldPkCols)}");
+                foreach (var idCol in oldPkCols.Where(static c => c.IsIdentity))
+                    down.Add(RestoreAutoIncrementModify(table, idCol));
+            }
 
             // DOWN-5: Restore columns that were dropped in UP-3.
             // C: include DefaultValue in the column definition so NOT NULL restore doesn't fail.
@@ -585,6 +601,16 @@ namespace nORM.Migration
                 _ => validated,
             };
         }
+
+        // MySQL rejects DROP PRIMARY KEY while a PK column is still AUTO_INCREMENT (error 1075: an auto column
+        // must be defined as a key). These emit a MODIFY that removes AUTO_INCREMENT before the key is dropped
+        // and restores it once the replacement key is in place, preserving store-generated identity across a
+        // primary-key change.
+        private static string StripAutoIncrementModify(TableSchema table, ColumnSchema col)
+            => $"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {Esc(col.Name)} {GetSqlType(col)}{FormatCollation(col)} {(col.IsNullable ? "NULL" : "NOT NULL")}";
+
+        private static string RestoreAutoIncrementModify(TableSchema table, ColumnSchema col)
+            => $"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {Esc(col.Name)} {GetSqlType(col)}{FormatCollation(col)} {(col.IsNullable ? "NULL" : "NOT NULL")} AUTO_INCREMENT";
 
         // MySQL data types that reject a literal DEFAULT clause and require the parenthesised
         // expression-default form (DEFAULT (expr)) instead: all BLOB/TEXT sizes, JSON, and spatial types.

@@ -274,6 +274,71 @@ public class LiveProviderMigrationDdlParityTests
         }
     }
 
+    // MySQL refuses DROP PRIMARY KEY while a PK column is still AUTO_INCREMENT (error 1075: "there can be
+    // only one auto column and it must be defined as a key"). Widening a single-column auto-increment PK into
+    // a composite PK emitted a bare DROP PRIMARY KEY and aborted the migration. The generator must strip
+    // AUTO_INCREMENT before dropping the key and restore it after the new key is in place. Live-only.
+    [Fact]
+    public void LiveProvider_MySql_ChangePrimaryKey_PreservesAutoIncrementColumn()
+    {
+        var (cn, skip) = Open("mysql");
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_PkChangeAutoInc";
+
+        try
+        {
+            ExecSafe(db, $"DROP TABLE IF EXISTS `{table}`");
+            Exec(db, $"CREATE TABLE `{table}` (`Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `Code` VARCHAR(50) NOT NULL)");
+            Exec(db, $"INSERT INTO `{table}` (`Code`) VALUES ('a')");
+
+            // New schema: composite PK (Id, Code); Id stays auto-increment.
+            var newTable = new TableSchema
+            {
+                Name = table,
+                Columns =
+                {
+                    new ColumnSchema { Name = "Id",   ClrType = typeof(int).FullName!,    IsPrimaryKey = true, IsNullable = false, IsIdentity = true },
+                    new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, MaxLength = 50, IsPrimaryKey = true, IsNullable = false, IsIdentity = false },
+                }
+            };
+            var newCode = newTable.Columns[1];
+            var oldCode = new ColumnSchema { Name = "Code", ClrType = typeof(string).FullName!, MaxLength = 50, IsPrimaryKey = false, IsNullable = false, IsIdentity = false };
+            var diff = new SchemaDiff();
+            diff.AlteredColumns.Add((newTable, newCode, oldCode));
+
+            // BUG: emitted `DROP PRIMARY KEY` while `Id` is still AUTO_INCREMENT → MySQL error 1075, migration aborts.
+            var stmts = Generator("mysql").GenerateSql(diff);
+            ApplyStatements(db, stmts.Up);
+
+            // Composite PK is in place and Id is still auto-increment (key-less inserts get distinct keys).
+            Assert.True(MySqlColumnIsAutoIncrement(db, table, "Id"), "Id must stay AUTO_INCREMENT after the PK change.");
+            Exec(db, $"INSERT INTO `{table}` (`Code`) VALUES ('b')");
+            Exec(db, $"INSERT INTO `{table}` (`Code`) VALUES ('c')");
+            using (var cnt = db.CreateCommand())
+            {
+                cnt.CommandText = $"SELECT COUNT(DISTINCT `Id`) FROM `{table}`";
+                Assert.Equal(3L, Convert.ToInt64(cnt.ExecuteScalar()));
+            }
+
+            // Down must reverse symmetrically (drop the composite PK — again while Id is auto-increment — and
+            // restore the single-column PK) without tripping error 1075 and while keeping Id auto-increment.
+            ApplyStatements(db, stmts.Down);
+            Assert.True(MySqlColumnIsAutoIncrement(db, table, "Id"), "Id must stay AUTO_INCREMENT after Down.");
+            Exec(db, $"INSERT INTO `{table}` (`Code`) VALUES ('d')");
+            using (var cnt2 = db.CreateCommand())
+            {
+                cnt2.CommandText = $"SELECT COUNT(DISTINCT `Id`) FROM `{table}`";
+                Assert.Equal(4L, Convert.ToInt64(cnt2.ExecuteScalar()));
+            }
+        }
+        finally
+        {
+            ExecSafe(cn, $"DROP TABLE IF EXISTS `{table}`");
+            db.Dispose();
+        }
+    }
+
     // ── Base-table DDL (provider-specific CREATE TABLE) ──────────────────────
 
     private static string CreateBaseDdl(string kind, string table) => kind switch
