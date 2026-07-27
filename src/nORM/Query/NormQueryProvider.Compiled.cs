@@ -827,6 +827,11 @@ namespace nORM.Query
 
         private async Task<TResult> ExecuteCompiledMaterializeAsync<TResult>(QueryPlan plan, DbCommand cmd, CancellationToken ct)
         {
+            // The scalar branch executes cmd via ExecuteScalar (which does not take ownership) and returns
+            // without disposing, leaking the command on both the success and throw paths. Own it here so the
+            // scalar path cannot leak; the non-scalar branches transfer cmd to a materializer that also disposes,
+            // but DbCommand.DisposeAsync is idempotent so the double-dispose is harmless.
+            await using var _ownedCmd = cmd;
             object? result;
             if (plan.IsScalar)
             {

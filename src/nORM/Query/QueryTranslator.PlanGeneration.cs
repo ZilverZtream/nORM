@@ -279,10 +279,13 @@ namespace nORM.Query
 
                         object ReadScalarValue(object dbValue)
                         {
+                            // Let OverflowException propagate: an aggregate (e.g. Sum) whose DB total exceeds the
+                            // declared CLR result type overflows exactly as Enumerable.Sum does — swallowing it and
+                            // returning the raw provider value would surface a silently wrong result. A genuine
+                            // type/format mismatch keeps the provider value for the downstream converter to handle.
                             try { return Convert.ChangeType(dbValue, underlyingType); }
                             catch (InvalidCastException) { return dbValue; }
                             catch (FormatException) { return dbValue; }
-                            catch (OverflowException) { return dbValue; }
                         }
 
                         object HandleNull()
