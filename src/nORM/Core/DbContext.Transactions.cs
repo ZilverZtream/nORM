@@ -175,6 +175,18 @@ namespace nORM.Core
             if (_transactionKeySnapshot != null)
                 RestoreRolledBackGeneratedKeys(_transactionKeySnapshot);
             RestoreInsertedFlags(_transactionInsertedSnapshot);
+            RestoreTransactionTokenAndValueBaselines();
+        }
+
+        /// <summary>
+        /// Restores the OCC token snapshot and change-tracking value baselines advanced by saves under a
+        /// caller-owned or enlisted scope, so a rollback leaves a pending edit re-applicable and an OCC entity
+        /// re-updatable instead of false-conflicting. Shared by the explicit full-rollback path and the ambient
+        /// scope-abort path; a no-op when neither snapshot was captured. Clears the values snapshot so it cannot
+        /// leak into a later scope's rollback.
+        /// </summary>
+        private void RestoreTransactionTokenAndValueBaselines()
+        {
             if (_transactionTokenSnapshot != null)
                 RestoreOccOriginalTokens(_transactionTokenSnapshot);
             if (_transactionValuesSnapshot != null)
@@ -208,6 +220,12 @@ namespace nORM.Core
             _registeredAmbientTransaction = ambient;
             _ambientKeySnapshot = SnapshotAddedGeneratedKeys();
             _ambientInsertedSnapshot = SnapshotInsertedEntities();
+            // Capture the pre-scope OCC tokens here (the caller-owned path captures them in
+            // SetCurrentTransaction, which the ambient path never calls). A save under the scope advances
+            // both these tokens and the Modified-entity value baselines (the latter into the shared, lazily
+            // populated _transactionValuesSnapshot), so an abort must restore both — otherwise a re-updated
+            // OCC entity false-conflicts and a pending edit is silently dropped after the scope reverts.
+            _transactionTokenSnapshot = SnapshotOccOriginalTokens();
             ambient.TransactionCompleted += OnAmbientTransactionCompleted;
         }
 
@@ -220,6 +238,7 @@ namespace nORM.Core
                     if (_ambientKeySnapshot != null)
                         RestoreRolledBackGeneratedKeys(_ambientKeySnapshot);
                     RestoreInsertedFlags(_ambientInsertedSnapshot);
+                    RestoreTransactionTokenAndValueBaselines();
                 }
             }
             finally
@@ -229,6 +248,11 @@ namespace nORM.Core
                     _registeredAmbientTransaction = null;
                     _ambientKeySnapshot = null;
                     _ambientInsertedSnapshot = null;
+                    // Clear on BOTH commit and abort so a committed scope's advanced baselines cannot leak
+                    // into a later caller-owned transaction's full-rollback restore. (On abort they were
+                    // already restored above; RestoreTransactionTokenAndValueBaselines cleared the values map.)
+                    _transactionTokenSnapshot = null;
+                    _transactionValuesSnapshot = null;
                 }
             }
         }
