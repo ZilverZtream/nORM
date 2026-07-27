@@ -485,9 +485,12 @@ namespace nORM.Query
                   .Append(" WHERE ");
                 AppendNavigationRelationPredicate(sb, relation, depAlias, outerAlias);
                 if (globalFilterSql != null) sb.Append(" AND ").Append(globalFilterSql);
-                // All(p) ≡ NOT EXISTS(visible row matching NOT p) — invert the extra filter, not the
-                // global filter (visibility must still restrict the set the predicate ranges over).
-                if (extraFilterSql != null) sb.Append(" AND NOT (").Append(extraFilterSql).Append(')');
+                // All(p) ≡ NOT EXISTS(visible row matching NOT p) — invert the extra filter, not the global
+                // filter (visibility must still restrict the set the predicate ranges over). Render the NEGATION
+                // from the lambda through the null-aware negator, not a bare NOT over the positive SQL, so a NULL
+                // child correctly counts as a failing row (matching C#'s (int?)null > 5 == false).
+                if (extraFilter != null)
+                    sb.Append(" AND ").Append(RenderNavigationFilterBodyNegated(extraFilter.Body, extraFilter.Parameters[0], depAlias));
                 sb.Append(") THEN 1 ELSE 0 END");
             }
             else
@@ -643,6 +646,55 @@ namespace nORM.Query
         private string RenderNavigationFilter(LambdaExpression filter, string depAlias)
             => RenderNavigationFilterBody(filter.Body, filter.Parameters[0], depAlias);
 
+        /// <summary>
+        /// Null-aware negation of a navigation-filter predicate, mirroring the WHERE-side EmitNegation so a
+        /// projected All / negated filter follows SQL three-valued logic instead of a bare NOT (which stays
+        /// UNKNOWN for a NULL operand and drops the row). Pushes the negation to the leaves: De Morgan for
+        /// &amp;&amp;/||, flips ==/!= back through the (null-safe) positive path, and for a relational comparison
+        /// emits NOT(a op b) OR &lt;nullable operand&gt; IS NULL. Uses the grammar's own RenderFilterSide so column
+        /// aliasing/converters stay consistent with the positive rendering.
+        /// </summary>
+        private string RenderNavigationFilterBodyNegated(Expression body, ParameterExpression elementParam, string depAlias)
+        {
+            body = StripBoolConvertForNegation(body);
+            switch (body)
+            {
+                case UnaryExpression { NodeType: ExpressionType.Not } inner: // !!x == x
+                    return RenderNavigationFilterBody(StripBoolConvertForNegation(inner.Operand), elementParam, depAlias);
+                case BinaryExpression { NodeType: ExpressionType.AndAlso } and:
+                    return $"({RenderNavigationFilterBodyNegated(and.Left, elementParam, depAlias)} OR {RenderNavigationFilterBodyNegated(and.Right, elementParam, depAlias)})";
+                case BinaryExpression { NodeType: ExpressionType.OrElse } orElse:
+                    return $"({RenderNavigationFilterBodyNegated(orElse.Left, elementParam, depAlias)} AND {RenderNavigationFilterBodyNegated(orElse.Right, elementParam, depAlias)})";
+                // Flip through the positive path: it lowers `== null`/`!= null` to IS [NOT] NULL and expands a
+                // value `!=` to the null-safe 3-term form, so the negations inherit correct 3VL.
+                case BinaryExpression { NodeType: ExpressionType.Equal } eq:
+                    return RenderNavigationFilterBody(Expression.NotEqual(eq.Left, eq.Right), elementParam, depAlias);
+                case BinaryExpression { NodeType: ExpressionType.NotEqual } ne:
+                    return RenderNavigationFilterBody(Expression.Equal(ne.Left, ne.Right), elementParam, depAlias);
+                case BinaryExpression
+                {
+                    NodeType: ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                        or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                } rel:
+                    var negated = "(NOT (" + RenderNavigationFilterBody(rel, elementParam, depAlias) + ")";
+                    if (NavOperandCouldBeNull(rel.Left))
+                        negated += " OR " + RenderFilterSide(rel.Left, elementParam, depAlias) + " IS NULL";
+                    if (NavOperandCouldBeNull(rel.Right))
+                        negated += " OR " + RenderFilterSide(rel.Right, elementParam, depAlias) + " IS NULL";
+                    return negated + ")";
+                default:
+                    return "NOT (" + RenderNavigationFilterBody(body, elementParam, depAlias) + ")";
+            }
+        }
+
+        private static bool NavOperandCouldBeNull(Expression e)
+        {
+            if (e is ConstantExpression { Value: not null })
+                return false;
+            var t = e.Type;
+            return !t.IsValueType || Nullable.GetUnderlyingType(t) != null;
+        }
+
         // Renders a predicate against the dependent alias. Recursive so it covers the common global
         // filter shapes (soft-delete `!c.IsDeleted`, a bare boolean flag, and `&&`/`||` compositions)
         // in addition to the simple `c.X op constant` comparisons.
@@ -651,7 +703,7 @@ namespace nORM.Query
             switch (body)
             {
                 case UnaryExpression { NodeType: ExpressionType.Not } notExpr:
-                    return $"NOT ({RenderNavigationFilterBody(notExpr.Operand, elementParam, depAlias)})";
+                    return RenderNavigationFilterBodyNegated(notExpr.Operand, elementParam, depAlias);
 
                 // Bare boolean member (`c.IsActive`) → `alias.IsActive = <true>`.
                 case MemberExpression boolMember when boolMember.Type == typeof(bool) && boolMember.Expression == elementParam:
@@ -684,6 +736,17 @@ namespace nORM.Query
                     var rightColConv = ColumnConverterFor(be.Right, elementParam);
                     var lhs = RenderFilterSide(be.Left, elementParam, depAlias, valueConverter: rightColConv);
                     var rhs = RenderFilterSide(be.Right, elementParam, depAlias, valueConverter: leftColConv);
+                    if (be.NodeType == ExpressionType.NotEqual)
+                    {
+                        // C# `a != b` is true when EXACTLY ONE side is NULL, or both are non-NULL and unequal —
+                        // NOT the bare SQL `a <> b`, which is UNKNOWN (dropped) whenever either side is NULL, and
+                        // (crucially) which must stay FALSE when BOTH are NULL. Expand to match, rescuing only the
+                        // operands that can actually be NULL.
+                        var neTerms = new List<string> { $"{lhs} <> {rhs}" };
+                        if (NavOperandCouldBeNull(be.Left)) neTerms.Add($"({lhs} IS NULL AND {rhs} IS NOT NULL)");
+                        if (NavOperandCouldBeNull(be.Right)) neTerms.Add($"({rhs} IS NULL AND {lhs} IS NOT NULL)");
+                        return neTerms.Count == 1 ? neTerms[0] : "(" + string.Join(" OR ", neTerms) + ")";
+                    }
                     var op = be.NodeType switch
                     {
                         ExpressionType.Equal => "=",
