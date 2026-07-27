@@ -6,6 +6,16 @@ namespace nORM.Providers
 {
     public partial class SqliteProvider
     {
+        // Every code point for which char.IsWhiteSpace is true, as a SQLite string of those characters.
+        // SQLite's two-argument TRIM/LTRIM/RTRIM(x, Y) strip any leading/trailing character that appears in Y,
+        // so passing this set makes the parameterless Trim()/TrimStart()/TrimEnd()/IsNullOrWhiteSpace strip the
+        // same whitespace .NET does. The one-argument form strips only U+0020, silently leaving tabs, newlines,
+        // NBSP and other Unicode whitespace — dropping rows a Trim() predicate should keep.
+        private const string DotNetWhitespaceChars =
+            "char(9)||char(10)||char(11)||char(12)||char(13)||char(32)||char(133)||char(160)||char(5760)" +
+            "||char(8192)||char(8193)||char(8194)||char(8195)||char(8196)||char(8197)||char(8198)||char(8199)" +
+            "||char(8200)||char(8201)||char(8202)||char(8232)||char(8233)||char(8239)||char(8287)||char(12288)";
+
         private static string? TryTranslateStringFunction(string name, Type declaringType, string[] args)
         {
             if (declaringType != typeof(string))
@@ -26,7 +36,7 @@ namespace nORM.Providers
                 // falls through to its generic function-name handler and emits
                 // raw "ISNULLOREMPTY(...)" -- a SQLite 'no such function' error.
                 nameof(string.IsNullOrEmpty) when args.Length == 1 => $"({args[0]} IS NULL OR {args[0]} = '')",
-                nameof(string.IsNullOrWhiteSpace) when args.Length == 1 => $"({args[0]} IS NULL OR LTRIM(RTRIM({args[0]})) = '')",
+                nameof(string.IsNullOrWhiteSpace) when args.Length == 1 => $"({args[0]} IS NULL OR LTRIM(RTRIM({args[0]}, {DotNetWhitespaceChars}), {DotNetWhitespaceChars}) = '')",
                 // string.Concat static with 2+ args -- chain via SQLite's || operator.
                 // Mirror of ExpressionToSqlVisitor's ~line 1333 inline path so SCV
                 // doesn't fall through to its lambda-expecting Queryable fallback
@@ -44,9 +54,9 @@ namespace nORM.Providers
                 nameof(string.ToUpperInvariant) => $"UPPER({args[0]})",
                 nameof(string.ToLowerInvariant) => $"LOWER({args[0]})",
                 nameof(string.Length) when args.Length == 1 => $"LENGTH({args[0]})",
-                nameof(string.Trim) when args.Length == 1 => $"TRIM({args[0]})",
-                nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
-                nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
+                nameof(string.Trim) when args.Length == 1 => $"TRIM({args[0]}, {DotNetWhitespaceChars})",
+                nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]}, {DotNetWhitespaceChars})",
+                nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]}, {DotNetWhitespaceChars})",
                 // SQLite SUBSTR is 1-indexed; .NET Substring is 0-indexed, so add 1 to the start.
                 nameof(string.Substring) when args.Length == 2 => $"SUBSTR({args[0]}, {args[1]} + 1)",
                 nameof(string.Substring) when args.Length == 3 => $"SUBSTR({args[0]}, {args[1]} + 1, {args[2]})",
