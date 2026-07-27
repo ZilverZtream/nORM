@@ -528,6 +528,11 @@ namespace nORM.Query
             /// <returns>The original method call expression.</returns>
             public Expression Translate(QueryTranslator t, MethodCallExpression node)
             {
+                // Set operations match columns POSITIONALLY. If both arms project the same DTO via a
+                // member-initializer but in DIFFERENT member order, align the right arm to the left arm's
+                // order first (the left arm drives the shared materializer) so values don't land under the
+                // wrong member — a silent field swap.
+                node = NormalizeSetOpArmMemberOrder(node);
                 // A client-tail reshape in either arm never reaches the set-op SQL — the
                 // reshaped element exists only after materialization, so the SQL set-op
                 // would silently drop it. Concat has exact client semantics (no dedup):
@@ -814,6 +819,61 @@ namespace nORM.Query
                 "AsNoTracking", "AsNoTrackingWithIdentityResolution", "AsTracking", "AsSplitQuery",
                 "IgnoreQueryFilters", "TagWith", "Cast", "Cacheable"
             };
+
+        // When a set-op arm is DIRECTLY a `.Select(x => new TDto { ... })`, returns that member-init lambda.
+        private static LambdaExpression? DirectMemberInitProjection(Expression arm)
+            => arm is MethodCallExpression mce
+               && mce.Method.Name == nameof(Queryable.Select)
+               && mce.Arguments.Count == 2
+               && StripQuotes(mce.Arguments[1]) is LambdaExpression lam
+               && lam.Body is MemberInitExpression
+                ? lam : null;
+
+        // Reorders the right arm's member-init bindings to follow the LEFT arm's member order, so both arms
+        // emit columns in the same order and the (left-arm-driven, positional) materializer reads correctly.
+        // Only fires when both arms are a direct member-init Select over the same member set; any other shape
+        // is returned untouched (conservative — other emit paths keep binding order on both sides).
+        private static MethodCallExpression NormalizeSetOpArmMemberOrder(MethodCallExpression node)
+        {
+            if (node.Arguments.Count != 2)
+                return node;
+            var leftLam = DirectMemberInitProjection(node.Arguments[0]);
+            var rightLam = DirectMemberInitProjection(node.Arguments[1]);
+            if (leftLam == null || rightLam == null)
+                return node;
+            var rightSelect = (MethodCallExpression)node.Arguments[1];
+            var leftInit = (MemberInitExpression)leftLam.Body;
+            var rightInit = (MemberInitExpression)rightLam.Body;
+            if (leftInit.Bindings.Count != rightInit.Bindings.Count)
+                return node;
+
+            var rightByName = new Dictionary<string, System.Linq.Expressions.MemberBinding>(StringComparer.Ordinal);
+            foreach (var b in rightInit.Bindings)
+                if (!rightByName.TryAdd(b.Member.Name, b))
+                    return node; // duplicate / non-assignment shape — leave alone
+
+            var reordered = new System.Linq.Expressions.MemberBinding[leftInit.Bindings.Count];
+            bool sameOrder = true;
+            for (int i = 0; i < leftInit.Bindings.Count; i++)
+            {
+                var name = leftInit.Bindings[i].Member.Name;
+                if (!rightByName.TryGetValue(name, out var b))
+                    return node; // member set differs — not a safe reorder
+                reordered[i] = b;
+                if (rightInit.Bindings[i].Member.Name != name)
+                    sameOrder = false;
+            }
+            if (sameOrder)
+                return node;
+
+            var newInit = Expression.MemberInit(rightInit.NewExpression, reordered);
+            var newLambda = Expression.Lambda(rightLam.Type, newInit, rightLam.Parameters);
+            Expression newArg1 = rightSelect.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote }
+                ? Expression.Quote(newLambda)
+                : newLambda;
+            var newSelect = rightSelect.Update(rightSelect.Object, new[] { rightSelect.Arguments[0], newArg1 });
+            return node.Update(node.Object, new[] { node.Arguments[0], (Expression)newSelect });
+        }
 
         /// <summary>
         /// True when <paramref name="e"/> is a set-operation call (Union / Concat / Intersect / Except),
