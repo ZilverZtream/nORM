@@ -839,12 +839,27 @@ namespace nORM.Core
 
                 foreach (var relation in entry.Mapping.Relations.Values)
                 {
-                    if (relation.NavProp.GetValue(entity) is not System.Collections.IList list || list.IsReadOnly)
+                    var navValue = relation.NavProp.GetValue(entity);
+                    if (navValue == null)
                         continue;
-                    foreach (var gone in deleted)
+                    if (navValue is System.Collections.IList list)
                     {
-                        if (relation.DependentType.IsInstanceOfType(gone))
-                            list.Remove(gone);
+                        if (list.IsReadOnly)
+                            continue;
+                        foreach (var gone in deleted)
+                        {
+                            if (relation.DependentType.IsInstanceOfType(gone))
+                                list.Remove(gone);
+                        }
+                    }
+                    else
+                    {
+                        // A collection navigation whose runtime type is NOT IList (HashSet<T> / ISet<T> /
+                        // any non-IList ICollection<T>) must also have the deleted instances stripped, via
+                        // the generic ICollection<T>.Remove — otherwise the just-deleted child stays in the
+                        // collection and the next SaveChanges' fixup rediscovers the now-untracked instance
+                        // and re-inserts it (resurrection).
+                        RemoveDeletedFromNonListCollection(navValue, relation.DependentType, deleted);
                     }
                 }
 
@@ -864,6 +879,39 @@ namespace nORM.Core
                             break;
                         }
                     }
+                }
+            }
+        }
+
+        // Cache of the closed ICollection<T> Remove method + IsReadOnly property per dependent element type,
+        // used to strip deleted instances from non-IList collection navigations.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type,
+            (Type CollType, System.Reflection.MethodInfo Remove, System.Reflection.PropertyInfo IsReadOnly)?> _nonListCollectionRemoveCache = new();
+
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Resolves ICollection<T>.Remove via reflection; trimming may remove the member.")]
+        private static void RemoveDeletedFromNonListCollection(object navValue, Type dependentType, IReadOnlyList<object> deleted)
+        {
+            var info = _nonListCollectionRemoveCache.GetOrAdd(dependentType, static dt =>
+            {
+                var collType = typeof(System.Collections.Generic.ICollection<>).MakeGenericType(dt);
+                var remove = collType.GetMethod("Remove");
+                var isReadOnly = collType.GetProperty("IsReadOnly");
+                return remove != null && isReadOnly != null
+                    ? (collType, remove, isReadOnly)
+                    : ((Type, System.Reflection.MethodInfo, System.Reflection.PropertyInfo)?)null;
+            });
+            if (info == null)
+                return;
+            var (collType, removeMethod, isReadOnlyProp) = info.Value;
+            if (!collType.IsInstanceOfType(navValue) || isReadOnlyProp.GetValue(navValue) is true)
+                return;
+            var args = new object[1];
+            foreach (var gone in deleted)
+            {
+                if (dependentType.IsInstanceOfType(gone))
+                {
+                    args[0] = gone;
+                    removeMethod.Invoke(navValue, args);
                 }
             }
         }
