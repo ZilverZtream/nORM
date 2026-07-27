@@ -75,11 +75,20 @@ namespace nORM.Query
             // MIN/MAX over a TEXT-stored temporal operand (TimeSpan multi-day, DateTimeOffset mixed-offset)
             // must order by value; SQLite's BINARY-lexical MIN/MAX mis-orders it. Wrap the final operand.
             bool minMaxOperand = sqlAgg == "MIN" || sqlAgg == "MAX";
+
+            string Emit(string operand) => decimalOperand
+                ? _provider.DecimalAggregateSql(sqlAgg, operand)
+                : $"{sqlAgg}({(minMaxOperand ? _provider.MinMaxAggregateOperand(operand, selBodyType) : operand)})";
+            // Enumerable.Sum over an empty / all-null group is 0, never null; SQL SUM returns NULL there,
+            // which the projection materializer would surface as the nullable default (null) — a silent
+            // divergence from LINQ-to-Objects. COALESCE so an all-null (or fully-unmatched, for the filtered
+            // form) group yields 0, matching the scalar Sum path and the nav-aggregate fix. Min/Max/Average
+            // correctly stay NULL for an empty group (matching Enumerable), so only Sum is wrapped.
+            string Finish(string operand) => sqlAgg == "SUM" ? $"COALESCE({Emit(operand)}, 0)" : Emit(operand);
+
             var whereFilter = ExtractAggregateSourceFilter(methodCall);
             if (whereFilter == null)
-                return decimalOperand
-                    ? _provider.DecimalAggregateSql(sqlAgg, columnSql)
-                    : $"{sqlAgg}({(minMaxOperand ? _provider.MinMaxAggregateOperand(columnSql, selBodyType) : columnSql)})";
+                return Finish(columnSql);
 
             // Rebind the filter lambda's parameter onto the selector's parameter so both
             // expressions reference the same group-element alias, then translate the
@@ -89,9 +98,7 @@ namespace nORM.Query
             var reboundFilter = Expression.Lambda(reboundBody, selector.Parameters[0]);
             var predSql = TranslateGroupPredicateBody(reboundFilter, alias);
             var caseSql = $"CASE WHEN {predSql} THEN {columnSql} ELSE {unmatchedBranchSql} END";
-            return decimalOperand
-                ? _provider.DecimalAggregateSql(sqlAgg, caseSql)
-                : $"{sqlAgg}({(minMaxOperand ? _provider.MinMaxAggregateOperand(caseSql, selBodyType) : caseSql)})";
+            return Finish(caseSql);
         }
 
         private LambdaExpression ExpandGroupElementSelector(LambdaExpression selector)
