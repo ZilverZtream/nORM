@@ -262,7 +262,12 @@ namespace nORM.Query
             foreach (System.Data.Common.DbParameter existing in cmd.Parameters)
                 if (existing.ParameterName == asOfParam) { present = true; break; }
             if (!present)
-                cmd.AddParam(asOfParam, asOf.Value);
+                // Bind the timestamp the way the provider stores its validity windows — the same hook the
+                // main-query and Include AsOf paths use. Binding the raw DateTime lets a differently
+                // formatted value (e.g. Microsoft.Data.Sqlite trims trailing-zero milliseconds, so an
+                // instant on a '.500' window edge binds as '.5') sort to the wrong side of the TEXT window
+                // boundary and reconstruct the previous era's rows.
+                cmd.AddParam(asOfParam, p.FormatTemporalAsOfParameterValue(asOf.Value));
             // Provider-native temporal delegates reconstruction to the engine's system-versioning; the clause
             // ({EscTable} FOR SYSTEM_TIME AS OF @asof) preserves the table's own name, so the child load's
             // FK/tenant/global/element filters resolve exactly as they do against the live table.
