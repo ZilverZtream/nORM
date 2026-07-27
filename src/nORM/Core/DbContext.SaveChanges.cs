@@ -328,6 +328,24 @@ namespace nORM.Core
                                 e.CaptureInsertedBaseline();
                         }
 
+                        // An entity inserted earlier in this transaction is excluded from the INSERT batch
+                        // below (and thus from its deferred M2M / owned sync), but a many-to-many or owned
+                        // association ADDED to it by THIS later save must still be synced within the
+                        // transaction, or it is silently lost on commit. Mirrors the scalar dirty-inserted
+                        // UPDATE above for the association side.
+                        if (map.ManyToManyJoins.Count > 0 || map.OwnedCollections.Count > 0)
+                        {
+                            foreach (var e in entries)
+                            {
+                                if (!e.InsertedInUncommittedTransaction || e.Entity is null)
+                                    continue;
+                                if (map.OwnedCollections.Count > 0 && e.HasOwnedCollectionChanges())
+                                    await SaveOwnedCollectionsAsync(e.Entity, map, EntityState.Modified, transaction, ct).ConfigureAwait(false);
+                                if (map.ManyToManyJoins.Count > 0 && e.HasManyToManyChanges())
+                                    (deferredM2MSync ??= new()).Add((e.Entity, e));
+                            }
+                        }
+
                         var hasDbGeneratedKey = map.KeyColumns.Any(k => k.IsDbGenerated);
                         if (hasDbGeneratedKey || entries.Any(e => e.InsertedInUncommittedTransaction))
                         {
