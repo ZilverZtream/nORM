@@ -139,4 +139,43 @@ public class CombinedM2MOwnedUnderTransactionTests
 
         Assert.Equal(new[] { 2, 3 }, Tags(keeper).ToArray());
     }
+
+    // Reversal: add a tag then remove it, one save each, in the SAME caller-owned transaction. The second
+    // save must detect that the collection returned to its load-time state and delete the join row inserted
+    // by the first — but if the m2m snapshot isn't advanced after save 1, save 2 sees current == stale
+    // snapshot, detects no change, and the (1,3) join row silently leaks.
+    [Fact]
+    public async Task Many_to_many_add_then_remove_across_two_saves_in_one_transaction_nets_out()
+    {
+        var (keeper, make) = Setup();
+        using var _ = keeper;
+        await using var ctx = make();
+        var post = Load(ctx); // Tags = {1}
+        var tag3 = ctx.Query<Tag>().ToList().Single(t => t.Id == 3);
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        post.Tags.Add(tag3); await ctx.SaveChangesAsync();     // inserts join (1,3)
+        post.Tags.Remove(tag3); await ctx.SaveChangesAsync();  // must delete join (1,3)
+        await tx.CommitAsync();
+
+        Assert.Equal(new[] { 1 }, Tags(keeper).ToArray());
+    }
+
+    // Owned twin of the reversal case: add an owned line then remove it across two saves in one transaction.
+    [Fact]
+    public async Task Owned_add_then_remove_across_two_saves_in_one_transaction_nets_out()
+    {
+        var (keeper, make) = Setup();
+        using var _ = keeper;
+        await using var ctx = make();
+        var post = Load(ctx); // Lines = {a, b}
+
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        var line = new Line { Text = "c" };
+        post.Lines.Add(line); await ctx.SaveChangesAsync();     // inserts line c
+        post.Lines.Remove(line); await ctx.SaveChangesAsync();  // must delete line c
+        await tx.CommitAsync();
+
+        Assert.Equal(new[] { "a", "b" }, Lines(keeper).ToArray());
+    }
 }

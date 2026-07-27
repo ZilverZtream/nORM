@@ -593,6 +593,16 @@ namespace nORM.Core
                         RememberPreTransactionValuesBaseline(modifiedEntity, entry);
                         entry.CaptureInsertedBaseline();
                     }
+
+                    // Advance the many-to-many and owned-collection snapshots to the state the deferred sync
+                    // just persisted — the collection twin of the scalar baseline advance above. AcceptChanges
+                    // (deferred under a caller-owned transaction) does this; without it a later save that
+                    // REVERSES a collection edit in the same transaction (add a tag/line then remove it)
+                    // compares the collection against the stale load-time snapshot, sees no net change, and
+                    // silently leaks the join row / owned child inserted by the first save. An entry whose only
+                    // change is a collection edit can sit here as Unchanged, so this runs for every entry.
+                    entry.CaptureManyToManySnapshots();
+                    entry.CaptureOwnedCollectionSnapshots();
                 }
             }
 
