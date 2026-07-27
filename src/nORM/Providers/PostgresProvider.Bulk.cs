@@ -184,7 +184,12 @@ namespace nORM.Providers
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
 
-            var nonKeyCols = m.Columns.Where(c => !c.IsKey && !c.IsTimestamp).ToList();
+            // SET only the updatable columns (non-key, non-timestamp, non-db-generated, non-discriminator) —
+            // the same set SqlServer/MySQL use. Assigning a DB-generated column is rejected by Postgres (a
+            // GENERATED column can't be written) and a store-generated default / TPH discriminator would be
+            // silently overwritten.
+            var nonKeyCols = m.UpdateColumns.ToList();
+            if (nonKeyCols.Count == 0) return 0;
             var keyCols = m.KeyColumns.ToList();
             var valueCols = keyCols.Concat(nonKeyCols).ToList();
             if (m.TimestampColumn != null) valueCols.Add(m.TimestampColumn);
