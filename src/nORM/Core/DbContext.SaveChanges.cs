@@ -689,6 +689,10 @@ namespace nORM.Core
                 .GroupBy(e => e.Mapping.Type)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
+            // Added dependents reached by the cascade are detached (never persisted), but only AFTER the
+            // walk so their own entries stay valid while their subtrees are traversed (see below).
+            HashSet<object>? addedToDetach = null;
+
             while (queue.Count > 0)
             {
                 var principalEntry = queue.Dequeue();
@@ -807,8 +811,15 @@ namespace nORM.Core
 
                         if (dependentEntry.State == EntityState.Added)
                         {
-                            // Never persisted — nothing to delete; just stop tracking it.
-                            ChangeTracker.Remove(dependent);
+                            // Never persisted — nothing to DELETE. But its OWN Added descendants must also be
+                            // detached, or they would be inserted as orphans (their FK points at this
+                            // now-untracked parent, still default 0). Enqueue it so the walk reaches its
+                            // grandchildren, and DEFER the untrack until the walk completes — removing it now
+                            // would clear the entry's Entity and the dequeue would skip its subtree.
+                            addedToDetach ??= new HashSet<object>(ReferenceEqualityComparer.Instance);
+                            // Add returns false if already scheduled — avoids re-walking a cyclic Added graph.
+                            if (addedToDetach.Add(dependent) && dependentEntry.Mapping.Relations.Count > 0)
+                                queue.Enqueue(dependentEntry);
                             continue;
                         }
 
@@ -818,6 +829,11 @@ namespace nORM.Core
                     }
                 }
             }
+
+            // Untrack the Added dependents the cascade reached, now that the whole subtree has been walked.
+            if (addedToDetach != null)
+                foreach (var added in addedToDetach)
+                    ChangeTracker.Remove(added);
         }
 
         /// <summary>
