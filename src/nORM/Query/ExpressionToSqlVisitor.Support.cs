@@ -683,21 +683,27 @@ namespace nORM.Query
         {
             var lhs = visitor.GetSql(left);
             var rhs = visitor.GetSql(right);
+            string eq;
             if (ignoreCase)
             {
-                lhs = $"LOWER({lhs})";
-                rhs = $"LOWER({rhs})";
-                visitor._sql.Append('(').Append(lhs).Append(" = ").Append(rhs).Append(')');
-                return;
+                eq = $"(LOWER({lhs}) = LOWER({rhs}))";
             }
             // Ordinal comparison (string.Equals default / StringComparison.Ordinal): providers
             // whose default collation folds case need the sargable ordinal wrap.
-            if (visitor._provider.DefaultStringEqualityIsCaseInsensitive)
+            else if (visitor._provider.DefaultStringEqualityIsCaseInsensitive)
             {
-                visitor._sql.Append(visitor._provider.OrdinalStringEqualSql(lhs, rhs));
-                return;
+                eq = visitor._provider.OrdinalStringEqualSql(lhs, rhs);
             }
-            visitor._sql.Append('(').Append(lhs).Append(" = ").Append(rhs).Append(')');
+            else
+            {
+                eq = $"({lhs} = {rhs})";
+            }
+            // string.Equals(a, b, StringComparison) is null-safe: Equals(null, null, ...) is TRUE and
+            // Equals(x, null, ...) is false. SQL `a = b` is UNKNOWN when either operand is NULL, so it would
+            // silently drop the both-null row; add the both-NULL case explicitly. (When an operand is a
+            // non-null literal its IS NULL test is constant-false, so the added term is a harmless no-op.)
+            visitor._sql.Append('(').Append(eq)
+                .Append(" OR (").Append(lhs).Append(" IS NULL AND ").Append(rhs).Append(" IS NULL))");
         }
         // ContainsTranslator, StartsWithTranslator, and EndsWithTranslator were consolidated into
         // _fastMethodHandlers. String methods are exclusively handled there.
