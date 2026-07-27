@@ -50,6 +50,12 @@ namespace nORM.Query
                 return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteInternalAsync<TResult>(expression, token), ct);
             return ExecuteInternalAsync<TResult>(expression, ct);
         }
+        // A set-based ExecuteUpdate/ExecuteDelete is a single non-idempotent autocommit statement: a transient
+        // error raised after it has executed (e.g. a dropped connection while reading the ack) has an unknown
+        // outcome, so retrying it would double-apply a relative update or delete a second page of rows. Passing
+        // this as isCommitAttempted makes the retry strategy never re-run it. Matches the Bulk* guard.
+        private static readonly Func<bool> s_nonIdempotentNoRetry = static () => true;
+
         /// <summary>
         /// Executes a translated <c>DELETE</c> query asynchronously.
         /// </summary>
@@ -59,13 +65,13 @@ namespace nORM.Query
         public Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken ct)
         {
             if (_ctx.Options.RetryPolicy != null)
-                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), ct);
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteDeleteInternalAsync(expression, token), s_nonIdempotentNoRetry, ct);
             return ExecuteDeleteInternalAsync(expression, ct);
         }
         public Task<int> ExecuteUpdateAsync<T>(Expression expression, Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> set, CancellationToken ct)
         {
             if (_ctx.Options.RetryPolicy != null)
-                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), ct);
+                return new RetryingExecutionStrategy(_ctx, _ctx.Options.RetryPolicy).ExecuteAsync((_, token) => ExecuteUpdateInternalAsync(expression, set, token), s_nonIdempotentNoRetry, ct);
             return ExecuteUpdateInternalAsync(expression, set, ct);
         }
         /// <summary>
