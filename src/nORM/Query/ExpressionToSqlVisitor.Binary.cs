@@ -914,6 +914,30 @@ namespace nORM.Query
                 return true;
             }
 
+            // A relational comparison against an enum stored as its NAME (value converter to string) must
+            // compare by the enum's underlying value, exactly as C# does. Binding the provider string would
+            // order member names alphabetically ('Cancelled' < 'Shipped'), silently returning wrong rows.
+            // Map the stored name back to its ordinal with a CASE and compare ordinals; == / != above already
+            // compare names correctly (name equality IS value equality).
+            if (op is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual
+                && column.Converter!.ProviderType == typeof(string)
+                && (Nullable.GetUnderlyingType(column.Converter!.ModelType) ?? column.Converter!.ModelType) is { IsEnum: true } enumType)
+            {
+                var columnSql = GetSql(memberSide);
+                _sql.Append('(').Append(BuildStringToEnumCase(_provider, columnSql, enumType)).Append(op switch
+                {
+                    ExpressionType.GreaterThan => " > ",
+                    ExpressionType.GreaterThanOrEqual => " >= ",
+                    ExpressionType.LessThan => " < ",
+                    ExpressionType.LessThanOrEqual => " <= ",
+                    _ => throw new InvalidOperationException()
+                });
+                EmitConvertedValueOperand(stripped, EnumToOrdinalConverter.Instance, isInlineConstant, isFreeParameter);
+                _sql.Append(')');
+                return true;
+            }
+
             _sql.Append('(');
             if (op == ExpressionType.NotEqual && memberIsNullable)
             {
@@ -982,6 +1006,18 @@ namespace nORM.Query
             while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
                 expr = u.Operand;
             return expr;
+        }
+
+        // Converts an enum model value to its underlying integer. Used to compare an enum-stored-as-string
+        // column relationally by value (BuildStringToEnumCase maps the column's stored name back to its
+        // ordinal) instead of by member name, for both baked constants and compiled/closure parameters.
+        private sealed class EnumToOrdinalConverter : nORM.Mapping.IValueConverter
+        {
+            public static readonly EnumToOrdinalConverter Instance = new();
+            public Type ModelType => typeof(Enum);
+            public Type ProviderType => typeof(long);
+            public object? ConvertToProvider(object? modelValue) => modelValue is null ? null : Convert.ToInt64(modelValue);
+            public object? ConvertFromProvider(object? providerValue) => providerValue;
         }
 
         private bool TryGetConverterColumn(Expression expr, out Column column)
