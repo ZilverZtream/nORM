@@ -459,6 +459,9 @@ namespace nORM.Query
                 }
             }
 
+            // Check cancellation BEFORE creating the command so a cancellation in this window cannot leak an
+            // undisposed command (the sync branch's ExecuteScalar...AndDispose only disposes once it runs).
+            ct.ThrowIfCancellationRequested();
             var cmd = _ctx.CreateCommand();
             cmd.CommandTimeout = (int)_ctx.Options.TimeoutConfiguration.BaseTimeout.TotalSeconds;
             cmd.CommandText = sql;
@@ -469,7 +472,6 @@ namespace nORM.Query
             // to avoid the ValueTask/Task wrapper overhead from ExecuteScalarAsync.
             if (_ctx.RawProvider.PrefersSyncExecution)
             {
-                ct.ThrowIfCancellationRequested();
                 var scalar = cmd.ExecuteScalarWithInterceptionSerializedAndDispose(_ctx);
                 if (scalar == null || scalar is DBNull)
                     return Task.FromResult(default(TResult)!);
