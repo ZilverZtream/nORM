@@ -266,12 +266,30 @@ namespace nORM.Query
                 }
 
                 if (!firstColumn) sb.Append(", ");
-                Visit(arg);
-                sb.Append(" AS ").Append(_provider.Escape(memberName));
+                if (arg is NewExpression && IsNestedProjectionShape(arg.Type))
+                {
+                    // Nested anonymous / ValueTuple projection member (Info = new { e.Salary, e.Name }): the
+                    // recursive Visit emits one flat `col AS member` per nested component. Do NOT append the
+                    // outer `AS <memberName>` — it would double-alias the last nested column
+                    // ("... AS Name AS Info"), which is invalid SQL. The nested materializer reads these
+                    // component columns positionally, so the flat emit is all it needs.
+                    Visit(arg);
+                }
+                else
+                {
+                    Visit(arg);
+                    sb.Append(" AS ").Append(_provider.Escape(memberName));
+                }
                 firstColumn = false;
             }
             return node;
         }
+
+        // A nested projection member whose Visit emits SEVERAL flat columns (anonymous type or ValueTuple),
+        // rather than a single value that needs an alias.
+        private static bool IsNestedProjectionShape(Type t)
+            => (t.Namespace == null && t.Name.Contains("AnonymousType", StringComparison.Ordinal))
+               || (t.IsGenericType && t.Namespace == "System" && t.Name.StartsWith("ValueTuple`", StringComparison.Ordinal));
 
         protected override Expression VisitMember(MemberExpression node)
         {
