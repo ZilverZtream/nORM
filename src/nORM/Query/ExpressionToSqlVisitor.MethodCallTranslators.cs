@@ -328,24 +328,36 @@ namespace nORM.Query
                 var charSql = GetSql(node.Arguments[0]);
                 switch (node.Method.Name)
                 {
+                    // Compare CODEPOINTS, not string ranges: a `col BETWEEN 'A' AND 'Z'` range is evaluated
+                    // under the column's collation, so on a case-insensitive collation (SQL Server/MySQL
+                    // defaults) 'a' falls within 'A'..'Z' and on a locale collation (Postgres) case is
+                    // interleaved — both make IsUpper/IsLower (and, at the edges, the letter ranges) match the
+                    // wrong characters. Codepoint arithmetic via GetCharCodeSql is collation-immune, matching
+                    // .NET's ASCII classification on every provider (mirrors IsPunctuation/IsSymbol below).
                     case nameof(char.IsDigit):
-                        _sql.Append('(').Append(charSql).Append(" BETWEEN '0' AND '9')");
+                        _sql.Append('(').Append(_provider.GetCharCodeSql(charSql)).Append(" BETWEEN 48 AND 57)");
                         return true;
                     case nameof(char.IsLetter):
-                        _sql.Append("((").Append(charSql).Append(" BETWEEN 'A' AND 'Z') OR (")
-                            .Append(charSql).Append(" BETWEEN 'a' AND 'z'))");
+                    {
+                        var code = _provider.GetCharCodeSql(charSql);
+                        _sql.Append("((").Append(code).Append(" BETWEEN 65 AND 90) OR (")
+                            .Append(code).Append(" BETWEEN 97 AND 122))");
                         return true;
+                    }
                     case nameof(char.IsLetterOrDigit):
+                    {
+                        var code = _provider.GetCharCodeSql(charSql);
                         _sql.Append('(')
-                            .Append('(').Append(charSql).Append(" BETWEEN 'A' AND 'Z') OR (")
-                            .Append(charSql).Append(" BETWEEN 'a' AND 'z') OR (")
-                            .Append(charSql).Append(" BETWEEN '0' AND '9'))");
+                            .Append('(').Append(code).Append(" BETWEEN 65 AND 90) OR (")
+                            .Append(code).Append(" BETWEEN 97 AND 122) OR (")
+                            .Append(code).Append(" BETWEEN 48 AND 57))");
                         return true;
+                    }
                     case nameof(char.IsUpper):
-                        _sql.Append('(').Append(charSql).Append(" BETWEEN 'A' AND 'Z')");
+                        _sql.Append('(').Append(_provider.GetCharCodeSql(charSql)).Append(" BETWEEN 65 AND 90)");
                         return true;
                     case nameof(char.IsLower):
-                        _sql.Append('(').Append(charSql).Append(" BETWEEN 'a' AND 'z')");
+                        _sql.Append('(').Append(_provider.GetCharCodeSql(charSql)).Append(" BETWEEN 97 AND 122)");
                         return true;
                     case nameof(char.IsPunctuation):
                     {
