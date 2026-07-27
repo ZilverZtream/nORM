@@ -218,6 +218,20 @@ namespace nORM.Providers
                 .Replace("^", esc + "^");
         }
 
+        /// <summary>
+        /// Runtime (parameterized) counterpart of <see cref="EscapeLikePattern"/> for
+        /// Contains/StartsWith/EndsWith with a non-constant search term. SQL Server treats '[' as a LIKE
+        /// character-class opener, so the base escaping (escape char, %, _) is not enough: an un-escaped '['
+        /// in a runtime term silently turns the term into a wildcard class. Escape '[' (and ']'/'^' for parity
+        /// with the constant path — harmless, they stay literal) on top of the base wildcard escaping.
+        /// </summary>
+        public override string GetLikeEscapeSql(string sqlExpression)
+        {
+            var esc = NormValidator.ValidateLikeEscapeChar(LikeEscapeChar).ToString();
+            var baseSql = base.GetLikeEscapeSql(sqlExpression);
+            return $"REPLACE(REPLACE(REPLACE({baseSql}, '[', '{esc}['), ']', '{esc}]'), '^', '{esc}^')";
+        }
+
 
         /// <summary>
         /// DATEDIFF_BIG(MICROSECOND) preserves sub-second deltas while avoiding
