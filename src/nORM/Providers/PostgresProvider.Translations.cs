@@ -139,7 +139,9 @@ namespace nORM.Providers
                     nameof(DateTime.Day) => $"EXTRACT(DAY FROM {source})",
                     nameof(DateTime.Hour) => $"EXTRACT(HOUR FROM {source})",
                     nameof(DateTime.Minute) => $"EXTRACT(MINUTE FROM {source})",
-                    nameof(DateTime.Second) => $"EXTRACT(SECOND FROM {source})",
+                    // EXTRACT(SECOND ...) includes fractional seconds (e.g. 30.5); .NET DateTime.Second is a
+                    // whole-second int. FLOOR before the ::int cast (a bare cast would ROUND 30.5 -> 31).
+                    nameof(DateTime.Second) => $"FLOOR(EXTRACT(SECOND FROM {source}))::int",
                     nameof(DateTime.DayOfYear) => $"EXTRACT(DOY FROM {source})",
                     nameof(DateTime.Date) => $"DATE_TRUNC('day', {source})",
                     // The double-argument Add* family converts to whole microseconds
@@ -233,7 +235,8 @@ namespace nORM.Providers
                 {
                     nameof(TimeOnly.Hour) => $"EXTRACT(HOUR FROM {args[0]})",
                     nameof(TimeOnly.Minute) => $"EXTRACT(MINUTE FROM {args[0]})",
-                    nameof(TimeOnly.Second) => $"EXTRACT(SECOND FROM {args[0]})",
+                    // Whole-second int, not fractional (see DateTime.Second above).
+                    nameof(TimeOnly.Second) => $"FLOOR(EXTRACT(SECOND FROM {args[0]}))::int",
                     nameof(TimeOnly.Millisecond) => $"(EXTRACT(MILLISECONDS FROM {args[0]})::int % 1000)",
                     // PostgreSQL cast TIMESTAMP -> TIME and INTERVAL -> TIME.
                     nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"({args[0]})::time",
