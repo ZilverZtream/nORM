@@ -87,6 +87,77 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Reference-navigation fixup for a COMPOSITE-key principal: when a dependent's reference nav points
+        /// at a composite-key principal, copy every principal key component into the matching FK columns —
+        /// the collection direction already does this, so the two directions agree. Only acts on an
+        /// unambiguous composite relation from the principal to this dependent type (a dual composite FK is
+        /// skipped to avoid guessing), a fully-assigned principal key (a still-default DB-generated component
+        /// defers), and never rewrites a key or an already-correct FK. Non-null principals only; composite
+        /// disassociation keeps the prior (conservative) no-op.
+        /// </summary>
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup reflects over navigation properties; trimming may remove the required members.")]
+        private void TryFixupCompositeReferenceNav(EntityEntry entry, object? principal, TableMapping principalMap, Queue<EntityEntry> queue)
+        {
+            if (principal == null)
+                return;
+
+            TableMapping.Relation? match = null;
+            foreach (var rel in principalMap.Relations.Values)
+            {
+                if (rel.DependentType == entry.Mapping.Type && rel.IsComposite)
+                {
+                    if (match != null)
+                        return; // ambiguous (dual composite FK to the same dependent) — stay safe
+                    match = rel;
+                }
+            }
+            if (match == null)
+                return;
+
+            var principalEntry = ChangeTracker.GetEntryOrDefault(principal);
+            if (principalEntry == null)
+            {
+                principalEntry = ChangeTracker.Track(principal, EntityState.Added, principalMap);
+                if (principalEntry.Mapping.Relations.Count > 0 || principalEntry.Mapping.ReferenceNavigations.Length > 0)
+                    queue.Enqueue(principalEntry);
+            }
+            else if (principalEntry.State == EntityState.Deleted)
+            {
+                return;
+            }
+
+            var count = Math.Min(match.ForeignKeys.Count, match.PrincipalKeys.Count);
+            // Defer until every principal key component is assigned (a still-default DB-generated component
+            // is propagated post-insert by PropagateGeneratedKeyToChildren).
+            for (int i = 0; i < count; i++)
+            {
+                var pk = match.PrincipalKeys[i];
+                if (ChangeTracker.IsDefaultKeyValue(pk.Getter(principal), pk.Prop.PropertyType))
+                    return;
+            }
+
+            var dependent = entry.Entity!;
+            var changed = false;
+            for (int i = 0; i < count; i++)
+            {
+                var fkCol = match.ForeignKeys[i];
+                if (fkCol.IsKey)
+                    continue; // never rewrite a key column
+                var pkValue = match.PrincipalKeys[i].Getter(principal);
+                if (!Equals(fkCol.Getter(dependent), pkValue))
+                {
+                    fkCol.Setter(dependent, pkValue);
+                    changed = true;
+                }
+            }
+            if (changed && entry.State is EntityState.Unchanged or EntityState.Modified)
+            {
+                entry.SetStateInternal(EntityState.Modified);
+                entry.MarkExplicitlyModified();
+            }
+        }
+
+        /// <summary>
         /// Fills an already-tracked child's UNSET foreign key from the principal's ASSIGNED key when the
         /// child sits in the principal's collection navigation. Skips a principal whose key is still default
         /// (DB-generated, propagated post-insert instead) and a child whose FK is already non-default (set
@@ -281,7 +352,12 @@ namespace nORM.Core
                     continue;
                 }
                 if (principalMap.KeyColumns.Length != 1)
+                {
+                    // Composite-key principal: the single-column fixup below can't express it. Propagate the
+                    // full composite FK from an assigned composite key, mirroring the collection direction.
+                    TryFixupCompositeReferenceNav(entry, principal, principalMap, queue);
                     continue;
+                }
                 var fk = global::nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(
                     entry.Mapping, navProp.Name, navProp.PropertyType, principalMap);
                 if (fk == null)
