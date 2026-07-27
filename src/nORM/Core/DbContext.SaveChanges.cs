@@ -533,6 +533,27 @@ namespace nORM.Core
                 throw; // unreachable - satisfies compiler
             }
 
+            // Collect the cache-invalidation tags NOW, before the accept phase below detaches deleted entries
+            // (which nulls their Entity and state). Each changed entity's table is invalidated, plus the
+            // cascade-delete-dependent tables of every deleted entity — a DB cascade removes rows from those
+            // tables even when the children were never loaded, so a Cacheable() query over them would
+            // otherwise replay the deleted rows. Over-invalidation when no cascade fired is a harmless miss.
+            HashSet<string>? cacheTags = null;
+            if (Options.CacheProvider != null && committedSuccessfully)
+            {
+                cacheTags = new HashSet<string>();
+                foreach (var entry in changedEntries)
+                {
+                    if (entry.Entity is { } cachedEntity)
+                    {
+                        var cachedMap = GetMapping(cachedEntity.GetType());
+                        cacheTags.Add(cachedMap.TableName);
+                        if (entry.State == EntityState.Deleted)
+                            AddCascadeDependentTables(cachedMap, cacheTags);
+                    }
+                }
+            }
+
             // Accept tracker state AFTER the commit and OUTSIDE the try/catch. A throw here — a faulting
             // entity getter during snapshot capture, a lazy navigation load that faults during cleanup —
             // must NOT reach the catch above: doing so would roll back the already-committed transaction
@@ -634,21 +655,28 @@ namespace nORM.Core
             }
 
             var cache = Options.CacheProvider;
-            if (cache != null)
+            if (cache != null && cacheTags != null)
             {
-                var tags = new HashSet<string>();
-                foreach (var entry in changedEntries)
-                {
-                    if (entry.Entity is { } entity)
-                    {
-                        var map = GetMapping(entity.GetType());
-                        tags.Add(map.TableName);
-                    }
-                }
-                foreach (var tag in tags)
+                foreach (var tag in cacheTags)
                     cache.InvalidateTag(tag);
             }
             return totalAffected;
+        }
+
+        // Adds the tables of every relation that cascade-deletes from this mapping to the cache-invalidation
+        // set, recursing through cascade-of-cascade chains. Guards cycles via the shared set (a table already
+        // present is not revisited).
+        private void AddCascadeDependentTables(TableMapping map, HashSet<string> tags)
+        {
+            map.EnsureRelationshipsInitialized(this);
+            foreach (var rel in map.Relations.Values)
+            {
+                if (rel.OnDelete != ReferentialAction.Cascade)
+                    continue;
+                var dependentMap = GetMapping(rel.DependentType);
+                if (tags.Add(dependentMap.TableName))
+                    AddCascadeDependentTables(dependentMap, tags);
+            }
         }
 
         private int CalculateBatchSize(int totalEntries, int paramsPerEntity)
