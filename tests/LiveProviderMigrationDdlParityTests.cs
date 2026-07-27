@@ -176,6 +176,57 @@ public class LiveProviderMigrationDdlParityTests
         return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
     }
 
+    private static bool MySqlColumnIsAutoIncrement(DbConnection cn, string table, string column)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
+            $"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='{table}' AND COLUMN_NAME='{column}' " +
+            $"AND EXTRA LIKE '%auto_increment%'";
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
+    // MySQL MODIFY COLUMN replaces the WHOLE column definition; altering any attribute (here: widening the
+    // type) of an AUTO_INCREMENT column must re-emit AUTO_INCREMENT or MySQL silently drops it, breaking
+    // store-generated keys (the next inserts collide on 0). Live-only: needs a real MySQL server.
+    [Fact]
+    public void LiveProvider_MySql_AlterIdentityColumn_PreservesAutoIncrement()
+    {
+        var (cn, skip) = Open("mysql");
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_AutoInc";
+
+        try
+        {
+            ExecSafe(db, $"DROP TABLE IF EXISTS `{table}`");
+            Exec(db, $"CREATE TABLE `{table}` (`Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, `Name` VARCHAR(200) NOT NULL)");
+
+            var tableSchema = new TableSchema { Name = table };
+            var oldId = new ColumnSchema { Name = "Id", ClrType = typeof(int).FullName!, IsPrimaryKey = true, IsNullable = false, IsIdentity = true };
+            var newId = new ColumnSchema { Name = "Id", ClrType = typeof(long).FullName!, IsPrimaryKey = true, IsNullable = false, IsIdentity = true };
+            var diff = new SchemaDiff();
+            diff.AlteredColumns.Add((tableSchema, newId, oldId));
+            ApplyStatements(db, Generator("mysql").GenerateSql(diff).Up);
+
+            // AUTO_INCREMENT must survive the widening (BUG: MODIFY COLUMN dropped it).
+            Assert.True(MySqlColumnIsAutoIncrement(db, table, "Id"),
+                "AUTO_INCREMENT must be preserved after MODIFY COLUMN on an identity column.");
+
+            // Behavioural: two key-less inserts get distinct auto-generated keys.
+            Exec(db, $"INSERT INTO `{table}` (`Name`) VALUES ('a')");
+            Exec(db, $"INSERT INTO `{table}` (`Name`) VALUES ('b')");
+            using var cnt = db.CreateCommand();
+            cnt.CommandText = $"SELECT COUNT(DISTINCT `Id`) FROM `{table}`";
+            Assert.Equal(2L, Convert.ToInt64(cnt.ExecuteScalar()));
+        }
+        finally
+        {
+            ExecSafe(cn, $"DROP TABLE IF EXISTS `{table}`");
+            db.Dispose();
+        }
+    }
+
     // ── Base-table DDL (provider-specific CREATE TABLE) ──────────────────────
 
     private static string CreateBaseDdl(string kind, string table) => kind switch

@@ -212,7 +212,11 @@ namespace nORM.Migration
                 if (IsImplicitUniqueColumn(oldCol) && !IsImplicitUniqueColumn(newCol))
                     up.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, oldCol))} ON {EscTable(table.Name)}");
                 var newDefault = newCol.DefaultValue != null ? $" DEFAULT {FormatDefaultValue(newCol)}" : "";
-                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newDefault}{FormatColumnComment(newCol.Comment)}";
+                // MODIFY COLUMN replaces the WHOLE definition, so AUTO_INCREMENT must be re-emitted for an
+                // identity column or MySQL silently drops it (store-generated keys then break — the next
+                // inserts collide on 0). Matches the CREATE/restore column-definition form.
+                var newIdentity = newCol.IsIdentity ? " AUTO_INCREMENT" : "";
+                var newDef = $"{Esc(newCol.Name)} {GetSqlType(newCol)}{FormatCollation(newCol)} {(newCol.IsNullable ? "NULL" : "NOT NULL")}{newIdentity}{newDefault}{FormatColumnComment(newCol.Comment)}";
                 up.Add($"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {newDef}");
                 if (!IsImplicitUniqueColumn(oldCol) && IsImplicitUniqueColumn(newCol))
                     up.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, newCol)}");
@@ -356,7 +360,9 @@ namespace nORM.Migration
                 if (IsImplicitUniqueColumn(newCol) && !IsImplicitUniqueColumn(oldCol))
                     down.Add($"DROP INDEX {Esc(GetUniqueConstraintName(table, newCol))} ON {EscTable(table.Name)}");
                 var oldDefault = oldCol.DefaultValue != null ? $" DEFAULT {FormatDefaultValue(oldCol)}" : "";
-                var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldDefault}{FormatColumnComment(oldCol.Comment)}";
+                // Re-emit AUTO_INCREMENT when reverting to an identity column (see the UP MODIFY COLUMN note).
+                var oldIdentity = oldCol.IsIdentity ? " AUTO_INCREMENT" : "";
+                var oldDef = $"{Esc(oldCol.Name)} {GetSqlType(oldCol)}{FormatCollation(oldCol)} {(oldCol.IsNullable ? "NULL" : "NOT NULL")}{oldIdentity}{oldDefault}{FormatColumnComment(oldCol.Comment)}";
                 down.Add($"ALTER TABLE {EscTable(table.Name)} MODIFY COLUMN {oldDef}");
                 if (!IsImplicitUniqueColumn(newCol) && IsImplicitUniqueColumn(oldCol))
                     down.Add($"ALTER TABLE {EscTable(table.Name)} ADD {BuildUniqueConstraintSql(table, oldCol)}");
