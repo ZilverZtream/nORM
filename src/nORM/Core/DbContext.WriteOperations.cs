@@ -477,8 +477,7 @@ namespace nORM.Core
             var entry = ChangeTracker.GetEntryOrDefault(entity);
             if (entry == null)
                 return;
-            // Capture the pre-advance token so a rollback restores it even for an entity loaded AFTER the
-            // transaction began (absent from the begin-time snapshot).
+            // Capture the pre-advance token so a rollback restores it even for an entity loaded AFTER the tx began.
             RememberPreTransactionTokenBaseline(entity, entry);
             var current = map.TimestampColumn.Getter(entity);
             entry.OriginalToken = current is byte[] bytes ? bytes.Clone() : current;

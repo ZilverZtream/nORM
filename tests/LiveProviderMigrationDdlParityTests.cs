@@ -969,6 +969,43 @@ public class LiveProviderMigrationDdlParityTests
         }
     }
 
+    // DOWN restore of a dropped NOT NULL column (no default) must run on a POPULATED table. A bare
+    // ADD COLUMN ... NOT NULL fails there ("column contains null values") — the restore must backfill
+    // existing rows with a type-appropriate value. SQLite recreates to do this; PostgreSQL must too.
+    [Fact]
+    public void LiveProvider_Postgres_DownRestores_DroppedNotNullColumn_OnPopulatedTable()
+    {
+        var (cn, skip) = Open("postgres");
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_DownRestoreNn";
+
+        try
+        {
+            ExecSafe(db, $"DROP TABLE IF EXISTS \"{table}\" CASCADE");
+            Exec(db, $"CREATE TABLE \"{table}\" (\"Id\" INT PRIMARY KEY, \"Name\" VARCHAR(200) NOT NULL, \"Score\" INT NOT NULL)");
+
+            var tableAfter = BaseTable(table);   // Id, Name (Score dropped)
+            var scoreCol = new ColumnSchema { Name = "Score", ClrType = typeof(int).FullName!, IsNullable = false };
+            var diff = new SchemaDiff();
+            diff.DroppedColumns.Add((tableAfter, scoreCol));
+            var sql = Generator("postgres").GenerateSql(diff);
+
+            ApplyStatements(db, sql.Up);                        // drop Score
+            Assert.False(ColumnExists(db, table, "Score"));
+            Exec(db, $"INSERT INTO \"{table}\" (\"Id\",\"Name\") VALUES (1, 'x')");  // POPULATE
+
+            ApplyStatements(db, sql.Down);                      // BUG: ADD COLUMN NOT NULL fails on the populated table
+            Assert.True(ColumnExists(db, table, "Score"), "DOWN: Score should be restored.");
+            Assert.False(IsNullable(db, table, "Score"), "restored Score must be NOT NULL");
+        }
+        finally
+        {
+            ExecSafe(cn, $"DROP TABLE IF EXISTS \"{table}\" CASCADE");
+            db.Dispose();
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // Item 15 — DOWN migration reverses ADD COLUMN
     // ══════════════════════════════════════════════════════════════════════════

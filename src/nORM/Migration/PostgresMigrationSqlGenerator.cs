@@ -426,11 +426,25 @@ namespace nORM.Migration
                     down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {BuildComputedColumnDefinition(column)}");
                     continue;
                 }
-                var restoreDefault = !string.IsNullOrEmpty(column.DefaultValue)
-                    ? $" DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}"
-                    : "";
-                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}{restoreDefault}";
-                down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
+                var colDef = $"{Esc(column.Name)} {GetSqlType(column)}{FormatCollation(column)} {(column.IsNullable ? "NULL" : "NOT NULL")}";
+                if (!string.IsNullOrEmpty(column.DefaultValue))
+                {
+                    // The column carried a default: restore it (also backfills existing rows).
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef} DEFAULT {DefaultValueValidator.Validate(column.DefaultValue)}");
+                }
+                else if (!column.IsNullable)
+                {
+                    // NOT NULL with no default: a bare ADD COLUMN ... NOT NULL fails on a POPULATED table
+                    // ("column contains null values"). Add a temporary type-appropriate fill to backfill the
+                    // existing rows, then drop it so the restored schema keeps no default — mirroring the
+                    // SQLite recreate zero-fill.
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef} DEFAULT {GetPostgresRestoreFillLiteral(column)}");
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ALTER COLUMN {Esc(column.Name)} DROP DEFAULT");
+                }
+                else
+                {
+                    down.Add($"ALTER TABLE {EscTable(table.Name)} ADD COLUMN {colDef}");
+                }
             }
             foreach (var group in diff.DroppedColumns.GroupBy(static item => item.Table.Name, StringComparer.OrdinalIgnoreCase))
             {
