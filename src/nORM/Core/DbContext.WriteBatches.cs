@@ -493,6 +493,9 @@ namespace nORM.Core
                 foreach (var entry in emitted)
                     if (entry.Entity is { } e)
                     {
+                        // Capture the pre-advance token so a rollback restores it even for an entity loaded
+                        // AFTER the transaction began (absent from the begin-time snapshot).
+                        RememberPreTransactionTokenBaseline(e, entry);
                         var current = tc.Getter(e);
                         entry.OriginalToken = current is byte[] bytes ? bytes.Clone() : current;
                     }

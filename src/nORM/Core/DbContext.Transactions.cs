@@ -139,6 +139,25 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Records an OCC entity's pre-advance concurrency token the FIRST time a save inside a
+        /// caller-owned/enlisted transaction advances it, so a full rollback (or ambient abort) restores it.
+        /// The begin-time snapshot (<see cref="SnapshotOccOriginalTokens"/>) only covers entities already
+        /// tracked when the transaction began; an OCC entity LOADED or attached AFTER begin would otherwise
+        /// keep its advanced token past the rollback and false-conflict on the next write of the reverted row.
+        /// Only augments an already-armed snapshot (a non-nORM-managed external transaction has no restore
+        /// hook); idempotent per entity so an earlier advance's baseline is never overwritten by a later one.
+        /// </summary>
+        internal void RememberPreTransactionTokenBaseline(object entity, EntityEntry entry)
+        {
+            if (_transactionTokenSnapshot == null || entry.Mapping.TimestampColumn == null)
+                return;
+            if (_transactionTokenSnapshot.ContainsKey(entity))
+                return;
+            var tok = entry.OriginalToken;
+            _transactionTokenSnapshot[entity] = tok is byte[] bytes ? bytes.Clone() : tok;
+        }
+
+        /// <summary>
         /// After a caller-owned transaction commits DURABLY, accept the entities it inserted and left in the
         /// <see cref="EntityState.Added"/> state so they become <see cref="EntityState.Unchanged"/> — matching
         /// EF Core, where an entity is updatable once its transaction commits. Without this an entity inserted

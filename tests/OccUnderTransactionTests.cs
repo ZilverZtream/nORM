@@ -126,4 +126,27 @@ public class OccUnderTransactionTests
 
         Assert.Equal("v2", PayloadInDb(cn, 1));
     }
+
+    [Fact]
+    public async Task Occ_entity_loaded_AFTER_begin_then_rolled_back_still_matches_the_reverted_row()
+    {
+        using var cn = OpenDb();
+        Seed(cn, "original");
+        using var ctx = new DbContext(cn, new SqliteProvider());
+
+        OccTx row;
+        await using (var tx = await ctx.Database.BeginTransactionAsync())
+        {
+            // Loaded INSIDE the transaction — so it is absent from the begin-time OCC token snapshot.
+            row = await ctx.Query<OccTx>().Where(r => r.Id == 1).FirstAsync();
+            row.Payload = "v1"; ctx.Update(row); await ctx.SaveChangesAsync();   // token advances
+            await tx.RollbackAsync();   // DB reverts to 'original'; this entity's token must revert too
+        }
+
+        // Re-update the same tracked entity after the rollback: before the fix its advanced token was never
+        // restored (it was not captured at begin), so this compared a stale token and threw a FALSE conflict.
+        row.Payload = "v2"; ctx.Update(row); await ctx.SaveChangesAsync();
+
+        Assert.Equal("v2", PayloadInDb(cn, 1));
+    }
 }
