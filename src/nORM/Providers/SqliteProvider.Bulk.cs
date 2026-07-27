@@ -162,6 +162,14 @@ namespace nORM.Providers
             var entityList = entities.ToList();
             if (entityList.Count == 0) return 0;
 
+            // A client-managed [Timestamp] token must be freshly stamped per row AND advanced on the in-memory
+            // entity, or a later bulk update of the SAME instances stages the now-stale token and the OCC match
+            // finds nothing (silent lost update). The temp-table path below regenerates the token server-side
+            // (randomblob) without refreshing the entity, so route through the row-by-row BatchedUpdateAsync,
+            // which advances the entity token via ConcurrencyTokenGenerator.Next — matching MySQL/PostgreSQL.
+            if (m.ClientManagedConcurrencyToken)
+                return await base.BatchedUpdateAsync(ctx, m, entityList, ct).ConfigureAwait(false);
+
             var tempTableName = $"\"BulkUpdate_{Guid.NewGuid():N}\"";
             // SET only the updatable columns (non-key, non-timestamp, non-db-generated, non-discriminator) —
             // the same set SqlServer/MySQL use. Assigning a DB-generated column is rejected by SQLite (a
