@@ -37,6 +37,8 @@ namespace nORM.Scaffolding
                                         COALESCE(p.parameter_name, 'return'), ':', COALESCE(p.parameter_mode, 'RETURN'), ':',
                                         CASE
                                             WHEN LOWER(COALESCE(p.dtd_identifier, '')) LIKE '%unsigned%' THEN COALESCE(p.dtd_identifier, p.data_type, '')
+                                            WHEN LOWER(COALESCE(p.data_type, '')) = 'tinyint' THEN 'tinyint signed'
+                                            WHEN LOWER(COALESCE(p.data_type, '')) = 'bit' AND p.numeric_precision > 1 THEN 'bit multi'
                                             ELSE COALESCE(p.data_type, '')
                                         END,
                                         CASE

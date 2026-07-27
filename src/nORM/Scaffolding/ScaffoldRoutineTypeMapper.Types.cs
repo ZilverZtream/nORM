@@ -25,8 +25,14 @@ namespace nORM.Scaffolding
                 "bigint unsigned" => "ulong?",
                 "smallint" or "int2" => "short?",
                 "smallint unsigned" => "ushort?",
+                // MySQL TINYINT is signed (-128..127) → sbyte; SQL Server TINYINT is unsigned (0..255) → byte.
+                // The MySQL discovery emits "tinyint signed" to disambiguate from SQL Server's bare "tinyint".
+                "tinyint signed" => "sbyte?",
                 "tinyint" => "byte?",
                 "tinyint unsigned" => "byte?",
+                // BIT(1)/SQL Server BIT → bool; a MySQL BIT(M>1) bit-field (emitted as "bit multi") holds up
+                // to 64 bits and must not collapse to a single boolean.
+                "bit multi" => "ulong?",
                 "bit" or "bool" or "boolean" => "bool?",
                 "decimal" or "numeric" or "money" or "smallmoney" => "decimal?",
                 "float" or "float8" or "double" => "double?",
@@ -65,8 +71,10 @@ namespace nORM.Scaffolding
                 "bigint unsigned" => nameof(DbType.UInt64),
                 "smallint" or "int2" => nameof(DbType.Int16),
                 "smallint unsigned" => nameof(DbType.UInt16),
+                "tinyint signed" => nameof(DbType.SByte),
                 "tinyint" => nameof(DbType.Byte),
                 "tinyint unsigned" => nameof(DbType.Byte),
+                "bit multi" => nameof(DbType.UInt64),
                 "bit" or "bool" or "boolean" => nameof(DbType.Boolean),
                 "decimal" or "numeric" or "money" or "smallmoney" => nameof(DbType.Decimal),
                 "float" or "float8" or "double" => nameof(DbType.Double),

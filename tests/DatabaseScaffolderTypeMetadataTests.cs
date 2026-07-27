@@ -170,6 +170,32 @@ public partial class DatabaseScaffolderPrivateMethodTests
         Assert.Equal(expectedScale, actualScale);
     }
 
+    // MySQL TINYINT is signed (-128..127) and must map to sbyte; mapping it to byte silently corrupts
+    // negative values (-1 → 255). SQL Server TINYINT is unsigned (0..255) → byte, so the bare "tinyint"
+    // token (emitted by the SQL Server routine discovery) must stay byte. The MySQL discovery emits the
+    // distinct "tinyint signed"/"bit multi" tokens so the shared mapper can tell them apart.
+    [Theory]
+    [InlineData("tinyint signed", "sbyte?")]  // MySQL signed TINYINT
+    [InlineData("tinyint unsigned", "byte?")] // MySQL TINYINT UNSIGNED
+    [InlineData("tinyint", "byte?")]          // SQL Server TINYINT (unsigned)
+    [InlineData("bit multi", "ulong?")]       // MySQL BIT(M>1) bit-field
+    [InlineData("bit", "bool?")]              // BIT(1) / SQL Server BIT
+    public void GetRoutineParameterTypeName_MapsProviderDistinctIntegerTokens(string dataType, string expected)
+    {
+        Assert.Equal(expected, ScaffoldRoutineTypeMapper.GetRoutineParameterTypeName(dataType, useNullableReferenceTypes: true));
+    }
+
+    [Theory]
+    [InlineData("tinyint signed", "SByte")]
+    [InlineData("tinyint unsigned", "Byte")]
+    [InlineData("tinyint", "Byte")]
+    [InlineData("bit multi", "UInt64")]
+    [InlineData("bit", "Boolean")]
+    public void GetRoutineParameterDbTypeName_MapsProviderDistinctIntegerTokens(string dataType, string expected)
+    {
+        Assert.Equal(expected, ScaffoldRoutineTypeMapper.GetRoutineParameterDbTypeName(dataType));
+    }
+
     [Fact]
     public void GetTypeName_Double_NotNull_ReturnsDouble()
     {
