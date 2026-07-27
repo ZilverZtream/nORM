@@ -151,11 +151,8 @@ namespace nORM.Core
         /// disassociation keeps the prior (conservative) no-op.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Relationship fixup reflects over navigation properties; trimming may remove the required members.")]
-        private void TryFixupCompositeReferenceNav(EntityEntry entry, object? principal, TableMapping principalMap, Queue<EntityEntry> queue)
+        private void TryFixupCompositeReferenceNav(EntityEntry entry, object? principal, TableMapping principalMap, System.Reflection.PropertyInfo navProp, Queue<EntityEntry> queue)
         {
-            if (principal == null)
-                return;
-
             TableMapping.Relation? match = null;
             foreach (var rel in principalMap.Relations.Values)
             {
@@ -168,6 +165,38 @@ namespace nORM.Core
             }
             if (match == null)
                 return;
+
+            if (principal == null)
+            {
+                // The user cleared a loaded composite reference nav → disassociate by nulling EVERY FK
+                // component, mirroring the single-key clearing path. Only for an OPTIONAL relationship (each FK
+                // component nullable and non-key), a nav that was loaded non-null, currently-set FK components,
+                // and a non-Added entry. A required (non-nullable) FK is left intact — nulling a value-type
+                // column would throw — as is a never-loaded nav's still-valid FK.
+                if (entry.LoadedReferenceNavs?.Contains(navProp.Name) == true
+                    && entry.State != EntityState.Added)
+                {
+                    var dep = entry.Entity!;
+                    var fks = match.ForeignKeys;
+                    bool allNullableNonKey = true, anySet = false;
+                    for (int i = 0; i < fks.Count; i++)
+                    {
+                        if (fks[i].IsKey || !fks[i].IsNullable) allNullableNonKey = false;
+                        if (fks[i].Getter(dep) != null) anySet = true;
+                    }
+                    if (allNullableNonKey && anySet)
+                    {
+                        for (int i = 0; i < fks.Count; i++)
+                            fks[i].Setter(dep, null);
+                        if (entry.State is EntityState.Unchanged or EntityState.Modified)
+                        {
+                            entry.SetStateInternal(EntityState.Modified);
+                            entry.MarkExplicitlyModified();
+                        }
+                    }
+                }
+                return;
+            }
 
             var principalEntry = ChangeTracker.GetEntryOrDefault(principal);
             if (principalEntry == null)
@@ -410,7 +439,7 @@ namespace nORM.Core
                 {
                     // Composite-key principal: the single-column fixup below can't express it. Propagate the
                     // full composite FK from an assigned composite key, mirroring the collection direction.
-                    TryFixupCompositeReferenceNav(entry, principal, principalMap, queue);
+                    TryFixupCompositeReferenceNav(entry, principal, principalMap, navProp, queue);
                     continue;
                 }
                 var fk = global::nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(
