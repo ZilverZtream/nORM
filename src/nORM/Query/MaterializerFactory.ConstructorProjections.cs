@@ -65,14 +65,25 @@ namespace nORM.Query
         private static bool IsAnonymousType(Type t)
             => t.Namespace == null && t.Name.Contains("AnonymousType", StringComparison.Ordinal);
 
+        // A ValueTuple ((a, b) group key / projection member) is emitted as one flat column per component
+        // (Key__Item1/Item2, …) exactly like an anonymous composite shape, and constructs positionally via
+        // its single (T1, T2, …) constructor — so it takes the same nested multi-column materializer path.
+        private static bool IsValueTupleType(Type t)
+            => t.IsGenericType && t.Namespace == "System" && t.Name.StartsWith("ValueTuple`", StringComparison.Ordinal);
+
+        // Types the projection materializer reads as SEVERAL flat columns and builds via a positional
+        // constructor: anonymous types and ValueTuples.
+        private static bool IsNestedMultiColumnType(Type t)
+            => IsAnonymousType(t) || IsValueTupleType(t);
+
         private static bool HasNestedAnonymousProjectionArg(NewExpression body)
         {
             foreach (var arg in body.Arguments)
             {
-                if (!IsAnonymousType(arg.Type)) continue;
-                // Explicit nested anonymous payload: `Stats = new { Total = ..., Count = ... }`.
+                if (!IsNestedMultiColumnType(arg.Type)) continue;
+                // Explicit nested anonymous / tuple payload: `Stats = new { ... }` or `new (a, b)`.
                 if (arg is NewExpression) return true;
-                // Composite key projected whole: `Key = g.Key`.
+                // Composite key projected whole: `Key = g.Key` (anonymous or ValueTuple key).
                 if (arg is MemberExpression me
                     && me.Member.Name == "Key"
                     && me.Expression is ParameterExpression mep
@@ -82,7 +93,7 @@ namespace nORM.Query
                     return true;
                 }
                 // Bare key parameter from 3-arg GroupBy result selector: `(k, g) => new { Key = k, ... }`.
-                if (arg is ParameterExpression pe && IsAnonymousType(pe.Type))
+                if (arg is ParameterExpression pe && IsNestedMultiColumnType(pe.Type))
                 {
                     return true;
                 }
@@ -108,7 +119,7 @@ namespace nORM.Query
                 // Explicit nested anonymous payload: the projection itself has a `new {...}`
                 // sub-expression. The SQL side emitted one flat column per sub-arg with a
                 // prefixed alias; read them sequentially and call the inner anon ctor.
-                if (arg is NewExpression nestedNew && IsAnonymousType(arg.Type))
+                if (arg is NewExpression nestedNew && IsNestedMultiColumnType(arg.Type))
                 {
                     var nestedCtor = nestedNew.Constructor ?? paramType.GetConstructors()[0];
                     var nestedParams = nestedCtor.GetParameters();
@@ -126,14 +137,14 @@ namespace nORM.Query
                     continue;
                 }
 
-                bool isNestedAnonRef = IsAnonymousType(arg.Type)
+                bool isNestedAnonRef = IsNestedMultiColumnType(arg.Type)
                     && (
                         (arg is MemberExpression me
                          && me.Member.Name == "Key"
                          && me.Expression is ParameterExpression mep
                          && mep.Type.IsGenericType
                          && mep.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>))
-                        || (arg is ParameterExpression pe && IsAnonymousType(pe.Type))
+                        || (arg is ParameterExpression pe && IsNestedMultiColumnType(pe.Type))
                     );
 
                 if (isNestedAnonRef)
