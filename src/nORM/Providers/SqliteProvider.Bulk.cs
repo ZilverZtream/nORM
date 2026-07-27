@@ -90,6 +90,17 @@ namespace nORM.Providers
                         for (int i = 0; i < cols.Length; i++)
                         {
                             var raw = cols[i].Getter(entity);
+                            // A default-valued convention store-generated key must let SQLite assign the
+                            // rowid alias, exactly as Add + SaveChanges does. Binding the literal default (0)
+                            // stores 0 and later rows collide on the primary key. Bind NULL so the rowid is
+                            // generated; an explicit (non-default) key is still honored. The check is
+                            // per-entity, so a batch mixing default and explicit keys is handled correctly.
+                            if (ReferenceEquals(cols[i], m.ConventionGeneratedKeyColumn)
+                                && ChangeTracker.IsDefaultKeyValue(raw, cols[i].Prop.PropertyType))
+                            {
+                                nORM.Query.ParameterAssign.AssignValue(parameters[i], null);
+                                continue;
+                            }
                             var conv = cols[i].Converter;
                             var val = conv != null ? conv.ConvertToProvider(raw) : raw;
                             nORM.Query.ParameterAssign.AssignValue(parameters[i], val);

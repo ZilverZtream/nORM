@@ -97,7 +97,11 @@ file class AegOccItem
 [Table("AEG_BulkRow")]
 file class AegBulkRow
 {
+    // This stress test assigns explicit sequential keys (including 0 on the first row), so opt out of the
+    // store-generated-key convention — otherwise a 0 key is treated as "generate" (EF parity) and collides
+    // with the explicitly-assigned key 1.
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.None)]
     public int Id { get; set; }
     public string Batch { get; set; } = string.Empty;
 }
