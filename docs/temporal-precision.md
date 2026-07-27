@@ -26,7 +26,7 @@ engines.
 | SQL Server | `SYSUTCDATETIME()` | High precision UTC database clock for history and tags. |
 | PostgreSQL | `now()` / timestamp columns | Transaction timestamp semantics; avoid assuming every row in one transaction has a different instant. |
 | MySQL | `UTC_TIMESTAMP(6)` | nORM bootstraps tag/history period columns as `DATETIME(6)` and upgrades existing tag tables to that precision. |
-| SQLite | SQLite datetime expressions | Second-level precision in the v1 trigger and tag contract. Use a delay between tag and write in deterministic tests. |
+| SQLite | `strftime('%Y-%m-%d %H:%M:%f', 'now')` | Millisecond precision (`%f`) in the v1 trigger and tag contract — `datetime('now')` would be second-precision and collapse same-second versions, so nORM uses `%f`. Still, use a delay > 1 ms between tag and write in deterministic tests. |
 
 ## Guidance
 

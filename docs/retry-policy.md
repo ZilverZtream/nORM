@@ -56,16 +56,19 @@ The following are **never** retried regardless of the `RetryPolicy` setting:
 | `MaxRetries` | 3 |
 | `BaseDelay` | 1 second |
 | Backoff | Exponential: `BaseDelay * 2^attempt` |
-| Jitter | ±10% applied to each backoff interval |
-| Maximum delay cap | 5 minutes per interval |
-| Exponent cap | 30 (prevents overflow for very high `MaxRetries`) |
+| Jitter | ±20% applied to each backoff interval (`RetryJitterRange = 0.2`) |
+| Maximum delay cap | 5 minutes per interval (`RetryingExecutionStrategy` only) |
+| Exponent cap | 30, preventing overflow for very high `MaxRetries` (`RetryingExecutionStrategy` only) |
 
-With the defaults a `SaveChangesAsync` retry sequence looks like:
+The delay/exponent caps above apply to `RetryingExecutionStrategy`; the `SaveChangesAsync`
+write-path retry loop applies the ±20% jitter but does not cap the exponent, so keep
+`MaxRetries` modest on that path. With the defaults a `SaveChangesAsync` retry sequence looks
+like:
 
 ```
 attempt 0: execute immediately
-attempt 1: wait ~1 s  (±10% jitter)
-attempt 2: wait ~2 s  (±10% jitter)
+attempt 1: wait ~1 s  (±20% jitter)
+attempt 2: wait ~2 s  (±20% jitter)
 attempt 3: propagate the exception
 ```
 
@@ -128,13 +131,16 @@ timeout fires, it throws `NormTimeoutException` (a `NormException` subtype).
 
 Key interactions with retry:
 
-- `NormTimeoutException` inherits from `NormException`, not `DbException`. The
-  default `ShouldRetry` delegate returns `false` for it because it is not a
-  `DbException`, `IOException`, or `SocketException`. This is intentional: a
-  timed-out operation has an unknown database outcome.
-- `RetryingExecutionStrategy` does not catch `TimeoutException` in its catch
-  guard, so `NormTimeoutException` propagates directly without triggering the
-  retry loop.
+- `NormTimeoutException` inherits from `NormException`, which itself derives from
+  `DbException` (every nORM exception is a `DbException`, so `catch (DbException)`
+  catches nORM timeouts). The default `ShouldRetry` delegate returns `false` for it
+  because the default predicate only matches transient `SqlException` codes plus
+  `IOException` / `SocketException` — not because it is not a `DbException`. This is
+  intentional: a timed-out operation has an unknown database outcome.
+- `RetryingExecutionStrategy`'s catch guard matches `DbException`, so it DOES catch
+  `NormTimeoutException`; `ShouldRetry` then returns `false` and it is rethrown without
+  retrying (a retry-error is logged). Only a raw `System.TimeoutException` bypasses the
+  guard entirely.
 - If an application needs to retry timed-out operations (e.g. for reads where
   idempotency is certain), configure `ShouldRetry` to return `true` for
   `NormTimeoutException` explicitly. Do not use this for writes unless you have
