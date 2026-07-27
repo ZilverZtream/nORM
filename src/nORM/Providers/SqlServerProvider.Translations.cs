@@ -96,13 +96,18 @@ namespace nORM.Providers
 
             if (declaringType == typeof(string))
             {
+                // T-SQL LEN() ignores trailing spaces whereas .NET String.Length counts every character.
+                // Append a sentinel so any trailing spaces become interior, take LEN, then subtract the
+                // sentinel — the true character length. Used by Length/Substring/Pad below so a value with
+                // trailing spaces is not silently under-counted (predicate miss / dropped chars / over-pad).
+                string TrueLen(string s) => $"(LEN({s} + N'.') - 1)";
                 return name switch
                 {
                     nameof(string.ToUpper) => $"UPPER({args[0]})",
                     nameof(string.ToLower) => $"LOWER({args[0]})",
                     nameof(char.ToUpperInvariant) => $"UPPER({args[0]})",
                     nameof(char.ToLowerInvariant) => $"LOWER({args[0]})",
-                    nameof(string.Length) when args.Length == 1 => $"LEN({args[0]})",
+                    nameof(string.Length) when args.Length == 1 => $"{TrueLen(args[0])}",
                     nameof(string.Trim) when args.Length == 1 => $"LTRIM(RTRIM({args[0]}))",
                     nameof(string.TrimStart) when args.Length == 1 => $"LTRIM({args[0]})",
                     nameof(string.TrimEnd) when args.Length == 1 => $"RTRIM({args[0]})",
@@ -111,21 +116,21 @@ namespace nORM.Providers
                     // target input passes through unchanged (matching .NET
                     // PadLeft/PadRight's "never truncates" contract).
                     nameof(string.PadLeft) when args.Length == 2 =>
-                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
-                        $"ELSE REPLICATE(' ', {args[1]} - LEN({args[0]})) + {args[0]} END)",
+                        $"(CASE WHEN {TrueLen(args[0])} >= {args[1]} THEN {args[0]} " +
+                        $"ELSE REPLICATE(' ', {args[1]} - {TrueLen(args[0])}) + {args[0]} END)",
                     nameof(string.PadLeft) when args.Length == 3 =>
-                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
-                        $"ELSE REPLICATE({args[2]}, {args[1]} - LEN({args[0]})) + {args[0]} END)",
+                        $"(CASE WHEN {TrueLen(args[0])} >= {args[1]} THEN {args[0]} " +
+                        $"ELSE REPLICATE({args[2]}, {args[1]} - {TrueLen(args[0])}) + {args[0]} END)",
                     nameof(string.PadRight) when args.Length == 2 =>
-                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
-                        $"ELSE {args[0]} + REPLICATE(' ', {args[1]} - LEN({args[0]})) END)",
+                        $"(CASE WHEN {TrueLen(args[0])} >= {args[1]} THEN {args[0]} " +
+                        $"ELSE {args[0]} + REPLICATE(' ', {args[1]} - {TrueLen(args[0])}) END)",
                     nameof(string.PadRight) when args.Length == 3 =>
-                        $"(CASE WHEN LEN({args[0]}) >= {args[1]} THEN {args[0]} " +
-                        $"ELSE {args[0]} + REPLICATE({args[2]}, {args[1]} - LEN({args[0]})) END)",
+                        $"(CASE WHEN {TrueLen(args[0])} >= {args[1]} THEN {args[0]} " +
+                        $"ELSE {args[0]} + REPLICATE({args[2]}, {args[1]} - {TrueLen(args[0])}) END)",
                     // SQL Server SUBSTRING is 1-indexed; .NET Substring is 0-indexed, add 1.
                     // The 2-arg form needs an explicit large length because SUBSTRING requires
                     // a length parameter; LEN of the source is always >= what we need.
-                    nameof(string.Substring) when args.Length == 2 => $"SUBSTRING({args[0]}, {args[1]} + 1, LEN({args[0]}))",
+                    nameof(string.Substring) when args.Length == 2 => $"SUBSTRING({args[0]}, {args[1]} + 1, {TrueLen(args[0])})",
                     nameof(string.Substring) when args.Length == 3 => $"SUBSTRING({args[0]}, {args[1]} + 1, {args[2]})",
                     // .NET Replace matches ordinally, but T-SQL REPLACE follows the (case-
                     // insensitive by default) collation and would rewrite case variants too.

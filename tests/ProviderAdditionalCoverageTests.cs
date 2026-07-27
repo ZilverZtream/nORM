@@ -428,11 +428,12 @@ public class ProviderAdditionalCoverageTests
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void SqlServerProvider_TranslateFunction_String_Length_EmitsLen()
+    public void SqlServerProvider_TranslateFunction_String_Length_CountsTrailingSpaces()
     {
         var p = new SqlServerProvider();
         var result = p.TranslateFunction(nameof(string.Length), typeof(string), "[Name]");
-        Assert.Equal("LEN([Name])", result);
+        // Bare LEN() drops trailing spaces; append a sentinel and subtract it for the true char count.
+        Assert.Equal("(LEN([Name] + N'.') - 1)", result);
     }
 
     [Fact]
