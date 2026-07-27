@@ -31,13 +31,33 @@ namespace nORM.Scaffolding
             // INTEGER (case-insensitive). BIGINT / INT / SMALLINT / etc. have INTEGER affinity but are NOT
             // the rowid alias — they are app-assigned — so Contains("INT") wrongly flagged them. Matches
             // the migration generator's rule.
+            // ...and only in a normal (rowid) table: a WITHOUT ROWID table has NO rowid, so even an
+            // INTEGER PRIMARY KEY is app-assigned there, not store-generated.
             if (primaryKeyColumns.Length == 1
-                && string.Equals(primaryKeyColumns[0].Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase))
+                && string.Equals(primaryKeyColumns[0].Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase)
+                && !IsSqliteWithoutRowidTable(connection, schemaName, tableName))
             {
                 return new HashSet<string>(StringComparer.OrdinalIgnoreCase) { primaryKeyColumns[0].Name };
             }
 
             return EmptyColumnNameSet();
+        }
+
+        private static bool IsSqliteWithoutRowidTable(DbConnection connection, string? schemaName, string tableName)
+        {
+            var prefix = string.IsNullOrWhiteSpace(schemaName)
+                ? string.Empty
+                : DynamicEntityConnectionKind.EscapeIdentifier(connection, schemaName!) + ".";
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT sql FROM {prefix}sqlite_master WHERE type='table' AND name = $name";
+            var p = cmd.CreateParameter();
+            p.ParameterName = "$name";
+            p.Value = tableName;
+            cmd.Parameters.Add(p);
+            var sql = Convert.ToString(cmd.ExecuteScalar());
+            // "WITHOUT ROWID" is a table-level option appended after the column list; a string match on the
+            // stored CREATE statement is the standard way to detect it (SQLite exposes no pragma for it).
+            return sql != null && sql.IndexOf("WITHOUT ROWID", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static IReadOnlyDictionary<string, int> GetSqlitePrimaryKeyOrdinals(DbConnection connection, string? schemaName, string tableName)

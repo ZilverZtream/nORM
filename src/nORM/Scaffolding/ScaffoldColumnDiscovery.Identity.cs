@@ -45,7 +45,10 @@ namespace nORM.Scaffolding
                     // Only an EXACTLY-INTEGER single-column PK aliases the store-generated rowid; BIGINT /
                     // INT / SMALLINT / etc. are app-assigned despite their INTEGER affinity. Contains("INT")
                     // wrongly flagged them, emitting [DatabaseGenerated(Identity)] on an app-assigned key.
-                    if (string.Equals(key.Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase))
+                    // And only in a rowid table — a WITHOUT ROWID table has no rowid, so even an INTEGER PK
+                    // is app-assigned there.
+                    if (string.Equals(key.Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase)
+                        && !await IsSqliteWithoutRowidTableAsync(connection, provider, table.Schema, table.Name).ConfigureAwait(false))
                     {
                         var tableKey = TableKey(table.Schema, table.Name);
                         result[tableKey] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { key.Name };
@@ -93,6 +96,22 @@ namespace nORM.Scaffolding
             }
 
             return new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // True when the SQLite table was created WITHOUT ROWID (so even an INTEGER PRIMARY KEY is
+        // app-assigned, not a store-generated rowid alias). SQLite exposes no pragma for this, so match the
+        // table-level option on the stored CREATE statement.
+        private static async Task<bool> IsSqliteWithoutRowidTableAsync(DbConnection connection, DatabaseProvider provider, string? schema, string tableName)
+        {
+            var prefix = string.IsNullOrWhiteSpace(schema) ? string.Empty : provider.Escape(schema!) + ".";
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT sql FROM {prefix}sqlite_master WHERE type='table' AND name = $name";
+            var p = cmd.CreateParameter();
+            p.ParameterName = "$name";
+            p.Value = tableName;
+            cmd.Parameters.Add(p);
+            var sql = Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
+            return sql != null && sql.IndexOf("WITHOUT ROWID", StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }
