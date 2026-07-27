@@ -853,9 +853,21 @@ namespace nORM.Query
             // SQL NULL IN (...) is UNKNOWN (not TRUE); emit null-safe OR pattern for nullable value types.
             bool isNullable = !value.Type.IsValueType || Nullable.GetUnderlyingType(value.Type) != null;
 
+            // C# Enumerable.Contains(string) is ORDINAL, but `val IN (SELECT col ...)` compares using the outer
+            // value's collation — case-INSENSITIVE by default on SQL Server / MySQL, so 'ABC' would wrongly
+            // match a subquery row 'abc' (extra rows). Force a case-sensitive comparison by wrapping the IN's
+            // left operand: collation precedence makes the explicit COLLATE/BINARY win for the whole predicate.
+            // Mirrors the local-list Contains ordinal path; the hook is identity on ordinal-default providers
+            // (SQLite/PostgreSQL), so they are unaffected.
+            var valueClrType = Nullable.GetUnderlyingType(value.Type) ?? value.Type;
+            bool ordinalStringSubquery = _provider.DefaultStringEqualityIsCaseInsensitive
+                && (valueClrType == typeof(string) || valueClrType == typeof(char));
+            string OrdinalLeft(string sql) => ordinalStringSubquery ? _provider.ForceCaseSensitiveStringComparison(sql) : sql;
+
             if (!isNullable)
             {
-                Visit(value);
+                var nnValueSql = GetSql(value);
+                _sql.Append(OrdinalLeft(nnValueSql));
                 _sql.Append(" IN (");
                 _sql.Append(subPlan.Sql);
                 _sql.Append(")");
@@ -865,7 +877,7 @@ namespace nORM.Query
             // Runtime nullable: (val IN (subq) OR (val IS NULL AND EXISTS(null-filtered subq)))
             var valueSql = GetSql(value);
             _sql.Append("(");
-            _sql.Append(valueSql);
+            _sql.Append(OrdinalLeft(valueSql));
             _sql.Append(" IN (");
             _sql.Append(subPlan.Sql);
             _sql.Append(") OR (");
