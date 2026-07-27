@@ -187,6 +187,11 @@ namespace nORM.Query
                     selectorSql = _provider.MinMaxAggregateOperand(selectorSql, aggType);
                 aggCall = $"{sqlAgg}({selectorSql})";
             }
+            // Enumerable.Sum over an empty collection is 0, not NULL; SQL SUM over no rows is NULL. Without
+            // COALESCE, a predicate like `p.Children.Sum(c => c.V) == 0` becomes `NULL == 0` (UNKNOWN) for a
+            // parent with no children, silently dropping that row. Mirror the projection nav-aggregate path.
+            if (sqlAgg == "SUM")
+                aggCall = $"COALESCE({aggCall}, 0)";
             _sql.Append("(SELECT ").Append(aggCall).Append(" FROM ").Append(fromClause).Append(" WHERE ").Append(whereSql).Append(')');
             return true;
         }
@@ -263,6 +268,12 @@ namespace nORM.Query
             if (sqlAgg == "AVG")
                 selectorSql = _provider.AverageAggregateOperand(selectorSql, selectorLambda.Body.Type);
 
+            // Enumerable.Sum over an empty collection is 0, not NULL; SQL SUM over no rows is NULL. Without
+            // COALESCE, a predicate like `p.Children.Sum(c => c.V) == 0` becomes `NULL == 0` (UNKNOWN) for a
+            // parent with no children, silently dropping that row. Only Sum gets the 0 fallback; Min/Max/Avg
+            // over empty stay NULL (nullable-aggregate semantics). Mirrors the projection nav-aggregate path.
+            if (sqlAgg == "SUM")
+                _sql.Append("COALESCE(");
             _sql.Append("(SELECT ").Append(sqlAgg).Append('(').Append(selectorSql).Append(')')
                 .Append(" FROM ").Append(QueryTranslator.TemporalTableSource(childMapping)).Append(' ').Append(subAlias)
                 .Append(" WHERE ");
@@ -274,6 +285,8 @@ namespace nORM.Query
             if (visibilitySql != null)
                 _sql.Append(" AND ").Append(visibilitySql);
             _sql.Append(')');
+            if (sqlAgg == "SUM")
+                _sql.Append(", 0)");
         }
 
         private static void AppendRelationPredicate(OptimizedSqlBuilder sql, TableMapping.Relation relation, string childAlias, string parentAlias)
@@ -586,14 +599,21 @@ namespace nORM.Query
                     "supported; use a constant fallback or restructure the query.",
                     NormUnsupportedReason.CorrelatedDefaultIfEmptyFallbackNotConstant);
 
-            if (defaultIfEmptyFallbackSql != null)
+            // A DefaultIfEmpty fallback takes precedence; otherwise Sum over an EMPTY subquery must be 0
+            // (Enumerable.Sum semantics), not the SQL NULL a bare SUM yields — else a predicate like
+            // `.Sum(x => x.V) == 0` becomes `NULL == 0` (UNKNOWN) and the empty-collection / no-match row is
+            // silently dropped. Only Sum gets the 0 fallback; Min/Max/Average over empty stay NULL (matching
+            // nullable-aggregate semantics). Mirrors the projection nav-aggregate path.
+            var coalesceFallbackSql = defaultIfEmptyFallbackSql ?? (sqlAgg == "SUM" ? "0" : null);
+
+            if (coalesceFallbackSql != null)
                 _sql.Append("COALESCE(");
             _sql.Append("(SELECT ").Append(sqlAgg).Append('(');
             if (distinct)
                 _sql.Append("DISTINCT ");
             _sql.Append(head).Append(')').Append(tail).Append(')');
-            if (defaultIfEmptyFallbackSql != null)
-                _sql.Append(", ").Append(defaultIfEmptyFallbackSql).Append(')');
+            if (coalesceFallbackSql != null)
+                _sql.Append(", ").Append(coalesceFallbackSql).Append(')');
         }
 
         /// <summary>
