@@ -105,6 +105,8 @@ namespace nORM.Core
             _savepointInsertedSnapshots = null;
             _transactionInsertedSnapshot = null;
             _ambientInsertedSnapshot = null;
+            _savepointValuesSnapshots = null;
+            _savepointTokenSnapshots = null;
             _transactionTokenSnapshot = null;
             _transactionValuesSnapshot = null;
 

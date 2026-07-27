@@ -80,6 +80,43 @@ namespace nORM.Core
         // baseline would otherwise equal the reverted-but-still-edited entity and read as "no change".
         private Dictionary<object, object?[]>? _transactionValuesSnapshot;
 
+        // Per-savepoint original-value baselines, captured at CreateSavepoint and restored at
+        // RollbackToSavepoint — the analogue of _transactionValuesSnapshot for the full-rollback path. Without
+        // this, a Modified entity whose baseline advanced during a save BETWEEN the savepoint and the rollback
+        // keeps the advanced baseline, so the re-save after RollbackToSavepoint compares the current value against
+        // that advanced baseline, finds no diff, emits no UPDATE, and silently drops the pending update.
+        private Dictionary<string, Dictionary<object, object?[]>>? _savepointValuesSnapshots;
+        // Per-savepoint OCC ([Timestamp]) original-token snapshots — the analogue of _transactionTokenSnapshot.
+        // Without restoring these, an OCC entity updated in-tx then rolled back to a savepoint keeps its advanced
+        // OriginalToken while the DB row's token reverts, so the next write matches 0 rows and throws a spurious
+        // DbConcurrencyException (a false conflict).
+        private Dictionary<string, Dictionary<object, object?>>? _savepointTokenSnapshots;
+
+        private Dictionary<object, object?[]> SnapshotAllTrackedOriginalValues()
+        {
+            var dict = new Dictionary<object, object?[]>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.Entity is { } e)
+                {
+                    var snap = entry.SnapshotOriginalValues();
+                    if (snap != null)
+                        dict[e] = snap;
+                }
+            }
+            return dict;
+        }
+
+        private void RestoreSavepointOriginalValues(Dictionary<object, object?[]> snapshot)
+        {
+            foreach (var (entity, values) in snapshot)
+            {
+                var entry = ChangeTracker.GetEntryOrDefault(entity);
+                if (entry != null && ReferenceEquals(entry.Entity, entity))
+                    entry.RestoreOriginalValues(values);
+            }
+        }
+
         /// <summary>
         /// Records the pre-advance baseline of a Modified entity the first time a caller-owned-transaction save
         /// advances it, so a full rollback can restore it. Idempotent per entity within a transaction.
@@ -210,6 +247,10 @@ namespace nORM.Core
                 = SnapshotAddedGeneratedKeys();
             (_savepointInsertedSnapshots ??= new Dictionary<string, HashSet<object>>(StringComparer.Ordinal))[name]
                 = SnapshotInsertedEntities();
+            (_savepointValuesSnapshots ??= new Dictionary<string, Dictionary<object, object?[]>>(StringComparer.Ordinal))[name]
+                = SnapshotAllTrackedOriginalValues();
+            (_savepointTokenSnapshots ??= new Dictionary<string, Dictionary<object, object?>>(StringComparer.Ordinal))[name]
+                = SnapshotOccOriginalTokens();
         }
 
         /// <summary>
@@ -246,6 +287,16 @@ namespace nORM.Core
             // silently skip it; one inserted before the savepoint keeps its row and its flag.
             if (_savepointInsertedSnapshots != null && _savepointInsertedSnapshots.TryGetValue(name, out var insSnapshot))
                 RestoreInsertedFlags(insSnapshot);
+            // Restore the change-tracking baselines captured at the savepoint so a Modified entity whose baseline
+            // advanced during a save AFTER the savepoint is re-detected and re-applied on the next SaveChanges,
+            // rather than silently dropped (its current value would otherwise equal the advanced baseline).
+            // Mirrors the full-rollback baseline restore in ResetGeneratedKeysAfterFullRollback.
+            if (_savepointValuesSnapshots != null && _savepointValuesSnapshots.TryGetValue(name, out var valSnapshot))
+                RestoreSavepointOriginalValues(valSnapshot);
+            // Likewise restore the OCC tokens so a rolled-back [Timestamp] entity does not throw a spurious
+            // concurrency conflict on its next write.
+            if (_savepointTokenSnapshots != null && _savepointTokenSnapshots.TryGetValue(name, out var tokSnapshot))
+                RestoreOccOriginalTokens(tokSnapshot);
         }
 
         /// <summary>

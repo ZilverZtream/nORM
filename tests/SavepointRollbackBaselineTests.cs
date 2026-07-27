@@ -11,11 +11,17 @@ using Xunit;
 
 namespace nORM.Tests;
 
-[Xunit.Trait("Category", "Fast")]
-public class ZZZ_SavepointLostUpdateRepro
+/// <summary>
+/// Rolling a caller-owned transaction back to a savepoint must restore the change-tracking baseline of a
+/// Modified entity whose save advanced that baseline after the savepoint — otherwise the next SaveChanges
+/// sees current == baseline, emits no UPDATE, and silently drops the user's edit. The full-rollback path
+/// already restores the baseline; the savepoint path must too.
+/// </summary>
+[Trait("Category", "Fast")]
+public class SavepointRollbackBaselineTests
 {
     [Table("SpItem")]
-    private class SpItem
+    private sealed class SpItem
     {
         [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int Id { get; set; }
         public string Name { get; set; } = "";
@@ -38,50 +44,47 @@ public class ZZZ_SavepointLostUpdateRepro
         return (string)cmd.ExecuteScalar()!;
     }
 
-    // CONTROL: full rollback path — should already work (restores _transactionValuesSnapshot).
+    // Control: the full-rollback path already restores the baseline, so the edit re-applies.
     [Fact]
-    public async Task FullRollback_ModifiedEntity_ReappliesUpdate()
+    public async Task FullRollback_reapplies_a_modified_entitys_update()
     {
         var (cn, ctx) = Build();
         using var _ = cn; await using var __ = ctx;
 
         var e = new SpItem { Name = "A" };
-        ctx.Add(e);
-        await ctx.SaveChangesAsync();          // committed row, Id assigned, Name="A"
+        ctx.Add(e); await ctx.SaveChangesAsync();
 
         await using (var tx = await ctx.Database.BeginTransactionAsync())
         {
             e.Name = "B";
-            await ctx.SaveChangesAsync();      // UPDATE to B (uncommitted), baseline advances to B
-            await tx.RollbackAsync();          // DB row reverts to A
+            await ctx.SaveChangesAsync();   // UPDATE to B (uncommitted); baseline advances to B
+            await tx.RollbackAsync();       // DB reverts to A; baseline restored to A
         }
-        Assert.Equal("A", RawName(cn, e.Id));  // rolled back
+        Assert.Equal("A", RawName(cn, e.Id));
 
-        await ctx.SaveChangesAsync();          // baseline should be restored to A, so B re-applies
-        Assert.Equal("B", RawName(cn, e.Id));  // user's intent B must persist
+        await ctx.SaveChangesAsync();       // B re-applies (current B != restored baseline A)
+        Assert.Equal("B", RawName(cn, e.Id));
     }
 
-    // SUSPECT: savepoint rollback path — claim: baseline NOT restored -> silent lost update.
     [Fact]
-    public async Task RollbackToSavepoint_ModifiedEntity_ReappliesUpdate()
+    public async Task RollbackToSavepoint_reapplies_a_modified_entitys_update()
     {
         var (cn, ctx) = Build();
         using var _ = cn; await using var __ = ctx;
 
         var e = new SpItem { Name = "A" };
-        ctx.Add(e);
-        await ctx.SaveChangesAsync();          // committed row, Id assigned, Name="A"
+        ctx.Add(e); await ctx.SaveChangesAsync();
 
         await using var tx = await ctx.Database.BeginTransactionAsync();
         await tx.CreateSavepointAsync("sp");
         e.Name = "B";
-        await ctx.SaveChangesAsync();          // UPDATE to B (uncommitted), baseline advances to B
-        await tx.RollbackToSavepointAsync("sp"); // DB row reverts to A
+        await ctx.SaveChangesAsync();       // UPDATE to B (uncommitted); baseline advances to B
+        await tx.RollbackToSavepointAsync("sp"); // DB reverts to A; baseline must be restored to A
         Assert.Equal("A", RawName(cn, e.Id));
 
-        await ctx.SaveChangesAsync();          // must re-apply B, but baseline stuck at B -> no UPDATE
+        await ctx.SaveChangesAsync();       // B must re-apply (was silently dropped before the fix)
         await tx.CommitAsync();
 
-        Assert.Equal("B", RawName(cn, e.Id));  // EXPECT FAIL: actual "A" (silent lost update)
+        Assert.Equal("B", RawName(cn, e.Id));
     }
 }

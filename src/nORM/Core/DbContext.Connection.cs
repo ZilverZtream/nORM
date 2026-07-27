@@ -472,6 +472,8 @@ namespace nORM.Core
                 _transactionKeySnapshot = null;
                 _savepointInsertedSnapshots?.Clear();
                 _transactionInsertedSnapshot = null;
+                _savepointValuesSnapshots?.Clear();
+                _savepointTokenSnapshots?.Clear();
                 _transactionTokenSnapshot = null;
                 _transactionValuesSnapshot = null;
             }
