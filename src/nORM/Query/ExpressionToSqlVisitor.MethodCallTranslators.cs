@@ -469,6 +469,17 @@ namespace nORM.Query
                 && node.Object != null
                 && node.Object.Type.IsEnum)
             {
+                // A flags enum persisted via a value converter as a non-integer (typically its name string)
+                // can't be bit-tested server-side: `('Read, Write' & 2)` coerces the text to 0 and silently
+                // matches no rows. A name-string bitwise test is not reliably translatable, so fail loud with
+                // an actionable message rather than returning silently-wrong results.
+                if (TryGetConverterColumn(node.Object, out var flagCol) && !IsIntegralTargetType(flagCol.Converter!.ProviderType))
+                    throw new NormUnsupportedFeatureException(
+                        $"HasFlag on the flags enum column '{flagCol.PropName}' isn't supported: it is stored via a " +
+                        $"value converter as {flagCol.Converter!.ProviderType.Name}, not an integer, so a server-side " +
+                        "bitwise test would silently match nothing. Store the flags enum as its integer value for a " +
+                        "server-side HasFlag, or evaluate the flag check client-side (e.g. after ToList()).",
+                        NormUnsupportedReason.MethodUntranslatable);
                 var receiverSql = GetSql(node.Object);
                 var flagSql = GetSql(node.Arguments[0]);
                 _sql.Append('(').Append(receiverSql).Append(" & ").Append(flagSql).Append(") = ").Append(flagSql);
