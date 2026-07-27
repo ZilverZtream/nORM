@@ -227,6 +227,53 @@ public class LiveProviderMigrationDdlParityTests
         }
     }
 
+    // MySQL forbids a literal DEFAULT on BLOB/TEXT/JSON/GEOMETRY columns (error 1101: "BLOB, TEXT, GEOMETRY
+    // or JSON column can't have a default value"). Adding a NOT NULL LONGTEXT column with a model default to a
+    // populated table emitted `... DEFAULT 'none'` and aborted the whole migration. MySQL 8.0.13+ accepts the
+    // same default only as a parenthesised expression default (`DEFAULT ('none')`), which also backfills the
+    // existing rows. Live-only: needs a real MySQL server.
+    [Fact]
+    public void LiveProvider_MySql_AddNotNullTextColumnWithDefault_OnPopulatedTable()
+    {
+        var (cn, skip) = Open("mysql");
+        if (skip != null) return;
+        var db = cn!;
+        const string table = "DdlParity_TextDefault";
+
+        try
+        {
+            ExecSafe(db, $"DROP TABLE IF EXISTS `{table}`");
+            Exec(db, $"CREATE TABLE `{table}` (`Id` INT NOT NULL PRIMARY KEY, `Name` VARCHAR(200) NOT NULL)");
+            Exec(db, $"INSERT INTO `{table}` (`Id`, `Name`) VALUES (1, 'row-one')");
+
+            // Added NOT NULL LONGTEXT (no MaxLength → LONGTEXT) column carrying a literal model default, plus a
+            // nullable LONGTEXT with an explicit DEFAULT NULL (which MySQL accepts literally — only a non-NULL
+            // literal on these types trips error 1101, so NULL must NOT be wrapped).
+            var bio = new ColumnSchema { Name = "Bio", ClrType = typeof(string).FullName!, IsNullable = false, DefaultValue = "'none'" };
+            var note = new ColumnSchema { Name = "Note", ClrType = typeof(string).FullName!, IsNullable = true, DefaultValue = "NULL" };
+            var diff = new SchemaDiff();
+            diff.AddedColumns.Add((BaseTable(table), bio));
+            diff.AddedColumns.Add((BaseTable(table), note));
+
+            // BUG: emitted `ADD COLUMN `Bio` LONGTEXT NOT NULL DEFAULT 'none'` → MySQL error 1101, migration aborts.
+            ApplyStatements(db, Generator("mysql").GenerateSql(diff).Up);
+
+            Assert.True(ColumnExists(db, table, "Bio"), "Bio column must be added.");
+            Assert.False(IsNullable(db, table, "Bio"), "Bio must be NOT NULL.");
+            Assert.True(ColumnExists(db, table, "Note"), "Note column must be added.");
+
+            // The pre-existing row must be backfilled with the default, not left NULL / rejected.
+            using var cmd = db.CreateCommand();
+            cmd.CommandText = $"SELECT `Bio` FROM `{table}` WHERE `Id` = 1";
+            Assert.Equal("none", Convert.ToString(cmd.ExecuteScalar()));
+        }
+        finally
+        {
+            ExecSafe(cn, $"DROP TABLE IF EXISTS `{table}`");
+            db.Dispose();
+        }
+    }
+
     // ── Base-table DDL (provider-specific CREATE TABLE) ──────────────────────
 
     private static string CreateBaseDdl(string kind, string table) => kind switch

@@ -556,7 +556,25 @@ namespace nORM.Migration
         private static string FormatDefaultValue(ColumnSchema column)
         {
             var validated = DefaultValueValidator.Validate(column.DefaultValue!) ?? string.Empty;
-            if (!GetSqlType(column).EndsWith("(6)", StringComparison.Ordinal))
+            var sqlType = GetSqlType(column);
+
+            // MySQL forbids a plain literal DEFAULT on BLOB/TEXT/JSON/GEOMETRY columns (error 1101). MySQL
+            // 8.0.13+ accepts the same value only as a parenthesised expression default (DEFAULT (expr)),
+            // which also backfills existing rows on ADD COLUMN. Wrap the literal unless the caller already
+            // supplied a parenthesised expression.
+            if (RequiresExpressionDefault(sqlType))
+            {
+                var t = validated.TrimStart();
+                // DEFAULT NULL is the implicit nullable default and is accepted literally on these types; only
+                // a non-NULL literal trips error 1101 and needs the parenthesised expression form. A caller-
+                // supplied parenthesised expression is left untouched.
+                if (t.StartsWith("(", StringComparison.Ordinal)
+                    || string.Equals(validated.Trim(), "NULL", StringComparison.OrdinalIgnoreCase))
+                    return validated;
+                return $"({validated})";
+            }
+
+            if (!sqlType.EndsWith("(6)", StringComparison.Ordinal))
                 return validated;
 
             var trimmed = validated.Trim();
@@ -566,6 +584,17 @@ namespace nORM.Migration
                 "CURRENT_TIMESTAMP" or "NOW" or "LOCALTIME" or "LOCALTIMESTAMP" => $"{name}(6)",
                 _ => validated,
             };
+        }
+
+        // MySQL data types that reject a literal DEFAULT clause and require the parenthesised
+        // expression-default form (DEFAULT (expr)) instead: all BLOB/TEXT sizes, JSON, and spatial types.
+        private static bool RequiresExpressionDefault(string sqlType)
+        {
+            var baseType = sqlType.Split('(')[0].Trim().ToUpperInvariant();
+            return baseType is "TINYTEXT" or "TEXT" or "MEDIUMTEXT" or "LONGTEXT"
+                or "TINYBLOB" or "BLOB" or "MEDIUMBLOB" or "LONGBLOB"
+                or "JSON" or "GEOMETRY" or "POINT" or "LINESTRING" or "POLYGON"
+                or "MULTIPOINT" or "MULTILINESTRING" or "MULTIPOLYGON" or "GEOMETRYCOLLECTION";
         }
 
         /// <summary>

@@ -133,7 +133,9 @@ public class MigrationDefaultsIdentityTests
 
         var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
         Assert.Contains("DEFAULT true", createSql);
-        Assert.Contains("DEFAULT 'default'", createSql);
+        // Tag has no MaxLength → LONGTEXT, which forbids a literal DEFAULT; MySQL requires the parenthesised
+        // expression-default form instead (a bare DEFAULT 'default' aborts CREATE TABLE with error 1101).
+        Assert.Contains("DEFAULT ('default')", createSql);
     }
 
     [Fact]
@@ -831,7 +833,9 @@ public class MigrationDefaultsIdentityTests
             var createSql = result.Up.Single(s => s.StartsWith("CREATE TABLE"));
             Assert.Contains("DEFAULT 42", createSql);
             Assert.Contains("DEFAULT 3.14", createSql);
-            Assert.Contains("DEFAULT 'hello'", createSql);
+            // A no-length string maps to LONGTEXT on MySQL, which forbids a literal DEFAULT and requires the
+            // parenthesised expression-default form; the other providers accept the literal directly.
+            Assert.Contains(gen is MySqlMigrationSqlGenerator ? "DEFAULT ('hello')" : "DEFAULT 'hello'", createSql);
             Assert.Contains("DEFAULT false", createSql);
             Assert.Contains("DEFAULT null", createSql);
         }
