@@ -643,7 +643,13 @@ namespace nORM.Query
             // would emit @p0 and the inner value would overwrite the outer in _params.
             var vctx2 = new VisitorContext(_ctx, _mapping, _provider, param, alias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctx2);
-            var predicateSql = visitor.Translate(predicate.Body);
+            // Negate the predicate THROUGH the visitor (Expression.Not) so EmitNegation applies
+            // three-valued-logic-aware negation (De Morgan + `OR col IS NULL` rescue). A row whose
+            // predicate is false-because-NULL in C# must be counted as a violation; a bare textual
+            // `NOT (...)` leaves it UNKNOWN, so the NULL row escapes the violation subquery and All
+            // silently flips false→true. Mirrors the Any/All lowering in QueryTranslator.HandleWhere
+            // and every other All emit path (ETSV/SCV nav-aggregate).
+            var negatedPredicateSql = visitor.Translate(Expression.Not(predicate.Body));
             // All() predicate parameters are fixed constants (not closure captures),
             // so add them only to _params (NOT _compiledParams) to ensure they are
             // bound directly rather than relying on ParameterValueExtractor.
@@ -656,8 +662,8 @@ namespace nORM.Query
             // semantics match Where(outer).All(p) -> NOT EXISTS(rows matching outer that
             // violate p).
             var subqueryWhere = outerWhereSql is null
-                ? $"NOT ({predicateSql})"
-                : $"NOT ({predicateSql}) AND ({outerWhereSql})";
+                ? negatedPredicateSql
+                : $"({negatedPredicateSql}) AND ({outerWhereSql})";
             _sql.Insert(0,
                 $"SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM {RootTableSource()} {alias} WHERE {subqueryWhere}) THEN 1 ELSE 0 END");
 
