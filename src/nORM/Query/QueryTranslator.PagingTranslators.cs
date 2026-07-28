@@ -262,7 +262,11 @@ namespace nORM.Query
                 var sourceSql = RemoveTrailingOrderByUnlessPaged(subPlan.Sql);
 
                 t._sql.Append("SELECT * FROM (SELECT ").Append(indexedAlias).Append(".*, ")
-                    .Append("SUM(CASE WHEN NOT (").Append(predSql).Append(") THEN 1 ELSE 0 END) OVER (ORDER BY ")
+                    // Break-flag = cumulative count of rows that DON'T satisfy the predicate. The predicate must
+                    // put the break in the ELSE branch (not `NOT(pred)`): SQL 3VL routes BOTH false and NULL into
+                    // ELSE, matching C#'s lifted comparison (a null-operand predicate is false → TakeWhile stops /
+                    // SkipWhile resumes). A `NOT(pred)` form left NULL→NULL→0, silently never breaking.
+                    .Append("SUM(CASE WHEN (").Append(predSql).Append(") THEN 0 ELSE 1 END) OVER (ORDER BY ")
                     .Append(PooledStringBuilder.JoinOrderBy(orderByForCumulativeWindow)).Append(" ROWS UNBOUNDED PRECEDING) AS ").Append(flagAlias)
                     .Append(" FROM (SELECT ").Append(srcAlias).Append(".*, (ROW_NUMBER() OVER (ORDER BY ")
                     .Append(PooledStringBuilder.JoinOrderBy(orderByForSourceWindow)).Append(") - 1) AS ").Append(indexAlias)
