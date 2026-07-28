@@ -348,7 +348,7 @@ namespace nORM.Query
                     // already sorts by instant). Plain DateTime is deliberately NOT coerced: its
                     // fixed-width offset-free text already sorts chronologically, and wrapping it in
                     // datetime() would overflow on DateTime.MaxValue's .9999999 fraction.
-                    string CoerceOrderKey(string sql, Type keyType) => t.CoerceOrderKeySql(sql, keyType);
+                    string CoerceOrderKey(string sql, Type keyType, Expression? keyBody) => t.CoerceOrderKeySql(sql, keyType, keyBody);
                     // C# sorts null keys as SMALLEST (first ascending, last descending). PostgreSQL
                     // defaults to the opposite, so nullable keys there get a leading null-rank
                     // entry `(key IS NOT NULL)` with the same direction — false(null) < true, and
@@ -361,7 +361,7 @@ namespace nORM.Query
                         // A value-converter column's stored representation (its provider type) drives the
                         // decimal/TimeSpan/DateTimeOffset numeric normalization, not its CLR model type — else a
                         // Money (decimal-provider converter) key sorts lexicographically.
-                        t._orderBy.Add((CoerceOrderKey(keySql, visitor.EffectiveComparableType(keyExpr, keyType)), ascending));
+                        t._orderBy.Add((CoerceOrderKey(keySql, visitor.EffectiveComparableType(keyExpr, keyType), keyExpr), ascending));
                     }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                     {

@@ -726,13 +726,37 @@ namespace nORM.Query
         /// fixed-width offset-free text sorts chronologically, and wrapping it in
         /// datetime() would overflow on DateTime.MaxValue's .9999999 fraction.
         /// </summary>
-        private string CoerceOrderKeySql(string sql, Type keyType)
+        private string CoerceOrderKeySql(string sql, Type keyType, Expression? keyBody = null)
         {
             var u = Nullable.GetUnderlyingType(keyType) ?? keyType;
             if (u == typeof(decimal)) return _provider.OrderByDecimalKeySql(sql);
-            if (u == typeof(TimeSpan)) return _provider.NormalizeTimeSpanForCompare(sql);
+            if (u == typeof(TimeSpan))
+                // A DateTime/TimeOnly difference key (`x.End - x.Start`) is already lowered to numeric
+                // seconds by ExpressionToSqlVisitor; the 'c'-TEXT parser would substr a number and corrupt
+                // it. Order on the numeric seconds directly. A stored TimeSpan column still needs the parser.
+                return IsTimeSpanDateDifference(keyBody) ? sql : _provider.NormalizeTimeSpanForCompare(sql);
             if (u == typeof(DateTimeOffset)) return _provider.NormalizeDateTimeOffsetForCompare(sql);
             return sql;
+        }
+
+        /// <summary>
+        /// True when <paramref name="e"/> is a TimeSpan-typed subtraction of two DateTime /
+        /// DateTimeOffset / TimeOnly operands (e.g. <c>x.End - x.Start</c>). ExpressionToSqlVisitor
+        /// lowers such a key to a numeric difference-in-seconds expression, so the TimeSpan 'c'-TEXT
+        /// canonicalizers (<c>NormalizeTimeSpanForCompare</c> / <c>ExactKeySql</c>) must NOT be applied
+        /// on top — they parse stored 'c' text and would corrupt the already-numeric value, silently
+        /// collapsing every ORDER BY / GROUP BY key. A stored TimeSpan column still needs them.
+        /// </summary>
+        internal static bool IsTimeSpanDateDifference(Expression? e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            if (e is not BinaryExpression { NodeType: ExpressionType.Subtract } b)
+                return false;
+            if ((Nullable.GetUnderlyingType(b.Type) ?? b.Type) != typeof(TimeSpan))
+                return false;
+            var lt = Nullable.GetUnderlyingType(b.Left.Type) ?? b.Left.Type;
+            return lt == typeof(DateTime) || lt == typeof(DateTimeOffset) || lt == typeof(TimeOnly);
         }
 
 

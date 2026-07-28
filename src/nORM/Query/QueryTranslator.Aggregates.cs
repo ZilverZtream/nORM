@@ -206,8 +206,10 @@ namespace nORM.Query
                     // materialized decimal key.
                     var partType = Nullable.GetUnderlyingType(compositeKey.Arguments[i].Type) ?? compositeKey.Arguments[i].Type;
                     // Exact key canonicalization (decimal text, TimeOnly fraction-strip); DateTimeOffset is
-                    // handled by its instant hook just below.
-                    partSql = _provider.ExactKeySql(partSql, partType);
+                    // handled by its instant hook just below. A DateTime/TimeOnly difference part is already
+                    // numeric seconds (see the single-key path) and must skip the 'c'-TEXT canonicalizer.
+                    if (!IsTimeSpanDateDifference(compositeKey.Arguments[i]))
+                        partSql = _provider.ExactKeySql(partSql, partType);
                     // .NET DateTimeOffset equality is instant-based; canonicalize the key so
                     // same-instant values at different offsets group together (SQLite TEXT
                     // storage would otherwise split them). The canonical text doubles as the
@@ -276,7 +278,11 @@ namespace nORM.Query
                     // Exact key canonicalization (decimal text, TimeOnly fraction-strip; see composite-key
                     // path above). DateTimeOffset is handled by its instant hook just below.
                     var keyType = Nullable.GetUnderlyingType(keySelectorLambda.Body.Type) ?? keySelectorLambda.Body.Type;
-                    groupBySql = _provider.ExactKeySql(groupBySql, keyType);
+                    // A DateTime/TimeOnly difference key is already numeric seconds (lowered by
+                    // ExpressionToSqlVisitor); the TimeSpan 'c'-TEXT canonicalizer inside ExactKeySql
+                    // would substr that number and collapse every distinct duration into one group.
+                    if (!IsTimeSpanDateDifference(keySelectorLambda.Body))
+                        groupBySql = _provider.ExactKeySql(groupBySql, keyType);
                     // Instant-based DateTimeOffset grouping (see the composite-key path above).
                     if (keyType == typeof(DateTimeOffset)
                         && _provider.CanonicalizeDateTimeOffsetGroupKey(groupBySql) is { } canonicalKey)

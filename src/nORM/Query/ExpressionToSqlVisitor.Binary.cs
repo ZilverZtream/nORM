@@ -353,6 +353,29 @@ namespace nORM.Query
                     NormUnsupportedReason.DateTimeFunctionProviderHookMissing);
             }
 
+            // A bare DateTime / DateTimeOffset / TimeOnly SUBTRACTION (result TimeSpan) used OUTSIDE a
+            // comparison — e.g. an ORDER BY / GROUP BY key like `OrderBy(x => x.End - x.Start)` — must
+            // lower to difference-in-seconds. The generic arithmetic emit below produces raw
+            // `(End - Start)`, which SQLite's numeric affinity collapses to `2020 - 2020 = 0` for every
+            // ISO-TEXT row, silently tying all sort keys / merging all groups. The comparison path
+            // (EmitTimeSpanOperand, below) and the projection path (SelectClauseVisitor) already lower
+            // it this way; this covers the remaining non-comparison arithmetic contexts. Native
+            // TIME/INTERVAL providers return the same seconds domain from the hook.
+            if (node.NodeType == ExpressionType.Subtract
+                && (Nullable.GetUnderlyingType(node.Type) ?? node.Type) == typeof(TimeSpan))
+            {
+                if (IsDateTimeLike(node.Left.Type))
+                {
+                    _sql.Append(_provider.GetDateTimeDifferenceSecondsSql(GetSql(node.Left), GetSql(node.Right)));
+                    return node;
+                }
+                if (IsTimeOnly(node.Left.Type))
+                {
+                    _sql.Append(_provider.GetTimeOnlyDifferenceSecondsSql(GetSql(node.Left), GetSql(node.Right)));
+                    return node;
+                }
+            }
+
             // Decimal comparisons / arithmetic on TEXT-stored decimal columns
             // must coerce both operands to REAL or SQLite performs lex compare
             // ('10.5' < '2' because '1' < '2'). Wrap both sides with CAST AS

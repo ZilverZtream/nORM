@@ -381,7 +381,7 @@ namespace nORM.Query
                         if (t._provider.RequiresExplicitNullOrderingForNullableKeys
                             && (!okType.IsValueType || Nullable.GetUnderlyingType(okType) != null))
                             t._orderBy.Add(($"({okSql} IS NOT NULL)", !asc));
-                        t._orderBy.Add((t.CoerceOrderKeySql(okSql, okType), !asc));
+                        t._orderBy.Add((t.CoerceOrderKeySql(okSql, okType, keyLambda.Body), !asc));
                     }
                 }
                 else

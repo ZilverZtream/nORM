@@ -451,7 +451,7 @@ namespace nORM.Query
                     if (t._provider.RequiresExplicitNullOrderingForNullableKeys
                         && (!keyType.IsValueType || Nullable.GetUnderlyingType(keyType) != null))
                         t._orderBy.Add(($"({keySql} IS NOT NULL)", ascending));
-                    t._orderBy.Add((t.CoerceOrderKeySql(keySql, keyType), ascending));
+                    t._orderBy.Add((t.CoerceOrderKeySql(keySql, keyType, keySelector.Body), ascending));
                 }
                 t._take = 1;
                 var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.Index++;

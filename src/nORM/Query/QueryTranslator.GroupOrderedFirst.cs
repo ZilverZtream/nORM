@@ -221,7 +221,7 @@ namespace nORM.Query
             foreach (var (selector, descending) in orderKeys)
             {
                 var keySql = TranslateAgainstSubAlias(selector.Body, selector.Parameters[0], subAlias);
-                keySql = CoerceOrderKeySql(keySql, selector.Body.Type);
+                keySql = CoerceOrderKeySql(keySql, selector.Body.Type, selector.Body);
                 orderParts.Add(descending ^ lastSemantics ? keySql + " DESC" : keySql);
             }
             var orderByFull = string.Join(", ", orderParts);
