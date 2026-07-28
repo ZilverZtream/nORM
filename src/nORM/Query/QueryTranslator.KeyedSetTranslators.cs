@@ -253,7 +253,12 @@ namespace nORM.Query
                                 combined.Append(", ");
                             var column = subMapping.Columns[colIndex];
                             var pName = t._ctx.RawProvider.ParamPrefix + "p" + t._parameterManager.GetNextIndex();
-                            t.AddLiteralParameter(pName, column.Prop.GetValue(secondRows[rowIndex]));
+                            // Bind the PROVIDER (stored) representation, not the raw model value, so the appended
+                            // local rows compare and materialize on the same representation as the DB source arm.
+                            // Otherwise a value-converted column is dedup-mismatched against stored source keys AND
+                            // run backwards through ConvertFromProvider by the outer materializer (value corruption).
+                            var rawValue = column.Prop.GetValue(secondRows[rowIndex]);
+                            t.AddLiteralParameter(pName, column.Converter != null ? column.Converter.ConvertToProvider(rawValue) : rawValue);
                             combined.Append(pName).Append(" AS ").Append(column.EscCol);
                         }
                         combined.Append(", 1 AS ").Append(srcFlag)
