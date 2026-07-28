@@ -427,6 +427,7 @@ namespace nORM.Query
     string? orderBy = null,
     bool distinct = false,
     string? outerFromOverride = null,
+    string? innerFromOverride = null,
     string? additionalOnConditions = null,
     Func<Expression, string>? translateProjectionExpression = null,
     Func<string, string>? escapeProjectionAlias = null,
@@ -505,7 +506,13 @@ namespace nORM.Query
             {
                 joinSql.Append(QueryTranslator.TemporalTableSource(outerMapping)).Append(' ').Append(outerAlias).Append(' ');
             }
-            joinSql.Append(joinType).Append(' ').Append(QueryTranslator.TemporalTableSource(innerMapping)).Append(' ').Append(innerAlias).Append(' ');
+            joinSql.Append(joinType).Append(' ');
+            if (innerFromOverride != null)
+                // Windowed-inner-source case: a `(subSql) AS alias` fragment so the join matches only the
+                // LIMITed/Skipped inner sub-plan rather than the whole inner table.
+                joinSql.Append(innerFromOverride).Append(' ');
+            else
+                joinSql.Append(QueryTranslator.TemporalTableSource(innerMapping)).Append(' ').Append(innerAlias).Append(' ');
             joinSql.Append("ON ").Append(onSqlOverride ?? BuildOnEquality(outerKeySql, innerKeySql, provider, keyClrType));
             if (!string.IsNullOrEmpty(additionalOnConditions))
                 joinSql.Append(" AND ").Append(additionalOnConditions);

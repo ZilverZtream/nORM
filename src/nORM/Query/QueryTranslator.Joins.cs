@@ -99,6 +99,17 @@ namespace nORM.Query
                 return node;
             }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
+            // Join over a Take/Skip-windowed INNER source — wrap it as a derived table so the join matches only
+            // the LIMITed/Skipped inner rows (a global top-N), mirroring the windowed-outer handling above. The
+            // sub-plan carries the inner's Where/OrderBy/Take/Skip, so the inline inner-WHERE extraction below is
+            // skipped for it. Sister of the post-Take/Skip silent-wrongness family (the outer was already wrapped).
+            string? innerFromOverride = null;
+            if (SourceHasTakeOrSkip(innerQuery))
+            {
+                var subInner = TranslateInSubContext(innerQuery, innerMapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);
+                MergeSubPlanParameters(subInner);
+                innerFromOverride = "(" + subInner.Sql + ") AS " + innerAlias;
+            }
             var sqlOuterKeySelector = ExpandProjection(effectiveOuterKeySelector);
             if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
                 _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -156,7 +167,11 @@ namespace nORM.Query
             foreach (var kvp in innerKeyVisitor.GetParameters())
                 AddLiteralParameter(kvp.Key, kvp.Value);
             FastExpressionVisitorPool.Return(innerKeyVisitor);
-            var innerOnConditions = ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
+            // A wrapped (windowed) inner already carries its WHERE inside the derived table; extracting it again
+            // here would either double it or reference columns off the wrong scope.
+            var innerOnConditions = innerFromOverride != null
+                ? new List<string>()
+                : ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
             var additionalOnSql = innerOnConditions.Count > 0
                 ? string.Join(" AND ", innerOnConditions.Select(c => "(" + c + ")"))
                 : null;
@@ -177,6 +192,7 @@ namespace nORM.Query
                 innerKeySql,
                 distinct: _isDistinct,
                 outerFromOverride: outerFromOverride,
+                innerFromOverride: innerFromOverride,
                 additionalOnConditions: additionalOnSql,
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,

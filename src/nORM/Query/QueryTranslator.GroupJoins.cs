@@ -131,6 +131,16 @@ namespace nORM.Query
                 return node;
             }
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
+            // Windowed (Take/Skip) inner source — wrap it as a derived table so the LEFT JOIN groups only the
+            // LIMITed/Skipped inner rows, mirroring the windowed-outer handling above. The sub-plan carries the
+            // inner's Where/OrderBy/Take/Skip, so the inline inner-WHERE extraction below is skipped for it.
+            string? gjInnerFromOverride = null;
+            if (SourceHasTakeOrSkip(innerQuery))
+            {
+                var subInner = TranslateInSubContext(innerQuery, innerMapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);
+                MergeSubPlanParameters(subInner);
+                gjInnerFromOverride = "(" + subInner.Sql + ") AS " + innerAlias;
+            }
             var sqlOuterKeySelector = ExpandProjection(effectiveOuterKeySelector);
             if (!_correlatedParams.ContainsKey(sqlOuterKeySelector.Parameters[0]))
                 _correlatedParams[sqlOuterKeySelector.Parameters[0]] = (_mapping, outerAlias);
@@ -221,7 +231,9 @@ namespace nORM.Query
             // and the outer row survives with an empty group instead of vanishing.
             // Without this the grouped rows leak filtered inner rows (another
             // tenant's, or soft-deleted) into the client-side group materializer.
-            var gjInnerOnConditions = ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
+            var gjInnerOnConditions = gjInnerFromOverride != null
+                ? new List<string>()
+                : ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
             var gjAdditionalOnSql = gjInnerOnConditions.Count > 0
                 ? string.Join(" AND ", gjInnerOnConditions.Select(c => "(" + c + ")"))
                 : null;
@@ -243,6 +255,7 @@ namespace nORM.Query
                 orderBy: null,
                 distinct: _isDistinct,
                 outerFromOverride: gjOuterFromOverride,
+                innerFromOverride: gjInnerFromOverride,
                 additionalOnConditions: gjAdditionalOnSql,
                 provider: _provider,
                 keyClrType: sqlOuterKeySelector.Body.Type,

@@ -42,6 +42,16 @@ namespace nORM.Query
             var innerElementType = GetElementType(innerQuery);
             var innerMapping = TrackMapping(innerElementType);
             var innerAlias = EscapeAlias("T" + (++_joinCounter));
+            // Windowed (Take/Skip) inner source — wrap it as a derived table so the LEFT JOIN matches only the
+            // LIMITed/Skipped inner rows. The sub-plan carries the inner's Where/OrderBy/Take/Skip, so the inline
+            // inner-WHERE extraction below is skipped for it.
+            string? ljInnerFromOverride = null;
+            if (SourceHasTakeOrSkip(innerQuery))
+            {
+                var subInner = TranslateInSubContext(innerQuery, innerMapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out _);
+                MergeSubPlanParameters(subInner);
+                ljInnerFromOverride = "(" + subInner.Sql + ") AS " + innerAlias;
+            }
 
             if (!_correlatedParams.ContainsKey(outerKeySel.Parameters[0]))
                 _correlatedParams[outerKeySel.Parameters[0]] = (outerMapping, outerAlias);
@@ -113,7 +123,9 @@ namespace nORM.Query
             // clause — ON, not WHERE, so a filtered-out inner row reads as UNMATCHED
             // and the LEFT JOIN keeps the outer row with a NULL inner instead of
             // leaking the filtered row into the flattened result.
-            var ljInnerOnConditions = ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
+            var ljInnerOnConditions = ljInnerFromOverride != null
+                ? new List<string>()
+                : ExtractInnerWhereConditions(innerQuery, innerMapping, innerAlias);
             var ljAdditionalOnSql = ljInnerOnConditions.Count > 0
                 ? string.Join(" AND ", ljInnerOnConditions.Select(c => "(" + c + ")"))
                 : null;
@@ -130,6 +142,7 @@ namespace nORM.Query
                 outerKeySql,
                 innerKeySql,
                 distinct: _isDistinct,
+                innerFromOverride: ljInnerFromOverride,
                 additionalOnConditions: ljAdditionalOnSql,
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,
