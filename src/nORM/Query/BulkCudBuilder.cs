@@ -588,6 +588,13 @@ namespace nORM.Query
                 switch (p)
                 {
                     case BinaryExpression pb:
+                        if (pb.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+                        {
+                            var nn = IsNullConstantOperand(pb.Right) ? pb.Left
+                                   : IsNullConstantOperand(pb.Left) ? pb.Right : null;
+                            if (nn != null)
+                                return $"({Render(nn, valuePosition: false)} {(pb.NodeType == ExpressionType.Equal ? "IS NULL" : "IS NOT NULL")})";
+                        }
                         var pop = pb.NodeType switch
                         {
                             ExpressionType.Equal => "=",
@@ -747,6 +754,13 @@ namespace nORM.Query
                         return $"(NOT {RenderDependentPredicate(not.Operand, depParam, dependent, alias)})";
 
                     case BinaryExpression pb:
+                        if (pb.NodeType is ExpressionType.Equal or ExpressionType.NotEqual)
+                        {
+                            var nn = IsNullConstantOperand(pb.Right) ? pb.Left
+                                   : IsNullConstantOperand(pb.Left) ? pb.Right : null;
+                            if (nn != null)
+                                return $"({RenderDependentOperand(nn, depParam, dependent, alias)} {(pb.NodeType == ExpressionType.Equal ? "IS NULL" : "IS NOT NULL")})";
+                        }
                         var pop = pb.NodeType switch
                         {
                             ExpressionType.Equal => "=",
@@ -775,6 +789,19 @@ namespace nORM.Query
                         NormUnsupportedReason.BulkNavAggregateUnsupported);
                 }
             }
+        }
+
+        /// <summary>
+        /// True when the expression is a null literal — a <c>ConstantExpression{Value:null}</c> or the
+        /// <c>Convert(null, T?)</c> the C# compiler inserts when a nullable column is compared to <c>null</c>.
+        /// A <c>col == null</c>/<c>!= null</c> BulkCud predicate must lower to <c>IS NULL</c>/<c>IS NOT NULL</c>;
+        /// a bare <c>col = NULL</c> is 3VL-unknown and silently mis-evaluates.
+        /// </summary>
+        private static bool IsNullConstantOperand(Expression e)
+        {
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            return e is ConstantExpression { Value: null };
         }
 
         private static Expression StripQuotes(Expression e)
