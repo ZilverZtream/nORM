@@ -247,7 +247,7 @@ namespace nORM.Query
             var reader = Expression.Parameter(typeof(DbDataReader), "reader");
             var cursor = 0;
 
-            Expression ReadNextColumn(Type targetType)
+            Expression ReadNextColumn(Type targetType, Expression sourceArgument)
             {
                 var col = columns[cursor];
                 var offset = cursor + startOffset;
@@ -255,6 +255,14 @@ namespace nORM.Query
                 var readValue = col.Converter != null
                     ? BuildConverterReadExpression(reader, col.Converter!, targetType, offset)
                     : GetOptimizedReaderCall(reader, targetType, offset);
+                // A direct NOT-NULL mapped column projected into a non-nullable value-type member must fail
+                // loud on a NULL (the typed getter throws), matching the entity read, the plain
+                // new Dto { M = x.M } projection, and the constructor-projection path. Wrapping it in
+                // Condition(isDbNull, default, read) silently substituted default(T)=0 — a silent-wrong value.
+                // Aggregates (SUM/AVG over no rows, not a MemberExpression) and nullable columns keep the guard.
+                if (sourceArgument is MemberExpression && !col.IsNullable
+                    && targetType.IsValueType && Nullable.GetUnderlyingType(targetType) == null)
+                    return readValue;
                 var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(offset));
                 return Expression.Condition(isDbNull, Expression.Default(targetType), readValue);
             }
@@ -266,7 +274,7 @@ namespace nORM.Query
             {
                 args[i] = IsShapedOrBareNavigationCollection(ctorArguments[i], mapping)
                     ? BuildEmptyProjectedCollection(ctorParams[i].ParameterType)
-                    : ReadNextColumn(ctorParams[i].ParameterType);
+                    : ReadNextColumn(ctorParams[i].ParameterType, ctorArguments[i]);
             }
 
             var bindings = new List<MemberBinding>(memberInit.Bindings.Count);
@@ -277,7 +285,7 @@ namespace nORM.Query
                 // A collection binding is populated in place by the split-query stitch after construction.
                 if (IsShapedOrBareNavigationCollection(ma.Expression, mapping))
                     continue;
-                bindings.Add(Expression.Bind(prop, ReadNextColumn(prop.PropertyType)));
+                bindings.Add(Expression.Bind(prop, ReadNextColumn(prop.PropertyType, ma.Expression)));
             }
 
             var body = Expression.Convert(Expression.MemberInit(Expression.New(ctor, args), bindings), typeof(object));
