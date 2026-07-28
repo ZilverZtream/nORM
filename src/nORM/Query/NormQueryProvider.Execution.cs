@@ -234,6 +234,13 @@ namespace nORM.Query
                 return (TResult)(object)MaterializerFactory.ConvertToTimeOnly(result);
             if (underlyingType == typeof(DateOnly))
                 return (TResult)(object)MaterializerFactory.ConvertToDateOnly(result);
+            // Enum TResult (e.g. a top-level `Max(x => x.EnumColumn)` on an int-stored enum): the provider
+            // returns the underlying integer, and Convert.ChangeType(<Int64>, enumType) throws
+            // InvalidCastException. Coerce to the enum's underlying type first, then Enum.ToObject — the same
+            // shape ConvertDbValue/ConvertToEnum use on the row-materialization path. (String-stored enums
+            // never reach here: ScalarResultConverter already turned the value into the enum upstream.)
+            if (underlyingType.IsEnum)
+                return (TResult)Enum.ToObject(underlyingType, Convert.ChangeType(result, Enum.GetUnderlyingType(underlyingType), ic));
 
             // Fallback for other types (still better than ChangeType for common cases above)
             return (TResult)Convert.ChangeType(result, underlyingType, ic)!;
