@@ -236,6 +236,16 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the related entity '{jtm.RightType.Name}'.",
                     NormUnsupportedReason.AggregateSelectorNotMappedColumn);
+            // SUM/AVG combine the STORED provider values; ConvertFromProvider does not distribute over that
+            // combination for a non-linear converter, so there is no correct result — fail loud (never
+            // silent-wrong), matching the relation-based nav path (GuardAggregateOverConverterColumn).
+            if (method is nameof(Queryable.Sum) or nameof(Queryable.Average) && col.Converter != null)
+                throw new NormUnsupportedFeatureException(
+                    $"{method}(...) over the many-to-many collection '{navMember.Member.Name}' cannot aggregate the " +
+                    $"value-converter column '{selMember.Member.Name}': SUM/AVG combine the stored provider values and " +
+                    "ConvertFromProvider does not distribute for a non-linear converter, so there is no correct result. " +
+                    "Materialise the related items and aggregate them client-side.",
+                    NormUnsupportedReason.NavAggregateValueConverterColumn);
 
             var sqlAgg = method switch
             {
@@ -341,6 +351,14 @@ namespace nORM.Query
                 throw new NormUnsupportedFeatureException(
                     $"Aggregate selector member '{selMember.Member.Name}' is not a mapped column on the owned collection '{navMember.Member.Name}'.",
                     NormUnsupportedReason.AggregateSelectorNotMappedColumn);
+            // SUM/AVG over a value-converter column has no correct result (see the m2m/relation paths) — fail loud.
+            if (method is nameof(Queryable.Sum) or nameof(Queryable.Average) && col.Converter != null)
+                throw new NormUnsupportedFeatureException(
+                    $"{method}(...) over the owned collection '{navMember.Member.Name}' cannot aggregate the value-converter " +
+                    $"column '{selMember.Member.Name}': SUM/AVG combine the stored provider values and ConvertFromProvider " +
+                    "does not distribute for a non-linear converter, so there is no correct result. Materialise the owned " +
+                    "items and aggregate them client-side.",
+                    NormUnsupportedReason.NavAggregateValueConverterColumn);
 
             var sqlAgg = method switch
             {

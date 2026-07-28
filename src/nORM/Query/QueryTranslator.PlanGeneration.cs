@@ -290,6 +290,37 @@ namespace nORM.Query
                             }
                         }
 
+                        // Sum/Average combine the STORED provider values across rows; ConvertFromProvider is a
+                        // per-value map that does not distribute over that combination for a non-linear converter,
+                        // so there is NO correct scalar result — returning the raw stored aggregate is silently
+                        // wrong. Fail loud, matching the navigation-collection path (GuardAggregateOverConverter
+                        // Column). Min/Max return a single stored value and ARE converted (above).
+                        if (aggMethodName is "Sum" or "Average"
+                            && _expression is MethodCallExpression sumAvgCall
+                            && sumAvgCall.Arguments.Count == 2)
+                        {
+                            var sumSelArg = sumAvgCall.Arguments[1];
+                            if (sumSelArg is UnaryExpression { NodeType: ExpressionType.Quote } sq)
+                                sumSelArg = sq.Operand;
+                            if (sumSelArg is LambdaExpression sumSel)
+                            {
+                                var sumBody = sumSel.Body;
+                                while (sumBody is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } scu)
+                                    sumBody = scu.Operand;
+                                if (sumBody is MemberExpression sumMember
+                                    && _t._mapping.TryGetColumnForMemberAccess(sumMember, out var sumCol)
+                                    && sumCol.Converter != null)
+                                {
+                                    throw new NormUnsupportedFeatureException(
+                                        $"{aggMethodName}(...) cannot aggregate a value-converter column: SUM/AVG combine " +
+                                        "the stored provider values and ConvertFromProvider does not distribute over that " +
+                                        "combination for a non-linear converter, so there is no correct result. Materialise " +
+                                        "the rows (e.g. AsEnumerable()) and aggregate client-side.",
+                                        NormUnsupportedReason.NavAggregateValueConverterColumn);
+                                }
+                            }
+                        }
+
                         object ReadScalarValue(object dbValue)
                         {
                             // Let OverflowException propagate: an aggregate (e.g. Sum) whose DB total exceeds the
