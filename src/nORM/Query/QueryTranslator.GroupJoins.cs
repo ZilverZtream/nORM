@@ -177,7 +177,7 @@ namespace nORM.Query
                     FastExpressionVisitorPool.Return(giVisitor);
 
                     gjParts.Add(JoinBuilder.BuildOnEquality(
-                        outerMemberSql, innerMemberSql, _provider, gjOuterComposite.Arguments[ci].Type));
+                        outerMemberSql, innerMemberSql, _provider, ResolveEffectiveJoinKeyType(_mapping, gjOuterComposite.Arguments[ci])));
                 }
                 gjCompositeOnSql = string.Join(" AND ", gjParts);
             }
@@ -258,7 +258,7 @@ namespace nORM.Query
                 innerFromOverride: gjInnerFromOverride,
                 additionalOnConditions: gjAdditionalOnSql,
                 provider: _provider,
-                keyClrType: sqlOuterKeySelector.Body.Type,
+                keyClrType: ResolveEffectiveJoinKeyType(_mapping, sqlOuterKeySelector.Body),
                 onSqlOverride: gjCompositeOnSql);
             // Insert outer-key sort at the front of _orderBy so it is always first. Composite
             // keys order by each member so streaming group segmentation stays contiguous.

@@ -83,7 +83,7 @@ namespace nORM.Query
                     FastExpressionVisitorPool.Return(liVisitor);
 
                     ljParts.Add(JoinBuilder.BuildOnEquality(
-                        outerMemberSql, innerMemberSql, _provider, ljOuterComposite.Arguments[ci].Type));
+                        outerMemberSql, innerMemberSql, _provider, ResolveEffectiveJoinKeyType(outerMapping, ljOuterComposite.Arguments[ci])));
                 }
                 ljCompositeOnSql = string.Join(" AND ", ljParts);
             }
@@ -147,7 +147,7 @@ namespace nORM.Query
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,
                 provider: _provider,
-                keyClrType: outerKeySel.Body.Type,
+                keyClrType: ResolveEffectiveJoinKeyType(outerMapping, outerKeySel.Body),
                 onSqlOverride: ljCompositeOnSql);
         }
 

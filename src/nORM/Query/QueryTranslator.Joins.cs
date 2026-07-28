@@ -12,6 +12,26 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        /// <summary>
+        /// The CLR type that drives <see cref="JoinBuilder.BuildOnEquality"/>'s key-canonicalization
+        /// decision. A value-converter key member stores its PROVIDER type (e.g. a Money value object
+        /// mapped to decimal-as-TEXT), so return that provider type — otherwise BuildOnEquality keys on
+        /// the model type, falls through to a plain <c>=</c>, and joins the raw TEXT LEXICALLY,
+        /// silently dropping matches stored at a different scale/precision. Mirrors the WHERE/ORDER BY
+        /// paths' <c>EffectiveComparableType</c>.
+        /// </summary>
+        private static Type ResolveEffectiveJoinKeyType(TableMapping outerMapping, Expression keyBody)
+        {
+            var e = keyBody;
+            while (e is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                e = u.Operand;
+            if (e is MemberExpression m
+                && outerMapping.TryGetColumnForMemberAccess(m, out var col)
+                && col.Converter != null)
+                return col.Converter.ProviderType;
+            return keyBody.Type;
+        }
+
         private Expression HandleInnerJoin(MethodCallExpression node)
         {
             if (node.Arguments.Count < 5)
@@ -144,7 +164,7 @@ namespace nORM.Query
                     FastExpressionVisitorPool.Return(ciVisitor);
 
                     onParts.Add(JoinBuilder.BuildOnEquality(
-                        outerMemberSql, innerMemberSql, _provider, outerCompositeKey.Arguments[ci].Type));
+                        outerMemberSql, innerMemberSql, _provider, ResolveEffectiveJoinKeyType(_mapping, outerCompositeKey.Arguments[ci])));
                 }
                 compositeOnSql = string.Join(" AND ", onParts);
             }
@@ -197,7 +217,7 @@ namespace nORM.Query
                 translateProjectionExpression: TranslateJoinProjectionExpression,
                 escapeProjectionAlias: _provider.Escape,
                 provider: _provider,
-                keyClrType: sqlOuterKeySelector.Body.Type,
+                keyClrType: ResolveEffectiveJoinKeyType(_mapping, sqlOuterKeySelector.Body),
                 onSqlOverride: compositeOnSql);
             return node;
         }
