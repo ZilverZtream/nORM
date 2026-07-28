@@ -339,10 +339,17 @@ namespace nORM.Mapping
             IsReadOnly = (fluentConfig?.IsReadOnly ?? false)
                 || t.GetCustomAttribute<ReadOnlyEntityAttribute>(inherit: true) != null;
 
-            IsKeyless = fluentConfig?.IsKeyless ?? false;
-
             Columns = cols.ToArray();
             ColumnsByName = BuildColumnsByName(Columns, t);
+
+            var hasExplicitKey = Columns.Any(c => c.IsKey);
+            // A read-only entity with no explicitly configured key ([Key]/HasKey) is keyless. It is never
+            // written, so it needs no key for writes; and manufacturing the "Id" convention key below would make
+            // read-path identity resolution silently collapse rows of a keyless source (a PK-less table, an
+            // append-only log, or a view) that legitimately share that value — the second row's data would vanish
+            // from the result. This is exactly EF Core's keyless query type for a PK-less table. A read-only
+            // entity WITH an explicit key (e.g. a temporal history table) keeps its key and identity resolution.
+            IsKeyless = (fluentConfig?.IsKeyless ?? false) || (IsReadOnly && !hasExplicitKey);
 
             // EF-parity key convention: when no explicit key is configured ([Key]/HasKey), a
             // property named "Id" - then "<Type>Id" - becomes the primary key, matching the
@@ -350,7 +357,7 @@ namespace nORM.Mapping
             // agree. Explicit configuration always wins; prefixed owned/shadow columns never
             // match (their PropName carries the prefix). A keyless entity (HasNoKey) opts out of the
             // convention entirely so it stays keyless even when an "Id" property is present.
-            if (!IsKeyless && !Columns.Any(c => c.IsKey))
+            if (!IsKeyless && !hasExplicitKey)
             {
                 var conventionKey = Columns.FirstOrDefault(c => string.Equals(c.PropName, "Id", StringComparison.Ordinal))
                     ?? Columns.FirstOrDefault(c => string.Equals(c.PropName, t.Name + "Id", StringComparison.Ordinal));
