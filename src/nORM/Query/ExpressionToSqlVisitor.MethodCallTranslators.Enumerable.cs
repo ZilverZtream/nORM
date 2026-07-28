@@ -180,7 +180,20 @@ namespace nORM.Query
                                     "Max" => "MAX",
                                     _ => "",
                                 };
-                                _sql.Append($"{fn}({colSql})");
+                                // Route through the same full-precision provider hooks the bare-aggregate
+                                // paths use (QueryTranslator.GroupByAggregateEmit / NavigationAggregates).
+                                // A plain MIN/MAX over a TEXT-stored decimal/TimeSpan/DateTimeOffset picks
+                                // the LEXICALLY extreme value ('10.5' < '2.0'), which is silently wrong
+                                // inside a HAVING predicate or a computed group-projection body — the only
+                                // aggregate emitter that had skipped these hooks.
+                                var selBodyType = Nullable.GetUnderlyingType(selector.Body.Type) ?? selector.Body.Type;
+                                bool decimalOperand = selBodyType == typeof(decimal);
+                                if (!decimalOperand && fn == "AVG")
+                                    colSql = _provider.AverageAggregateOperand(colSql, selector.Body.Type);
+                                bool minMaxOperand = fn == "MIN" || fn == "MAX";
+                                _sql.Append(decimalOperand
+                                    ? _provider.DecimalAggregateSql(fn, colSql)
+                                    : $"{fn}({(minMaxOperand ? _provider.MinMaxAggregateOperand(colSql, selBodyType) : colSql)})");
                                 FastExpressionVisitorPool.Return(visitor);
                                 return node;
                             }
