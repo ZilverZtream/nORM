@@ -530,18 +530,30 @@ namespace nORM.Navigation
         }
 
         /// <summary>
-        /// A trailing <c>AND discriminator = value</c> fragment when the navigation targets a TPH derived
-        /// type (e.g. <c>Owner.Dogs</c> where <c>Dog : Pet</c> share a table), otherwise empty. Without it the
-        /// lazy / explicit collection load reads every subtype sharing the foreign key — a Cat would load and
-        /// materialize as a Dog. Only derived types carry a <see cref="TableMapping.DiscriminatorValue"/>.
+        /// The trailing row-visibility fragment a lazy / explicit navigation load must AND onto its raw SQL to
+        /// match what the eager Include loader (IncludeProcessor.BuildSql) emits: the tenant column equality,
+        /// the combined global (soft-delete) filters, and the TPH discriminator. Without it a soft-deleted row,
+        /// another tenant's row sharing the foreign-key value, or a sibling subtype leaks into the loaded
+        /// collection — the query pipeline injects these predicates on the LINQ root only, so this hand-built
+        /// SQL has to repeat them. Returns empty when none apply.
         /// </summary>
-        private string BuildSubtypeDiscriminatorClause(DbCommand cmd, TableMapping mapping)
+        private string BuildNavigationRowFilterClause(DbCommand cmd, TableMapping mapping)
         {
-            if (mapping.DiscriminatorValue is not { } value || mapping.DiscriminatorColumn is not { } column)
-                return string.Empty;
-            var paramName = $"{_context.RawProvider.ParamPrefix}__navdisc";
-            cmd.AddParam(paramName, value);
-            return $" AND {column.EscCol} = {paramName}";
+            var sb = new System.Text.StringBuilder();
+            // Tenant boundary. A target without a tenant column is a shared table and gets no tenant predicate
+            // (matching GlobalFilterFragment.CombineWithTenant on the query path).
+            if (_context.Options.TenantProvider != null && mapping.TenantColumn is { } tenantCol)
+            {
+                var tenantParam = $"{_context.RawProvider.ParamPrefix}__navtenant";
+                cmd.AddParam(tenantParam, _context.GetRequiredTenantId(mapping, "navigation load"));
+                sb.Append(" AND ").Append(mapping.EscTable).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tenantParam);
+            }
+            // Combined user global filters + TPH discriminator (GlobalFilterFragment.Build folds the
+            // discriminator in), qualified by the table name; parameters numbered after the FK-IN parameters.
+            var globalFilter = nORM.Query.GlobalFilterFragment.Build(_context, mapping, mapping.EscTable, cmd);
+            if (globalFilter != null)
+                sb.Append(" AND ").Append(globalFilter);
+            return sb.ToString();
         }
 
         /// <summary>
@@ -557,7 +569,7 @@ namespace nORM.Navigation
         {
             using var cmd = _context.CreateCommand();
             var where = BuildNavigationWhereClause(cmd, relation, chunk);
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildSubtypeDiscriminatorClause(cmd, mapping)}";
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildNavigationRowFilterClause(cmd, mapping)}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
             cmd.CommandTimeout = ToSecondsClamped(timeout);
@@ -584,7 +596,7 @@ namespace nORM.Navigation
         {
             using var cmd = _context.CreateCommand();
             var where = BuildNavigationWhereClause(cmd, relation, chunk);
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildSubtypeDiscriminatorClause(cmd, mapping)}";
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildNavigationRowFilterClause(cmd, mapping)}";
 
             var timeout = _context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
             cmd.CommandTimeout = ToSecondsClamped(timeout);
