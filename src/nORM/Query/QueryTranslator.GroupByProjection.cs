@@ -365,6 +365,32 @@ namespace nORM.Query
         /// merging any literal constants as compiled-literal parameters. Shared by every
         /// IGrouping aggregate path that needs the CASE-WHEN-emitter pattern.
         /// </summary>
+        /// <summary>
+        /// Recognises a <c>g.Select(x =&gt; sel).Distinct().Count()</c> count source (peeling an optional leading
+        /// <c>Where(f)</c> on the group), yielding the scalar selector and filter lambdas so the Count case can
+        /// emit <c>COUNT(DISTINCT …)</c> instead of silently discarding the projection as <c>COUNT(*)</c>. Only a
+        /// scalar <c>Select</c> under <c>Distinct</c> qualifies — <c>g.Distinct().Count()</c> (whole-row distinct)
+        /// equals <c>COUNT(*)</c> since group rows are key-unique, so it is left to the plain path.
+        /// </summary>
+        private static bool TryExtractGroupDistinctSelectSelector(MethodCallExpression countCall,
+            out LambdaExpression selector, out LambdaExpression? sourceFilter)
+        {
+            selector = null!;
+            sourceFilter = null;
+            if (countCall.Arguments.Count == 0
+                || countCall.Arguments[0] is not MethodCallExpression distinct
+                || distinct.Method.Name != "Distinct" || distinct.Arguments.Count != 1
+                || distinct.Arguments[0] is not MethodCallExpression select
+                || select.Method.Name != "Select" || select.Arguments.Count != 2
+                || StripQuotes(select.Arguments[1]) is not LambdaExpression sel)
+                return false;
+            selector = sel;
+            if (select.Arguments[0] is MethodCallExpression where && where.Method.Name == "Where"
+                && where.Arguments.Count == 2 && StripQuotes(where.Arguments[1]) is LambdaExpression wf)
+                sourceFilter = wf;
+            return true;
+        }
+
         private string TranslateGroupPredicateBody(LambdaExpression predicate, string alias)
         {
             // Expand the predicate through a join/transparent-identifier or Select projection so a
@@ -501,6 +527,20 @@ namespace nORM.Query
                 case "Count":
                 case "LongCount":
                     {
+                        // `g.Select(x => sel).Distinct().Count()` must be COUNT(DISTINCT sel), not COUNT(*):
+                        // the Select projection and Distinct were silently discarded, returning the group's
+                        // total row count. A leading `Where(f)` becomes COUNT(DISTINCT CASE WHEN f THEN sel END)
+                        // so only matching rows are counted (NULL is not distinct-counted, matching Enumerable).
+                        if (TryExtractGroupDistinctSelectSelector(methodCall, out var distinctSelector, out var distinctFilter))
+                        {
+                            var selSql = TranslateGroupPredicateBody(distinctSelector, alias);
+                            if (distinctFilter != null)
+                            {
+                                var fSql = TranslateGroupPredicateBody(distinctFilter, alias);
+                                return $"COUNT(DISTINCT CASE WHEN {fSql} THEN {selSql} ELSE NULL END)";
+                            }
+                            return $"COUNT(DISTINCT {selSql})";
+                        }
                         // 1-arg `g.Count()` - COUNT(*). `g.Count(predicate)` and/or a filtered source
                         // `g.Where(f).Count()` must apply the filter: COUNT(CASE WHEN <f AND pred> THEN 1 ELSE
                         // NULL END) - NULL excluded by SQL count semantics, matching .NET. The source Where(...)
