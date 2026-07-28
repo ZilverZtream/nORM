@@ -1,9 +1,46 @@
 #nullable enable
+using System;
 
 namespace nORM.Scaffolding
 {
     internal static partial class ScaffoldSqliteDdlParser
     {
+        /// <summary>
+        /// True when <paramref name="columnName"/> is declared as a COLUMN-CONSTRAINT
+        /// <c>INTEGER PRIMARY KEY … DESC</c>, which SQLite documents as NOT aliasing the rowid (unlike the
+        /// plain/ASC column-constraint form). Such a key is app-assigned, not store-generated, so it must not
+        /// be scaffolded as an identity. The table-constraint form <c>PRIMARY KEY(col DESC)</c> still aliases
+        /// the rowid and is intentionally NOT matched here.
+        /// </summary>
+        public static bool IsIntegerPrimaryKeyDescColumn(string? createTableSql, string columnName)
+        {
+            if (string.IsNullOrWhiteSpace(createTableSql) || string.IsNullOrEmpty(columnName))
+                return false;
+
+            foreach (var part in SplitCreateTableBodyParts(createTableSql))
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Length == 0 || StartsWithTableConstraint(trimmed))
+                    continue;
+
+                if (!TryReadLeadingSqlIdentifier(trimmed, out var colName, out var afterName)
+                    || !string.Equals(colName, columnName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Column-constraint grammar: <col> <type> PRIMARY KEY [ASC|DESC] [conflict] [AUTOINCREMENT].
+                // A DESC direction immediately after PRIMARY KEY disables rowid aliasing.
+                var primaryIndex = ScaffoldSqlMetadataParser.FindSqlKeywordOutsideQuotes(trimmed, "PRIMARY", afterName);
+                if (primaryIndex < 0)
+                    return false;
+
+                var index = primaryIndex + "PRIMARY".Length;
+                return ScaffoldSqlMetadataParser.TryConsumeSqlKeyword(trimmed, ref index, "KEY")
+                    && ScaffoldSqlMetadataParser.TryConsumeSqlKeyword(trimmed, ref index, "DESC");
+            }
+
+            return false;
+        }
+
         public static string? ExtractPrimaryKeyConstraintName(string? createTableSql)
         {
             foreach (var part in SplitCreateTableBodyParts(createTableSql))

@@ -19,44 +19,7 @@ namespace nORM.Scaffolding
             var tableKeys = tables.Select(t => TableKey(t.Schema, t.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             if (ScaffoldProviderKind.IsSqlite(provider))
-            {
-                var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var table in tables)
-                {
-                    await using var cmd = connection.CreateCommand();
-                    cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
-                    await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
-                    var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
-                    while (await reader.ReadAsync().ConfigureAwait(false))
-                    {
-                        rows.Add((
-                            Convert.ToString(reader["name"]) ?? string.Empty,
-                            Convert.ToString(reader["type"]) ?? string.Empty,
-                            ReaderHasColumn(reader, "pk")
-                                ? Convert.ToInt32(reader["pk"], CultureInfo.InvariantCulture)
-                                : 0));
-                    }
-
-                    var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
-                    if (primaryKeyColumns.Length != 1)
-                        continue;
-
-                    var key = primaryKeyColumns[0];
-                    // Only an EXACTLY-INTEGER single-column PK aliases the store-generated rowid; BIGINT /
-                    // INT / SMALLINT / etc. are app-assigned despite their INTEGER affinity. Contains("INT")
-                    // wrongly flagged them, emitting [DatabaseGenerated(Identity)] on an app-assigned key.
-                    // And only in a rowid table — a WITHOUT ROWID table has no rowid, so even an INTEGER PK
-                    // is app-assigned there.
-                    if (string.Equals(key.Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase)
-                        && !await IsSqliteWithoutRowidTableAsync(connection, provider, table.Schema, table.Name).ConfigureAwait(false))
-                    {
-                        var tableKey = TableKey(table.Schema, table.Name);
-                        result[tableKey] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { key.Name };
-                    }
-                }
-
-                return ToReadOnlySetDictionary(result);
-            }
+                return await GetSqliteIdentityColumnNamesAsync(connection, provider, tables).ConfigureAwait(false);
 
             if (ScaffoldProviderKind.IsSqlServer(provider))
             {
@@ -98,10 +61,58 @@ namespace nORM.Scaffolding
             return new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase);
         }
 
-        // True when the SQLite table was created WITHOUT ROWID (so even an INTEGER PRIMARY KEY is
-        // app-assigned, not a store-generated rowid alias). SQLite exposes no pragma for this, so match the
-        // table-level option on the stored CREATE statement.
-        private static async Task<bool> IsSqliteWithoutRowidTableAsync(DbConnection connection, DatabaseProvider provider, string? schema, string tableName)
+        private static async Task<IReadOnlyDictionary<string, IReadOnlySet<string>>> GetSqliteIdentityColumnNamesAsync(
+            DbConnection connection,
+            DatabaseProvider provider,
+            IReadOnlyList<ScaffoldTableInfo> tables)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var table in tables)
+            {
+                await using var cmd = connection.CreateCommand();
+                cmd.CommandText = SqlitePragma(provider, table.Schema, "table_xinfo", table.Name);
+                await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+                var rows = new List<(string Name, string Type, int PrimaryKeyOrdinal)>();
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    rows.Add((
+                        Convert.ToString(reader["name"]) ?? string.Empty,
+                        Convert.ToString(reader["type"]) ?? string.Empty,
+                        ReaderHasColumn(reader, "pk")
+                            ? Convert.ToInt32(reader["pk"], CultureInfo.InvariantCulture)
+                            : 0));
+                }
+
+                var primaryKeyColumns = rows.Where(row => row.PrimaryKeyOrdinal > 0).ToArray();
+                if (primaryKeyColumns.Length != 1)
+                    continue;
+
+                var key = primaryKeyColumns[0];
+                // Only an EXACTLY-INTEGER single-column PK aliases the store-generated rowid; BIGINT /
+                // INT / SMALLINT / etc. are app-assigned despite their INTEGER affinity. Contains("INT")
+                // wrongly flagged them, emitting [DatabaseGenerated(Identity)] on an app-assigned key.
+                if (!string.Equals(key.Type.Trim(), "INTEGER", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var createSql = await GetSqliteTableCreateSqlAsync(connection, provider, table.Schema, table.Name).ConfigureAwait(false);
+                // A rowid table aliases its INTEGER PK to the store-generated rowid, EXCEPT:
+                // - WITHOUT ROWID tables have no rowid, so even an INTEGER PK is app-assigned; and
+                // - a column-constraint `INTEGER PRIMARY KEY DESC` disables aliasing (SQLite docs), so that
+                //   key is app-assigned too. Both would otherwise scaffold as an identity, and nORM would
+                //   then omit the column from INSERTs and read back a NULL it never assigned.
+                var isWithoutRowid = createSql != null
+                    && createSql.IndexOf("WITHOUT ROWID", StringComparison.OrdinalIgnoreCase) >= 0;
+                var isDescColumnPk = ScaffoldSqliteDdlParser.IsIntegerPrimaryKeyDescColumn(createSql, key.Name);
+                if (!isWithoutRowid && !isDescColumnPk)
+                    result[TableKey(table.Schema, table.Name)] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { key.Name };
+            }
+
+            return ToReadOnlySetDictionary(result);
+        }
+
+        // Returns the stored CREATE TABLE statement for a SQLite table. SQLite exposes no pragma for the
+        // table-level WITHOUT ROWID option or a column's key direction, so both are read off this DDL.
+        private static async Task<string?> GetSqliteTableCreateSqlAsync(DbConnection connection, DatabaseProvider provider, string? schema, string tableName)
         {
             var prefix = string.IsNullOrWhiteSpace(schema) ? string.Empty : provider.Escape(schema!) + ".";
             await using var cmd = connection.CreateCommand();
@@ -110,8 +121,7 @@ namespace nORM.Scaffolding
             p.ParameterName = "$name";
             p.Value = tableName;
             cmd.Parameters.Add(p);
-            var sql = Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
-            return sql != null && sql.IndexOf("WITHOUT ROWID", StringComparison.OrdinalIgnoreCase) >= 0;
+            return Convert.ToString(await cmd.ExecuteScalarAsync().ConfigureAwait(false));
         }
     }
 }
