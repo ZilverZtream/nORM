@@ -81,36 +81,22 @@ namespace nORM.Migration
                 {
                     // Check for [RenameColumn("OldName")] - prefer rename over drop+add when the
                     // referenced old column exists in the old snapshot.
-                    if (col.PreviousName != null && oldColByName.ContainsKey(col.PreviousName))
+                    if (col.PreviousName != null && oldColByName.TryGetValue(col.PreviousName, out var renamedOld))
                     {
                         diff.RenamedColumns.Add((newTable, col.PreviousName, col));
                         renamedOldNames.Add(col.PreviousName);
-                        // The new column name is now "in use"; skip add/alter detection for it.
+                        // [RenameColumn] asserts identity, NOT that the definition is unchanged. If the renamed
+                        // column also changed type / nullability / default / precision / ..., emit an alter
+                        // (keyed on the NEW name) so the change is applied after the rename — otherwise the
+                        // rename-only branch silently dropped a co-occurring retype (silent schema drift).
+                        if (ColumnDefinitionChanged(renamedOld, col))
+                            diff.AlteredColumns.Add((newTable, col, renamedOld));
                         continue;
                     }
 
                     if (!oldColByName.TryGetValue(col.Name, out var oldCol))
                         diff.AddedColumns.Add((newTable, col));
-                    else if (!string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(oldCol.StoreType, col.StoreType, StringComparison.OrdinalIgnoreCase)  // HasColumnType: an explicit store-type change must re-emit the column type (ALTER/MODIFY already renders GetSqlType, which honors StoreType)
-                        || oldCol.MaxLength != col.MaxLength
-                        || oldCol.IsUnicode != col.IsUnicode
-                        || oldCol.IsFixedLength != col.IsFixedLength
-                        || oldCol.Precision != col.Precision
-                        || oldCol.Scale != col.Scale
-                        || oldCol.IsNullable != col.IsNullable
-                        || oldCol.IsPrimaryKey != col.IsPrimaryKey
-                        || oldCol.IsUnique != col.IsUnique
-                        || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
-                        || !string.Equals(oldCol.DefaultConstraintName, col.DefaultConstraintName, StringComparison.OrdinalIgnoreCase)
-                        || !string.Equals(oldCol.Collation, col.Collation, StringComparison.OrdinalIgnoreCase)
-                        || oldCol.IsIdentity != col.IsIdentity
-                        || oldCol.IdentitySeed != col.IdentitySeed
-                        || oldCol.IdentityIncrement != col.IdentityIncrement
-                        || !string.Equals(oldCol.ComputedColumnSql, col.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
-                        || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn
-                        || !string.Equals(oldCol.Comment, col.Comment, StringComparison.Ordinal))  // HasComment: comment text is user-facing/case-sensitive; a change must re-emit the provider comment DDL
+                    else if (ColumnDefinitionChanged(oldCol, col))
                         diff.AlteredColumns.Add((newTable, col, oldCol));
                 }
 
@@ -327,6 +313,34 @@ namespace nORM.Migration
 
         private static bool CheckEqual(CheckConstraintSchema a, CheckConstraintSchema b) =>
             string.Equals(NormalizeCheckSql(a.Sql), NormalizeCheckSql(b.Sql), StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// True when two columns differ in any definition attribute EXCEPT the name (type, nullability,
+        /// default, precision/scale, length, collation, uniqueness, identity, computed SQL, comment, ...).
+        /// Shared by the normal alter-detection and the rename branch so a rename that also changes the
+        /// definition applies both.
+        /// </summary>
+        private static bool ColumnDefinitionChanged(ColumnSchema oldCol, ColumnSchema col)
+            => !string.Equals(oldCol.ClrType, col.ClrType, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(oldCol.StoreType, col.StoreType, StringComparison.OrdinalIgnoreCase)  // HasColumnType: an explicit store-type change must re-emit the column type (ALTER/MODIFY already renders GetSqlType, which honors StoreType)
+                || oldCol.MaxLength != col.MaxLength
+                || oldCol.IsUnicode != col.IsUnicode
+                || oldCol.IsFixedLength != col.IsFixedLength
+                || oldCol.Precision != col.Precision
+                || oldCol.Scale != col.Scale
+                || oldCol.IsNullable != col.IsNullable
+                || oldCol.IsPrimaryKey != col.IsPrimaryKey
+                || oldCol.IsUnique != col.IsUnique
+                || !string.Equals(oldCol.IndexName, col.IndexName, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(oldCol.DefaultValue, col.DefaultValue, StringComparison.OrdinalIgnoreCase)  // OrdinalIgnoreCase: SQL keyword case differences like CURRENT_TIMESTAMP vs current_timestamp must not trigger spurious migrations
+                || !string.Equals(oldCol.DefaultConstraintName, col.DefaultConstraintName, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(oldCol.Collation, col.Collation, StringComparison.OrdinalIgnoreCase)
+                || oldCol.IsIdentity != col.IsIdentity
+                || oldCol.IdentitySeed != col.IdentitySeed
+                || oldCol.IdentityIncrement != col.IdentityIncrement
+                || !string.Equals(oldCol.ComputedColumnSql, col.ComputedColumnSql, StringComparison.OrdinalIgnoreCase)
+                || oldCol.IsStoredComputedColumn != col.IsStoredComputedColumn
+                || !string.Equals(oldCol.Comment, col.Comment, StringComparison.Ordinal);  // HasComment: comment text is user-facing/case-sensitive; a change must re-emit the provider comment DDL
 
         private static string NormalizeCheckSql(string sql)
             => string.Join(" ", sql.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
