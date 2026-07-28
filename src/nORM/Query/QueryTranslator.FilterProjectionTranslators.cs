@@ -196,8 +196,22 @@ namespace nORM.Query
                         // every parameter as a grouping key so the visitor's aggregate-detection
                         // path (line 1260) fires for whichever parameter the body actually uses.
                         var groupBySql = PooledStringBuilder.Join(t._groupBy);
+                        // When the group key is a single value-converter column (e.g. a string-backed enum),
+                        // carry it into the grouping registration so a HAVING comparison over g.Key binds the
+                        // provider representation via the converter path — matching the WHERE side — instead of
+                        // the model value against the stored text (which SQLite affinity silently mis-compares).
+                        Column? keyConverterColumn = null;
+                        if (t._groupBy.Count == 1 && t._groupByKeySelector?.Body is { } gbKeyBody)
+                        {
+                            while (gbKeyBody is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } gbConv)
+                                gbKeyBody = gbConv.Operand;
+                            if (gbKeyBody is MemberExpression gbKeyMember
+                                && t._mapping.TryGetColumnForMemberAccess(gbKeyMember, out var gbKeyCol)
+                                && gbKeyCol.Converter != null)
+                                keyConverterColumn = gbKeyCol;
+                        }
                         foreach (var p in lambda.Parameters)
-                            visitor.RegisterGroupingKey(p, groupBySql);
+                            visitor.RegisterGroupingKey(p, groupBySql, keyConverterColumn);
                     }
                     var sql = visitor.Translate(lambda.Body);
                     var target = isGrouping ? t._having : t._where;

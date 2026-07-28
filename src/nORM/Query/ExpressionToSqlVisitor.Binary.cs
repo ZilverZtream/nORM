@@ -1127,6 +1127,17 @@ namespace nORM.Query
             }
             if (expr is not MemberExpression me)
                 return false;
+            // g.Key over a grouping whose key IS a single value-converter column: the synthetic "Key" member
+            // does not resolve via TryGetColumnForMemberAccess, but the grouping registration carries the key's
+            // column so a HAVING comparison (g.Key OP enumValue) binds the PROVIDER representation — matching the
+            // WHERE path — instead of the model value against the stored text.
+            if (me.Member.Name == "Key"
+                && me.Expression is ParameterExpression gp
+                && _groupingKeyColumns.TryGetValue(gp, out var groupKeyCol))
+            {
+                column = groupKeyCol;
+                return true;
+            }
             if (TableMapping.TryGetMemberAccessRoot(me, out var root)
                 && _parameterMappings.TryGetValue(root, out var info)
                 && info.Mapping.TryGetColumnForMemberAccess(me, out var col)

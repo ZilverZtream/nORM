@@ -57,6 +57,10 @@ namespace nORM.Query
         private readonly Dictionary<(ParameterExpression Param, string Member), string> _memberParamMap = new();
         private static readonly Expression s_emptyExpression = Expression.Empty();
         private readonly Dictionary<ParameterExpression, string> _groupingKeys = new();
+        // When a grouping's key IS a single value-converter column (e.g. a string-backed enum), the key column
+        // is recorded here so a HAVING comparison over g.Key binds the PROVIDER representation — matching the
+        // WHERE path — instead of the model value against the stored text (silently wrong).
+        private readonly Dictionary<ParameterExpression, Column> _groupingKeyColumns = new();
         // For a group built with an element selector (GroupBy(key, s => s.Amount)): the IGrouping parameter
         // maps to that selector, so a parameterless/identity aggregate (g.Sum()/g.Sum(x=>x)) inside a computed
         // projection body lowers to SUM(Amount) — the element selector's body is the aggregate operand.
@@ -192,6 +196,7 @@ namespace nORM.Query
             _recursionDepth = context.RecursionDepth;
             _memberParamMap.Clear();
             _groupingKeys.Clear();
+            _groupingKeyColumns.Clear();
             _groupingElementSelectors.Clear();
         }
         /// <summary>
@@ -219,6 +224,7 @@ namespace nORM.Query
             _constParamMap.Clear();
             _memberParamMap.Clear();
             _groupingKeys.Clear();
+            _groupingKeyColumns.Clear();
             _groupingElementSelectors.Clear();
             _ownedParamConverters.Clear();
             _paramConverters = null!;
@@ -262,8 +268,18 @@ namespace nORM.Query
         /// so that subsequent <c>g.Key</c> accesses emit the correct SQL column reference.
         /// </summary>
         public void RegisterGroupingKey(ParameterExpression parameter, string keySql)
+            => RegisterGroupingKey(parameter, keySql, null);
+
+        /// <summary>
+        /// As <see cref="RegisterGroupingKey(ParameterExpression, string)"/>, additionally recording the key's
+        /// value-converter <paramref name="keyColumn"/> (when the key is a single mapped converter column) so a
+        /// <c>g.Key</c> comparison in a HAVING clause binds the provider representation via the converter path.
+        /// </summary>
+        public void RegisterGroupingKey(ParameterExpression parameter, string keySql, Column? keyColumn)
         {
             _groupingKeys[parameter] = keySql;
+            if (keyColumn?.Converter != null)
+                _groupingKeyColumns[parameter] = keyColumn;
         }
 
         /// <summary>
