@@ -54,9 +54,15 @@ namespace nORM.Migration
                 var columnsChanged = added.Count > 0 || dropped.Count > 0 || altered || renames.Count > 0;
 
                 // ── Up: mirror the change onto history ─────────────────────────────────────
-                if (dropped.Count > 0 || altered)
+                // A NOT NULL column with no default (in practice a computed column — a plain NOT NULL no-default
+                // column is rejected earlier) cannot be ALTER-added to a populated history table, and a computed
+                // column has no default to satisfy NOT NULL either (it would emit an invalid empty DEFAULT).
+                // Recreate the history so the column arrives via CREATE TABLE with a backfill, like a restore.
+                if (dropped.Count > 0 || altered
+                    || added.Any(static c => !c.IsNullable && string.IsNullOrEmpty(c.DefaultValue)))
                 {
                     // Column removal or redefinition needs the recreate workaround on history too.
+                    EmitDropTemporalTriggers(up, tableName);
                     RecreateHistoryTable(
                         up,
                         BuildHistorySchema(newSchema),
@@ -78,12 +84,14 @@ namespace nORM.Migration
 
                 // ── Down: revert history to the pre-migration shape ────────────────────────
                 var downNeedsHistoryRecreate = added.Count > 0 || altered
-                    // Restoring a dropped NOT NULL no-default column cannot use ADD COLUMN on a
-                    // populated history table; recreate backfills the type-appropriate zero
-                    // exactly like the main table's Down recreate.
-                    || dropped.Any(static c => !c.IsNullable && string.IsNullOrEmpty(c.DefaultValue) && !IsComputedColumn(c));
+                    // Restoring a dropped NOT NULL no-default column cannot use ADD COLUMN on a populated history
+                    // table; recreate backfills the type-appropriate zero like the main table's Down recreate.
+                    // This includes a computed column: the history stores it as a plain NOT NULL value column, so
+                    // ADD COLUMN would emit an invalid empty DEFAULT (SQLite "incomplete input") and cannot backfill.
+                    || dropped.Any(static c => !c.IsNullable && string.IsNullOrEmpty(c.DefaultValue));
                 if (downNeedsHistoryRecreate)
                 {
+                    EmitDropTemporalTriggers(down, tableName);
                     RecreateHistoryTable(
                         down,
                         BuildHistorySchema(oldSchema),
@@ -241,6 +249,18 @@ namespace nORM.Migration
         /// The runtime bootstrap's CREATE TRIGGER IF NOT EXISTS would keep a stale trigger alive,
         /// so the drop is explicit.
         /// </summary>
+        // The versioning triggers reference the &lt;Table&gt;_History companion. When the history is recreated
+        // (DROP + rename a temp table into place) while those triggers still exist — which happens whenever the
+        // main table is ALTER-ed rather than recreated, so a DROP TABLE didn't take the triggers with it —
+        // SQLite's schema-aware rename re-validates the triggers against the momentarily-absent history table and
+        // fails ("no such table &lt;Table&gt;_History"). Dropping the triggers BEFORE the history recreate avoids
+        // that; they are re-created from the direction's post-state schema afterwards.
+        private static void EmitDropTemporalTriggers(List<string> stmts, string tableName)
+        {
+            foreach (var triggerName in SqliteTemporalDdl.GetTriggerNames(tableName))
+                stmts.Add($"DROP TRIGGER IF EXISTS {Esc(triggerName)}");
+        }
+
         private static void EmitTemporalTriggers(List<string> stmts, TableSchema schema)
         {
             foreach (var triggerName in SqliteTemporalDdl.GetTriggerNames(schema.Name))
