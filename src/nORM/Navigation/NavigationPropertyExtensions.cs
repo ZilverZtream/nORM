@@ -47,6 +47,15 @@ namespace nORM.Navigation
         internal static void UnregisterLoader(BatchedNavigationLoader loader) => _activeLoaders.TryRemove(loader, out _);
 
         /// <summary>
+        /// Drops the batched navigation loader mapped to a context. Called when a pooled context is reset:
+        /// the reset disposes the loader (it is registered for disposal), but the context-keyed mapping would
+        /// otherwise survive (the context object is retained by the pool), so the next lease would receive the
+        /// disposed loader and every collection navigation load would throw. Removing the mapping makes the
+        /// next lease build a fresh loader.
+        /// </summary>
+        internal static void RemoveLoader(DbContext context) => _navigationLoaders.Remove(context);
+
+        /// <summary>
         /// Enables lazy loading for an entity instance by attaching lazy-loading proxies to
         /// all eligible navigation properties.
         /// </summary>

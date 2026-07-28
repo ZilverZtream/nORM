@@ -89,6 +89,12 @@ namespace nORM.Core
                 if (entry.Entity is { } trackedEntity)
                     nORM.Navigation.NavigationPropertyExtensions.CleanupNavigationContext(trackedEntity);
 
+            // Drop the batched navigation loader mapped to this context. The loop above cleared the per-ENTITY
+            // registrations; the per-CONTEXT loader is a separate mapping that the disposal drain (below/above)
+            // disposes but never un-maps — leaving the next lease with a disposed loader that throws on every
+            // collection navigation load. Remove it so the next lease builds a fresh one.
+            nORM.Navigation.NavigationPropertyExtensions.RemoveLoader(this);
+
             // Clear all tracked entities, the identity map, and any pending relationship key fixups.
             ChangeTracker.Clear();
             ChangeTracker.ClearPendingReferenceKeyFixups();
