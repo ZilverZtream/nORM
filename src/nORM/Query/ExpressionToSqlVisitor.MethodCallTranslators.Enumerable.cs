@@ -327,6 +327,24 @@ namespace nORM.Query
                             || (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type) == typeof(char)
                             || inConverter?.ProviderType == typeof(string));
 
+                    // Exact-compare canonicalization for TEXT-stored key types. The scalar `==` path
+                    // canonicalizes BOTH operands so a value stored at a different scale/precision
+                    // (external '10.50' vs nORM's '10.5'; '12:00:00.500' vs '12:00:00.5000000') still
+                    // matches. `col IN (@p…)` compared the raw TEXT lexically and silently dropped/kept
+                    // the wrong rows — asymmetric with `==`. Wrap the column and each parameter with the
+                    // same key-canonicalization the JOIN ON-equality uses (ExactKeySql /
+                    // NormalizeDateTimeOffsetForCompare); identity on native-typed providers. Gated to a
+                    // raw-storage column of an exact-compare type (a computed operand renders numeric
+                    // REAL and must not be text-canonicalized).
+                    var inKeyType = inConverter?.ProviderType ?? (Nullable.GetUnderlyingType(valueExpr.Type) ?? valueExpr.Type);
+                    bool canonicalizeInKey = !ordinalStringIn
+                        && IsRawStorageOperand(valueExpr)
+                        && (inKeyType == typeof(decimal) || inKeyType == typeof(TimeOnly) || inKeyType == typeof(TimeSpan)
+                            || inKeyType == typeof(DateTime) || inKeyType == typeof(DateTimeOffset));
+                    string CanonKey(string sql) => inKeyType == typeof(DateTimeOffset)
+                        ? _provider.NormalizeDateTimeOffsetForCompare(sql)
+                        : _provider.ExactKeySql(sql, inKeyType);
+
                     // Emits `col IN (@p…)` (registering the parameters once) and returns the
                     // rendered `(@p…)` list so the ordinal wrap can reference the same names.
                     string EmitInList(IEnumerable<object?> items)
@@ -339,7 +357,15 @@ namespace nORM.Query
                             if (!first) _sql.Append(", ");
                             var paramName = $"{_provider.ParamPrefix}p{_paramIndex++}";
                             var bound = inConverter != null && item != null ? inConverter.ConvertToProvider(item) : item;
-                            _sql.AppendParameterizedValue(paramName, bound, _paramSink);
+                            if (canonicalizeInKey)
+                            {
+                                _paramSink[paramName] = bound!;
+                                _sql.Append(CanonKey(paramName));
+                            }
+                            else
+                            {
+                                _sql.AppendParameterizedValue(paramName, bound, _paramSink);
+                            }
                             first = false;
                         }
                         _sql.Append(")");
@@ -350,7 +376,7 @@ namespace nORM.Query
                     {
                         var colSql = GetSql(valueExpr);
                         if (ordinalStringIn) _sql.Append('(');
-                        _sql.Append(colSql);
+                        _sql.Append(canonicalizeInKey ? CanonKey(colSql) : colSql);
                         var renderedList = EmitInList(items);
                         if (ordinalStringIn)
                         {
