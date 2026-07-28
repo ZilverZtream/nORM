@@ -19,17 +19,18 @@ namespace nORM.Tests;
 ///   * <c>Where(i =&gt; i.IsActive ?? false)</c> (coalesce-then-test)
 ///   * <c>Where(i =&gt; (bool)i.IsActive)</c> (explicit cast, throws at runtime on null)
 ///
-/// SQL 3VL specifics:
-///   * <c>col = TRUE</c> matches only TRUE rows; null is UNKNOWN -> excluded.
-///   * <c>col = FALSE</c> matches only FALSE rows; null is excluded.
-///   * <c>col &lt;&gt; TRUE</c> matches only FALSE rows; null is excluded.
-///   * <c>COALESCE(col, FALSE) = TRUE</c> matches only TRUE rows; null treated as FALSE.
+/// nORM compensates SQL three-valued logic to match C#/LINQ-to-Objects (and EF Core's
+/// default), so the row sets mirror what the same lambda returns in memory:
+///   * <c>col == TRUE</c> matches only TRUE rows; null is excluded (C#: null==true is false).
+///   * <c>col == FALSE</c> matches only FALSE rows; null is excluded (null==false is false).
+///   * <c>col != TRUE</c> matches FALSE rows AND null rows (C#: null!=true is true) -> emits
+///     <c>(col &lt;&gt; 1 OR col IS NULL)</c>; a bare <c>&lt;&gt; 1</c> would silently DROP nulls.
+///   * <c>COALESCE(col, FALSE) == TRUE</c> matches only TRUE rows; null treated as FALSE.
 ///
 /// Silent-wrongness shapes:
-///   * Translator emits a 2VL bool comparison and null rows "fall through" -- one
-///     direction returns null rows when they shouldn't, or excludes them when they
-///     should appear via COALESCE.
-///   * `== false` collapses to `!= true` (loses null exclusion).
+///   * A bare 2VL <c>col &lt;&gt; 1</c> for <c>!= true</c>/<c>!= false</c> drops null rows (data loss).
+///   * `== false` must NOT collapse to `!= true` (they now correctly differ: == false excludes
+///     nulls, != true keeps them).
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class LinqWhereNullableBoolThreeValuedLogicTests : IAsyncLifetime
@@ -91,18 +92,17 @@ public class LinqWhereNullableBoolThreeValuedLogicTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_nullable_bool_not_equals_true_matches_only_false_rows_not_null_rows()
+    public async Task Where_nullable_bool_not_equals_true_keeps_false_and_null_rows()
     {
-        // SQL 3VL: col <> TRUE returns FALSE when col is TRUE, TRUE when col is FALSE,
-        // UNKNOWN when col is NULL. UNKNOWN is excluded from the result set.
-        // Expected: Id 2 only (the FALSE row).
-        // Silent-wrongness: including the null rows would happen if the translator
-        // lifted `!=` to a 2VL operator without honoring SQL NULL semantics.
+        // C#/LINQ-to-Objects: `null != true` is true and `false != true` is true, so
+        // FALSE rows AND NULL rows are kept; only TRUE rows drop. nORM emits
+        // (col <> 1 OR col IS NULL), matching EF Core's default null compensation.
+        // Expected: Id 2 (false), 3 and 5 (null). A bare `<> 1` would drop 3 and 5.
         var result = await _ctx.Query<WnbItem>()
             .Where(i => i.IsActive != true)
             .OrderBy(i => i.Id)
             .ToListAsync();
-        Assert.Equal(new[] { 2 }, result.Select(r => r.Id).ToArray());
+        Assert.Equal(new[] { 2, 3, 5 }, result.Select(r => r.Id).ToArray());
     }
 
     [Fact]

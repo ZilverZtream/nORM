@@ -10,20 +10,19 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// Pins SQL three-valued-logic semantics for <c>Where</c> over a nullable
-/// bool column. Two distinct results to lock in so future translator changes
-/// don't silently flip the NULL handling:
+/// Pins C#/LINQ-to-Objects (and EF Core default) null semantics for <c>Where</c>
+/// over a nullable bool column — nORM compensates for SQL three-valued logic the
+/// same way it does for <c>int? != x</c> and the <c>bool?</c> projection path:
 /// <list type="bullet">
 ///   <item>
-///     <c>== true</c> -> SQL <c>= 1</c>; NULL rows excluded (matches both
-///     SQL and EF Core behavior — NULL = 1 is UNKNOWN). Safe.
+///     <c>== true</c> -> SQL <c>= 1</c>; NULL rows excluded (C#: <c>null == true</c>
+///     is <c>false</c>; SQL <c>NULL = 1</c> is UNKNOWN — both agree, no rescue needed).
 ///   </item>
 ///   <item>
-///     <c>!= true</c> -> SQL <c>&lt;&gt; 1</c>; NULL rows ALSO excluded
-///     (SQL: NULL &lt;&gt; 1 is UNKNOWN). This diverges from naive C#
-///     intuition where <c>null != true</c> is <c>true</c>. Document and
-///     pin the SQL behavior so the test catches any well-meaning
-///     "fix" that adds <c>OR col IS NULL</c> on the side.
+///     <c>!= true</c> -> SQL <c>(&lt;&gt; 1 OR IS NULL)</c>; NULL rows KEPT. In C#
+///     <c>null != true</c> is <c>true</c>, so those rows must appear — EF Core's
+///     default relational-null compensation emits the same <c>OR IS NULL</c>. A bare
+///     <c>&lt;&gt; 1</c> is UNKNOWN for NULL and would SILENTLY DROP the rows (data loss).
 ///   </item>
 /// </list>
 /// </summary>
@@ -72,28 +71,25 @@ public class LinqWhereNullableBoolComparisonTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Where_nullable_bool_not_equals_true_excludes_nulls_per_sql_three_valued_logic()
+    public async Task Where_nullable_bool_not_equals_true_keeps_null_rows_matching_csharp_and_ef()
     {
-        // != true -> Ids {2, 5} only -- NOT {2, 3, 5, 6}.
-        // SQL evaluates NULL <> 1 as UNKNOWN which WHERE treats as false,
-        // so NULL rows drop out. To get the "naive C#" set including NULLs,
-        // the user must write `p.IsActive != true || p.IsActive == null`
-        // (next test) -- this divergence is the silent-wrongness risk and
-        // the assertion locks in the actual SQL behavior so future
-        // translator changes can't quietly flip it.
+        // != true -> Ids {2, 3, 5, 6}: false rows {2,5} AND null rows {3,6}. In C#
+        // `null != true` is true, so NULL rows are KEPT; nORM emits (<> 1 OR IS NULL),
+        // matching LINQ-to-Objects and EF Core's default null compensation. A bare
+        // `<> 1` would silently drop rows 3 and 6 (data loss).
         var ids = (await _ctx.Query<NbcRow>()
             .Where(p => p.IsActive != true)
             .OrderBy(p => p.Id)
             .ToListAsync())
             .Select(r => r.Id).ToArray();
-        Assert.Equal(new[] { 2, 5 }, ids);
+        Assert.Equal(new[] { 2, 3, 5, 6 }, ids);
     }
 
     [Fact]
-    public async Task Where_nullable_bool_explicit_or_isnull_includes_null_rows()
+    public async Task Where_nullable_bool_explicit_or_isnull_matches_bare_not_equal()
     {
-        // To get "not true OR unset" semantics, callers must write the
-        // null check explicitly. Pin this as the supported escape hatch.
+        // The explicit `|| == null` is now equivalent to a bare `!= true` (nORM adds the
+        // IS NULL rescue automatically); pin that both forms return the same rows.
         var ids = (await _ctx.Query<NbcRow>()
             .Where(p => p.IsActive != true || p.IsActive == null)
             .OrderBy(p => p.Id)

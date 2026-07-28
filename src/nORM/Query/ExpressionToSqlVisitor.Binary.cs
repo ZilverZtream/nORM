@@ -740,8 +740,28 @@ namespace nORM.Query
             }
 
             var literal = boolVal ? _provider.BooleanTrueLiteral : _provider.BooleanFalseLiteral;
-            _sql.Append("(");
+            // Capture the member SQL once so a nullable `!=` can reuse it for the IS NULL rescue.
+            var startLen = _sql.Length;
             Visit(memberSide);
+            var memberSql = _sql.ToString(startLen, _sql.Length - startLen);
+            _sql.TruncateTo(startLen);
+
+            // C#/LINQ-to-Objects (and EF Core's default relational-null compensation) treat
+            // `bool? != true` and `bool? != false` as TRUE for a NULL member, so the NULL row
+            // must be KEPT. Raw SQL `col <> 1` is UNKNOWN for NULL and would silently DROP those
+            // rows — the same data-loss the `int? != x` path and the bool? PROJECTION path already
+            // guard against. Add the `OR col IS NULL` rescue for a nullable NotEqual. (`== true` /
+            // `== false` correctly EXCLUDE NULL: `null == true` is false in C#, and `col = 1` is
+            // UNKNOWN for NULL, so those keep the bare form.)
+            if (op == ExpressionType.NotEqual && Nullable.GetUnderlyingType(memberSide.Type) != null)
+            {
+                _sql.Append("(").Append(memberSql).Append(" <> ").Append(literal)
+                    .Append(" OR ").Append(memberSql).Append(" IS NULL)");
+                return;
+            }
+
+            _sql.Append("(");
+            _sql.Append(memberSql);
             _sql.Append(op == ExpressionType.Equal ? " = " : " <> ");
             _sql.Append(literal);
             _sql.Append(")");
