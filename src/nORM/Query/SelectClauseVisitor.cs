@@ -351,6 +351,16 @@ namespace nORM.Query
                 return node;
             }
 
+            // A closure-captured member whose RECEIVER is itself a member (a NESTED capture like a ValueTuple
+            // field `local.Field` or a property on a captured object) folds to its value BEFORE the column/nav
+            // branches below. Otherwise `node.Expression` being a MemberExpression makes the reference-navigation
+            // branch fire on the captured receiver and the operand emits NULL — materializing "data is NULL at
+            // ordinal N" for a computed projection. A direct closure local (receiver = ConstantExpression) and a
+            // row column (receiver = the row ParameterExpression) are unaffected: the former already folds below,
+            // the latter is excluded because TryGetConstantValue rejects a row-parameter-rooted member.
+            if (node.Expression is MemberExpression && TryEmitCapturedConstantMember(node))
+                return node;
+
             // dtoCol.LocalDateTime — wall clock at the local machine's offset.
             // The local offset isn't known to the SQL engine, so capture it at
             // query-build time via TimeZoneInfo.Local and bake it into the SQL
@@ -524,36 +534,47 @@ namespace nORM.Query
             // -- without this, `var prefix = "x"; .Select(p => p.Name.StartsWith(prefix))`
             // throws the misleading "not mapped to a column" error pointing at the
             // DisplayClass field.
-            if (QueryTranslator.TryGetConstantValue(node, out var capturedValue))
-            {
-                // Emit a compiled parameter when the owning translator shared its channel: the
-                // live value is re-extracted on every plan-cache hit. Baking the literal would
-                // freeze the FIRST run's captured value into the cached SQL.
-                if (SharedParams != null && SharedCompiledParams != null)
-                {
-                    // Reuse the slot already minted for this exact node (an ORDER BY key
-                    // expansion may render the projection fragment before Build does) —
-                    // the extractor produces ONE value per tree occurrence.
-                    var reused = QueryTranslator.TryReuseClosureSlot(node);
-                    if (reused != null)
-                    {
-                        sb.Append(reused);
-                        return node;
-                    }
-                    var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
-                    SharedParams[paramName] = DBNull.Value;
-                    SharedCompiledParams.Add(paramName);
-                    QueryTranslator.RecordClosureSlot(node, paramName);
-                    sb.Append(paramName);
-                    return node;
-                }
-                sb.Append(FormatLiteral(capturedValue));
+            if (TryEmitCapturedConstantMember(node))
                 return node;
-            }
 
             throw new InvalidOperationException(
                 $"Member '{node.Member.Name}' on type '{node.Member.DeclaringType?.Name}' is not mapped to a column in table '{_mapping.TableName}'. " +
                 $"Ensure the property is read/write and not a navigation collection.");
+        }
+
+        /// <summary>
+        /// Folds a closure-captured member access (a compiler-generated DisplayClass local, or a NESTED member
+        /// such as a captured ValueTuple field / object property) to its value and emits it. Emits a compiled
+        /// parameter when the owning translator shared its channel (the live value is re-extracted on every
+        /// plan-cache hit — baking the literal would freeze the first run's captured value into the cached SQL);
+        /// otherwise inlines the literal. Returns false when <paramref name="node"/> is not a captured constant
+        /// (e.g. a row-column or navigation member), so the caller falls through to the mapped-column path.
+        /// Mirrors ExpressionToSqlVisitor's WHERE-side closure fold so projection accepts the same shapes.
+        /// </summary>
+        private bool TryEmitCapturedConstantMember(MemberExpression node)
+        {
+            if (!QueryTranslator.TryGetConstantValue(node, out var capturedValue))
+                return false;
+            var sb = EnsureBuilder();
+            if (SharedParams != null && SharedCompiledParams != null)
+            {
+                // Reuse the slot already minted for this exact node (an ORDER BY key expansion may render the
+                // projection fragment before Build does) — the extractor produces ONE value per tree occurrence.
+                var reused = QueryTranslator.TryReuseClosureSlot(node);
+                if (reused != null)
+                {
+                    sb.Append(reused);
+                    return true;
+                }
+                var paramName = $"{_provider.ParamPrefix}cp{SharedCompiledParams.Count}";
+                SharedParams[paramName] = DBNull.Value;
+                SharedCompiledParams.Add(paramName);
+                QueryTranslator.RecordClosureSlot(node, paramName);
+                sb.Append(paramName);
+                return true;
+            }
+            sb.Append(FormatLiteral(capturedValue));
+            return true;
         }
 
         /// <summary>
