@@ -62,7 +62,13 @@ namespace nORM.Scaffolding
                     identityColumns)
                 && ScaffoldForeignKeyShape.HasExactUniqueColumnSet(indexes, joinTableKey, fkColumnNames);
 
-            if (payloadColumns.Length > 0 && !hasGeneratedSurrogatePrimaryKey)
+            // Any column that is not an FK, identity, or store-generated column is user payload (e.g. CreatedAt,
+            // a quantity). Its presence means this is NOT a pure join table and must scaffold as a full entity —
+            // regardless of whether the table also carries a generated surrogate primary key. Collapsing it to an
+            // implicit many-to-many would silently drop those columns (they become unmapped and unreadable, and a
+            // NOT NULL payload without a default then breaks m2m inserts). EF Core disqualifies the pure-m2m shape
+            // on any extra column for the same reason.
+            if (payloadColumns.Length > 0)
                 return false;
 
             if (!hasExactBridgePrimaryKey && !hasGeneratedSurrogatePrimaryKey)
