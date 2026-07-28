@@ -392,15 +392,16 @@ namespace nORM.Core
                     // A Modified entity may have entered this batch solely because its
                     // many-to-many collection changed (change detection marks the owner
                     // Modified for an association edit). When such an owner has NO mutable
-                    // columns — a key-only join owner — there is no column UPDATE to emit,
-                    // and building one would throw. Skip the column UPDATE; the M2M sync
-                    // below still runs and applies the association change. Restricted to
-                    // maps that HAVE M2M joins so a genuinely un-updatable entity (key- or
-                    // key+timestamp-only, no M2M) still surfaces the clear configuration
-                    // error rather than silently no-op'ing a real update attempt.
+                    // columns — a key-only join / owned-collection owner — there is no column
+                    // UPDATE to emit, and building one would throw. Skip the column UPDATE; the
+                    // M2M and owned-collection sync below still runs and applies the association
+                    // change. Restricted to maps that HAVE M2M joins or owned collections so a
+                    // genuinely un-updatable entity (key- or key+timestamp-only, no association)
+                    // still surfaces the clear configuration error rather than silently
+                    // no-op'ing a real update attempt.
                     var isColumnlessModified = state == EntityState.Modified
                         && map.UpdateColumns.Length == 0
-                        && map.ManyToManyJoins.Count > 0;
+                        && (map.ManyToManyJoins.Count > 0 || map.OwnedCollections.Count > 0);
                     var batchSize = ShouldInsertSelfReferentialRowsIndividually(map, state)
                         ? 1
                         : CalculateBatchSize(entries.Count, paramsPerEntity);
