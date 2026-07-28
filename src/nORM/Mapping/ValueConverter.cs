@@ -85,7 +85,12 @@ namespace nORM.Mapping
             var target = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
             if (target.IsEnum)
                 return (T)Enum.ToObject(target, value);
-            return (T)System.Convert.ChangeType(value, target);
+            // Invariant culture: the database stores numbers with invariant formatting, so a provider
+            // value read as a string (SQLite TEXT affinity for decimal/double) must be parsed invariantly.
+            // Convert.ChangeType(value, type) without a provider uses the current thread culture, which turns
+            // "1.5" into 15 on a group-separator-is-dot locale (de-DE) or throws on a comma-decimal locale
+            // (sv-SE). Every other read-coercion path already passes InvariantCulture.
+            return (T)System.Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }
