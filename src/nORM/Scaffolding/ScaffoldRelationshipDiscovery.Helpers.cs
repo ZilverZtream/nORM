@@ -18,10 +18,19 @@ namespace nORM.Scaffolding
             string tableKey,
             string columnName)
         {
-            if (columnPropertiesByTable.TryGetValue(tableKey, out var properties)
-                && properties.TryGetValue(columnName, out var propertyName))
+            if (columnPropertiesByTable.TryGetValue(tableKey, out var properties))
             {
-                return propertyName;
+                if (properties.TryGetValue(columnName, out var propertyName))
+                    return propertyName;
+
+                // SQLite's PRAGMA foreign_key_list returns the referenced ("to") column with the casing written
+                // in the REFERENCES clause, which can differ from the parent column's DECLARED casing that this
+                // map is keyed by (Ordinal). Column names are case-insensitively unique, so a case-insensitive
+                // match resolves to the CORRECT entity property. Without it the ToPascalCase fallback below emits
+                // a property name the entity does not have, and the generated DbContext fails to compile.
+                foreach (var candidate in properties)
+                    if (string.Equals(candidate.Key, columnName, System.StringComparison.OrdinalIgnoreCase))
+                        return candidate.Value;
             }
 
             return ScaffoldNameHelper.EscapeCSharpIdentifier(ScaffoldNameHelper.ToPascalCase(columnName));
