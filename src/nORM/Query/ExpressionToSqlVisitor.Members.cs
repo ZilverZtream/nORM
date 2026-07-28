@@ -516,11 +516,17 @@ namespace nORM.Query
         internal static string BuildDotNetToStringSql(DatabaseProvider provider, string inner, Type clrType)
         {
             var underlying = Nullable.GetUnderlyingType(clrType) ?? clrType;
-            if (underlying.IsEnum)
-                return BuildEnumToStringCase(provider, inner, underlying);
-            if (underlying == typeof(bool))
-                return "(CASE WHEN " + inner + " = 1 THEN 'True' ELSE 'False' END)";
-            return provider.GetToStringSql(inner);
+            var nonNull = underlying.IsEnum
+                ? BuildEnumToStringCase(provider, inner, underlying)
+                : underlying == typeof(bool)
+                    ? "(CASE WHEN " + inner + " = 1 THEN 'True' ELSE 'False' END)"
+                    : provider.GetToStringSql(inner);
+            // Nullable<T>.ToString() is documented to return String.Empty (never null) when HasValue is false —
+            // and the bool CASE above would wrongly yield 'False' for a NULL element. Guard the null first so a
+            // projected `x.N.ToString()` materializes "" rather than null (a downstream NRE hazard) / 'False'.
+            if (Nullable.GetUnderlyingType(clrType) != null)
+                return "CASE WHEN " + inner + " IS NULL THEN '' ELSE " + nonNull + " END";
+            return nonNull;
         }
 
         internal static string BuildEnumToStringCase(DatabaseProvider provider, string columnSql, Type enumType)
