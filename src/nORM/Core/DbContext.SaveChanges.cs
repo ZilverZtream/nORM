@@ -391,19 +391,9 @@ namespace nORM.Core
                     var isColumnlessModified = state == EntityState.Modified
                         && map.UpdateColumns.Length == 0
                         && map.ManyToManyJoins.Count > 0;
-                    var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
-                    // A self-referential Added group with a generated key (DB-generated or convention
-                    // store-generated) must insert ONE row at a time. A child row's FK parameter is bound
-                    // before the multi-row INSERT command executes, so packing a parent and its
-                    // self-referencing child into one command binds the child's FK to the parent's
-                    // still-default key (0/NULL) — a silently wrong persisted FK, or an outright FK
-                    // violation under enforcement. Per-row inserts let each parent's INSERT hydrate its key
-                    // and PropagateGeneratedKeyToChildren update its in-memory children before the child row
-                    // binds its parameters. OrderSelfReferentialRows already places the parent first.
-                    if (state == EntityState.Added
-                        && (map.ConventionGeneratedKeyColumn != null || map.KeyColumns.Any(k => k.IsDbGenerated))
-                        && map.Relations.Values.Any(r => r.DependentType == map.Type))
-                        batchSize = 1;
+                    var batchSize = ShouldInsertSelfReferentialRowsIndividually(map, state)
+                        ? 1
+                        : CalculateBatchSize(entries.Count, paramsPerEntity);
                     var templateLength = isColumnlessModified ? 64 : EstimateTemplateLength(state, map);
 
                     // Reuse DbCommand and StringBuilder across batches: create ONE of each and
@@ -690,31 +680,6 @@ namespace nORM.Core
                     AddCascadeDependentTables(dependentMap, tags);
             }
         }
-
-        private int CalculateBatchSize(int totalEntries, int paramsPerEntity)
-        {
-            var batchSize = totalEntries;
-            if (_p.MaxParameters != int.MaxValue)
-            {
-                var maxParams = Math.Max(1, _p.MaxParameters - ParameterBudgetReserve);
-                var capacity = Math.Max(1, maxParams / Math.Max(1, paramsPerEntity));
-                // Cap at the actual entity count — never batch (or size the SQL StringBuilder for) more rows
-                // than exist. Without the Min, a single-row save sized its StringBuilder for the provider's
-                // full parameter capacity (~83 rows on SQLite), allocating tens of KB per write for nothing.
-                batchSize = Math.Min(totalEntries, capacity);
-            }
-            return batchSize;
-        }
-
-        private int EstimateTemplateLength(EntityState state, TableMapping map)
-            => state switch
-            {
-                EntityState.Added => BuildInsertBatch(map, 0).Length + 1,
-                EntityState.Modified => BuildUpdateBatch(map, 0).Length + 1,
-                EntityState.Deleted => BuildDeleteBatch(map, 0).Length + 1,
-                _ => 0
-            };
-
 
         /// <summary>
         /// <see cref="TimeoutException"/> is intentionally NOT retried by default because a
