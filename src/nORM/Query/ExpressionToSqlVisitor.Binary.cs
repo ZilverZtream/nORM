@@ -420,6 +420,15 @@ namespace nORM.Query
                     => exactEqualityOp ? _provider.ExactDecimalKeySql(sql) : _provider.NormalizeDecimalForCompare(sql);
                 var leftSqlD = WrapDecimal(GetSql(node.Left));
                 var rightSqlD = WrapDecimal(GetSql(node.Right));
+                // Decimal modulo needs the true (fractional) remainder. SQLite's `%` casts
+                // both operands to integer first (10.5 % 3 -> 10 % 3 -> 1, silently wrong),
+                // so route it through the same provider remainder hook the double/float path
+                // uses (left - right * trunc(left/right)). Other operators keep `op`.
+                if (node.NodeType == ExpressionType.Modulo)
+                {
+                    _sql.Append(_provider.GetFloatingPointModuloSql(leftSqlD, rightSqlD));
+                    return node;
+                }
                 _sql.Append('(').Append(leftSqlD);
                 _sql.Append(node.NodeType switch
                 {
@@ -433,7 +442,6 @@ namespace nORM.Query
                     ExpressionType.Subtract => " - ",
                     ExpressionType.Multiply => " * ",
                     ExpressionType.Divide => " / ",
-                    ExpressionType.Modulo => " % ",
                     _ => throw new InvalidOperationException()
                 });
                 _sql.Append(rightSqlD).Append(')');

@@ -487,6 +487,14 @@ namespace nORM.Query
                 sb.Length = decRightStart;
                 string WrapDec(string sqlFrag)
                     => exactDecEquality ? _provider.ExactDecimalKeySql(sqlFrag) : _provider.NormalizeDecimalForCompare(sqlFrag);
+                // Decimal modulo needs the true fractional remainder; SQLite's `%` casts both
+                // operands to integer (10.5 % 3 -> 1, silently wrong). Route through the same
+                // provider remainder hook as the double/float path and the WHERE-side (ETSV).
+                if (node.NodeType == ExpressionType.Modulo)
+                {
+                    sb.Append(_provider.GetFloatingPointModuloSql(WrapDec(decLeftSql), WrapDec(decRightSql)));
+                    return node;
+                }
                 sb.Append('(').Append(WrapDec(decLeftSql))
                   .Append(' ').Append(node.NodeType switch
                 {
@@ -500,7 +508,6 @@ namespace nORM.Query
                     ExpressionType.Subtract => "-",
                     ExpressionType.Multiply => "*",
                     ExpressionType.Divide => "/",
-                    ExpressionType.Modulo => "%",
                     _ => throw new InvalidOperationException()
                 }).Append(' ').Append(WrapDec(decRightSql)).Append(')');
                 return node;
