@@ -184,6 +184,15 @@ namespace nORM.Query
             if (!IsNavigationCollection(current, out navProperty))
                 return false;
 
+            // The child is materialized bare — only its own table columns (and inlined owned references).
+            // A projection that dereferences the child's OWN navigation (a nested collection, m2m, owned
+            // collection, or reference nav to another table) would read an unloaded, empty/null value:
+            // silent data loss for a collection, an NRE for a reference. Reject it loudly. The sibling
+            // nested-lambda shape (i => i.Tags.Select(t => t.Name)) already fails loud via the foreign-
+            // parameter check in IsSafeChildProjection; this closes the bare i => i.Tags / i.Category.Name.
+            if (projection != null)
+                ValidateChildProjectionDoesNotDerefNavigation(projection);
+
             // Skip/Take without an OrderBy makes the top-N nondeterministic (undefined row order) — fail loud.
             if (spec != null && spec.Keys.Count == 0)
                 throw new NormUnsupportedFeatureException(
@@ -248,6 +257,79 @@ namespace nORM.Query
                 if (node != _elementParam)
                     ReferencesOnlyElement = false;
                 return node;
+            }
+        }
+
+        /// <summary>
+        /// Throws when a shaped-collection element projection dereferences one of the child entity's own
+        /// navigations — a nested collection, many-to-many, owned collection, or reference navigation to
+        /// another table. The child is materialized bare, so such a member reads an unloaded value (empty
+        /// collection or null reference), which would be silent data loss or an NRE deep in execution.
+        /// Scalar columns of the child and inlined owned references (which the row materializer supplies)
+        /// pass through untouched.
+        /// </summary>
+        private void ValidateChildProjectionDoesNotDerefNavigation(LambdaExpression projection)
+        {
+            if (_ctx == null)
+                return;
+            var elementParam = projection.Parameters[0];
+            var elementType = elementParam.Type;
+            if (!elementType.IsClass || elementType == typeof(string))
+                return;
+
+            var childMap = _ctx.GetMapping(elementType);
+            var navNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var r in childMap.Relations.Values)
+                navNames.Add(r.NavProp.Name);
+            foreach (var rn in childMap.ReferenceNavigations)
+                navNames.Add(rn.Name);
+            foreach (var oc in childMap.OwnedCollections)
+                navNames.Add(oc.NavigationProperty.Name);
+            foreach (var j in childMap.ManyToManyJoins)
+            {
+                navNames.Add(j.LeftNavPropertyName);
+                if (j.RightNavPropertyName != null)
+                    navNames.Add(j.RightNavPropertyName);
+            }
+            if (navNames.Count == 0)
+                return;
+
+            var finder = new ChildNavigationDerefFinder(elementParam, navNames);
+            finder.Visit(projection.Body);
+            if (finder.Offender != null)
+                throw new NormUnsupportedFeatureException(
+                    $"The projected collection element dereferences the child entity's navigation '{finder.Offender}', " +
+                    "which nORM does not load inside a collection projection. Project the child's own scalar columns here, " +
+                    "or eager-load the nested data with Include.",
+                    NormUnsupportedReason.CollectionProjectionChildNavigationUnsupported);
+        }
+
+        /// <summary>Finds the first member access, rooted at the child element parameter, whose name is a
+        /// navigation of the child entity (so the bare child materializer never loaded it).</summary>
+        private sealed class ChildNavigationDerefFinder : ExpressionVisitor
+        {
+            private readonly ParameterExpression _elementParam;
+            private readonly HashSet<string> _navNames;
+            public string? Offender { get; private set; }
+
+            public ChildNavigationDerefFinder(ParameterExpression elementParam, HashSet<string> navNames)
+            {
+                _elementParam = elementParam;
+                _navNames = navNames;
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (Offender == null && _navNames.Contains(node.Member.Name) && RootsAtElement(node.Expression))
+                    Offender = node.Member.Name;
+                return base.VisitMember(node);
+            }
+
+            private bool RootsAtElement(Expression? expr)
+            {
+                while (expr is MemberExpression m)
+                    expr = m.Expression;
+                return expr == _elementParam;
             }
         }
 

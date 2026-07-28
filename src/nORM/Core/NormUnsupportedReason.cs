@@ -221,6 +221,9 @@ namespace nORM.Core
         /// <summary>Ordered / top-N (OrderBy/Take/Skip) projection is not supported for owned or many-to-many collections.</summary>
         public const string OrderedProjectionOwnedM2mUnsupported = "ordered-projection-owned-m2m-unsupported";
 
+        /// <summary>A shaped-collection element projection dereferences the child entity's own navigation (a nested collection or reference nav), which is not loaded inside a collection projection.</summary>
+        public const string CollectionProjectionChildNavigationUnsupported = "collection-projection-child-navigation-unsupported";
+
         /// <summary>A Join/GroupJoin over a `.Distinct()` outer source of an unsupported shape is not supported.</summary>
         public const string JoinDistinctOuterUnsupported = "join-distinct-outer-unsupported";
 
