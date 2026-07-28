@@ -947,6 +947,39 @@ namespace nORM.Query
                 return true;
             }
 
+            // A converter that stores a decimal / TimeSpan / DateTimeOffset as TEXT (SQLite) mis-orders a
+            // RELATIONAL comparison lexicographically ('9.0' > '50.0'): the column's provider representation is
+            // decimal TEXT, invisible to the CLR-type-gated decimal block that normalizes a plain decimal
+            // column. Wrap both operands with the provider's numeric-compare hook so `Cost > 50` compares
+            // numerically. (Equality stays as-is: the value binds in the same canonical form as the column.)
+            if (op is ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual)
+            {
+                var providerUnderlying = Nullable.GetUnderlyingType(column.Converter!.ProviderType) ?? column.Converter!.ProviderType;
+                Func<string, string>? normalize =
+                    providerUnderlying == typeof(decimal) ? _provider.NormalizeDecimalForCompare
+                    : providerUnderlying == typeof(TimeSpan) ? _provider.NormalizeTimeSpanForCompare
+                    : providerUnderlying == typeof(DateTimeOffset) ? _provider.NormalizeDateTimeOffsetForCompare
+                    : null;
+                if (normalize != null)
+                {
+                    var colSqlNorm = GetSql(memberSide);
+                    var valStart = _sql.Length;
+                    EmitConvertedValueOperand(stripped, column.Converter!, isInlineConstant, isFreeParameter);
+                    var valSqlNorm = _sql.ToString(valStart, _sql.Length - valStart);
+                    _sql.TruncateTo(valStart);
+                    _sql.Append('(').Append(normalize(colSqlNorm)).Append(op switch
+                    {
+                        ExpressionType.GreaterThan => " > ",
+                        ExpressionType.GreaterThanOrEqual => " >= ",
+                        ExpressionType.LessThan => " < ",
+                        ExpressionType.LessThanOrEqual => " <= ",
+                        _ => throw new InvalidOperationException()
+                    }).Append(normalize(valSqlNorm)).Append(')');
+                    return true;
+                }
+            }
+
             _sql.Append('(');
             if (op == ExpressionType.NotEqual && memberIsNullable)
             {
@@ -1031,6 +1064,17 @@ namespace nORM.Query
 
         private bool TryGetConverterColumn(Expression expr, out Column column)
             => TryGetConverterColumn(expr, out column, out _);
+
+        /// <summary>
+        /// Returns the type that drives a stored-representation comparison/ordering decision for
+        /// <paramref name="expr"/>. A value-converter column stores its PROVIDER type (a decimal/TimeSpan/
+        /// DateTimeOffset stored as TEXT on SQLite needs numeric normalization), which is invisible to the
+        /// CLR model type — so return the converter's provider type for a converter column, else the CLR type.
+        /// </summary>
+        internal Type EffectiveComparableType(Expression expr, Type clrType)
+            => TryGetConverterColumn(expr, out var column) && column.Converter != null
+                ? column.Converter.ProviderType
+                : clrType;
 
         private bool TryGetConverterColumn(Expression expr, out Column column, out bool viaNavigation)
         {

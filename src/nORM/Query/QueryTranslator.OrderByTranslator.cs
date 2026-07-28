@@ -343,25 +343,28 @@ namespace nORM.Query
                     // defaults to the opposite, so nullable keys there get a leading null-rank
                     // entry `(key IS NOT NULL)` with the same direction — false(null) < true, and
                     // because rank and key flip together the semantics survive Reverse().
-                    void AddOrderKey(string keySql, Type keyType)
+                    void AddOrderKey(string keySql, Type keyType, Expression keyExpr)
                     {
                         if (t._provider.RequiresExplicitNullOrderingForNullableKeys
                             && (!keyType.IsValueType || Nullable.GetUnderlyingType(keyType) != null))
                             t._orderBy.Add(($"({keySql} IS NOT NULL)", ascending));
-                        t._orderBy.Add((CoerceOrderKey(keySql, keyType), ascending));
+                        // A value-converter column's stored representation (its provider type) drives the
+                        // decimal/TimeSpan/DateTimeOffset numeric normalization, not its CLR model type — else a
+                        // Money (decimal-provider converter) key sorts lexicographically.
+                        t._orderBy.Add((CoerceOrderKey(keySql, visitor.EffectiveComparableType(keyExpr, keyType)), ascending));
                     }
                     if (keySelector.Body is NewExpression newKey && newKey.Arguments.Count > 0)
                     {
                         foreach (var member in newKey.Arguments)
                         {
                             var memberSql = visitor.Translate(member);
-                            AddOrderKey(memberSql, member.Type);
+                            AddOrderKey(memberSql, member.Type, member);
                         }
                     }
                     else
                     {
                         var sql = visitor.Translate(keySelector.Body);
-                        AddOrderKey(sql, keySelector.Body.Type);
+                        AddOrderKey(sql, keySelector.Body.Type, keySelector.Body);
                     }
                     // Merge any parameters the visitor allocated (e.g. for COALESCE fallback
                     // constants in `OrderBy(r => r.Col ?? int.MaxValue)`) back into the outer

@@ -639,6 +639,32 @@ namespace nORM.Query
             var stripped = valueSide;
             while (stripped is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
                 stripped = u.Operand;
+
+            // A converter that stores a decimal / TimeSpan / DateTimeOffset as TEXT (SQLite) must compare a
+            // RELATIONAL projected operator NUMERICALLY, not lexicographically — the column's provider type is
+            // invisible to the CLR-type-gated decimal block. Returns the wrapping hook for such a case, else null.
+            Func<string, string>? RelationalNormalize(ExpressionType compareOp)
+            {
+                if (compareOp is not (ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+                    or ExpressionType.LessThan or ExpressionType.LessThanOrEqual))
+                    return null;
+                var pu = Nullable.GetUnderlyingType(column.Converter!.ProviderType) ?? column.Converter!.ProviderType;
+                if (pu == typeof(decimal)) return _provider.NormalizeDecimalForCompare;
+                if (pu == typeof(TimeSpan)) return _provider.NormalizeTimeSpanForCompare;
+                if (pu == typeof(DateTimeOffset)) return _provider.NormalizeDateTimeOffsetForCompare;
+                return null;
+            }
+            static string OpSql(ExpressionType o) => o switch
+            {
+                ExpressionType.Equal => "=",
+                ExpressionType.NotEqual => "<>",
+                ExpressionType.LessThan => "<",
+                ExpressionType.LessThanOrEqual => "<=",
+                ExpressionType.GreaterThan => ">",
+                ExpressionType.GreaterThanOrEqual => ">=",
+                _ => throw new InvalidOperationException()
+            };
+
             // Closure capture vs converter column: emit a compiled-parameter slot and register
             // the converter so binders convert the LIVE value on every plan-cache hit.
             if (stripped is MemberExpression
@@ -656,18 +682,21 @@ namespace nORM.Query
                     QueryTranslator.RecordClosureSlot(stripped, paramName);
                 }
                 SharedParamConverters[paramName] = column.Converter!;
+                var norm = RelationalNormalize(closureOp);
                 closureSb.Append('(');
+                var mStart = closureSb.Length;
                 Visit(memberSide);
-                closureSb.Append(' ').Append(closureOp switch
+                if (norm != null)
                 {
-                    ExpressionType.Equal => "=",
-                    ExpressionType.NotEqual => "<>",
-                    ExpressionType.LessThan => "<",
-                    ExpressionType.LessThanOrEqual => "<=",
-                    ExpressionType.GreaterThan => ">",
-                    ExpressionType.GreaterThanOrEqual => ">=",
-                    _ => throw new InvalidOperationException()
-                }).Append(' ').Append(paramName).Append(')');
+                    var mSql = closureSb.ToString(mStart, closureSb.Length - mStart);
+                    closureSb.Length = mStart;
+                    closureSb.Append(norm(mSql)).Append(' ').Append(OpSql(closureOp)).Append(' ').Append(norm(paramName));
+                }
+                else
+                {
+                    closureSb.Append(' ').Append(OpSql(closureOp)).Append(' ').Append(paramName);
+                }
+                closureSb.Append(')');
                 return true;
             }
 
@@ -676,19 +705,22 @@ namespace nORM.Query
 
             var converted = column.Converter!.ConvertToProvider(raw);
             var op = leftIsColumn ? node.NodeType : FlipScvComparison(node.NodeType);
+            var normC = RelationalNormalize(op);
             var sb = EnsureBuilder();
             sb.Append('(');
+            var cStart = sb.Length;
             Visit(memberSide);
-            sb.Append(' ').Append(op switch
+            if (normC != null)
             {
-                ExpressionType.Equal => "=",
-                ExpressionType.NotEqual => "<>",
-                ExpressionType.LessThan => "<",
-                ExpressionType.LessThanOrEqual => "<=",
-                ExpressionType.GreaterThan => ">",
-                ExpressionType.GreaterThanOrEqual => ">=",
-                _ => throw new InvalidOperationException()
-            }).Append(' ').Append(FormatLiteral(converted)).Append(')');
+                var cSql = sb.ToString(cStart, sb.Length - cStart);
+                sb.Length = cStart;
+                sb.Append(normC(cSql)).Append(' ').Append(OpSql(op)).Append(' ').Append(normC(FormatLiteral(converted)));
+            }
+            else
+            {
+                sb.Append(' ').Append(OpSql(op)).Append(' ').Append(FormatLiteral(converted));
+            }
+            sb.Append(')');
             return true;
         }
 
