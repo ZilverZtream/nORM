@@ -228,7 +228,23 @@ namespace nORM.Navigation
                 return;
                 
             var entityMapping = context.DbContext.GetMapping(context.EntityType);
-            
+
+            // Many-to-many navigations live in ManyToManyJoins, not Relations; the inferred-relationship
+            // fallback below only finds a DIRECT foreign key on the target table, so a real m2m (whose FK is in
+            // the join table) silently loaded nothing and was marked loaded. Load it through the join table
+            // exactly like the eager Include path (applying the right-side global filter), so a lazy/explicit
+            // m2m load matches Include.
+            if (entityMapping.ManyToManyJoins.FirstOrDefault(j =>
+                    string.Equals(j.LeftNavPropertyName, property.Name, StringComparison.Ordinal)) is { } m2mJoin)
+            {
+                var m2mParents = new List<object> { entity };
+                await new IncludeProcessor(context.DbContext)
+                    .LoadManyToManyAsync(new M2MIncludePlan(m2mJoin), m2mParents, ct, noTracking: false)
+                    .ConfigureAwait(false);
+                context.MarkAsLoaded(property.Name);
+                return;
+            }
+
             // Check if this property has a relationship defined
             if (entityMapping.Relations.TryGetValue(property.Name, out var relation))
             {
