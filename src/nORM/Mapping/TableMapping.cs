@@ -100,6 +100,14 @@ namespace nORM.Mapping
         /// <summary>Gets the set of columns included in update statements.</summary>
         public Column[] UpdateColumns { get; }
 
+        /// <summary>
+        /// Non-key, non-timestamp columns whose value the database generates (a computed column, or a column
+        /// with a DB default configured store-generated). nORM omits them from its own INSERT/UPDATE; after a
+        /// successful write it reads them back onto the tracked entity so the in-memory object matches the row
+        /// (EF-parity). Empty for the overwhelming majority of mappings, gating the read-back to zero cost.
+        /// </summary>
+        public Column[] StoreGeneratedReadBackColumns { get; }
+
         /// <summary>Gets the unescaped table name.</summary>
         public string TableName { get; }
 
@@ -414,6 +422,11 @@ namespace nORM.Mapping
             // by an UPDATE — doing so would relabel the row as a sibling subtype (a masquerade). Exclude it so
             // no UpdateColumns-based path (tracked partial update, direct update, bulk update) can emit it.
             UpdateColumns = Columns.Where(c => !c.IsKey && !c.IsTimestamp && !c.IsDbGenerated
+                && !ReferenceEquals(c, DiscriminatorColumn)).ToArray();
+            // Store-generated non-key columns (computed / DB-default) omitted from the write but read back
+            // after it. Excludes the key (read back via SetPrimaryKey), the timestamp (read back with the
+            // token), and the discriminator (identity-defining, stamped once).
+            StoreGeneratedReadBackColumns = Columns.Where(c => c.IsDbGenerated && !c.IsKey && !c.IsTimestamp
                 && !ReferenceEquals(c, DiscriminatorColumn)).ToArray();
 
             // Compute converter fingerprint for materializer cache differentiation
