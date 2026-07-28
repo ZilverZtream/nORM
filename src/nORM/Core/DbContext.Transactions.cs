@@ -92,6 +92,42 @@ namespace nORM.Core
         // DbConcurrencyException (a false conflict).
         private Dictionary<string, Dictionary<object, object?>>? _savepointTokenSnapshots;
 
+        // Pre-advance m2m / owned-collection snapshot baselines, captured lazily the FIRST time a caller-owned
+        // save advances them (the collection twin of _transactionValuesSnapshot). A full rollback / ambient abort
+        // restores them so a still-pending collection edit re-applies on the next save instead of being silently
+        // dropped — the advanced snapshot would otherwise equal the reverted-but-still-edited collection and read
+        // as "no change".
+        private Dictionary<object, CollectionSnapshotBaseline>? _transactionCollectionSnapshot;
+        // Per-savepoint m2m/owned snapshot baselines — the analogue for RollbackToSavepoint.
+        private Dictionary<string, Dictionary<object, CollectionSnapshotBaseline>>? _savepointCollectionSnapshots;
+
+        private Dictionary<object, CollectionSnapshotBaseline> SnapshotAllTrackedCollectionBaselines()
+        {
+            var dict = new Dictionary<object, CollectionSnapshotBaseline>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.Entity is { } e
+                    && (entry.Mapping.ManyToManyJoins.Count > 0 || entry.Mapping.OwnedCollections.Count > 0))
+                    dict[e] = entry.CaptureCollectionSnapshotBaseline();
+            }
+            return dict;
+        }
+
+        /// <summary>
+        /// Records the pre-advance m2m/owned snapshot baseline of an entity the first time a caller-owned save
+        /// advances it, so a full rollback can restore it. Idempotent per entity; only for entities that have
+        /// m2m or owned-collection navigations.
+        /// </summary>
+        internal void RememberPreTransactionCollectionBaseline(object entity, EntityEntry entry)
+        {
+            if (entry.Mapping.ManyToManyJoins.Count == 0 && entry.Mapping.OwnedCollections.Count == 0)
+                return;
+            _transactionCollectionSnapshot ??= new Dictionary<object, CollectionSnapshotBaseline>(ReferenceEqualityComparer.Instance);
+            if (_transactionCollectionSnapshot.ContainsKey(entity))
+                return;
+            _transactionCollectionSnapshot[entity] = entry.CaptureCollectionSnapshotBaseline();
+        }
+
         private Dictionary<object, object?[]> SnapshotAllTrackedOriginalValues()
         {
             var dict = new Dictionary<object, object?[]>(ReferenceEqualityComparer.Instance);
@@ -218,6 +254,16 @@ namespace nORM.Core
                 }
                 _transactionValuesSnapshot.Clear();
             }
+            if (_transactionCollectionSnapshot != null)
+            {
+                foreach (var (entity, baseline) in _transactionCollectionSnapshot)
+                {
+                    var entry = ChangeTracker.GetEntryOrDefault(entity);
+                    if (entry != null && ReferenceEquals(entry.Entity, entity))
+                        entry.RestoreCollectionSnapshotBaseline(baseline);
+                }
+                _transactionCollectionSnapshot.Clear();
+            }
         }
 
         // The ambient System.Transactions.Transaction nORM enlisted in, plus the Added-entity key
@@ -294,6 +340,8 @@ namespace nORM.Core
                 = SnapshotAllTrackedOriginalValues();
             (_savepointTokenSnapshots ??= new Dictionary<string, Dictionary<object, object?>>(StringComparer.Ordinal))[name]
                 = SnapshotOccOriginalTokens();
+            (_savepointCollectionSnapshots ??= new Dictionary<string, Dictionary<object, CollectionSnapshotBaseline>>(StringComparer.Ordinal))[name]
+                = SnapshotAllTrackedCollectionBaselines();
         }
 
         /// <summary>
@@ -340,6 +388,18 @@ namespace nORM.Core
             // concurrency conflict on its next write.
             if (_savepointTokenSnapshots != null && _savepointTokenSnapshots.TryGetValue(name, out var tokSnapshot))
                 RestoreOccOriginalTokens(tokSnapshot);
+            // Restore the m2m/owned snapshot baselines captured at the savepoint so a collection edit saved AFTER
+            // the savepoint (whose snapshot was advanced by the deferred-accept branch) is re-detected and
+            // re-applied on the next SaveChanges rather than silently dropped. Mirrors the full-rollback restore.
+            if (_savepointCollectionSnapshots != null && _savepointCollectionSnapshots.TryGetValue(name, out var colSnapshot))
+            {
+                foreach (var (entity, baseline) in colSnapshot)
+                {
+                    var entry = ChangeTracker.GetEntryOrDefault(entity);
+                    if (entry != null && ReferenceEquals(entry.Entity, entity))
+                        entry.RestoreCollectionSnapshotBaseline(baseline);
+                }
+            }
         }
 
         /// <summary>

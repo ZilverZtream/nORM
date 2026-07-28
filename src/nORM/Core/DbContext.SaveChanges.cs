@@ -624,6 +624,10 @@ namespace nORM.Core
                     // compares the collection against the stale load-time snapshot, sees no net change, and
                     // silently leaks the join row / owned child inserted by the first save. An entry whose only
                     // change is a collection edit can sit here as Unchanged, so this runs for every entry.
+                    // Remember the pre-advance snapshot first so a full rollback restores it and a still-pending
+                    // collection edit re-applies (mirrors RememberPreTransactionValuesBaseline for scalars).
+                    if (entry.Entity is { } collectionOwner)
+                        RememberPreTransactionCollectionBaseline(collectionOwner, entry);
                     entry.CaptureManyToManySnapshots();
                     entry.CaptureOwnedCollectionSnapshots();
                 }

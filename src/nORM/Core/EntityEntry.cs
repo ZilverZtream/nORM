@@ -16,6 +16,22 @@ using nORM.Navigation;
 namespace nORM.Core
 {
     /// <summary>
+    /// A deep-cloned copy of an entity's many-to-many and owned-collection snapshot baselines, used to restore
+    /// them after a transaction rollback (the collection twin of the scalar original-value snapshot).
+    /// </summary>
+    internal readonly struct CollectionSnapshotBaseline
+    {
+        public CollectionSnapshotBaseline(Dictionary<string, HashSet<object>>? manyToMany, Dictionary<string, List<string>>? owned)
+        {
+            ManyToMany = manyToMany;
+            Owned = owned;
+        }
+
+        public Dictionary<string, HashSet<object>>? ManyToMany { get; }
+        public Dictionary<string, List<string>>? Owned { get; }
+    }
+
+    /// <summary>
     /// Represents the change tracking information for a single entity instance.
     /// An <see cref="EntityEntry"/> keeps the original values and state required to
     /// compute database updates when <c>SaveChanges</c> is invoked.
@@ -609,6 +625,39 @@ namespace nORM.Core
             OwnedCollectionSnapshots ??= new Dictionary<string, List<string>>();
             foreach (var ocm in _mapping.OwnedCollections)
                 OwnedCollectionSnapshots[ocm.NavigationProperty.Name] = OwnedContentSignatures(ocm, entity);
+        }
+
+        /// <summary>
+        /// Deep-clones the current m2m and owned-collection snapshot baselines so a transaction rollback can
+        /// restore them. The collection twin of <see cref="SnapshotOriginalValues"/>: under a caller-owned
+        /// transaction the snapshots are ADVANCED after each save (so an in-transaction reversal is detected),
+        /// and a rollback must put them back — otherwise the advanced snapshot equals the still-edited
+        /// collection, the next save sees no delta, and the edit is silently lost.
+        /// </summary>
+        internal CollectionSnapshotBaseline CaptureCollectionSnapshotBaseline()
+        {
+            Dictionary<string, HashSet<object>>? m2m = null;
+            if (ManyToManySnapshots != null)
+            {
+                m2m = new Dictionary<string, HashSet<object>>(ManyToManySnapshots.Count);
+                foreach (var (k, v) in ManyToManySnapshots)
+                    m2m[k] = new HashSet<object>(v);
+            }
+            Dictionary<string, List<string>>? owned = null;
+            if (OwnedCollectionSnapshots != null)
+            {
+                owned = new Dictionary<string, List<string>>(OwnedCollectionSnapshots.Count);
+                foreach (var (k, v) in OwnedCollectionSnapshots)
+                    owned[k] = new List<string>(v);
+            }
+            return new CollectionSnapshotBaseline(m2m, owned);
+        }
+
+        /// <summary>Restores m2m/owned snapshot baselines captured by <see cref="CaptureCollectionSnapshotBaseline"/>.</summary>
+        internal void RestoreCollectionSnapshotBaseline(CollectionSnapshotBaseline baseline)
+        {
+            ManyToManySnapshots = baseline.ManyToMany;
+            OwnedCollectionSnapshots = baseline.Owned;
         }
 
         private static List<string> OwnedContentSignatures(nORM.Mapping.OwnedCollectionMapping ocm, object owner)
