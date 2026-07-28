@@ -152,6 +152,24 @@ namespace nORM.Providers
         }
 
         /// <summary>
+        /// Seeds a newly-created history table with every existing live row as an OPEN (current) version,
+        /// mirroring the AFTER INSERT trigger — so a table versioned AFTER it already held rows still answers
+        /// AsOf(now) with the current state. The UPDATE/DELETE triggers close this open row on the first change.
+        /// Uses the SAME column set as the triggers (live physical columns when supplied).
+        /// </summary>
+        public override string GenerateBackfillHistorySql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
+        {
+            var columnNames = liveColumns is { Count: > 0 }
+                ? liveColumns.Select(c => c.Name).ToArray()
+                : mapping.Columns.Select(c => c.Name).ToArray();
+            var table = Escape(mapping.TableName);
+            var history = Escape(mapping.TableName + "_History");
+            var columnList = string.Join(", ", columnNames.Select(Escape));
+            return $"INSERT INTO {history} (__ValidFrom, __ValidTo, __Operation, {columnList})\n" +
+                   $"    SELECT {SqliteTemporalDdl.NowExpression}, '9999-12-31', 'I', {columnList} FROM {table};";
+        }
+
+        /// <summary>
         /// SQLite validity windows are TEXT compared lexically. The triggers write fixed
         /// three-decimal milliseconds (strftime %f), but Microsoft.Data.Sqlite's default
         /// DateTime text trims trailing fractional zeros - "53.59" sorts BEFORE "53.590", so

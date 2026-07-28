@@ -67,6 +67,17 @@ namespace nORM.Providers
         public abstract string GenerateTemporalTriggersSql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null);
 
         /// <summary>
+        /// Generates SQL that backfills a NEWLY-CREATED trigger-emulated history table with the current
+        /// version of every existing live row (as an open period), so enabling versioning on a table that
+        /// already contains rows does not make those rows invisible to AsOf. Empty by default: providers with
+        /// native system-versioning capture existing rows when versioning is turned on and need no backfill.
+        /// </summary>
+        /// <param name="mapping">The table mapping representing the entity.</param>
+        /// <param name="liveColumns">Live physical column info from the main table, or null to use the mapped set.</param>
+        public virtual string GenerateBackfillHistorySql(TableMapping mapping, IReadOnlyList<LiveColumnInfo>? liveColumns = null)
+            => string.Empty;
+
+        /// <summary>
         /// Gets whether this provider can use database-native temporal tables for
         /// time-travel reads and provider-owned history storage.
         /// </summary>

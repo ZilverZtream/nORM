@@ -97,15 +97,16 @@ public class TemporalAsOfNavigationTests
     }
 
     [Fact]
-    public async Task principal_without_history_is_not_visible_through_asof_nav()
+    public async Task principal_that_pre_existed_versioning_is_visible_through_asof_nav()
     {
         var cn = new SqliteConnection("Data Source=:memory:");
         cn.Open();
         using var _cn = cn;
         using (var cmd = cn.CreateCommand())
         {
-            // The principal row pre-dates temporal bootstrap (raw SQL insert), so
-            // its history table never records it.
+            // The principal row pre-dates temporal bootstrap (raw SQL insert). The bootstrap backfills
+            // existing live rows into history as the current (open) version, so its current state IS
+            // reconstructable by AsOf — matching SQL Server's SET SYSTEM_VERSIONING = ON.
             cmd.CommandText = """
                 CREATE TABLE AsOfNav_Dept (Id INTEGER PRIMARY KEY, Title TEXT NOT NULL);
                 CREATE TABLE AsOfNav_Emp (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, DeptId INTEGER NULL);
@@ -122,14 +123,12 @@ public class TemporalAsOfNavigationTests
         await Task.Delay(60);
         var t1 = await ServerNowAsync(cn);
 
-        // The root reconstructs (tracked write -> history row), but the untracked
-        // principal has no history: at t1 it reads as MISSING through the navigation,
-        // exactly as an untracked root row would be missing from an AsOf query.
+        // At t1 the backfilled principal is current, so the AsOf navigation resolves it (AsOf(now) == live).
         var names = await ctx.Query<Emp>().AsOf(t1).Where(e => e.Dept!.Title == "Eng")
             .Select(e => e.Name).ToListAsync();
-        Assert.Empty(names);
+        Assert.Equal(new[] { "ann" }, names);
 
-        // The live query still sees it.
+        // The live query sees it too.
         var live = await ctx.Query<Emp>().Where(e => e.Dept!.Title == "Eng")
             .Select(e => e.Name).ToListAsync();
         Assert.Equal(new[] { "ann" }, live);

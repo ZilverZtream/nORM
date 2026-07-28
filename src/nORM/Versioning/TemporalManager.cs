@@ -83,6 +83,13 @@ namespace nORM.Versioning
                     {
                         var createHistoryTableSql = context.RawProvider.GenerateCreateHistoryTableSql(mapping, liveColumns);
                         await ExecuteDdlAsync(context, conn, createHistoryTableSql, ct).ConfigureAwait(false);
+                        // Backfill the current version of every existing live row into the just-created history
+                        // table. Versioning enabled on an already-populated table would otherwise leave those
+                        // rows with no history row, making them invisible to AsOf at every timestamp. Runs once,
+                        // only when the history table is first created (empty), before the triggers exist.
+                        var backfillSql = context.RawProvider.GenerateBackfillHistorySql(mapping, liveColumns);
+                        if (!string.IsNullOrEmpty(backfillSql))
+                            await ExecuteNonQuerySqlAsync(context, conn, backfillSql, ct).ConfigureAwait(false);
                     }
 
                     var createTriggersSql = context.RawProvider.GenerateTemporalTriggersSql(mapping, liveColumns);
@@ -273,6 +280,20 @@ namespace nORM.Versioning
                     return 0;
                 }, "ExecuteDdlAsync", new Dictionary<string, object> { ["Sql"] = trimmed }).ConfigureAwait(false);
             }
+        }
+
+        // Executes a single non-DDL statement (the history backfill INSERT) with the same interception and
+        // exception handling as the DDL path, but without the DDL-prefix guard that ExecuteDdlAsync enforces.
+        private static async Task ExecuteNonQuerySqlAsync(DbContext context, DbConnection conn, string sql, CancellationToken ct)
+        {
+            var handler = new NormExceptionHandler(context.Options.Logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            await handler.ExecuteWithExceptionHandling(async () =>
+            {
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = sql;
+                await cmd.ExecuteNonQueryWithInterceptionAsync(context, ct).ConfigureAwait(false);
+                return 0;
+            }, "TemporalHistoryBackfill", new Dictionary<string, object> { ["Sql"] = sql }).ConfigureAwait(false);
         }
 
         private static bool IsValidDdl(string ddl)
