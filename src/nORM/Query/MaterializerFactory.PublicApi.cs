@@ -49,7 +49,7 @@ namespace nORM.Query
             {
                 // For simple entity materialization without projection, prefer fast materializers
                 // Skip fast materializer when converters are configured
-                if (projection == null && startOffset == 0 && mapping.ConverterFingerprint == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
+                if (projection == null && startOffset == 0 && mapping.ConverterFingerprint == 0 && _fastMaterializers.TryGetValue(targetType, out var fast) && IsFastMaterializerAligned(targetType, mapping))
                 {
                     return fast;
                 }
@@ -103,7 +103,7 @@ namespace nORM.Query
             {
                 // For simple entity materialization without projection, prefer fast materializers
                 // Skip fast materializer when converters are configured
-                if (projection == null && startOffset == 0 && mapping.ConverterFingerprint == 0 && _fastMaterializers.TryGetValue(targetType, out var fast))
+                if (projection == null && startOffset == 0 && mapping.ConverterFingerprint == 0 && _fastMaterializers.TryGetValue(targetType, out var fast) && IsFastMaterializerAligned(targetType, mapping))
                 {
                     return fast;
                 }

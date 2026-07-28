@@ -19,6 +19,29 @@ namespace nORM.Query
 {
     internal sealed partial class MaterializerFactory
     {
+        /// <summary>
+        /// True when the precompiled IL fast materializer for <paramref name="targetType"/> aligns with
+        /// <paramref name="mapping"/>. The IL materializer reads reader ordinal i into the i-th public
+        /// property, so it is only correct when the type's public properties are exactly the mapped columns —
+        /// same count, same order, all writable. Any navigation, [NotMapped], read-only, or reordered property
+        /// shifts the ordinals and makes it read the wrong column (silent-wrong on a wide/joined reader) or
+        /// past the end (crash). When it does not align, the caller falls back to the reflection materializer,
+        /// which reads by the mapping. Converter columns are excluded separately by the caller.
+        /// </summary>
+        private static bool IsFastMaterializerAligned(Type targetType, TableMapping mapping)
+        {
+            var props = _propertiesCache.GetOrAdd(targetType, t => t.GetProperties(BindingFlags.Instance | BindingFlags.Public));
+            if (props.Length != mapping.Columns.Length)
+                return false;
+            for (int i = 0; i < props.Length; i++)
+            {
+                if (!props[i].CanWrite
+                    || !string.Equals(mapping.Columns[i].Prop.Name, props[i].Name, StringComparison.Ordinal))
+                    return false;
+            }
+            return true;
+        }
+
         private static Func<DbDataReader, object> CreateILMaterializer<T>(int startOffset = 0) where T : class
         {
             var type = typeof(T);
