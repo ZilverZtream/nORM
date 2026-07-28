@@ -820,28 +820,73 @@ namespace nORM.Query
                 "IgnoreQueryFilters", "TagWith", "Cast", "Cacheable"
             };
 
-        // When a set-op arm is DIRECTLY a `.Select(x => new TDto { ... })`, returns that member-init lambda.
-        private static LambdaExpression? DirectMemberInitProjection(Expression arm)
-            => arm is MethodCallExpression mce
-               && mce.Method.Name == nameof(Queryable.Select)
-               && mce.Arguments.Count == 2
-               && StripQuotes(mce.Arguments[1]) is LambdaExpression lam
-               && lam.Body is MemberInitExpression
-                ? lam : null;
+        // Operators that keep a projected DTO's column SET intact and reference its members by NAME, so a
+        // reorder of the underlying Select's bindings is invisible to them: the query-config passthroughs plus
+        // the row-shaping operators. A Select sitting under any chain of these is still the arm's projection —
+        // an operator AFTER the Select (`.Select(...).Distinct()`, `.Select(...).Take(n)`) must not defeat
+        // column alignment. Deliberately EXCLUDES a second Select / GroupBy / Join etc., which reshape columns.
+        private static bool IsShapePreservingSetOpArmOperator(string methodName)
+            => SetOpTransparentOperators.Contains(methodName)
+               || methodName is nameof(Queryable.Distinct) or nameof(Queryable.Where)
+                   or nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
+                   or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending)
+                   or nameof(Queryable.Take) or nameof(Queryable.Skip);
+
+        // The member-init `.Select(x => new TDto { ... })` at the base of a set-op arm, looking THROUGH any
+        // shape-preserving operators between it and the set-op. Returns the Select's lambda, or null.
+        private static LambdaExpression? FindArmMemberInitProjection(Expression arm)
+        {
+            for (var cur = arm; cur is MethodCallExpression mce;)
+            {
+                if (mce.Method.Name == nameof(Queryable.Select)
+                    && mce.Arguments.Count == 2
+                    && StripQuotes(mce.Arguments[1]) is LambdaExpression lam
+                    && lam.Body is MemberInitExpression)
+                    return lam;
+                if (mce.Arguments.Count >= 1 && IsShapePreservingSetOpArmOperator(mce.Method.Name))
+                    cur = mce.Arguments[0];
+                else
+                    return null;
+            }
+            return null;
+        }
+
+        // Rebuilds a set-op arm with its base member-init Select's lambda replaced, preserving any
+        // shape-preserving operators wrapped around it (walks to the same Select FindArmMemberInitProjection did).
+        private static Expression RewriteArmInnerSelect(Expression arm, LambdaExpression newSelectLambda)
+        {
+            if (arm is not MethodCallExpression mce)
+                return arm;
+            if (mce.Method.Name == nameof(Queryable.Select)
+                && mce.Arguments.Count == 2
+                && StripQuotes(mce.Arguments[1]) is LambdaExpression { Body: MemberInitExpression })
+            {
+                Expression newArg1 = mce.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote }
+                    ? Expression.Quote(newSelectLambda)
+                    : newSelectLambda;
+                return mce.Update(mce.Object, new[] { mce.Arguments[0], newArg1 });
+            }
+            if (mce.Arguments.Count >= 1 && IsShapePreservingSetOpArmOperator(mce.Method.Name))
+            {
+                var args = mce.Arguments.ToArray();
+                args[0] = RewriteArmInnerSelect(mce.Arguments[0], newSelectLambda);
+                return mce.Update(mce.Object, args);
+            }
+            return arm;
+        }
 
         // Reorders the right arm's member-init bindings to follow the LEFT arm's member order, so both arms
         // emit columns in the same order and the (left-arm-driven, positional) materializer reads correctly.
-        // Only fires when both arms are a direct member-init Select over the same member set; any other shape
-        // is returned untouched (conservative — other emit paths keep binding order on both sides).
+        // Fires when both arms project the same member set via a member-init Select (looking through any
+        // shape-preserving operators wrapped around each Select); any other shape is returned untouched.
         private static MethodCallExpression NormalizeSetOpArmMemberOrder(MethodCallExpression node)
         {
             if (node.Arguments.Count != 2)
                 return node;
-            var leftLam = DirectMemberInitProjection(node.Arguments[0]);
-            var rightLam = DirectMemberInitProjection(node.Arguments[1]);
+            var leftLam = FindArmMemberInitProjection(node.Arguments[0]);
+            var rightLam = FindArmMemberInitProjection(node.Arguments[1]);
             if (leftLam == null || rightLam == null)
                 return node;
-            var rightSelect = (MethodCallExpression)node.Arguments[1];
             var leftInit = (MemberInitExpression)leftLam.Body;
             var rightInit = (MemberInitExpression)rightLam.Body;
             if (leftInit.Bindings.Count != rightInit.Bindings.Count)
@@ -868,11 +913,8 @@ namespace nORM.Query
 
             var newInit = Expression.MemberInit(rightInit.NewExpression, reordered);
             var newLambda = Expression.Lambda(rightLam.Type, newInit, rightLam.Parameters);
-            Expression newArg1 = rightSelect.Arguments[1] is UnaryExpression { NodeType: ExpressionType.Quote }
-                ? Expression.Quote(newLambda)
-                : newLambda;
-            var newSelect = rightSelect.Update(rightSelect.Object, new[] { rightSelect.Arguments[0], newArg1 });
-            return node.Update(node.Object, new[] { node.Arguments[0], (Expression)newSelect });
+            var newRightArm = RewriteArmInnerSelect(node.Arguments[1], newLambda);
+            return node.Update(node.Object, new[] { node.Arguments[0], newRightArm });
         }
 
         /// <summary>
