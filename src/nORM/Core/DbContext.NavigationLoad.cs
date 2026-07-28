@@ -35,6 +35,11 @@ namespace nORM.Core
 
             var ownerMap = GetMapping(entityType);
             var principalType = property.PropertyType;
+            // A lazy reference nav is typed LazyNavigationReference<TPrincipal>; the principal is its type
+            // argument. Without this unwrap GetMapping(LazyNavigationReference<..>) throws, is swallowed, and the
+            // dependent→principal load (child.Parent) silently returns null.
+            if (principalType.IsGenericType && principalType.GetGenericTypeDefinition() == typeof(nORM.Navigation.LazyNavigationReference<>))
+                principalType = principalType.GetGenericArguments()[0];
             TableMapping principalMap;
             try { principalMap = GetMapping(principalType); }
             catch { return false; }
@@ -58,7 +63,7 @@ namespace nORM.Core
             var fkValue = fkColumn.Getter(entity);
             if (fkValue == null)
             {
-                property.SetValue(entity, null);
+                SetReferenceNavigationValue(entity, property, null);
             }
             else
             {
@@ -66,6 +71,26 @@ namespace nORM.Core
                     .Invoke(this, new object[] { entity, property, principalMap, fkValue, ct })!;
             }
             nORM.Navigation.NavigationPropertyExtensions.SetNavigationLoaded(entity, property, true, entityType, this);
+        }
+
+        /// <summary>
+        /// Assigns a loaded principal onto a reference navigation, unwrapping a
+        /// <see cref="nORM.Navigation.LazyNavigationReference{T}"/> proxy (calling its <c>SetValue</c>) so a
+        /// lazy-typed nav isn't the target of a raw <c>PropertyInfo.SetValue</c> (which throws on the type
+        /// mismatch — the property is the proxy, the value is the principal).
+        /// </summary>
+        private static void SetReferenceNavigationValue(object entity, PropertyInfo property, object? principal)
+        {
+            var propType = property.PropertyType;
+            if (propType.IsGenericType && propType.GetGenericTypeDefinition() == typeof(nORM.Navigation.LazyNavigationReference<>))
+            {
+                var proxy = property.GetValue(entity);
+                proxy?.GetType().GetMethod("SetValue")?.Invoke(proxy, new[] { principal });
+            }
+            else
+            {
+                property.SetValue(entity, principal);
+            }
         }
 
         [RequiresDynamicCode("Reference loading builds a key predicate; not NativeAOT-compatible. See docs/aot-trimming.md.")]
@@ -76,7 +101,7 @@ namespace nORM.Core
             // Tracking query so identity resolution returns an already-tracked principal, matching EF.
             var predicate = BuildFindPredicate<TPrincipal>(principalMap, new object?[] { fkValue });
             var principal = await this.Query<TPrincipal>().Where(predicate).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-            property.SetValue(entity, principal);
+            SetReferenceNavigationValue(entity, property, principal);
         }
     }
 }

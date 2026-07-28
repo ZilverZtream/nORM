@@ -521,6 +521,16 @@ namespace nORM.Navigation
 
         private static async Task LoadInferredRelationshipAsync(object entity, PropertyInfo property, NavigationContext context, CancellationToken ct)
         {
+            // Dependent → principal reference (this entity holds the FK, e.g. child.Parent). The relationship
+            // loader reads the principal key from the wrong side for this direction, so route it through the
+            // dedicated dependent→principal loader — the same one the explicit-load path uses — which loads the
+            // principal by the FK value and unwraps a LazyNavigationReference<T> proxy when setting it.
+            if (context.DbContext.TryLoadDependentToPrincipalReference(entity, context.EntityType, property, ct, out var dependentToPrincipal))
+            {
+                await dependentToPrincipal.ConfigureAwait(false);
+                return;
+            }
+
             Type targetType;
             if (property.PropertyType.IsGenericType && typeof(IEnumerable).IsAssignableFrom(property.PropertyType))
             {
