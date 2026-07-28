@@ -159,9 +159,6 @@ namespace nORM.Configuration
             {
                 foreach (var m2m in config.ManyToManyRelationships)
                 {
-                    if (string.IsNullOrEmpty(m2m.RelatedNavPropertyName))
-                        continue; // declaring-side-only relationship — nothing to mirror
-
                     if (!_configurations.TryGetValue(m2m.RelatedType, out var relatedConfig))
                     {
                         relatedConfig = new EntityTypeBuilder<object>.MappingConfiguration();
@@ -173,6 +170,36 @@ namespace nORM.Configuration
                     if (relatedConfig.ManyToManyRelationships.Any(x =>
                             string.Equals(x.JoinTableName, m2m.JoinTableName, StringComparison.OrdinalIgnoreCase)))
                         continue;
+
+                    // Unidirectional (WithMany() with no inverse navigation): the related type carries no
+                    // navigation, so there is nothing to sync — but DELETING the related entity must still remove
+                    // its join rows, which only the related type's own mapping can do. Register a CLEANUP-ONLY
+                    // mirror (empty nav on both sides, FK columns/keys swapped) so a tracked or direct delete of
+                    // the related entity removes its join rows by the swapped left FK; otherwise they dangle at a
+                    // deleted entity. A bidirectional relationship falls through to the full nav-bearing mirror.
+                    if (string.IsNullOrEmpty(m2m.RelatedNavPropertyName))
+                    {
+                        var cleanupMirror = new ManyToManyConfiguration(
+                            string.Empty,          // no navigation on the related (cleanup-only) side
+                            declaringType,
+                            m2m.JoinTableName,
+                            m2m.RightFkColumn,     // swap join-table FK columns
+                            m2m.LeftFkColumn,
+                            null)                  // no inverse navigation
+                        {
+                            JoinTableSchema = m2m.JoinTableSchema,
+                            LeftFkColumns = m2m.RightFkColumns,
+                            RightFkColumns = m2m.LeftFkColumns,
+                            LeftKeyProperties = m2m.RightKeyProperties,
+                            RightKeyProperties = m2m.LeftKeyProperties,
+                            LeftOnDelete = m2m.RightOnDelete,
+                            LeftOnUpdate = m2m.RightOnUpdate,
+                            RightOnDelete = m2m.LeftOnDelete,
+                            RightOnUpdate = m2m.LeftOnUpdate,
+                        };
+                        ((IManyToManyConfigurationSink)relatedConfig).AddManyToMany(cleanupMirror);
+                        continue;
+                    }
 
                     var mirror = new ManyToManyConfiguration(
                         m2m.RelatedNavPropertyName!, // the inverse navigation becomes the related type's nav

@@ -145,7 +145,7 @@ namespace nORM.Mapping
             string? rightNavPropertyName,
             IReadOnlyList<Column> leftPkColumns,
             IReadOnlyList<Column> rightPkColumns,
-            PropertyInfo leftNavProp,
+            PropertyInfo? leftNavProp,
             PropertyInfo? rightNavProp,
             DatabaseProvider provider,
             ReferentialAction leftOnDelete = ReferentialAction.NoAction,
@@ -180,18 +180,29 @@ namespace nORM.Mapping
             LeftPkGetter = LeftPkGetters[0];
             RightPkGetter = RightPkGetters[0];
 
-            // Build left collection getter/setter (the nav property on leftType)
-            var leftParam = Expression.Parameter(typeof(object), "e");
-            var leftCast = Expression.Convert(leftParam, leftType);
-            var leftGetProp = Expression.Property(leftCast, leftNavProp);
-            LeftCollectionGetter = Expression.Lambda<Func<object, IList?>>(
-                Expression.Convert(leftGetProp, typeof(IList)), leftParam).Compile();
+            // Build left collection getter/setter (the nav property on leftType). A CLEANUP-ONLY join — the
+            // inverse side of a UNIDIRECTIONAL many-to-many, where the related type carries no navigation — has
+            // no left nav; its getter returns null so the association-sync path (Added/Modified) is a harmless
+            // no-op (empty collection => no delta), while the delete cleanup uses only the entity's key.
+            if (leftNavProp != null)
+            {
+                var leftParam = Expression.Parameter(typeof(object), "e");
+                var leftCast = Expression.Convert(leftParam, leftType);
+                var leftGetProp = Expression.Property(leftCast, leftNavProp);
+                LeftCollectionGetter = Expression.Lambda<Func<object, IList?>>(
+                    Expression.Convert(leftGetProp, typeof(IList)), leftParam).Compile();
 
-            var leftValueParam = Expression.Parameter(typeof(IList), "v");
-            var leftCastV = Expression.Convert(leftValueParam, leftNavProp.PropertyType);
-            var leftSetProp = Expression.Call(leftCast, leftNavProp.GetSetMethod()!, leftCastV);
-            LeftCollectionSetter = Expression.Lambda<Action<object, IList?>>(
-                leftSetProp, leftParam, leftValueParam).Compile();
+                var leftValueParam = Expression.Parameter(typeof(IList), "v");
+                var leftCastV = Expression.Convert(leftValueParam, leftNavProp.PropertyType);
+                var leftSetProp = Expression.Call(leftCast, leftNavProp.GetSetMethod()!, leftCastV);
+                LeftCollectionSetter = Expression.Lambda<Action<object, IList?>>(
+                    leftSetProp, leftParam, leftValueParam).Compile();
+            }
+            else
+            {
+                LeftCollectionGetter = _ => null;
+                LeftCollectionSetter = static (_, __) => { };
+            }
 
             // Build right collection getter/setter (inverse nav property on rightType), if configured
             if (rightNavProp != null)

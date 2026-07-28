@@ -860,6 +860,13 @@ namespace nORM.Mapping
 
             foreach (var m2m in fluentConfig.ManyToManyRelationships)
             {
+                // A cleanup-only inverse join (the related side of a unidirectional m2m — empty nav) mirrors the
+                // declaring config. When that config is invalid (mismatched FK counts, missing key), the
+                // DECLARING side reports the user-facing error; skip the mirror so it does not surface a confusing
+                // error that names the related type the user never configured directly.
+                var isCleanupOnlyJoin = string.IsNullOrEmpty(m2m.NavPropertyName);
+                try
+                {
                 var leftKeyColumns = ResolveManyToManyKeyColumns(
                     m2m.LeftKeyProperties,
                     Columns,
@@ -889,10 +896,14 @@ namespace nORM.Mapping
                         $"Many-to-many relationship on '{Type.Name}' declares {m2m.RightFkColumns.Count} right FK columns " +
                         $"but related entity '{m2m.RelatedType.Name}' has {rightKeyColumns.Length} key columns.");
 
-                // Resolve nav properties
-                var leftNavProp = Type.GetProperty(m2m.NavPropertyName)
-                    ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
-                        $"Navigation property '{m2m.NavPropertyName}' not found on type '{Type.Name}'"));
+                // Resolve nav properties. An empty NavPropertyName marks a CLEANUP-ONLY join (the inverse side
+                // of a unidirectional many-to-many): this type has no navigation for the relationship, only the
+                // join-row delete cleanup, so it carries no left nav.
+                var leftNavProp = string.IsNullOrEmpty(m2m.NavPropertyName)
+                    ? null
+                    : Type.GetProperty(m2m.NavPropertyName)
+                        ?? throw new NormConfigurationException(string.Format(ErrorMessages.InvalidConfiguration,
+                            $"Navigation property '{m2m.NavPropertyName}' not found on type '{Type.Name}'"));
 
                 System.Reflection.PropertyInfo? rightNavProp = null;
                 if (m2m.RelatedNavPropertyName != null)
@@ -916,6 +927,11 @@ namespace nORM.Mapping
                     m2m.LeftOnUpdate,
                     m2m.RightOnDelete,
                     m2m.RightOnUpdate));
+                }
+                catch (NormConfigurationException) when (isCleanupOnlyJoin)
+                {
+                    // Invalid unidirectional config — the declaring side validates and reports it.
+                }
             }
         }
 
