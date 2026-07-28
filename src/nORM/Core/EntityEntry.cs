@@ -844,6 +844,11 @@ namespace nORM.Core
         {
             if (ReferenceEquals(current, original)) return true;
             if (current is byte[] cb && original is byte[] ob) return cb.SequenceEqual(ob);
+            // DateTimeOffset.Equals (and GetHashCode) compare only the INSTANT and ignore the Offset,
+            // but nORM stores the offset (offset-suffixed TEXT). Without EqualsExact an offset-only edit
+            // (same instant, different offset) reads as "unchanged", so DetectChanges omits the column and
+            // the new offset is silently never written. Boxed DateTimeOffset? unboxes to DateTimeOffset.
+            if (current is DateTimeOffset cdt && original is DateTimeOffset odt) return cdt.EqualsExact(odt);
             return Equals(current, original);
         }
 
