@@ -165,6 +165,26 @@ namespace nORM.Core
         internal bool InsertedInUncommittedTransaction { get; set; }
 
         /// <summary>
+        /// True when this entity's DELETE has already executed inside the current uncommitted caller-owned or
+        /// enlisted transaction. The delete-state counterpart of <see cref="InsertedInUncommittedTransaction"/>:
+        /// set after a save that did not accept changes, so the delete is reconciled (the entity detached) when
+        /// the caller commits. Cleared when the entity is accepted/detached and reset — together with the
+        /// DB-generated keys — at every rollback site (full, savepoint, ambient-abort) so a rolled-back delete
+        /// stays <see cref="EntityState.Deleted"/> and re-deletable rather than being wrongly detached at commit.
+        /// </summary>
+        internal bool DeletedInUncommittedTransaction { get; set; }
+
+        /// <summary>
+        /// True when this entity's UPDATE has already executed inside the current uncommitted caller-owned or
+        /// enlisted transaction. The modified-state counterpart of <see cref="InsertedInUncommittedTransaction"/>:
+        /// set after a save that did not accept changes so the update is accepted (the entry marked
+        /// <see cref="EntityState.Unchanged"/>) when the caller commits — otherwise a later save with
+        /// <c>detectChanges:false</c> re-issues the stale UPDATE and clobbers a concurrent external write.
+        /// Reset at every rollback site so a rolled-back update stays Modified and its pending edit re-applies.
+        /// </summary>
+        internal bool ModifiedInUncommittedTransaction { get; set; }
+
+        /// <summary>
         /// Assigns the raw state field with no transition side effects. Used by the change tracker and
         /// the save pipeline, which manage identity-map membership and dirty registration themselves.
         /// </summary>
@@ -1280,8 +1300,9 @@ namespace nORM.Core
             // re-severed on the next save, and a newly added child becomes the baseline.
             RecaptureLoadedCollectionNavSnapshots();
             _state = EntityState.Unchanged;
-            // The entity's row is now committed and the entry clean; the uncommitted-insert marker is spent.
+            // The entity's row is now committed and the entry clean; the uncommitted-flush markers are spent.
             InsertedInUncommittedTransaction = false;
+            ModifiedInUncommittedTransaction = false;
             _hasNotifiedChange = false;
             // Refresh the original token so future saves use the latest DB value.
             var tsCol = _mapping.TimestampColumn;
@@ -1319,6 +1340,8 @@ namespace nORM.Core
         {
             _state = EntityState.Detached;
             InsertedInUncommittedTransaction = false;
+            DeletedInUncommittedTransaction = false;
+            ModifiedInUncommittedTransaction = false;
             var entity = Entity;
             if (entity is INotifyPropertyChanged notify)
                 notify.PropertyChanged -= PropertyChangedHandler;

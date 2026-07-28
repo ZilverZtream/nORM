@@ -626,6 +626,19 @@ namespace nORM.Core
                         // baseline first so a full rollback restores it and a still-pending edit re-applies.
                         RememberPreTransactionValuesBaseline(modifiedEntity, entry);
                         entry.CaptureInsertedBaseline();
+                        // Mark the flushed UPDATE so the caller's commit accepts it (marks the entry
+                        // Unchanged). Without acceptance a later SaveChanges with detectChanges:false skips
+                        // DetectChanges, re-issues this stale UPDATE, and clobbers a concurrent external write.
+                        entry.ModifiedInUncommittedTransaction = true;
+                    }
+                    else if (entry.State == EntityState.Deleted)
+                    {
+                        // Mark the flushed DELETE so the caller's commit reconciles it (detaches the entity).
+                        // Without acceptance the entity stays tracked as Deleted and the next SaveChanges
+                        // silently re-issues its DELETE (dropping a row re-created at the same key by any other
+                        // path) or, for an OCC entity, throws a spurious concurrency conflict that poisons the
+                        // context. A pending delete not yet flushed carries no flag and is left untouched.
+                        entry.DeletedInUncommittedTransaction = true;
                     }
 
                     // Advance the many-to-many and owned-collection snapshots to the state the deferred sync

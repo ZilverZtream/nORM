@@ -67,6 +67,18 @@ namespace nORM.Core
         private Dictionary<string, HashSet<object>>? _savepointInsertedSnapshots;
         private HashSet<object>? _ambientInsertedSnapshot;
 
+        // Delete/update counterparts of the inserted snapshots: the set of entities whose DELETE / UPDATE had
+        // already run in the current uncommitted transaction (the DeletedInUncommittedTransaction /
+        // ModifiedInUncommittedTransaction flags) at snapshot time. Restored alongside the inserted flags at
+        // every rollback site so a rolled-back delete stays Deleted (re-deletable) and a rolled-back update stays
+        // Modified (its pending edit re-applies), instead of being wrongly reconciled at the eventual commit.
+        private HashSet<object>? _transactionDeletedSnapshot;
+        private Dictionary<string, HashSet<object>>? _savepointDeletedSnapshots;
+        private HashSet<object>? _ambientDeletedSnapshot;
+        private HashSet<object>? _transactionModifiedSnapshot;
+        private Dictionary<string, HashSet<object>>? _savepointModifiedSnapshots;
+        private HashSet<object>? _ambientModifiedSnapshot;
+
         // Snapshot of each tracked OCC entity's original concurrency token when a caller-owned transaction
         // begins. A save inside the transaction advances the token snapshot (so a second update matches the
         // uncommitted row), so a full rollback must restore the pre-transaction token — otherwise re-updating
@@ -171,6 +183,8 @@ namespace nORM.Core
         {
             _transactionKeySnapshot = SnapshotAddedGeneratedKeys();
             _transactionInsertedSnapshot = SnapshotInsertedEntities();
+            _transactionDeletedSnapshot = SnapshotDeletedEntities();
+            _transactionModifiedSnapshot = SnapshotModifiedEntities();
             _transactionTokenSnapshot = SnapshotOccOriginalTokens();
         }
 
@@ -194,28 +208,58 @@ namespace nORM.Core
         }
 
         /// <summary>
-        /// After a caller-owned transaction commits DURABLY, accept the entities it inserted and left in the
-        /// <see cref="EntityState.Added"/> state so they become <see cref="EntityState.Unchanged"/> — matching
-        /// EF Core, where an entity is updatable once its transaction commits. Without this an entity inserted
-        /// inside a caller transaction stays Added after commit, so a later update of it cannot emit an UPDATE
-        /// (the modify-after-insert guard rejects it). Only entities PROVEN saved in this transaction (the
-        /// <see cref="EntityEntry.InsertedInUncommittedTransaction"/> flag) AND unmodified since their insert are
-        /// accepted: a still-dirty inserted entity is left Added because AcceptChanges would capture its unsaved
-        /// edit as the baseline over the committed row (silent loss), and a pending never-saved entity carries no
-        /// flag and is untouched. Modified and Deleted entities keep their existing post-commit handling. Called
-        /// only on the success path of commit, so a rollback never accepts.
+        /// After a caller-owned transaction commits DURABLY, reconcile the ChangeTracker with the now-durable
+        /// writes — matching EF Core, where a committed change is fully accepted. Only entities PROVEN flushed in
+        /// this transaction (the per-state <c>*InUncommittedTransaction</c> flags) are reconciled:
+        /// <list type="bullet">
+        /// <item>Inserted (<see cref="EntityState.Added"/>) and Modified entities become
+        /// <see cref="EntityState.Unchanged"/> — so a later update emits a normal UPDATE and a
+        /// <c>detectChanges:false</c> save does not re-issue a stale UPDATE. A still-dirty entity (edited again
+        /// after its flush) is left as-is because AcceptChanges would capture the unsaved edit as the committed
+        /// baseline (silent loss); its pending edit re-applies on the next DetectChanges.</item>
+        /// <item>Deleted entities are detached and removed from tracked navigations — otherwise the next
+        /// SaveChanges silently re-issues the committed DELETE (dropping a row re-created at the same key by any
+        /// other path) or, for an OCC entity, throws a spurious concurrency conflict that poisons the context.</item>
+        /// </list>
+        /// A pending change not yet flushed carries no flag and is untouched. Called only on the success path of
+        /// commit, so a rollback never accepts.
         /// </summary>
-        internal void AcceptSavedInsertsAfterCommit()
+        internal void AcceptSavedChangesAfterCommit()
         {
+            List<EntityEntry>? toAccept = null;
+            List<object>? deletedInstances = null;
             foreach (var entry in ChangeTracker.Entries)
             {
+                if (entry.Entity is not { } entity)
+                    continue;
                 if (entry.State == EntityState.Added
                     && entry.InsertedInUncommittedTransaction
-                    && entry.Entity is not null
                     && !entry.HasChangedSinceInsertedBaseline())
                 {
-                    entry.AcceptChanges();
+                    (toAccept ??= new List<EntityEntry>()).Add(entry);
                 }
+                else if (entry.State == EntityState.Modified
+                    && entry.ModifiedInUncommittedTransaction
+                    && !entry.HasChangedSinceInsertedBaseline())
+                {
+                    (toAccept ??= new List<EntityEntry>()).Add(entry);
+                }
+                else if (entry.State == EntityState.Deleted
+                    && entry.DeletedInUncommittedTransaction)
+                {
+                    (deletedInstances ??= new List<object>()).Add(entity);
+                }
+            }
+            // Act AFTER enumeration completes: ChangeTracker.Remove mutates the entry dictionary that
+            // ChangeTracker.Entries lazily enumerates, so removing mid-iteration would throw.
+            if (toAccept != null)
+                foreach (var entry in toAccept)
+                    entry.AcceptChanges();
+            if (deletedInstances != null)
+            {
+                foreach (var entity in deletedInstances)
+                    ChangeTracker.Remove(entity, true);
+                RemoveDeletedInstancesFromTrackedNavigations(deletedInstances);
             }
         }
 
@@ -230,6 +274,8 @@ namespace nORM.Core
             if (_transactionKeySnapshot != null)
                 RestoreRolledBackGeneratedKeys(_transactionKeySnapshot);
             RestoreInsertedFlags(_transactionInsertedSnapshot);
+            RestoreDeletedFlags(_transactionDeletedSnapshot);
+            RestoreModifiedFlags(_transactionModifiedSnapshot);
             RestoreTransactionTokenAndValueBaselines();
         }
 
@@ -285,6 +331,8 @@ namespace nORM.Core
             _registeredAmbientTransaction = ambient;
             _ambientKeySnapshot = SnapshotAddedGeneratedKeys();
             _ambientInsertedSnapshot = SnapshotInsertedEntities();
+            _ambientDeletedSnapshot = SnapshotDeletedEntities();
+            _ambientModifiedSnapshot = SnapshotModifiedEntities();
             // Capture the pre-scope OCC tokens here (the caller-owned path captures them in
             // SetCurrentTransaction, which the ambient path never calls). A save under the scope advances
             // both these tokens and the Modified-entity value baselines (the latter into the shared, lazily
@@ -303,6 +351,8 @@ namespace nORM.Core
                     if (_ambientKeySnapshot != null)
                         RestoreRolledBackGeneratedKeys(_ambientKeySnapshot);
                     RestoreInsertedFlags(_ambientInsertedSnapshot);
+                    RestoreDeletedFlags(_ambientDeletedSnapshot);
+                    RestoreModifiedFlags(_ambientModifiedSnapshot);
                     RestoreTransactionTokenAndValueBaselines();
                 }
             }
@@ -313,6 +363,8 @@ namespace nORM.Core
                     _registeredAmbientTransaction = null;
                     _ambientKeySnapshot = null;
                     _ambientInsertedSnapshot = null;
+                    _ambientDeletedSnapshot = null;
+                    _ambientModifiedSnapshot = null;
                     // Clear on BOTH commit and abort so a committed scope's advanced baselines cannot leak
                     // into a later caller-owned transaction's full-rollback restore. (On abort they were
                     // already restored above; RestoreTransactionTokenAndValueBaselines cleared the values map.)
@@ -336,6 +388,10 @@ namespace nORM.Core
                 = SnapshotAddedGeneratedKeys();
             (_savepointInsertedSnapshots ??= new Dictionary<string, HashSet<object>>(StringComparer.Ordinal))[name]
                 = SnapshotInsertedEntities();
+            (_savepointDeletedSnapshots ??= new Dictionary<string, HashSet<object>>(StringComparer.Ordinal))[name]
+                = SnapshotDeletedEntities();
+            (_savepointModifiedSnapshots ??= new Dictionary<string, HashSet<object>>(StringComparer.Ordinal))[name]
+                = SnapshotModifiedEntities();
             (_savepointValuesSnapshots ??= new Dictionary<string, Dictionary<object, object?[]>>(StringComparer.Ordinal))[name]
                 = SnapshotAllTrackedOriginalValues();
             (_savepointTokenSnapshots ??= new Dictionary<string, Dictionary<object, object?>>(StringComparer.Ordinal))[name]
@@ -378,6 +434,13 @@ namespace nORM.Core
             // silently skip it; one inserted before the savepoint keeps its row and its flag.
             if (_savepointInsertedSnapshots != null && _savepointInsertedSnapshots.TryGetValue(name, out var insSnapshot))
                 RestoreInsertedFlags(insSnapshot);
+            // Same reconciliation-flag restore for deletes and updates flushed AFTER the savepoint: their
+            // DELETE/UPDATE was undone, so the flag clears and the entity stays Deleted / Modified (its pending
+            // change re-applies) rather than being wrongly detached / accepted at the eventual commit.
+            if (_savepointDeletedSnapshots != null && _savepointDeletedSnapshots.TryGetValue(name, out var delSnapshot))
+                RestoreDeletedFlags(delSnapshot);
+            if (_savepointModifiedSnapshots != null && _savepointModifiedSnapshots.TryGetValue(name, out var modSnapshot))
+                RestoreModifiedFlags(modSnapshot);
             // Restore the change-tracking baselines captured at the savepoint so a Modified entity whose baseline
             // advanced during a save AFTER the savepoint is re-detected and re-applied on the next SaveChanges,
             // rather than silently dropped (its current value would otherwise equal the advanced baseline).
@@ -432,6 +495,8 @@ namespace nORM.Core
             // inserted since it are KEPT (unlike a rollback), so their stamped keys stay valid as-is.
             _savepointKeySnapshots?.Remove(name);
             _savepointInsertedSnapshots?.Remove(name);
+            _savepointDeletedSnapshots?.Remove(name);
+            _savepointModifiedSnapshots?.Remove(name);
         }
 
         /// <summary>
@@ -468,6 +533,67 @@ namespace nORM.Core
                 if (entry.State != EntityState.Added || entry.Entity is not { } e)
                     continue;
                 entry.InsertedInUncommittedTransaction = snapshot != null && snapshot.Contains(e);
+            }
+        }
+
+        /// <summary>
+        /// Captures the set of entities whose DELETE has already run in the current uncommitted transaction
+        /// (<see cref="EntityEntry.DeletedInUncommittedTransaction"/>), keyed by reference — the delete-state
+        /// counterpart of <see cref="SnapshotInsertedEntities"/>.
+        /// </summary>
+        private HashSet<object> SnapshotDeletedEntities()
+        {
+            var snapshot = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+                if (entry.State == EntityState.Deleted && entry.DeletedInUncommittedTransaction && entry.Entity is { } e)
+                    snapshot.Add(e);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// After a rollback that undid deletes, restores the "already deleted" flag on Deleted entities to the
+        /// supplied snapshot: one present in it kept its committed delete and stays flagged (detached at commit);
+        /// one absent had its DELETE undone, so the flag clears and it stays Deleted / re-deletable. A null
+        /// snapshot clears every flag (a full rollback undid all uncommitted deletes). Mirrors
+        /// <see cref="RestoreInsertedFlags"/>.
+        /// </summary>
+        private void RestoreDeletedFlags(HashSet<object>? snapshot)
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State != EntityState.Deleted || entry.Entity is not { } e)
+                    continue;
+                entry.DeletedInUncommittedTransaction = snapshot != null && snapshot.Contains(e);
+            }
+        }
+
+        /// <summary>
+        /// Captures the set of entities whose UPDATE has already run in the current uncommitted transaction
+        /// (<see cref="EntityEntry.ModifiedInUncommittedTransaction"/>), keyed by reference — the modified-state
+        /// counterpart of <see cref="SnapshotInsertedEntities"/>.
+        /// </summary>
+        private HashSet<object> SnapshotModifiedEntities()
+        {
+            var snapshot = new HashSet<object>(ReferenceEqualityComparer.Instance);
+            foreach (var entry in ChangeTracker.Entries)
+                if (entry.State == EntityState.Modified && entry.ModifiedInUncommittedTransaction && entry.Entity is { } e)
+                    snapshot.Add(e);
+            return snapshot;
+        }
+
+        /// <summary>
+        /// After a rollback that undid updates, restores the "already updated" flag on Modified entities to the
+        /// supplied snapshot: one present in it kept its committed update and stays flagged (accepted at commit);
+        /// one absent had its UPDATE undone, so the flag clears and it stays Modified so its pending edit
+        /// re-applies. A null snapshot clears every flag. Mirrors <see cref="RestoreInsertedFlags"/>.
+        /// </summary>
+        private void RestoreModifiedFlags(HashSet<object>? snapshot)
+        {
+            foreach (var entry in ChangeTracker.Entries)
+            {
+                if (entry.State != EntityState.Modified || entry.Entity is not { } e)
+                    continue;
+                entry.ModifiedInUncommittedTransaction = snapshot != null && snapshot.Contains(e);
             }
         }
 

@@ -57,9 +57,9 @@ namespace nORM.Core
             try
             {
                 _transaction?.Commit();
-                // The transaction is durable; accept the rows it inserted so a later update of one emits a
-                // normal UPDATE instead of being rejected for still being Added (matches EF Core).
-                _context.AcceptSavedInsertsAfterCommit();
+                // The transaction is durable; reconcile the tracker with the committed inserts, updates and
+                // deletes so later saves emit correct statements and never re-issue a committed change (matches EF Core).
+                _context.AcceptSavedChangesAfterCommit();
             }
             finally { DisposeTransactionAndClear(); }
         }
@@ -86,9 +86,9 @@ namespace nORM.Core
                     // to distinguish a cancelled-before-commit from an ambiguous partial-commit.
                     // This mirrors the behaviour of RollbackAsync and internal TransactionManager.CommitAsync.
                     await _transaction.CommitAsync(CancellationToken.None).ConfigureAwait(false);
-                // The transaction is durable; accept the rows it inserted so a later update of one emits a
-                // normal UPDATE instead of being rejected for still being Added (matches EF Core).
-                _context.AcceptSavedInsertsAfterCommit();
+                // The transaction is durable; reconcile the tracker with the committed inserts, updates and
+                // deletes so later saves emit correct statements and never re-issue a committed change (matches EF Core).
+                _context.AcceptSavedChangesAfterCommit();
             }
             finally
             {
