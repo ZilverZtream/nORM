@@ -25,7 +25,11 @@ namespace nORM.Scaffolding
                 var rows = await ReadSqliteForeignKeyRowsAsync(connection, provider, table).ConfigureAwait(false);
 
                 foreach (var group in rows.GroupBy(static row => row.Id))
-                    AddSqliteForeignKeyRows(table, group.OrderBy(static row => row.Seq).ToArray(), providerSemanticsByColumns, constraintNamesByColumns, foreignKeys);
+                {
+                    var ordered = group.OrderBy(static row => row.Seq).ToArray();
+                    ordered = await BackfillImplicitPrincipalColumnsAsync(connection, provider, table.Schema, ordered).ConfigureAwait(false);
+                    AddSqliteForeignKeyRows(table, ordered, providerSemanticsByColumns, constraintNamesByColumns, foreignKeys);
+                }
             }
 
             return foreignKeys;
