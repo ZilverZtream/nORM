@@ -154,6 +154,28 @@ namespace nORM.Query
             if (TryHandleCorrelatedSelectMany(outerMapping, outerAlias, collectionBody, resultSelector, useLeftJoin, smOuterFromOverride))
                 return node;
 
+            // A collection body that still references the OUTER row (a free parameter) is correlated but was
+            // not matched by the navigation or correlated-Where handlers above — it carries an ordering, paging
+            // (Take/Skip), or Distinct tail (a top-N-per-group shape). HandleCrossSelectMany emits a CROSS JOIN
+            // that silently DROPS the correlation and the tail, returning a cartesian product. That shape needs
+            // a lateral join SQLite does not provide, so fail loud rather than return wrong rows. A genuine
+            // (uncorrelated) cross join has no free outer reference and proceeds to the cross-join path.
+            // Exclude a GROUP-element SelectMany (`GroupBy(...).SelectMany(g => g...)`, whose outer parameter is
+            // an IGrouping) — that is group flattening, a different family with its own handling downstream, not
+            // a correlated navigation.
+            var selectManyOuterParamType = collectionSelector.Parameters[0].Type;
+            var isGroupElementSelectMany = selectManyOuterParamType.IsGenericType
+                && selectManyOuterParamType.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>);
+            if (!isGroupElementSelectMany && HasFreeParameterReference(collectionBody))
+                throw new NormUnsupportedFeatureException(
+                    "This correlated SelectMany is not translatable to SQL. nORM translates a navigation " +
+                    "collection (c => c.Orders), a filtered navigation (c => c.Orders.Where(...)), and a " +
+                    "correlated Where (c => ctx.Query<Order>().Where(o => o.CustomerId == c.Id)) as joins, but a " +
+                    "correlated collection with an ordering, paging (Take/Skip), or Distinct tail (a " +
+                    "top-N-per-group shape) needs a lateral join SQLite does not provide. Restructure as a join- " +
+                    "or GroupBy-shaped query, or materialize the parent set and shape the children in memory.",
+                    NormUnsupportedReason.CorrelatedSourceShapeUnsupported);
+
             HandleCrossSelectMany(outerMapping, outerAlias, collectionSelector, resultSelector, useLeftJoin, smOuterFromOverride);
             return node;
         }
