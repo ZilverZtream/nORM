@@ -256,7 +256,10 @@ namespace nORM.Query
                 // OUTER projection through the inner GroupBy projection, so the combined
                 // `g => outerBody[with inner members inlined]` dispatches through the single GroupBy+Select
                 // path below. Without this the second Select over the grouped {Key, N} result was silently
-                // dropped (it returned just the inner projection's first column).
+                // dropped (it returned just the inner projection's first column). Also accepts an OrderBy/ThenBy
+                // chain BETWEEN the GroupBy and the result-Select (the ordering operates on the IGrouping and is
+                // kept intact in the rebuilt call) — otherwise that ordered shape matched neither collapse and
+                // the outer projection was dropped, returning the group key positionally.
                 if (originalProjection != null
                     && originalProjection.Parameters.Count == 1
                     && node.Arguments[0] is MethodCallExpression innerSel
@@ -267,8 +270,7 @@ namespace nORM.Query
                     && innerProj.Parameters.Count == 1
                     && innerProj.Parameters[0].Type.IsGenericType
                     && innerProj.Parameters[0].Type.GetGenericTypeDefinition() == typeof(IGrouping<,>)
-                    && innerSel.Arguments[0] is MethodCallExpression innerGb
-                    && innerGb.Method.Name == nameof(Queryable.GroupBy)
+                    && IsGroupByThroughOrdering(innerSel.Arguments[0])
                     && originalProjection.Parameters[0].Type == innerProj.Body.Type)
                 {
                     var composedBody = new nORM.Internal.ParameterReplacer(originalProjection.Parameters[0], innerProj.Body).Visit(originalProjection.Body)!;
@@ -589,6 +591,16 @@ namespace nORM.Query
                 => e is MethodCallExpression m
                    && m.Method.Name is nameof(Queryable.OrderBy) or nameof(Queryable.OrderByDescending)
                                     or nameof(Queryable.ThenBy) or nameof(Queryable.ThenByDescending);
+
+            // True when the expression is a GroupBy, optionally under an OrderBy/ThenBy chain (which operates
+            // on the IGrouping elements). Lets the outer-projection collapse fuse through an ordering placed
+            // BETWEEN the GroupBy and the result-Select while keeping the ordering chain in the rebuilt call.
+            private static bool IsGroupByThroughOrdering(Expression e)
+            {
+                while (IsQueryableOrdering(e) && e is MethodCallExpression ord)
+                    e = ord.Arguments[0];
+                return e is MethodCallExpression gb && gb.Method.Name == nameof(Queryable.GroupBy);
+            }
 
             /// <summary>
             /// Walks an OrderBy/ThenBy chain down to its <c>Select(GroupBy(...), g =&gt; new {...})</c>
