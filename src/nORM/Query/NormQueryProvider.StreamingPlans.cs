@@ -626,6 +626,30 @@ namespace nORM.Query
                 var resultElementType = GetElementType(expression);
                 var sourceElementType = GetElementType(queryCall.Arguments[0]);
 
+                // Keyed set operators (DistinctBy / UnionBy / ExceptBy / IntersectBy) collapse the source to one
+                // row per key. A global/tenant filter must apply to the SOURCE, before the dedup: the fall-through
+                // base case wraps the whole call in an outer Where, which over the pre-built ROW_NUMBER dedup
+                // subquery is untranslatable (a raw "near WHERE" syntax error) AND semantically wrong — a key
+                // whose surviving row is filtered out would vanish even though a visible sibling remains. Filter
+                // every entity-sequence argument (a scalar key sequence has no mapped filter, so it is a no-op)
+                // and return, so the predicate lands inside the dedup rather than after it.
+                if (queryCall.Method.Name is "DistinctBy" or "UnionBy" or "ExceptBy" or "IntersectBy")
+                {
+                    var keyedArgs = queryCall.Arguments.ToArray();
+                    var keyedChanged = false;
+                    for (int i = 0; i < keyedArgs.Length; i++)
+                    {
+                        if (!typeof(IQueryable).IsAssignableFrom(keyedArgs[i].Type)) continue;
+                        var filteredArg = ApplyGlobalFilters(keyedArgs[i], ignoreUserFilters);
+                        if (!ReferenceEquals(filteredArg, keyedArgs[i]))
+                        {
+                            keyedArgs[i] = filteredArg;
+                            keyedChanged = true;
+                        }
+                    }
+                    return keyedChanged ? queryCall.Update(queryCall.Object, keyedArgs) : expression;
+                }
+
                 // Recurse into EVERY IQueryable-typed argument, not just the source.
                 // Join/GroupJoin carry the inner (joined-to) sequence at Arguments[1];
                 // without this, global filters (soft-delete, tenant) on the inner entity
