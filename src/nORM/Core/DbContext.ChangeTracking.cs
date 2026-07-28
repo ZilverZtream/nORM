@@ -34,9 +34,34 @@ namespace nORM.Core
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
-            var map = GetMapping(typeof(T));
+            var map = ResolveWriteMapping(entity);
             EnsureWritableMapping(map, "Add");
             return ChangeTracker.Track(entity, EntityState.Added, map);
+        }
+
+        /// <summary>
+        /// Resolves the mapping to track a write under. For a base-typed reference to a derived TPH instance
+        /// (<c>ctx.Add&lt;Base&gt;(derived)</c> — an EF-idiomatic pattern) the compile-time <c>typeof(T)</c> is
+        /// the base, whose <c>ApplyDiscriminator</c> is a no-op and whose merged sibling-column getters
+        /// hard-cast to the wrong subtype. Resolving from the entity's RUNTIME type instead stamps the
+        /// discriminator and writes the subtype's own columns — matching how reads resolve the subtype
+        /// (<c>QueryExecutor.ProcessEntity</c>). The redirect is confined to a genuine discriminated hierarchy
+        /// (declared mapping has a discriminator column, and the runtime type is a subclass carrying
+        /// <see cref="DiscriminatorValueAttribute"/>) so an arbitrary non-TPH subclass keeps its declared
+        /// mapping and is never treated as a separate table.
+        /// </summary>
+        private TableMapping ResolveWriteMapping<T>(T entity) where T : class
+        {
+            var declaredMap = GetMapping(typeof(T));
+            var runtimeType = entity.GetType();
+            if (runtimeType != typeof(T)
+                && declaredMap.DiscriminatorColumn != null
+                && runtimeType.IsSubclassOf(typeof(T))
+                && Attribute.IsDefined(runtimeType, typeof(DiscriminatorValueAttribute)))
+            {
+                return GetMapping(runtimeType);
+            }
+            return declaredMap;
         }
 
         /// <summary>
@@ -68,7 +93,7 @@ namespace nORM.Core
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
             NavigationPropertyExtensions.EnableLazyLoading(entity, this);
-            return ChangeTracker.Track(entity, EntityState.Unchanged, GetMapping(typeof(T)));
+            return ChangeTracker.Track(entity, EntityState.Unchanged, ResolveWriteMapping(entity));
         }
 
         /// <summary>
@@ -83,7 +108,7 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
-            var map = GetMapping(typeof(T));
+            var map = ResolveWriteMapping(entity);
             EnsureWritableMapping(map, "Update");
             return ChangeTracker.Track(entity, EntityState.Modified, map);
         }
@@ -99,7 +124,7 @@ namespace nORM.Core
         {
             ThrowIfDisposed();
             NormValidator.ValidateEntity(entity);
-            var map = GetMapping(typeof(T));
+            var map = ResolveWriteMapping(entity);
             EnsureWritableMapping(map, "Remove");
             return ChangeTracker.Track(entity, EntityState.Deleted, map);
         }
