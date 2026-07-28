@@ -50,7 +50,7 @@ namespace nORM.Query
 
             if (targetType == typeof(string))
             {
-                sb.Append(_provider.GetToStringSql(innerSql));
+                sb.Append(ExpressionToSqlVisitor.BuildDotNetToStringSql(_provider, innerSql, node.Arguments[0].Type));
                 return true;
             }
 

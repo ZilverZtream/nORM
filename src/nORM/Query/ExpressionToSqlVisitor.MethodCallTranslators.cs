@@ -650,7 +650,7 @@ namespace nORM.Query
                         => convSrcIsFloating ? _provider.ConvertFloatingToIntegralSql(inner, asLong: false) : _provider.GetIntCastSql(inner),
                     nameof(Convert.ToInt64)
                         => convSrcIsFloating ? _provider.ConvertFloatingToIntegralSql(inner, asLong: true) : _provider.GetIntCastSql(inner, asLong: true),
-                    nameof(Convert.ToString) => _provider.GetToStringSql(inner),
+                    nameof(Convert.ToString) => BuildDotNetToStringSql(_provider, inner, node.Arguments[0].Type),
                     nameof(Convert.ToDouble) or nameof(Convert.ToSingle) => _provider.GetRealCastSql(inner),
                     nameof(Convert.ToDecimal) => _provider.GetRealCastSql(inner, asDecimal: true),
                     nameof(Convert.ToBoolean) => node.Arguments[0].Type == typeof(string)
@@ -676,7 +676,7 @@ namespace nORM.Query
                 {
                     var t when t == typeof(int) || t == typeof(short) || t == typeof(byte) || t == typeof(sbyte) => _provider.GetIntCastSql(inner),
                     var t when t == typeof(long) => _provider.GetIntCastSql(inner, asLong: true),
-                    var t when t == typeof(string) => _provider.GetToStringSql(inner),
+                    var t when t == typeof(string) => BuildDotNetToStringSql(_provider, inner, node.Arguments[0].Type),
                     var t when t == typeof(double) || t == typeof(float) => _provider.GetRealCastSql(inner),
                     var t when t == typeof(decimal) => _provider.GetRealCastSql(inner, asDecimal: true),
                     var t when t == typeof(bool) => node.Arguments[0].Type == typeof(string)

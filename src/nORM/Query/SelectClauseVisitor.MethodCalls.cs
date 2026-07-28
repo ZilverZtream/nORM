@@ -421,22 +421,9 @@ namespace nORM.Query
                 Visit(node.Object);
                 var receiverSql = sb.ToString(receiverStart, sb.Length - receiverStart);
                 sb.Length = receiverStart;
-                var underlying = Nullable.GetUnderlyingType(node.Object.Type) ?? node.Object.Type;
-                if (underlying.IsEnum)
-                {
-                    sb.Append(ExpressionToSqlVisitor.BuildEnumToStringCase(_provider, receiverSql, underlying));
-                }
-                else if (underlying == typeof(bool))
-                {
-                    // .NET bool.ToString returns "True" / "False" (capitalized) --
-                    // CAST AS TEXT on a 0/1 column returns "0"/"1" instead. Emit
-                    // an explicit CASE so the projected text matches .NET.
-                    sb.Append("(CASE WHEN ").Append(receiverSql).Append(" = 1 THEN 'True' ELSE 'False' END)");
-                }
-                else
-                {
-                    sb.Append(_provider.GetToStringSql(receiverSql));
-                }
+                // bool -> "True"/"False", enum -> member name, otherwise CAST-to-text. Shared with the
+                // string.Format / Convert.ToString paths so all render the same text .NET's ToString does.
+                sb.Append(ExpressionToSqlVisitor.BuildDotNetToStringSql(_provider, receiverSql, node.Object.Type));
                 return node;
             }
 
@@ -492,7 +479,7 @@ namespace nORM.Query
                             }
                             else if (arg.Type != typeof(string))
                             {
-                                inner = _provider.GetToStringSql(inner);
+                                inner = ExpressionToSqlVisitor.BuildDotNetToStringSql(_provider, inner, arg.Type);
                             }
                             if (seg.Alignment != 0)
                             {

@@ -254,7 +254,7 @@ namespace nORM.Query
                             }
                             else
                             {
-                                emitted = argType != typeof(string) ? _provider.GetToStringSql(argSql) : argSql;
+                                emitted = argType != typeof(string) ? BuildDotNetToStringSql(_provider, argSql, argType) : argSql;
                             }
                             if (seg.Alignment != 0)
                             {

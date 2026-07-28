@@ -506,6 +506,23 @@ namespace nORM.Query
             _sql.Append(BuildEnumToStringCase(_provider, columnSql, enumType));
         }
 
+        /// <summary>
+        /// SQL that renders <paramref name="inner"/> as text matching .NET's <c>ToString()</c>: a bool as
+        /// "True"/"False", an enum as its member name (via <see cref="BuildEnumToStringCase"/>), and every
+        /// other type via the provider's CAST-to-text. Centralises the bool/enum special-casing so that
+        /// string.Format / interpolation and Convert.ToString render the SAME text a bare <c>x.ToString()</c>
+        /// does, instead of leaking the raw stored 0/1 for a bool or the enum's underlying integer.
+        /// </summary>
+        internal static string BuildDotNetToStringSql(DatabaseProvider provider, string inner, Type clrType)
+        {
+            var underlying = Nullable.GetUnderlyingType(clrType) ?? clrType;
+            if (underlying.IsEnum)
+                return BuildEnumToStringCase(provider, inner, underlying);
+            if (underlying == typeof(bool))
+                return "(CASE WHEN " + inner + " = 1 THEN 'True' ELSE 'False' END)";
+            return provider.GetToStringSql(inner);
+        }
+
         internal static string BuildEnumToStringCase(DatabaseProvider provider, string columnSql, Type enumType)
         {
             var sb = new System.Text.StringBuilder();
