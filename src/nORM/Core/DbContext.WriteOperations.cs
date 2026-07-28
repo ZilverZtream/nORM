@@ -468,8 +468,14 @@ namespace nORM.Core
                 RefreshTrackedOriginalToken(entity, map);
             }
 
-            // Invalidate after a confirmed write (mirrors SaveChanges/ExecuteUpdate-Delete/Bulk).
-            Options.CacheProvider?.InvalidateTag(map.TableName);
+            // Invalidate after a confirmed write (mirrors SaveChanges/ExecuteUpdate-Delete/Bulk). A DELETE may
+            // cascade-remove rows from child tables via DB ON DELETE CASCADE, so it must invalidate those tables'
+            // caches too (same helper ExecuteDelete/BulkDelete use) — otherwise a Cacheable() child query serves
+            // the deleted rows. Insert/Update do not cascade-remove, so they tag only this table.
+            if (operation == WriteOperation.Delete)
+                InvalidateResultCacheForDeletedTable(map);
+            else
+                Options.CacheProvider?.InvalidateTag(map.TableName);
             return recordsAffected;
         }
 
