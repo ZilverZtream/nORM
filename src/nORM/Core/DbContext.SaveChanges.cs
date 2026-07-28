@@ -169,10 +169,20 @@ namespace nORM.Core
                     await interceptor.SavingChangesAsync(this, changedEntries, ct).ConfigureAwait(false);
 
                 // Recompute changedEntries AFTER interceptors run: interceptors may call context.Add()
-                // or modify tracked entities during SavingChangesAsync. Re-reading the change tracker
-                // ensures those additions and modifications are included in the current save operation.
-                // Also re-run DetectAllChanges so that property-level mutations made to previously-Unchanged
-                // entities (e.g. audit stamping) are picked up even if entries were not explicitly marked Modified.
+                // or modify tracked entities during SavingChangesAsync. An interceptor can also edit the
+                // GRAPH through navigations exactly as code can before SaveChanges — add a child to a
+                // collection nav, assign a reference nav to a new principal, or Remove a principal with
+                // loaded children. So re-run the FULL pre-save reconciliation, not DetectAllChanges alone:
+                // fixup discovers/tracks new graph children and propagates nav FKs, and cascade reaches a
+                // hook-marked delete's loaded dependents. DetectAllChanges alone only rescans already-tracked
+                // scalar values, so those graph edits were silently lost (nav-added child never inserted,
+                // nav-assigned principal dropped with a dangling FK, hook-deleted principal's children
+                // orphaned). Both passes are idempotent, so re-running them after the pre-hook run is safe.
+                if (detectChanges)
+                {
+                    FixupNavigationChildren();
+                    CascadeMarkDeletedDependents();
+                }
                 ChangeTracker.DetectAllChanges();
                 changedEntries = ChangeTracker.CollectChangedEntriesSorted();
                 if (changedEntries.Count == 0)
