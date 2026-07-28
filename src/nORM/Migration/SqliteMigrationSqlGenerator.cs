@@ -208,7 +208,12 @@ namespace nORM.Migration
         }
 
         private static bool RequiresRecreateForAddedColumn(ColumnSchema column)
-            => column.IsPrimaryKey;
+            => column.IsPrimaryKey
+               // SQLite's ALTER TABLE ADD COLUMN cannot add a STORED generated column (only VIRTUAL) — it errors
+               // "cannot add a STORED column". The CREATE TABLE the recreate emits accepts STORED, so route a
+               // stored-computed column's add (Up) and restore (Down) through the table recreate, like a PK
+               // column. A VIRTUAL computed column adds cleanly via ALTER and keeps that path.
+               || (IsComputedColumn(column) && column.IsStoredComputedColumn);
 
         /// <summary>
         /// Creates SQLite SQL statements for the operations described by the schema diff.
