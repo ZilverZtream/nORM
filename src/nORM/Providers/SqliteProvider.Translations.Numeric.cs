@@ -219,7 +219,10 @@ namespace nORM.Providers
                 "ToInt32" when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
                 "ToInt64" when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
                 "ToDouble" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
-                "ToDecimal" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
+                // ToDecimal must NOT go through REAL: SQLite has no exact decimal type, so CAST AS REAL
+                // silently collapses a TEXT-stored decimal to double precision. Pass the operand through;
+                // the decimal materializer reconstructs full precision from the raw TEXT/INTEGER.
+                "ToDecimal" when args.Length == 1 => args[0],
                 // Convert.ToBoolean(string) -- .NET semantics are case-
                 // insensitive plus tolerant of surrounding whitespace.
                 // Mirror bool.Parse emission with a TRIM wrap.

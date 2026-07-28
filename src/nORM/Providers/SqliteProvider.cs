@@ -603,8 +603,15 @@ namespace nORM.Providers
             return AddSecondsToTimeOnlySql(timeOnlySql, seconds);
         }
 
-        /// <summary>SQLite REAL handles both float and decimal - no DOUBLE PRECISION / DECIMAL(p,s) keywords.</summary>
-        public override string GetRealCastSql(string innerSql, bool asDecimal = false) => $"CAST({innerSql} AS REAL)";
+        /// <summary>
+        /// SQLite has no DOUBLE PRECISION / DECIMAL(p,s) keywords. For a double target, CAST AS REAL.
+        /// For a DECIMAL target, do NOT round-trip through REAL — SQLite has no exact decimal type, so
+        /// CAST AS REAL would silently collapse a TEXT-stored decimal to double precision (~15-16 digits).
+        /// Pass the operand through unchanged; the decimal materializer reconstructs full precision from
+        /// the raw TEXT/INTEGER, exactly as a plain decimal-column projection does.
+        /// </summary>
+        public override string GetRealCastSql(string innerSql, bool asDecimal = false)
+            => asDecimal ? innerSql : $"CAST({innerSql} AS REAL)";
 
         /// <summary>SQLite supports INSERT OR IGNORE for idempotent join-table inserts.</summary>
         public override string GetInsertOrIgnoreSql(string escTable, string escC1, string escC2, string p1, string p2)
