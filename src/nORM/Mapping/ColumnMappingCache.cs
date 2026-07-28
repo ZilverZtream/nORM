@@ -177,7 +177,14 @@ namespace nORM.Mapping
         {
             var getter = CreateOwnedGetter(ownerProp.Property, ownedProp.Property);
             var setter = CreateOwnedSetter(ownerProp.Property, ownedProp.Property, out var setterMethod);
-            return new Column(ownedProp, provider, config, ownerProp.Property.Name, getter, setter, setterMethod);
+            var column = new Column(ownedProp, provider, config, ownerProp.Property.Name, getter, setter, setterMethod);
+            // Attach the owned sub-property's value converter (e.g. OwnsOne(..).Property(x => x.Colour)
+            // .HasConversion(...)), mirroring the non-owned branch. Without this the converter is silently
+            // ignored on write/read: the raw model value (enum int) is stored instead of the provider form,
+            // corrupting the column and making owned-column predicates never match. Null config (an [Owned]
+            // type with no fluent conversion) yields null — no behavior change.
+            column.Converter = FindConverter(config, ownedProp.Property);
+            return column;
         }
 
         /// <summary>
