@@ -40,7 +40,7 @@ namespace nORM.Query
         /// Eagerly loads all relations defined in the <paramref name="include"/> for the given <paramref name="parents"/>
         /// using a single round trip per batch of keys.
         /// </summary>
-        public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false)
+        public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false, Dictionary<(TableMapping, object), object>? identityMap = null)
         {
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
@@ -116,7 +116,7 @@ namespace nORM.Query
 
                 for (int level = 0; level < include.Path.Count; level++)
                 {
-                    currentParents = await ProcessLevelAsync(include.Path[level], mappings[level], materializers[level], currentParents, reader, ct, noTracking).ConfigureAwait(false);
+                    currentParents = await ProcessLevelAsync(include.Path[level], mappings[level], materializers[level], currentParents, reader, ct, noTracking, identityMap).ConfigureAwait(false);
                     if (level < include.Path.Count - 1)
                         await reader.NextResultAsync(ct).ConfigureAwait(false);
                 }
@@ -129,7 +129,7 @@ namespace nORM.Query
         /// Called from the synchronous <c>Materialize</c> code path to eliminate
         /// sync-over-async anti-pattern.
         /// </summary>
-        public void EagerLoad(IncludePlan include, IList parents, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false)
+        public void EagerLoad(IncludePlan include, IList parents, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false, Dictionary<(TableMapping, object), object>? identityMap = null)
         {
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
@@ -200,7 +200,7 @@ namespace nORM.Query
 
                 for (int level = 0; level < include.Path.Count; level++)
                 {
-                    currentParents = ProcessLevel(include.Path[level], mappings[level], syncMaterializers[level], currentParents, reader, noTracking);
+                    currentParents = ProcessLevel(include.Path[level], mappings[level], syncMaterializers[level], currentParents, reader, noTracking, identityMap);
                     if (level < include.Path.Count - 1)
                         reader.NextResult();
                 }
@@ -213,7 +213,8 @@ namespace nORM.Query
             Func<DbDataReader, object> syncMaterializer,
             IList parents,
             DbDataReader reader,
-            bool noTracking)
+            bool noTracking,
+            Dictionary<(TableMapping, object), object>? identityMap)
         {
             var resultChildren = new List<object>();
             var childGroups = new Dictionary<object, List<object>>();
@@ -227,6 +228,7 @@ namespace nORM.Query
                     child = entry.Entity!;
                     NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
                 }
+                child = ResolveIncludeIdentity(childMap, child, identityMap);
 
                 resultChildren.Add(child);
 
@@ -291,6 +293,27 @@ namespace nORM.Query
             return propertyType != typeof(string)
                    && propertyType.IsGenericType
                    && typeof(IEnumerable).IsAssignableFrom(propertyType);
+        }
+
+        /// <summary>
+        /// Per-root-query graph identity for Include execution: when two include plans share a navigation
+        /// prefix (<c>Include(x=>x.Nav).ThenInclude(a)</c> + <c>Include(x=>x.Nav).ThenInclude(b)</c>), the later
+        /// plan re-materializes the shared navigation into fresh instances and, on <see cref="ProcessLevel"/>'s
+        /// <c>NavProp.SetValue</c>, would OVERWRITE the parent's nav — discarding the earlier plan's already-
+        /// attached deeper children (silent data loss under no-tracking). Reusing the instance an earlier plan
+        /// materialized for the same key collapses both plans onto ONE graph, matching EF Core. Under tracking
+        /// the ChangeTracker identity map already provides this; the shared map extends it to no-tracking.
+        /// </summary>
+        private static object ResolveIncludeIdentity(TableMapping childMap, object child,
+            Dictionary<(TableMapping, object), object>? identityMap)
+        {
+            if (identityMap == null || GetRelationKeyValue(childMap.KeyColumns, child) is not { } childKey)
+                return child;
+            var idKey = (childMap, childKey);
+            if (identityMap.TryGetValue(idKey, out var existing))
+                return existing;
+            identityMap[idKey] = child;
+            return child;
         }
 
         private static object? GetPrincipalKeyValue(TableMapping.Relation relation, object entity)
@@ -361,6 +384,7 @@ namespace nORM.Query
         /// <param name="reader">Data reader positioned at the result set for this level.</param>
         /// <param name="ct">Cancellation token for the asynchronous operation.</param>
         /// <param name="noTracking">If <c>true</c>, entities are not tracked by the context.</param>
+        /// <param name="identityMap">Per-root-query graph-identity map (see <see cref="ResolveIncludeIdentity"/>), or null.</param>
         /// <returns>A list of all materialized child entities for the level.</returns>
         private async Task<IList> ProcessLevelAsync(
             TableMapping.Relation relation,
@@ -369,7 +393,8 @@ namespace nORM.Query
             IList parents,
             DbDataReader reader,
             CancellationToken ct,
-            bool noTracking)
+            bool noTracking,
+            Dictionary<(TableMapping, object), object>? identityMap)
         {
             var resultChildren = new List<object>();
             var childGroups = new Dictionary<object, List<object>>();
@@ -384,6 +409,7 @@ namespace nORM.Query
                     child = entry.Entity!;
                     NavigationPropertyExtensions.EnableLazyLoading(child, _ctx);
                 }
+                child = ResolveIncludeIdentity(childMap, child, identityMap);
 
                 resultChildren.Add(child);
 

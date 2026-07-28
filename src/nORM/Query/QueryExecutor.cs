@@ -240,8 +240,11 @@ namespace nORM.Query
                 {
                     // Convert to IList for EagerLoadAsync compatibility
                     IList iList = list;
+                    // Shared graph-identity map so include plans with a common navigation prefix populate one
+                    // instance instead of a later plan overwriting an earlier plan's deeper children.
+                    var includeIdentity = new Dictionary<(TableMapping, object), object>();
                     foreach (var include in plan.Includes)
-                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters, includeIdentity).ConfigureAwait(false);
                 }
 
                 // M2M eager loading runs unconditionally (no SplitQuery requirement)
@@ -362,9 +365,10 @@ namespace nORM.Query
                 // Include() alone triggers eager loading (see the ExecuteToList overload).
                 if (plan.Includes.Count > 0)
                 {
+                    var includeIdentity = new Dictionary<(TableMapping, object), object>();
                     foreach (var include in plan.Includes)
                     {
-                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters, includeIdentity).ConfigureAwait(false);
                     }
                 }
 
@@ -526,10 +530,11 @@ namespace nORM.Query
                 // Include() alone triggers eager loading (see the ExecuteToList overload).
                 if (plan.Includes.Count > 0)
                 {
+                    var includeIdentity = new Dictionary<(TableMapping, object), object>();
                     foreach (var include in plan.Includes)
                     {
                         // Truly synchronous eager load - no GetAwaiter().GetResult().
-                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters);
+                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters, includeIdentity);
                     }
                 }
 
