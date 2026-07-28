@@ -613,6 +613,20 @@ namespace nORM.Query
                 // These go into CacheTables for result-cache invalidation but MUST NOT enter
                 // _tables — ExecuteUpdate/ExecuteDelete branch on Tables.Count to pick their
                 // single- vs multi-table form, and a subquery-only table there would misgenerate.
+                // EF ignores an Include once the query projects to a non-entity shape: the entity materializer
+                // that would attach the included graph is replaced by the projection's, so a leftover include
+                // plan runs against the projected (e.g. anonymous) rows and throws InvalidCastException when it
+                // reads the entity's key getter off an anon object. A projected collection member is loaded via
+                // the _detectedCollections dependent-query path instead. Drop the orphaned includes when the
+                // result type is not the include-owning entity (or a subtype).
+                if (_t._projection != null
+                    && !_t._mapping.Type.IsAssignableFrom(_t._projection.Body.Type)
+                    && (_t._includes.Count > 0 || _t._m2mIncludes.Count > 0))
+                {
+                    _t._includes.Clear();
+                    _t._m2mIncludes.Clear();
+                }
+
                 IReadOnlyCollection<string>? cacheTables = null;
                 if (CurrentReferencedTables is { Count: > 0 } referencedTables
                     && !referencedTables.All(_t._tables.Contains))
