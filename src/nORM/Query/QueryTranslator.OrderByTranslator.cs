@@ -114,6 +114,16 @@ namespace nORM.Query
                     return TranslateAfterTakeSkipWindow(t, node);
                 }
 
+                // A top-level OrderBy over a keyed-set operator (DistinctBy/UnionBy/ExceptBy/IntersectBy)
+                // re-sorts its derived-table result. Reuse the windowed resort so the new key binds to the
+                // wrap alias (not a phantom T{n} -> "no such column") and the operator's default source-order
+                // ordering is cleared in favour of the user's. ThenBy composes with an existing OrderBy so it
+                // is excluded (isTopLevelResort is false).
+                if (isTopLevelResort && QueryTranslator.SourceIsKeyedSetOperator(node.Arguments[0]))
+                {
+                    return TranslateAfterTakeSkipWindow(t, node);
+                }
+
                 // Detect OrderBy on the result of a set op (Union/Concat/Intersect/Except).
                 // After the set op runs the outer SELECT shape is the unioned projection,
                 // not the entity mapping -- so resolving `r.V` against `_mapping` throws

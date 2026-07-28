@@ -548,6 +548,18 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// True when the immediate source is a keyed-set operator (<c>DistinctBy</c> / <c>UnionBy</c> /
+        /// <c>ExceptBy</c> / <c>IntersectBy</c>). Those translators render a self-contained
+        /// <c>__distinctby</c>/<c>__keyedset</c> derived-table wrap and pre-seed <c>_orderBy</c> with a
+        /// default (source-order) ordering. A following top-level OrderBy must re-sort that wrapped result —
+        /// routing it through the same derived-table resort as a Take/Skip window both binds the new key to
+        /// the wrap alias (instead of minting a phantom <c>T{n}</c>) and clears the pre-seeded default so the
+        /// user's ordering wins.
+        /// </summary>
+        internal static bool SourceIsKeyedSetOperator(Expression source)
+            => source is MethodCallExpression { Method.Name: "DistinctBy" or "UnionBy" or "ExceptBy" or "IntersectBy" };
+
+        /// <summary>
         /// True when the source spine contains a set operation (Union/Concat/Intersect/Except) or a Distinct.
         /// A GROUP BY cannot sit directly on top of a compound or DISTINCT SELECT, so such a source must be
         /// wrapped as a derived table (<c>FROM (&lt;compound&gt;) AS alias</c>) before the group key can resolve.
