@@ -59,6 +59,47 @@ namespace nORM.Mapping
         }
         /// <summary>Delegate used to read the property value from an entity instance.</summary>
         public Func<object, object?> Getter { get; }
+
+        /// <summary>
+        /// Clones an existing column but substitutes a different value getter. Every other member is copied
+        /// verbatim (the type has no private state beyond its public/internal properties). Used to give a TPH
+        /// base mapping's merged sibling-subtype columns a null-safe getter — see <see cref="WithTphBaseSafeGetter"/>.
+        /// </summary>
+        private Column(Column source, Func<object, object?> getter)
+        {
+            Prop = source.Prop;
+            PropName = source.PropName;
+            Name = source.Name;
+            EscCol = source.EscCol;
+            IsKey = source.IsKey;
+            IsDbGenerated = source.IsDbGenerated;
+            ValueGenerationExplicitlyConfigured = source.ValueGenerationExplicitlyConfigured;
+            IsTimestamp = source.IsTimestamp;
+            IsShadow = source.IsShadow;
+            IsNullable = source.IsNullable;
+            ForeignKeyPrincipalTypeName = source.ForeignKeyPrincipalTypeName;
+            Getter = getter;
+            Setter = source.Setter;
+            SetterMethod = source.SetterMethod;
+            Converter = source.Converter;
+        }
+
+        /// <summary>
+        /// Returns this column, or — when it is a subtype column merged into a TPH base mapping whose declaring
+        /// type is not assignable from <paramref name="baseType"/> — a clone whose getter returns null for an
+        /// instance that is not that subtype. A base row (a concrete base instance, or an unknown-discriminator
+        /// row that materialized as the base) has no value for a sibling subtype's column, so the column's
+        /// hard-casting getter would otherwise throw <see cref="InvalidCastException"/> on both the
+        /// change-tracking snapshot and the INSERT/UPDATE parameter binding.
+        /// </summary>
+        internal Column WithTphBaseSafeGetter(Type baseType)
+        {
+            var declaringType = Prop.DeclaringType;
+            if (declaringType == null || declaringType.IsAssignableFrom(baseType))
+                return this;
+            var inner = Getter;
+            return new Column(this, e => declaringType.IsInstanceOfType(e) ? inner(e) : null);
+        }
         /// <summary>Delegate used to assign a value to the property on an entity instance.</summary>
         public Action<object, object?> Setter { get; }
         /// <summary>The underlying setter method for the property.</summary>

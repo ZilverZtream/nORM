@@ -331,7 +331,10 @@ namespace nORM.Mapping
                     foreach (var dc in map.Columns)
                     {
                         if (!cols.Any(c => string.Equals(c.Prop.Name, dc.Prop.Name, StringComparison.Ordinal)))
-                            cols.Add(dc);
+                            // Give the merged sibling-subtype column a null-safe getter so a base-materialized
+                            // row (concrete base, or unknown discriminator) doesn't throw when its value is read
+                            // for the tracking snapshot or the INSERT/UPDATE parameter binding.
+                            cols.Add(dc.WithTphBaseSafeGetter(t));
                     }
                 }
             }
