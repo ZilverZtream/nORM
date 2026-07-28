@@ -202,35 +202,42 @@ namespace nORM.Query
                 return true;
             }
 
+            // Key by the FULL owned access path ("Ship_Status"), not the leaf member name ("Status"): a root
+            // member and an owned member (or two owned members) that share a leaf name build different SQL but
+            // would otherwise collide onto one cache entry, so the second Count silently reuses the first's SQL
+            // column. Mirrors BuildSimpleWhereCacheKey. Path resolution failing → defer to the full plan path.
             if (predicate.Body is MemberExpression { Type: var memberType } member && memberType == typeof(bool))
             {
-                key = new CountSqlCacheKey(elementType, member.Member.Name, CountPredicateShape.BoolTrue);
+                if (!TableMapping.TryGetMemberAccessPath(member, out var memberPath)) { key = default; return false; }
+                key = new CountSqlCacheKey(elementType, memberPath, CountPredicateShape.BoolTrue);
                 return true;
             }
 
             if (predicate.Body is UnaryExpression { NodeType: ExpressionType.Not, Operand: MemberExpression { Type: var negatedType } negatedMember }
                 && negatedType == typeof(bool))
             {
-                key = new CountSqlCacheKey(elementType, negatedMember.Member.Name, CountPredicateShape.BoolFalse);
+                if (!TableMapping.TryGetMemberAccessPath(negatedMember, out var negatedPath)) { key = default; return false; }
+                key = new CountSqlCacheKey(elementType, negatedPath, CountPredicateShape.BoolFalse);
                 return true;
             }
 
             if (predicate.Body is BinaryExpression binary && TryGetMemberEquality(binary, out var comparedMember, out var valueExpression))
             {
+                if (!TableMapping.TryGetMemberAccessPath(comparedMember, out var comparedPath)) { key = default; return false; }
                 if (comparedMember.Type == typeof(bool) &&
                     ExpressionValueExtractor.TryGetConstantValue(valueExpression, out var boolValue) &&
                     boolValue is bool expected)
                 {
                     key = new CountSqlCacheKey(
                         elementType,
-                        comparedMember.Member.Name,
+                        comparedPath,
                         expected ? CountPredicateShape.BoolTrue : CountPredicateShape.BoolFalse);
                     return true;
                 }
 
                 key = new CountSqlCacheKey(
                     elementType,
-                    comparedMember.Member.Name,
+                    comparedPath,
                     IsNullConstant(valueExpression) ? CountPredicateShape.EqualityNull : CountPredicateShape.EqualityValue);
                 return true;
             }
