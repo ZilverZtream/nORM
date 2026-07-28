@@ -341,7 +341,15 @@ namespace nORM.Query
                     bool isSetOpSql = sqlStr.Contains(" UNION ", StringComparison.OrdinalIgnoreCase)
                                    || sqlStr.Contains(" INTERSECT ", StringComparison.OrdinalIgnoreCase)
                                    || sqlStr.Contains(" EXCEPT ", StringComparison.OrdinalIgnoreCase);
-                    if (isSetOpSql)
+                    // A pre-populated `SELECT DISTINCT …` (a Take/Skip window renders `SELECT DISTINCT *
+                    // FROM (… LIMIT n)`; a JOIN renders `SELECT DISTINCT col FROM … JOIN …`) must be counted
+                    // as its DEDUPED rows. The strip-before-FROM rewrite below would discard the leading
+                    // DISTINCT (and, for the join, the projection), silently returning the pre-dedup /
+                    // cartesian row count. Wrap a top-level DISTINCT in the same counting subquery as set-ops
+                    // so the modifier survives. (A DISTINCT nested inside a derived table is untouched by the
+                    // strip and stays correct, so only the outermost SELECT DISTINCT is special-cased.)
+                    bool isTopLevelDistinct = sqlStr.StartsWith("SELECT DISTINCT ", StringComparison.OrdinalIgnoreCase);
+                    if (isSetOpSql || isTopLevelDistinct)
                     {
                         var subqueryAlias = _t.EscapeAlias("T0");
                         _t._sql.Clear();

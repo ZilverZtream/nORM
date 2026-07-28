@@ -168,7 +168,12 @@ namespace nORM.Query
         {
             if (_projection == null
                 || _groupJoinInfo != null
-                || _isAggregate
+                // A non-distinct aggregate over a join (e.g. Count(*), or Sum which builds its own
+                // AGG(col) SELECT) does not need the projected column list. A DISTINCT aggregate DOES:
+                // `Join(...).Select((a,b) => a.City).Distinct().Count()` must dedup over `a.City`, so the
+                // SELECT must be narrowed to the projection first — otherwise DISTINCT ranges over every
+                // joined column and the wrapped COUNT(*) returns the un-deduped (cartesian) row count.
+                || (_isAggregate && !_isDistinct)
                 // A grouped projection is not a join projection: its SELECT was built
                 // by the GroupBy machinery (key members resolve through the composite
                 // key map, not the join visitors), and the " JOIN " sniff below would
