@@ -284,6 +284,33 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Null-tests a WHOLE mapped entity referenced by a bare parameter (e.g. a query-syntax
+        /// LEFT JOIN's flattened inner: <c>from c in g.DefaultIfEmpty() where c == null</c>). The
+        /// entity is "null" exactly when its row is absent, detected by its primary key column(s)
+        /// being NULL — a matched row always has them set. Without this the entity operand renders
+        /// as an empty string and emits malformed <c>( IS NULL)</c>.
+        /// </summary>
+        internal bool TryEmitEntityParameterNullTest(Expression expr, bool testIsNull)
+        {
+            while (expr is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } u)
+                expr = u.Operand;
+            if (expr is not ParameterExpression p
+                || !_parameterMappings.TryGetValue(p, out var info)
+                || info.Mapping.KeyColumns.Length == 0)
+                return false;
+            var keys = info.Mapping.KeyColumns;
+            _sql.Append('(');
+            for (int i = 0; i < keys.Length; i++)
+            {
+                if (i > 0) _sql.Append(testIsNull ? " AND " : " OR ");
+                _sql.Append(info.Alias).Append('.').Append(keys[i].EscCol)
+                    .Append(testIsNull ? " IS NULL" : " IS NOT NULL");
+            }
+            _sql.Append(')');
+            return true;
+        }
+
+        /// <summary>
         /// Translates the combined global filter of a navigation principal against the
         /// correlated subquery's alias. Same sub-visitor pattern as the aggregate
         /// selector branches (paramIndexStart offset prevents @pN collisions).

@@ -81,6 +81,11 @@ namespace nORM.Query
                     // carries global filters) the parent row being filtered out.
                     if (TryEmitNavigationNullTest(nullTestOperand, testIsNull: node.NodeType == ExpressionType.Equal))
                         return node;
+                    // A whole mapped entity compared to null (e.g. a LEFT JOIN's flattened inner
+                    // `c == null`) renders as its primary-key null test — the operand itself is not
+                    // a scalar column.
+                    if (TryEmitEntityParameterNullTest(nullTestOperand, testIsNull: node.NodeType == ExpressionType.Equal))
+                        return node;
                     _sql.Append("(");
                     Visit(nullTestOperand);
                     _sql.Append(node.NodeType == ExpressionType.Equal ? " IS NULL" : " IS NOT NULL");

@@ -83,6 +83,12 @@ namespace nORM.Query
         // outer / inner parameters - separate from _projection so the outer Select's
         // materializer projection isn't clobbered by the TI lambda.
         private LambdaExpression? _transparentIdentifier;
+        // The flattened nullable inner-entity parameter of a query-syntax LEFT JOIN (from a
+        // DefaultIfEmpty). A deferred outer projection reaches it as `inner != null ? inner.Prop
+        // : fallback` — an SQL LEFT JOIN null-guard that must be stripped to COALESCE before the
+        // projection is emitted, or the bare-entity reference bails the SELECT rebuild (leaving
+        // the wrong prebuilt inner-entity column list — a silent-wrong result).
+        private ParameterExpression? _leftJoinNullableInnerParam;
         private Func<object, object>? _clientProjection;
         // When the projection is split (server-side fetch + client-side transform), the server
         // projection's body type is the intermediate row, not what the caller sees. Recording the

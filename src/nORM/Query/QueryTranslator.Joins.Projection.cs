@@ -194,7 +194,20 @@ namespace nORM.Query
                 return;
             }
 
-            if (!TryBuildJoinProjectionSelectList(_projection.Body, out var selectList))
+            // A query-syntax LEFT JOIN's deferred outer projection reaches the flattened nullable
+            // inner as `inner != null ? inner.Prop : fallback` (an SQL left-join null-guard). Strip
+            // it to COALESCE first — otherwise the bare-entity reference makes the select-list
+            // rebuild bail, silently leaving the prebuilt inner-entity column list in place.
+            var projectionBody = _projection.Body;
+            if (_leftJoinNullableInnerParam != null)
+            {
+                var dummy = Expression.Parameter(typeof(object), "__lj_none");
+                var stripper = new QuerySyntaxLeftJoinRewriter(
+                    dummy, _leftJoinNullableInnerParam, " ", dummy, _leftJoinNullableInnerParam);
+                projectionBody = stripper.Visit(projectionBody)!;
+            }
+
+            if (!TryBuildJoinProjectionSelectList(projectionBody, out var selectList))
                 return;
 
             var fromIndex = sql.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);

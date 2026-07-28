@@ -118,6 +118,37 @@ namespace nORM.Query
 
             JoinBuilder.SetupJoinProjection(rewrittenResultSel, outerMapping, innerMapping, outerAlias, innerAlias, _correlatedParams, ref _projection);
 
+            // When the SelectMany result selector is a pure transparent-identifier passthrough
+            // (`(t, c) => new { t, c }`, emitted by the compiler when a WHERE/SELECT clause follows
+            // the DefaultIfEmpty), a downstream Where/Select reaches THROUGH it — `x.t.<outer>.Prop`,
+            // `x.c` — which the rewrite above cannot resolve (it maps `t.<outer>`, but `t` accessed
+            // WHOLE inside `new { t, c }` is left dangling). Register a transparent-identifier lambda
+            // that expresses the `{ t = { <outer>, <group> }, c }` shape in terms of the join's entity
+            // params, so ExpandProjection folds the tail onto them. The group member is never accessed
+            // after DefaultIfEmpty flattens it to `c`, so a null placeholder for it is safe.
+            if (smResultSelector.Body is NewExpression smTid
+                && smTid.Members != null
+                && smTid.Arguments.Count == 2
+                && smTid.Arguments[0] == smResultSelector.Parameters[0]
+                && smTid.Arguments[1] == smResultSelector.Parameters[1]
+                && groupJoinResultSelector.Body is NewExpression gjTid
+                && gjTid.Members != null
+                && gjTid.Constructor != null)
+            {
+                var gjArgs = new Expression[gjTid.Arguments.Count];
+                for (int gi = 0; gi < gjTid.Arguments.Count; gi++)
+                    gjArgs[gi] = gjTid.Members[gi].Name == outerMemberName
+                        ? (Expression)freshOuter
+                        : Expression.Constant(null, gjTid.Arguments[gi].Type);
+                var innerTid = Expression.New(gjTid.Constructor, gjArgs, gjTid.Members);
+                var outerTid = Expression.New(smTid.Constructor!, new Expression[] { innerTid, freshInner }, smTid.Members);
+                _transparentIdentifier = Expression.Lambda(outerTid, freshOuter, freshInner);
+                _leftJoinNullableInnerParam = freshInner;
+                if (!_correlatedParams.ContainsKey(freshOuter))
+                    _correlatedParams[freshOuter] = (outerMapping, outerAlias);
+                RegisterTransparentIdentifierTail(_transparentIdentifier, innerMapping, innerAlias);
+            }
+
             // Inner-source WHERE conditions (explicit filters, or the injected
             // soft-delete/tenant predicates on the inner root) belong in the JOIN ON
             // clause — ON, not WHERE, so a filtered-out inner row reads as UNMATCHED
