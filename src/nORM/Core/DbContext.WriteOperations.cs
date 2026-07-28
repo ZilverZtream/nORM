@@ -851,9 +851,13 @@ namespace nORM.Core
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Insert);
-                    // Stamp the TPH discriminator so bulk-inserted derived entities also persist as
-                    // their subtype (covers every provider's bulk path from this single choke point).
-                    map.ApplyDiscriminator(entity);
+                    // Stamp the TPH discriminator from the entity's RUNTIME type (not the compile-time typeof(T)):
+                    // a base-typed batch (List<Base> { new Derived(), ... }) must stamp each row's own subtype
+                    // discriminator, else the base mapping's no-op ApplyDiscriminator leaves discriminator=0 and
+                    // strands the subtype. ResolveWriteMapping mirrors the tracked write path. The base `map`
+                    // stays the bind target below — its merged columns (TPH-base-safe getters) bind each row's
+                    // own subtype columns (null for siblings) plus the now-stamped discriminator.
+                    ResolveWriteMapping(entity).ApplyDiscriminator(entity);
                 }
                 return await _p.BulkInsertAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, s_nonIdempotentNoRetry, ct);
