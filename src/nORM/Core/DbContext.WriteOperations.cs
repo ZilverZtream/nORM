@@ -360,6 +360,13 @@ namespace nORM.Core
 
             await EnsureConnectionAsync(ct).ConfigureAwait(false);
 
+            // A delete must first remove nORM's own child rows that hold an FK to this owner (owned-collection
+            // children, m2m join rows), mirroring the tracked SaveChanges Deleted branch — otherwise the
+            // active-record DeleteAsync leaves them orphaned. Runs on the same transaction, before the owner
+            // DELETE (this method always executes inside a caller-owned, owned, or ambient transaction).
+            if (operation == WriteOperation.Delete)
+                await CleanupNormManagedChildrenOnDeleteAsync(entity, map, transaction, ct).ConfigureAwait(false);
+
             // Store-generated convention key at its default: omit the key so the database generates it and
             // read the value back, instead of inserting the default (which would collide on a second row).
             // Explicit (non-default) keys fall through to the normal path and are inserted as-is (honored).
@@ -932,7 +939,44 @@ namespace nORM.Core
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Delete);
                 }
-                return await _p.BulkDeleteAsync(ctx, map, entityList, token).ConfigureAwait(false);
+
+                // Mappings with no nORM-managed children keep the fast direct path.
+                if (map.OwnedCollections.Count == 0 && map.ManyToManyJoins.Count == 0)
+                    return await _p.BulkDeleteAsync(ctx, map, entityList, token).ConfigureAwait(false);
+
+                // Owner rows + nORM-managed children (owned-collection children, m2m join rows) must delete
+                // atomically, mirroring the tracked SaveChanges Deleted branch — otherwise bulk delete orphans
+                // the children. Establish a transaction when the caller isn't managing one so the per-entity
+                // child cleanup and the provider bulk delete (which participates in CurrentTransaction) commit
+                // together; the children hold the FK so they are removed before the owner rows.
+                var ownTx = ctx.CurrentTransaction == null;
+                DbTransaction? bulkTx = null;
+                if (ownTx)
+                {
+                    bulkTx = await ctx.RawConnection.BeginTransactionAsync(token).ConfigureAwait(false);
+                    ctx.CurrentTransaction = bulkTx;
+                }
+                try
+                {
+                    foreach (var entity in entityList)
+                        await ctx.CleanupNormManagedChildrenOnDeleteAsync(entity, map, ctx.CurrentTransaction, token).ConfigureAwait(false);
+                    var deleted = await _p.BulkDeleteAsync(ctx, map, entityList, token).ConfigureAwait(false);
+                    if (bulkTx != null) await bulkTx.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                    return deleted;
+                }
+                catch
+                {
+                    if (bulkTx != null) await bulkTx.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    throw;
+                }
+                finally
+                {
+                    if (bulkTx != null)
+                    {
+                        ctx.CurrentTransaction = null;
+                        await bulkTx.DisposeAsync().ConfigureAwait(false);
+                    }
+                }
             }, s_nonIdempotentNoRetry, ct);
         }
         #endregion

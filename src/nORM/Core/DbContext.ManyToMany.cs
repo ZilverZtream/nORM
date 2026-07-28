@@ -29,6 +29,13 @@ namespace nORM.Core
         private async Task ExecuteJoinTableSyncAsync(object entity, EntityEntry entry, DbTransaction? transaction, CancellationToken ct)
         {
             var map = entry.Mapping;
+            // A deleted entity's join rows are removed wholesale by left FK — no collection/snapshot needed, so
+            // the Delete cleanup is shared with the active-record / bulk delete paths (which have no entry).
+            if (entry.State == EntityState.Deleted)
+            {
+                await DeleteManyToManyJoinRowsAsync(entity, map, transaction, ct).ConfigureAwait(false);
+                return;
+            }
             var tenantId = Options.TenantProvider != null ? GetRequiredTenantId(map, "many-to-many sync") : null;
             var leftTenantCol = Options.TenantProvider != null ? RequireTenantColumn(map, "many-to-many sync") : null;
             var hasTenantFilter = Options.TenantProvider != null;
@@ -42,18 +49,6 @@ namespace nORM.Core
 
                 await using var cmdScope = new CommandScope(RawConnection, transaction);
                 await using var cmd = cmdScope.CreateCommand();
-
-                if (entry.State == EntityState.Deleted)
-                {
-                    cmd.Parameters.Clear();
-                    var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lpk", leftKeyValues);
-                    var tenantFilter = BuildJoinTenantFilter(map, jtm.LeftKeyColumns, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
-                    cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTablePredicate(jtm.EscLeftFkColumns, leftParamNames)}{tenantFilter}";
-                    if (hasTenantFilter)
-                        cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
-                    await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
-                    continue;
-                }
 
                 // Compute current set of right PKs from the collection.
                 // SEC1: Also keep a pk?entity map so we can validate right-entity tenant before INSERT.
@@ -143,6 +138,52 @@ namespace nORM.Core
             }
         }
 
+        /// <summary>
+        /// Removes ALL many-to-many join rows referencing <paramref name="entity"/> as the LEFT side of each of
+        /// <paramref name="map"/>'s registered joins (a whole-entity delete). Reads only the entity's key — no
+        /// collection or snapshot — so it is shared by the tracked SaveChanges Deleted branch and the
+        /// active-record / bulk delete paths, which have no <see cref="EntityEntry"/>.
+        /// </summary>
+        private async Task DeleteManyToManyJoinRowsAsync(object entity, TableMapping map, DbTransaction? transaction, CancellationToken ct)
+        {
+            if (map.ManyToManyJoins.Count == 0)
+                return;
+            var tenantId = Options.TenantProvider != null ? GetRequiredTenantId(map, "many-to-many sync") : null;
+            var leftTenantCol = Options.TenantProvider != null ? RequireTenantColumn(map, "many-to-many sync") : null;
+            var hasTenantFilter = Options.TenantProvider != null;
+
+            foreach (var jtm in map.ManyToManyJoins)
+            {
+                var leftKeyValues = jtm.GetLeftKeyValues(entity);
+                if (leftKeyValues == null) continue;
+                var leftPk = jtm.CreateLeftKeyFromValues(leftKeyValues);
+                if (leftPk == null) continue;
+
+                await using var cmdScope = new CommandScope(RawConnection, transaction);
+                await using var cmd = cmdScope.CreateCommand();
+                var leftParamNames = AddKeyParams(cmd, _p.ParamPrefix, "lpk", leftKeyValues);
+                var tenantFilter = BuildJoinTenantFilter(map, jtm.LeftKeyColumns, leftTenantCol, leftParamNames, $"{_p.ParamPrefix}jtenant");
+                cmd.CommandText = $"DELETE FROM {jtm.EscTableName} WHERE {BuildJoinTablePredicate(jtm.EscLeftFkColumns, leftParamNames)}{tenantFilter}";
+                if (hasTenantFilter)
+                    cmd.AddParam($"{_p.ParamPrefix}jtenant", tenantId!);
+                await cmd.ExecuteNonQueryWithInterceptionAsync(this, ct).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Runs nORM's OWN client-side child cleanup for a deleted entity — owned-collection children and
+        /// many-to-many join rows — mirroring the tracked SaveChanges Deleted branch. Both hold an FK to the
+        /// owner, so they must be removed BEFORE the owner row. Used by the active-record <c>DeleteAsync</c> and
+        /// <c>BulkDeleteAsync</c> paths, which otherwise delete only the owner row and orphan these nORM-managed
+        /// children. Runs on the supplied transaction so it is atomic with the owner-row delete.
+        /// </summary>
+        private async Task CleanupNormManagedChildrenOnDeleteAsync(object entity, TableMapping map, DbTransaction? transaction, CancellationToken ct)
+        {
+            if (map.OwnedCollections.Count > 0)
+                await SaveOwnedCollectionsAsync(entity, map, EntityState.Deleted, transaction, ct).ConfigureAwait(false);
+            if (map.ManyToManyJoins.Count > 0)
+                await DeleteManyToManyJoinRowsAsync(entity, map, transaction, ct).ConfigureAwait(false);
+        }
 
         private static string[] AddKeyParams(DbCommand cmd, string prefix, string baseName, IReadOnlyList<object?> values)
         {
