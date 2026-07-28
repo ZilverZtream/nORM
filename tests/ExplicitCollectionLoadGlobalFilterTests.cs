@@ -119,4 +119,49 @@ public class ExplicitCollectionLoadGlobalFilterTests
         // T2's line (3) must not leak into T1's loaded collection.
         Assert.Equal(new[] { 1, 2 }, order.Lines.Select(l => l.Id).OrderBy(i => i).ToArray());
     }
+
+    [Table("EclPerson")]
+    public class Person
+    {
+        [Key] public int Id { get; set; }
+        public Passport? Passport { get; set; }
+    }
+
+    [Table("EclPassport")]
+    public class Passport
+    {
+        [Key] public int Id { get; set; }
+        public int PersonId { get; set; }
+        public bool IsRevoked { get; set; }
+        public Person? Person { get; set; }
+    }
+
+    [Fact]
+    public void Explicit_reference_load_principal_to_dependent_applies_the_global_filter()
+    {
+        using var cn = new SqliteConnection("Data Source=:memory:");
+        cn.Open();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE EclPerson (Id INTEGER PRIMARY KEY);" +
+                "CREATE TABLE EclPassport (Id INTEGER PRIMARY KEY, PersonId INTEGER NOT NULL, IsRevoked INTEGER NOT NULL);" +
+                "INSERT INTO EclPerson VALUES (1);" +
+                "INSERT INTO EclPassport VALUES (1, 1, 1);"; // revoked
+            cmd.ExecuteNonQuery();
+        }
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+                mb.Entity<Person>().HasOne(p => p.Passport).WithOne(pp => pp.Person).HasForeignKey(pp => pp.PersonId, p => p.Id)
+        };
+        opts.AddGlobalFilter<Passport>(pp => !pp.IsRevoked);
+        using var ctx = new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
+
+        var person = ctx.Query<Person>().First();
+        ctx.Entry(person).Reference("Passport").Load();
+
+        // The revoked passport (the FK lives on the dependent) must read as absent, matching Include.
+        Assert.Null(person.Passport);
+    }
 }

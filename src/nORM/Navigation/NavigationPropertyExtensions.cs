@@ -581,13 +581,35 @@ namespace nORM.Navigation
             }
         }
 
+        /// <summary>
+        /// Row-visibility predicate (tenant equality + combined global filters + TPH discriminator) a lazy /
+        /// explicit reference load must AND onto its hand-built SQL, mirroring the eager Include loader — a
+        /// one-to-one principal-to-dependent load (the FK lives on the dependent) otherwise returns a
+        /// soft-deleted / other-tenant / wrong-subtype dependent that Include would exclude. Returns empty when
+        /// none apply. A target without a tenant column is a shared table (matching the query path).
+        /// </summary>
+        private static string BuildNavigationRowFilterClause(DbContext context, System.Data.Common.DbCommand cmd, TableMapping mapping)
+        {
+            var sb = new System.Text.StringBuilder();
+            if (context.Options.TenantProvider != null && mapping.TenantColumn is { } tenantCol)
+            {
+                var tenantParam = $"{context.RawProvider.ParamPrefix}__navtenant";
+                cmd.AddParam(tenantParam, context.GetRequiredTenantId(mapping, "navigation load"));
+                sb.Append(" AND ").Append(mapping.EscTable).Append('.').Append(tenantCol.EscCol).Append(" = ").Append(tenantParam);
+            }
+            var globalFilter = Query.GlobalFilterFragment.Build(context, mapping, mapping.EscTable, cmd);
+            if (globalFilter != null)
+                sb.Append(" AND ").Append(globalFilter);
+            return sb.ToString();
+        }
+
         private static async Task<object?> ExecuteSingleQueryAsync(DbContext context, TableMapping mapping, IReadOnlyList<Column> foreignKeys, object keyValue, Type entityType, CancellationToken ct)
         {
             await context.EnsureConnectionAsync(ct).ConfigureAwait(false);
             using var cmd = context.CreateCommand();
 
             var where = BuildSingleQueryWhere(context, cmd, foreignKeys, keyValue);
-            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}";
+            cmd.CommandText = $"SELECT * FROM {mapping.EscTable} WHERE {where}{BuildNavigationRowFilterClause(context, cmd, mapping)}";
             cmd.CommandTimeout = ToSecondsClamped(context.GetAdaptiveTimeout(AdaptiveTimeoutManager.OperationType.SimpleSelect, cmd.CommandText));
 
             // Apply LIMIT 1 for single result
