@@ -152,7 +152,11 @@ namespace nORM.Query
                     }
                 }
                 if (concatParts.Count == 0) { sb.Append("''"); return node; }
-                if (concatParts.Count == 1) { sb.Append(concatParts[0]); return node; }
+                // A single element must STILL coalesce NULL -> '' to match .NET
+                // (string.Concat(null) == ""). Appending it bare projected NULL and
+                // silently dropped rows in a WHERE (`Nul = ''` is UNKNOWN for NULL).
+                // Route it through the provider's null-safe concat with an empty tail.
+                if (concatParts.Count == 1) { sb.Append(_provider.GetNullSafeConcatSql(concatParts[0], "''")); return node; }
                 sb.Append(concatParts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next)));
                 return node;
             }
@@ -495,7 +499,12 @@ namespace nORM.Query
                         }
                     }
                     if (parts.Count == 0) { sb.Append("''"); return node; }
-                    sb.Append(parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next)));
+                    // Single placeholder ("{0}"/single-hole $"{x}") must coalesce NULL -> ''
+                    // like .NET; the pairwise Aggregate is a no-op for one part and would
+                    // leave it bare (NULL projection + WHERE row-drop). Coalesce it.
+                    sb.Append(parts.Count == 1
+                        ? _provider.GetNullSafeConcatSql(parts[0], "''")
+                        : parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next)));
                     return node;
                 }
             }

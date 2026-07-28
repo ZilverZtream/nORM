@@ -281,7 +281,12 @@ namespace nORM.Query
                         _sql.Append("''");
                         return node;
                     }
-                    var concatSql = parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next));
+                    // Single placeholder must coalesce NULL -> '' like .NET; a one-part
+                    // Aggregate is a no-op and would leave the operand bare, dropping the
+                    // NULL row from the predicate (`Nul = ''` is UNKNOWN for NULL).
+                    var concatSql = parts.Count == 1
+                        ? _provider.GetNullSafeConcatSql(parts[0], "''")
+                        : parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next));
                     _sql.Append(concatSql);
                     return node;
                 }
@@ -303,7 +308,7 @@ namespace nORM.Query
                     }
                 }
                 var concatSql = parts.Count == 1
-                    ? parts[0]
+                    ? _provider.GetNullSafeConcatSql(parts[0], "''")   // coalesce NULL -> '' (string.Concat(null) == "")
                     : parts.Aggregate((acc, next) => _provider.GetNullSafeConcatSql(acc, next));
                 _sql.Append(concatSql);
                 return node;
