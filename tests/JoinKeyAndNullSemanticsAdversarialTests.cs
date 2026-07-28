@@ -120,10 +120,7 @@ public class JoinKeyAndNullSemanticsAdversarialTests
 
     // NOTE: left-anti-join / left-join with an INTERVENING WHERE on the null-probe
     // (`from p join c ... into g from c in g.DefaultIfEmpty() where c == null select p.Name`)
-    // is a known unimplemented translation shape — the intervening WHERE introduces a nested
-    // transparent identifier that the join-projection rewrite can't yet resolve, so it fails
-    // LOUD (NormUnsupportedFeatureException), never silently wrong. Tracked for implementation;
-    // repro queries recorded in memory (agent_findings_queue_20260729a). Not pinned as a throw.
+    // is now implemented — see LeftAntiJoinWhereProjectionTests for the oracle-diffed coverage.
 
     // ============================ SELECTMANY: cross join & correlated ============================
 
