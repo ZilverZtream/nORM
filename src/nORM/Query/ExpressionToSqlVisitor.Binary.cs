@@ -493,8 +493,18 @@ namespace nORM.Query
             {
                 var leftSql = GetSql(node.Left);
                 var rightSql = GetSql(node.Right);
+                // Pick the ordering coercion by operand type, mirroring the OrderBy path: a DateTimeOffset
+                // column stores offset-suffixed text and must convert to the UTC instant
+                // (NormalizeDateTimeOffsetForCompare, sub-second-preserving); a plain DateTime column is
+                // canonical offset-free text that lex-compares correctly (NormalizeDateTimeForCompare is
+                // identity on SQLite — the former datetime() wrap truncated sub-seconds). The parameter/
+                // literal side is left as-is (DateTimeOffset literal comparisons are already lowered earlier by
+                // TryEmitDateTimeOffsetLiteralComparison, so only the column-vs-column DTO shape reaches here).
+                string NormDt(Type t, string sql) => t == typeof(DateTimeOffset)
+                    ? _provider.NormalizeDateTimeOffsetForCompare(sql)
+                    : _provider.NormalizeDateTimeForCompare(sql);
                 _sql.Append("(")
-                    .Append(leftIsCol ? _provider.NormalizeDateTimeForCompare(leftSql) : leftSql);
+                    .Append(leftIsCol ? NormDt(leftDtType, leftSql) : leftSql);
                 _sql.Append(node.NodeType switch
                 {
                     ExpressionType.Equal => " = ",
@@ -505,7 +515,7 @@ namespace nORM.Query
                     ExpressionType.LessThanOrEqual => " <= ",
                     _ => throw new InvalidOperationException()
                 });
-                _sql.Append(rightIsCol ? _provider.NormalizeDateTimeForCompare(rightSql) : rightSql).Append(")");
+                _sql.Append(rightIsCol ? NormDt(rightDtType, rightSql) : rightSql).Append(")");
                 return node;
             }
 

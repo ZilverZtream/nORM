@@ -164,14 +164,20 @@ namespace nORM.Providers
             => $"({left} - {right} * CAST({left} / NULLIF({right}, 0) AS INTEGER))";
 
         /// <summary>
-        /// SQLite stores DateTime as TEXT; lex compare on raw ISO strings with mixed
-        /// timezone offsets ('+02:00' vs 'Z') silently mis-orders rows because the offset
-        /// suffix dominates the comparison. <c>datetime(...)</c> parses any ISO format
-        /// and produces a canonical 'YYYY-MM-DD HH:MM:SS' UTC text whose lex order matches
-        /// chronological order. Applied bilaterally in ETSV.VisitBinary for DateTime
-        /// comparisons.
+        /// A plain DateTime nORM writes is canonical, offset-free <c>yyyy-MM-dd HH:mm:ss.FFFFFFF</c> text
+        /// (Microsoft.Data.Sqlite) whose lexical order already matches chronological order to full sub-second
+        /// precision — the same raw text the ORDER BY path trusts (it leaves DateTime keys bare) — so leave it
+        /// BARE. A blanket <c>datetime(...)</c> wrap rendered whole-second text and SILENTLY DROPPED the
+        /// fraction, so an ordered WHERE comparison excluded rows in the same second as the bound. Only
+        /// externally-populated offset-bearing ISO text (a <c>T</c> separator or a trailing
+        /// <c>Z</c>/<c>+HH:MM</c>/<c>-HH:MM</c>) needs <c>datetime(...)</c> to order by the UTC instant; that
+        /// necessarily truncates the fraction, acceptable for the non-canonical shape. There is no lossless
+        /// SQLite normalization (<c>%f</c> is millisecond-only and overflows MaxValue's '.9999999'), so the
+        /// conditional keeps sub-seconds for the common case while still ordering mixed-offset external data
+        /// chronologically. Offset-suffixed DateTimeOffset routes through <see cref="NormalizeDateTimeOffsetForCompare"/>.
         /// </summary>
-        public override string NormalizeDateTimeForCompare(string sql) => $"datetime({sql})";
+        public override string NormalizeDateTimeForCompare(string sql)
+            => $"CASE WHEN instr({sql},'T')>0 OR {sql} LIKE '%Z' OR {sql} LIKE '%+__:__' OR {sql} LIKE '%-__:__' THEN datetime({sql}) ELSE {sql} END";
 
         /// <summary>
         /// SQLite stores decimal as TEXT and operators lex-compare ('10.5' &lt; '2.0' because
