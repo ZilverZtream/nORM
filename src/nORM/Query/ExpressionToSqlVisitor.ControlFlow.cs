@@ -250,6 +250,22 @@ namespace nORM.Query
                     _sql.Append(" IS NULL))");
                     return;
 
+                // Negated SUBQUERY Contains (`!source.Select(sel).Contains(x)` — an anti-join). A bare
+                // NOT(x IN (SELECT …)) has broken 3-valued logic: SQL `NOT(x IN (…, NULL, …))` is UNKNOWN for a
+                // non-matching x, so a NULL anywhere in the subquery result silently dropped EVERY row, and a
+                // nullable outer x dropped its NULL rows — while C# `!list.Contains(x)` includes them (and
+                // ExecuteDelete of orphans under-deletes). Re-express it as a correlated
+                //   NOT EXISTS(SELECT 1 FROM source WHERE sel(o) IS NOT DISTINCT FROM x)
+                // whose WHERE uses the binary translator's null-safe equality — correct for every NULL
+                // combination and emitting the subquery source exactly once. The constant-list Contains
+                // cases above are handled separately; this is the query-source form.
+                case MethodCallExpression subContains
+                    when subContains.Method.DeclaringType == typeof(System.Linq.Queryable)
+                        && subContains.Method.Name == nameof(System.Linq.Queryable.Contains)
+                        && subContains.Arguments.Count == 2:
+                    BuildNegatedSubqueryContains(subContains.Arguments[0], subContains.Arguments[1]);
+                    return;
+
                 // Method calls (other shapes) and anything else fall back to a straight
                 // NOT(...) — correct for non-nullable operands.
                 default:

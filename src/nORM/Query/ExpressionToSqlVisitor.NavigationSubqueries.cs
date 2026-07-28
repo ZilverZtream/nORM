@@ -976,5 +976,71 @@ namespace nORM.Query
             _sql.Append(existsPlan.Sql);
             _sql.Append(")");
         }
+
+        /// <summary>
+        /// Emits a correct anti-join for a negated subquery <c>Contains</c> —
+        /// <c>!source.Select(sel).Contains(x)</c> — as
+        /// <c>NOT EXISTS(SELECT 1 FROM source WHERE sel(o) &lt;null-safe-eq&gt; x)</c>. A bare
+        /// <c>NOT(x IN (SELECT …))</c> has broken 3-valued logic: <c>NOT(x IN (…, NULL))</c> is UNKNOWN
+        /// for a non-matching x, so a NULL anywhere in the subquery result silently dropped EVERY row.
+        /// Re-expressing it as a correlated NOT EXISTS whose WHERE compares the projected column to the
+        /// outer value with the binary translator's null-safe equality (<c>IS NOT DISTINCT FROM</c> /
+        /// SQLite <c>IS</c>) gives the C# / EF Core / LINQ-to-Objects semantics for every combination of
+        /// NULLs on either side, and — crucially — emits the subquery source EXACTLY ONCE, so the
+        /// query-source-root closure reserves a single compiled-param slot (the multi-emission IN + rescue
+        /// shape reserved two while the extractor produced one). The null-safe equality is what the
+        /// negated shape needs: inside NOT EXISTS a plain <c>=</c> would leave a NULL outer x matching a
+        /// NULL subquery row via UNKNOWN-excluded WHERE, wrongly INCLUDING a row C# excludes.
+        /// </summary>
+        private void BuildNegatedSubqueryContains(Expression source, Expression value)
+        {
+            // Unwrap a closure-captured IQueryable to its Expression so we can inspect the Select shape.
+            var unwrapped = source;
+            if (TryGetConstantValue(unwrapped, out var srcConst) && srcConst is System.Linq.IQueryable iq)
+                unwrapped = iq.Expression!;
+
+            // Peel the projecting Select to recover the entity source and the projected selector, then
+            // build the correlating predicate `o => sel(o) == value`. When there is no Select (Contains
+            // over the element sequence itself), compare the element directly.
+            Expression entitySource;
+            LambdaExpression predicate;
+            if (unwrapped is MethodCallExpression sel && sel.Method.Name == "Select" && sel.Arguments.Count == 2
+                && StripQuotes(sel.Arguments[1]) is LambdaExpression selector)
+            {
+                entitySource = sel.Arguments[0];
+                predicate = Expression.Lambda(BuildNullSafeContainsEquality(selector.Body, value), selector.Parameters[0]);
+            }
+            else
+            {
+                entitySource = source;
+                var et = GetElementType(source);
+                var p = Expression.Parameter(et, "__nc");
+                predicate = Expression.Lambda(BuildNullSafeContainsEquality(p, value), p);
+            }
+
+            // BuildExists wraps the source in Where(predicate), reserves ONE query-source-root closure
+            // slot, and correlates the outer value through the shared parameter mappings. The predicate's
+            // `==` lowers to null-safe equality because at least one operand is a nullable column.
+            BuildExists(entitySource, predicate, negate: true);
+        }
+
+        /// <summary>
+        /// Builds an <c>Expression.Equal</c> comparing a subquery-projected value to the outer Contains
+        /// argument, promoting a non-nullable operand to the shared nullable type so the comparison lifts
+        /// cleanly (and the binary translator's null-safe expansion fires for the nullable side).
+        /// </summary>
+        private static Expression BuildNullSafeContainsEquality(Expression projected, Expression value)
+        {
+            var cmpType = projected.Type;
+            // Prefer the nullable form of the projected value's underlying type so a nullable outer value
+            // and a non-nullable projection (or vice-versa) meet at one comparable, null-carrying type.
+            if (cmpType.IsValueType && Nullable.GetUnderlyingType(cmpType) == null &&
+                (Nullable.GetUnderlyingType(value.Type) != null || !value.Type.IsValueType))
+                cmpType = typeof(Nullable<>).MakeGenericType(cmpType);
+
+            var left = projected.Type == cmpType ? projected : Expression.Convert(projected, cmpType);
+            var right = value.Type == cmpType ? value : Expression.Convert(value, cmpType);
+            return Expression.Equal(left, right);
+        }
     }
 }
