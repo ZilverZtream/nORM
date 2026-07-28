@@ -307,6 +307,23 @@ namespace nORM.Core
             DbTransaction? transaction,
             CancellationToken ct) where T : class
         {
+            var affected = await ExecuteWriteCommandCoreAsync(entity, map, operation, transaction, ct).ConfigureAwait(false);
+            // Hydrate computed / store-generated non-key columns onto the entity from the just-written row over
+            // the write's transaction (the value is visible on the same connection even before commit), so the
+            // direct active-record path matches the batched SaveChanges read-back. No-op unless the mapping has
+            // such columns. DELETE has no row to read back. The key is already set (SetPrimaryKey ran in core).
+            if (operation is WriteOperation.Insert or WriteOperation.Update)
+                await MaybeReadBackStoreGeneratedColumnsAsync(transaction, map, entity, ct).ConfigureAwait(false);
+            return affected;
+        }
+
+        private async Task<int> ExecuteWriteCommandCoreAsync<T>(
+            T entity,
+            TableMapping map,
+            WriteOperation operation,
+            DbTransaction? transaction,
+            CancellationToken ct) where T : class
+        {
             // S2: Guard against primary key mutation on tracked entities before executing the write.
             // Mirrors the same guard in ExecuteUpdateBatch / ExecuteDeleteBatch.
             if (operation is WriteOperation.Update or WriteOperation.Delete)

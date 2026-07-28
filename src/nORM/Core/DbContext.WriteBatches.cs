@@ -666,16 +666,34 @@ namespace nORM.Core
         /// it observes the just-written (uncommitted) values; rows are matched to entities by primary key with
         /// both sides coerced to the model type.
         /// </summary>
-        private async Task MaybeReadBackStoreGeneratedColumnsAsync(DbCommand batchCmd, TableMapping map, IReadOnlyList<EntityEntry> batch, CancellationToken ct)
+        private Task MaybeReadBackStoreGeneratedColumnsAsync(DbCommand batchCmd, TableMapping map, IReadOnlyList<EntityEntry> batch, CancellationToken ct)
         {
-            var genCols = map.StoreGeneratedReadBackColumns;
-            if (genCols.Length == 0 || map.KeyColumns.Length == 0)
-                return;
+            if (map.StoreGeneratedReadBackColumns.Length == 0 || map.KeyColumns.Length == 0)
+                return Task.CompletedTask;
             var entities = new List<object>(batch.Count);
             foreach (var entry in batch)
                 if (entry.Entity is { } e)
                     entities.Add(e);
-            if (entities.Count == 0)
+            return ReadBackStoreGeneratedColumnsCoreAsync(batchCmd.Transaction, map, entities, ct);
+        }
+
+        /// <summary>
+        /// Single-entity entry point for the direct active-record write paths (InsertAsync/UpdateAsync). Reads
+        /// database-generated non-key columns back onto the entity over the write's transaction, so the direct
+        /// path hydrates computed/store-generated values exactly like the batched SaveChanges path. No-op unless
+        /// the mapping has such columns, so ordinary direct writes pay only a field check.
+        /// </summary>
+        private Task MaybeReadBackStoreGeneratedColumnsAsync(DbTransaction? tx, TableMapping map, object entity, CancellationToken ct)
+        {
+            if (map.StoreGeneratedReadBackColumns.Length == 0 || map.KeyColumns.Length == 0)
+                return Task.CompletedTask;
+            return ReadBackStoreGeneratedColumnsCoreAsync(tx, map, new[] { entity }, ct);
+        }
+
+        private async Task ReadBackStoreGeneratedColumnsCoreAsync(DbTransaction? tx, TableMapping map, IReadOnlyList<object> entities, CancellationToken ct)
+        {
+            var genCols = map.StoreGeneratedReadBackColumns;
+            if (genCols.Length == 0 || map.KeyColumns.Length == 0 || entities.Count == 0)
                 return;
 
             var perEntity = map.KeyColumns.Length;
@@ -719,8 +737,8 @@ namespace nORM.Core
                 }
 
                 await using var cmd = _cn.CreateCommand();
-                if (batchCmd.Transaction != null)
-                    cmd.Transaction = batchCmd.Transaction;
+                if (tx != null)
+                    cmd.Transaction = tx;
 
                 var selectList = string.Join(", ",
                     map.KeyColumns.Select(k => k.EscCol).Concat(genCols.Select(g => g.EscCol)));

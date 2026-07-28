@@ -258,6 +258,23 @@ namespace nORM.Core
 
             internal Task<int> ExecuteAsync(object entity, CancellationToken ct = default)
             {
+                // Fast path unchanged for mappings with no computed / store-generated non-key columns (the
+                // benchmarked shape) — no extra async state machine. Otherwise hydrate those columns back onto
+                // the entity after the insert (the key is set before any sub-path returns), matching SaveChanges.
+                if (_mapping.StoreGeneratedReadBackColumns.Length == 0)
+                    return ExecuteCoreAsync(entity, ct);
+                return ExecuteThenReadBackAsync(entity, ct);
+            }
+
+            private async Task<int> ExecuteThenReadBackAsync(object entity, CancellationToken ct)
+            {
+                var affected = await ExecuteCoreAsync(entity, ct).ConfigureAwait(false);
+                await _context.MaybeReadBackStoreGeneratedColumnsAsync(BoundTransaction, _mapping, entity, ct).ConfigureAwait(false);
+                return affected;
+            }
+
+            private Task<int> ExecuteCoreAsync(object entity, CancellationToken ct = default)
+            {
                 if (_disposed)
                     throw new ObjectDisposedException(nameof(PreparedInsertCommand));
                 if (entity == null)
