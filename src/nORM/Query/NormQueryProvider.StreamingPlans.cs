@@ -755,6 +755,34 @@ namespace nORM.Query
                 return pagingCall.Update(pagingCall.Object, pagingArgs);
             }
 
+            // A filter-COMMUTING operator (Where / OrderBy / ThenBy / Distinct) whose result IS the mapped
+            // entity type reaches the base case, which wraps the filter as an OUTER Where. That is correct only
+            // when nothing between here and the root is a NON-commuting window/dedup (Take/Skip/TakeLast/
+            // SkipLast/DistinctBy/UnionBy/ExceptBy/IntersectBy). When one is buried below a trailing Where/OrderBy
+            // — e.g. `Take(2).Where(...)` or `DistinctBy(k).OrderBy(...)` — the arg[0] recursion above did NOT
+            // descend (same mapped element type), so the base case would apply the filter AFTER the window,
+            // silently dropping the caller's OWN rows (soft-delete filter → empty page; tenant filter → own-tenant
+            // rows lost) or shifting the page. Push the filter into the SOURCE instead (the recursion then reaches
+            // the paging / keyed branch, which lands the predicate before the window) and return without wrapping.
+            if (expression is MethodCallExpression commutingCall &&
+                commutingCall.Method.DeclaringType == typeof(Queryable) &&
+                commutingCall.Method.Name is nameof(Queryable.Where) or nameof(Queryable.OrderBy)
+                    or nameof(Queryable.OrderByDescending) or nameof(Queryable.ThenBy)
+                    or nameof(Queryable.ThenByDescending) or nameof(Queryable.Distinct) &&
+                commutingCall.Arguments.Count > 0 &&
+                typeof(IQueryable).IsAssignableFrom(commutingCall.Arguments[0].Type) &&
+                GetElementType(commutingCall) == GetElementType(commutingCall.Arguments[0]) &&
+                _ctx.IsMapped(GetElementType(commutingCall)) &&
+                SourceSpineHasNonCommutingWindow(commutingCall.Arguments[0]))
+            {
+                var filteredSource = ApplyGlobalFilters(commutingCall.Arguments[0], ignoreUserFilters);
+                if (ReferenceEquals(filteredSource, commutingCall.Arguments[0]))
+                    return expression;
+                var commutingArgs = commutingCall.Arguments.ToArray();
+                commutingArgs[0] = filteredSource;
+                return commutingCall.Update(commutingCall.Object, commutingArgs);
+            }
+
             var entityType = GetElementType(expression);
             // User global filters (soft-delete etc.) are skipped when IgnoreQueryFilters() is in the
             // query. The tenant predicate below is NEVER skipped.
@@ -789,6 +817,48 @@ namespace nORM.Query
                     Expression.Quote(lambda));
             }
             return expression;
+        }
+
+        /// <summary>
+        /// Walks the single-source spine below <paramref name="source"/> through filter-COMMUTING operators
+        /// (Where / OrderBy / ThenBy / Distinct) and returns true if it reaches a NON-commuting window/dedup
+        /// operator (Take / Skip / TakeLast / SkipLast / DistinctBy / UnionBy / ExceptBy / IntersectBy) before the
+        /// root — meaning a global/tenant filter wrapped at the outer level would apply AFTER that window and lose
+        /// rows. Stops (returns false) at any shape-changing or multi-source operator (Select / Join / Union / …)
+        /// so the filter is never pushed through a boundary it does not commute across.
+        /// </summary>
+        private static bool SourceSpineHasNonCommutingWindow(Expression source)
+        {
+            var e = source;
+            while (e is MethodCallExpression mc
+                && mc.Method.DeclaringType == typeof(Queryable)
+                && mc.Arguments.Count > 0
+                && typeof(IQueryable).IsAssignableFrom(mc.Arguments[0].Type))
+            {
+                switch (mc.Method.Name)
+                {
+                    case nameof(Queryable.Take):
+                    case nameof(Queryable.Skip):
+                    case nameof(Queryable.TakeLast):
+                    case nameof(Queryable.SkipLast):
+                    case "DistinctBy":
+                    case "UnionBy":
+                    case "ExceptBy":
+                    case "IntersectBy":
+                        return true;
+                    case nameof(Queryable.Where):
+                    case nameof(Queryable.OrderBy):
+                    case nameof(Queryable.OrderByDescending):
+                    case nameof(Queryable.ThenBy):
+                    case nameof(Queryable.ThenByDescending):
+                    case nameof(Queryable.Distinct):
+                        e = mc.Arguments[0];
+                        continue;
+                    default:
+                        return false;
+                }
+            }
+            return false;
         }
 
         /// <summary>
