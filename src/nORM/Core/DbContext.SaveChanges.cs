@@ -739,7 +739,12 @@ namespace nORM.Core
 
                 foreach (var relation in principalEntry.Mapping.Relations.Values)
                 {
-                    if (!relation.CascadeDelete)
+                    // nORM applies referential actions to loaded/tracked dependents client-side (that is how
+                    // cascade works even with no DB FK constraint). NoAction leaves them to the database; every
+                    // other action (Cascade / SetNull / SetDefault / Restrict) must be applied to the tracked
+                    // dependents below — omitting SetNull/SetDefault/Restrict left dangling-FK orphans and let
+                    // a Restrict delete silently succeed.
+                    if (relation.OnDelete == ReferentialAction.NoAction)
                         continue;
                     if (!trackedByType.TryGetValue(relation.DependentType, out var dependents))
                         continue;
@@ -846,6 +851,45 @@ namespace nORM.Core
                         if (!matches)
                             continue;
 
+                        if (relation.OnDelete == ReferentialAction.Restrict)
+                            throw new InvalidOperationException(
+                                $"Cannot delete an instance of '{principalEntry.Mapping.Type.Name}': relationship " +
+                                $"'{relation.NavProp.Name}' to '{dependentEntry.Mapping.Type.Name}' is configured with " +
+                                "Restrict and a tracked dependent still references it. Delete or reassign the dependent first.");
+
+                        if (relation.OnDelete is ReferentialAction.SetNull or ReferentialAction.SetDefault)
+                        {
+                            // The dependent is NOT deleted — sever it by writing NULL (SetNull) or the FK column
+                            // type default (SetDefault) and marking it Modified so the UPDATE is emitted. Mirrors
+                            // the reference-nav-clear sever path. An Added dependent stays Added and inserts with
+                            // the severed FK. A required (non-nullable) FK cannot be nulled — left for the DB to
+                            // reject, matching a misconfigured SetNull.
+                            var setNull = relation.OnDelete == ReferentialAction.SetNull;
+                            for (var i = 0; i < relation.ForeignKeys.Count; i++)
+                            {
+                                var fk = relation.ForeignKeys[i];
+                                if (setNull)
+                                {
+                                    if (fk.IsNullable)
+                                        fk.Setter(dependent, null);
+                                }
+                                else
+                                {
+                                    var fkType = fk.Prop.PropertyType;
+                                    fk.Setter(dependent, fkType.IsValueType && Nullable.GetUnderlyingType(fkType) == null
+                                        ? Activator.CreateInstance(fkType)
+                                        : null);
+                                }
+                            }
+                            if (dependentEntry.State is EntityState.Unchanged or EntityState.Modified)
+                            {
+                                dependentEntry.SetStateInternal(EntityState.Modified);
+                                dependentEntry.MarkExplicitlyModified();
+                            }
+                            continue;
+                        }
+
+                        // ReferentialAction.Cascade
                         if (dependentEntry.State == EntityState.Added)
                         {
                             // Never persisted — nothing to DELETE. But its OWN Added descendants must also be
