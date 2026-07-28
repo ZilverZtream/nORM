@@ -187,10 +187,10 @@ namespace nORM.Query
             var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
             sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
-            // Set-based DELETE persists changes just like SaveChanges and the Bulk* ops,
-            // so the result cache for this table must be invalidated or Cacheable() queries
-            // keep replaying rows this delete removed.
-            _ctx.Options.CacheProvider?.InvalidateTag(mapping.TableName);
+            // Set-based DELETE persists changes just like SaveChanges and the Bulk* ops, so the result cache
+            // for this table AND any table a DB ON DELETE CASCADE removes rows from must be invalidated, or
+            // Cacheable() queries keep replaying rows this delete (or its cascade) removed.
+            _ctx.InvalidateResultCacheForDeletedTable(mapping);
             return affected;
         }
 

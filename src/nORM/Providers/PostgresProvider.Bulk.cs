@@ -447,7 +447,7 @@ namespace nORM.Providers
                     await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // Invalidate query cache after bulk write to prevent stale reads
+            ctx.InvalidateResultCacheForDeletedTable(m); // invalidate cache (incl. ON DELETE CASCADE child tables) to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }

@@ -697,6 +697,22 @@ namespace nORM.Core
         }
 
         /// <summary>
+        /// Invalidates the result cache for a delete of <paramref name="map"/>'s table AND every table a DB
+        /// <c>ON DELETE CASCADE</c> would remove rows from — mirroring what SaveChanges does for tracked
+        /// deletes (<see cref="AddCascadeDependentTables"/>). The set-based (ExecuteDelete) and bulk delete
+        /// paths call this so a <c>Cacheable()</c> query over cascade-deleted child rows is not served stale.
+        /// </summary>
+        internal void InvalidateResultCacheForDeletedTable(TableMapping map)
+        {
+            var cache = Options.CacheProvider;
+            if (cache == null) return;
+            var tags = new HashSet<string>(StringComparer.Ordinal) { map.TableName };
+            AddCascadeDependentTables(map, tags);
+            foreach (var t in tags)
+                cache.InvalidateTag(t);
+        }
+
+        /// <summary>
         /// <see cref="TimeoutException"/> is intentionally NOT retried by default because a
         /// timed-out write operation may have already been partially applied by the database and
         /// retrying it could produce duplicate rows. Callers that want to retry on timeout must

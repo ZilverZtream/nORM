@@ -364,7 +364,7 @@ namespace nORM.Providers
                 BatchSizer.RecordBatchPerformance(operationKey, batch.Count, batchSw.Elapsed, batch.Count);
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2
+            ctx.InvalidateResultCacheForDeletedTable(m); // X2
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }

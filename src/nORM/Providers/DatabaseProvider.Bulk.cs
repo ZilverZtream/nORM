@@ -425,7 +425,7 @@ namespace nORM.Providers
                 if (ownedTx) await transaction.DisposeAsync().ConfigureAwait(false);
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName);
+            ctx.InvalidateResultCacheForDeletedTable(m);
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, totalDeleted, sw.Elapsed);
             return totalDeleted;
         }

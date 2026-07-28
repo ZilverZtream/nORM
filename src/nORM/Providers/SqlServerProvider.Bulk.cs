@@ -314,7 +314,7 @@ namespace nORM.Providers
                 }
             }
 
-            ctx.Options.CacheProvider?.InvalidateTag(m.TableName); // X2: Invalidate query cache after bulk write to prevent stale reads
+            ctx.InvalidateResultCacheForDeletedTable(m); // X2: invalidate cache (incl. ON DELETE CASCADE child tables) to prevent stale reads
             ctx.Options.Logger?.LogBulkOperation(nameof(BulkDeleteAsync), m.EscTable, deletedCount, sw.Elapsed);
             return deletedCount;
         }
