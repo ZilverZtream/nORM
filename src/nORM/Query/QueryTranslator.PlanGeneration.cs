@@ -73,14 +73,27 @@ namespace nORM.Query
                         _t._params[_t._ctx.RawProvider.ParamPrefix + "p" + i] = rawParameters[i] ?? DBNull.Value;
                     _t._parameterManager.Index = rawParameters.Length;
                 }
-                var baseType = _t._rootType.BaseType;
+                // The discriminator filter for a TPH subtype root keys off the queried ENTITY, but a Select
+                // projection changes _rootType to the projection's element type (int/anon), so keying off
+                // _rootType alone injects nothing and sibling subtypes silently leak. When _rootType is not
+                // itself a discriminated subtype, fall back to the query's root SOURCE entity type. (An
+                // OfType/Cast in the chain returns null from the helper so its own translator injects the
+                // narrower discriminator instead of a contradictory one here.)
+                var discriminatorSubtype = _t._rootType;
+                if (discriminatorSubtype.GetCustomAttribute<DiscriminatorValueAttribute>() == null
+                    && FindRootEntitySourceType(_expression) is { } sourceEntityType
+                    && sourceEntityType.GetCustomAttribute<DiscriminatorValueAttribute>() != null)
+                {
+                    discriminatorSubtype = sourceEntityType;
+                }
+                var baseType = discriminatorSubtype.BaseType;
                 while (baseType != null && baseType != typeof(object))
                 {
                     var baseMap = _t.TrackMapping(baseType);
                     if (baseMap.DiscriminatorColumn != null)
                     {
                         _t._mapping = baseMap;
-                        var discAttr = _t._rootType.GetCustomAttribute<DiscriminatorValueAttribute>();
+                        var discAttr = discriminatorSubtype.GetCustomAttribute<DiscriminatorValueAttribute>();
                         if (discAttr != null)
                         {
                             var paramName = _t._ctx.RawProvider.ParamPrefix + "p" + _t._parameterManager.GetNextIndex();

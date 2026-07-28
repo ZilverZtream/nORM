@@ -506,6 +506,12 @@ namespace nORM.Query
             var subPlan = TranslateInSubContext(source, _mapping, _parameterManager.Index, _joinCounter, _recursionDepth + 1, out var subMapping);
             _mapping = subMapping;
             MergeSubPlanParameters(subPlan);
+            // The whole source (including a TPH discriminator filter Setup injected, and any Where/predicate
+            // folded in above) is now inside the EXISTS subquery. Any residual outer _where — e.g. the
+            // discriminator predicate the outer Setup injected for a subtype root — is a duplicate that Build()
+            // would append after the FROM-less `SELECT 1 WHERE EXISTS(...)`, producing a second WHERE
+            // ("near WHERE: syntax error"). Clear it. Mirrors the All-operation snapshot-and-clear.
+            _where.Clear();
             using var subSqlBuilder = new OptimizedSqlBuilder();
             var fromIndex = subPlan.Sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
             if (fromIndex >= 0)

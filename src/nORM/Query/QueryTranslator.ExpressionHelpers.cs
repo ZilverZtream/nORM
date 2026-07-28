@@ -149,6 +149,42 @@ namespace nORM.Query
                 : expression;
 
         /// <summary>
+        /// Walks the operator chain to the query's ROOT entity source and returns the entity type actually read
+        /// from the table — the type a TPH discriminator filter must key off, which differs from the query's
+        /// element type once a <c>Select</c> projection changes it. Returns null when it can't be determined this
+        /// way: no queryable constant at the root, or an <c>OfType</c>/<c>Cast</c> narrowing operator is present
+        /// (that translator injects its own — narrower — discriminator, so the root source must NOT also inject a
+        /// contradictory one). Follows the receiver (instance operators) or first argument (static operators) and
+        /// unwraps the Convert/Quote nodes nORM inserts for its interface-typed operators, mirroring
+        /// <see cref="FindRootRawSource"/>.
+        /// </summary>
+        private static Type? FindRootEntitySourceType(Expression expression)
+        {
+            var expr = expression;
+            while (true)
+            {
+                switch (expr)
+                {
+                    case MethodCallExpression { Method.Name: "OfType" or "Cast" }:
+                        return null;
+                    case MethodCallExpression { Object: { } receiver }:
+                        expr = receiver;
+                        break;
+                    case MethodCallExpression mc when mc.Arguments.Count > 0:
+                        expr = mc.Arguments[0];
+                        break;
+                    case UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.Quote } u:
+                        expr = u.Operand;
+                        break;
+                    case ConstantExpression { Value: IQueryable q }:
+                        return q.ElementType;
+                    default:
+                        return null;
+                }
+            }
+        }
+
+        /// <summary>
         /// Walks to the deepest source expression and returns the <see cref="INormRawSqlSource"/> at the root
         /// of the query, if any — i.e. when the query started from <c>FromSqlRaw</c>/<c>FromSqlInterpolated</c>.
         /// Descends through the operator chain (each operator's first argument) and unwraps the
