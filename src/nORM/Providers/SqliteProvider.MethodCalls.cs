@@ -21,6 +21,20 @@ namespace nORM.Providers
     public partial class SqliteProvider
     {
         /// <summary>
+        /// True when the expression is a RAW decimal operand — a column member, a captured
+        /// local, or a constant — whose translated SQL is guaranteed to be canonical,
+        /// fixed-point invariant decimal TEXT (never a REAL-coerced or exponential form).
+        /// A computed operand (arithmetic, another method call, a Convert, a conditional)
+        /// has already run through nORM's REAL decimal arithmetic and is excluded, so the
+        /// TEXT-based Abs/Floor/Ceiling only apply where they can actually preserve precision.
+        /// </summary>
+        private static bool IsRawDecimalStorageOperand(System.Linq.Expressions.Expression e)
+            => (e is System.Linq.Expressions.MemberExpression
+                    || e is System.Linq.Expressions.ConstantExpression
+                    || e is System.Linq.Expressions.ParameterExpression)
+               && (Nullable.GetUnderlyingType(e.Type) ?? e.Type) == typeof(decimal);
+
+        /// <summary>
         /// Overload-aware hook -- called by the visitors BEFORE
         /// <see cref="TranslateFunction"/>. Used here to distinguish Math.Round
         /// overloads that share arity but differ in semantics:
@@ -231,6 +245,39 @@ namespace nORM.Providers
                 // expression args present.
                 return $"(CASE WHEN {args[0]} COLLATE {collation} < {args[1]} COLLATE {collation} THEN -1 " +
                        $"WHEN {args[0]} COLLATE {collation} > {args[1]} COLLATE {collation} THEN 1 ELSE 0 END)";
+            }
+
+            // Decimal Abs/Floor/Ceiling on a RAW decimal operand (column / captured local /
+            // constant) must preserve full decimal precision. The generic ABS()/FLOOR()/CEIL()
+            // coerce the TEXT-stored decimal to IEEE-754 REAL first, silently truncating past
+            // ~15-16 significant digits (and past 2^53 for the integer-valued Floor/Ceiling).
+            // Microsoft.Data.Sqlite binds decimal columns AND params as canonical, fixed-point
+            // (never exponential) invariant TEXT, so compute these by TEXT/INTEGER instead.
+            // Gated to raw storage: a COMPUTED decimal operand is already REAL (nORM's decimal
+            // arithmetic runs in REAL) and keeps the existing REAL FLOOR/CEIL/ABS.
+            if ((node.Method.Name is nameof(Math.Abs) or nameof(Math.Floor) or nameof(Math.Ceiling))
+                && (declType == typeof(Math) || declType == typeof(decimal))
+                && node.Arguments.Count == 1
+                && (Nullable.GetUnderlyingType(node.Type) ?? node.Type) == typeof(decimal)
+                && IsRawDecimalStorageOperand(node.Arguments[0]))
+            {
+                var a = args[0];
+                // Toward-zero integer part: SQLite CAST(TEXT AS INTEGER) reads the leading
+                // integer prefix, stopping at '.', exact within INT64 (matches decimal.Truncate).
+                var trunc = $"CAST({a} AS INTEGER)";
+                var isNeg = $"substr({a}, 1, 1) = '-'";
+                // A nonzero fractional digit is present (guards Floor/Ceiling's +/-1 adjustment).
+                var hasFrac = $"(instr({a}, '.') > 0 AND substr({a}, instr({a}, '.') + 1) GLOB '*[1-9]*')";
+                return node.Method.Name switch
+                {
+                    // Sign strip, precision-exact (no arithmetic): drop a leading '-'.
+                    nameof(Math.Abs) => $"(CASE WHEN {isNeg} THEN substr({a}, 2) ELSE {a} END)",
+                    // Floor rounds toward -inf: negatives with a fraction drop by one.
+                    nameof(Math.Floor) => $"({trunc} - (CASE WHEN {isNeg} AND {hasFrac} THEN 1 ELSE 0 END))",
+                    // Ceiling rounds toward +inf: positives with a fraction rise by one.
+                    nameof(Math.Ceiling) => $"({trunc} + (CASE WHEN NOT ({isNeg}) AND {hasFrac} THEN 1 ELSE 0 END))",
+                    _ => null
+                };
             }
 
             // Math.Round and decimal.Round share identical overload semantics

@@ -84,13 +84,15 @@ namespace nORM.Providers
                 // SQLite has no TRUNC; CAST drops the fractional part for finite reals and
                 // matches Math.Truncate semantics (truncate toward zero).
                 nameof(Math.Truncate) when args.Length == 1 => $"CAST({args[0]} AS INTEGER)",
-                // Force numeric comparison via CAST AS REAL -- otherwise
-                // TEXT-stored decimal columns get lex-compared and MIN(
-                // '10.0', '5.5') wrongly returns '10.0' (since '1' < '5').
-                // CAST(int AS REAL) is identity-with-decimal-zero so
-                // integer pairings still round-trip correctly.
-                nameof(Math.Min) when args.Length == 2 => $"MIN(CAST({args[0]} AS REAL), CAST({args[1]} AS REAL))",
-                nameof(Math.Max) when args.Length == 2 => $"MAX(CAST({args[0]} AS REAL), CAST({args[1]} AS REAL))",
+                // Compare numerically via CAST AS REAL (TEXT-stored decimals would
+                // otherwise lex-compare, so MIN('10.0','5.5') wrongly picks '10.0'),
+                // but RETURN the original operand verbatim. MIN/MAX(CAST(.. AS REAL))
+                // returned the REAL-coerced value, silently truncating a TEXT decimal
+                // past ~15-16 significant digits; emitting the untouched operand is
+                // precision-exact for decimal, double and int alike. Sister to the
+                // MaxMagnitude/MinMagnitude CASE forms above.
+                nameof(Math.Min) when args.Length == 2 => $"(CASE WHEN CAST({args[0]} AS REAL) <= CAST({args[1]} AS REAL) THEN {args[0]} ELSE {args[1]} END)",
+                nameof(Math.Max) when args.Length == 2 => $"(CASE WHEN CAST({args[0]} AS REAL) >= CAST({args[1]} AS REAL) THEN {args[0]} ELSE {args[1]} END)",
                 // SQLite 3.35+ exposes log2() and pow() as built-ins via the
                 // math extension. Cbrt has no direct function -- use pow(x, 1/3)
                 // which matches Math.Cbrt for non-negative reals (the .NET
