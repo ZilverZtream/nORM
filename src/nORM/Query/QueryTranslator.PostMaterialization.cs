@@ -57,14 +57,41 @@ namespace nORM.Query
                 foreach (var outer in rows.Cast<object>())
                 {
                     var outerKey = outerKeyReader(outer);
+                    // A null join key (or a composite key with any null component) never joins — matching both
+                    // SQL (`K = K` is UNKNOWN for NULL) and Enumerable.Join. object.Equals(null, null) is TRUE,
+                    // so without this a NULL-keyed outer/inner pair spuriously matched (a row neither SQL nor
+                    // LINQ-to-Objects returns). The scalar-projection path goes through the SQL join and was
+                    // already correct; only this client-side whole-entity/chained path was wrong.
+                    if (IsNullJoinKey(outerKey)) continue;
                     foreach (var inner in inners)
                     {
-                        if (object.Equals(outerKey, innerKeyReader(inner)))
+                        var innerKey = innerKeyReader(inner);
+                        if (!IsNullJoinKey(innerKey) && object.Equals(outerKey, innerKey))
                             output.Add(projector(outer, inner));
                     }
                 }
                 return output;
             }, resultType);
+        }
+
+        /// <summary>
+        /// True when a client-side join key must NOT match: a null scalar key, or a composite (anonymous-type /
+        /// ValueTuple) key with any null component. Mirrors SQL join semantics (a NULL key column is never equal
+        /// to anything, including another NULL) and Enumerable.Join, so the client-side whole-entity/chained
+        /// join path agrees with both — and with nORM's own SQL join path for the scalar-projection shape.
+        /// </summary>
+        private static bool IsNullJoinKey(object? key)
+        {
+            if (key is null) return true;
+            var type = key.GetType();
+            var isComposite = System.Attribute.IsDefined(type, typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute))
+                || (type.IsGenericType && type.FullName is { } fn && (fn.StartsWith("System.ValueTuple`", System.StringComparison.Ordinal) || fn.StartsWith("System.Tuple`", System.StringComparison.Ordinal)));
+            if (!isComposite) return false;
+            foreach (var f in type.GetFields())
+                if (f.GetValue(key) is null) return true;
+            foreach (var p in type.GetProperties())
+                if (p.GetIndexParameters().Length == 0 && p.GetValue(key) is null) return true;
+            return false;
         }
 
         private void AppendPostMaterializeGroupJoin(Expression innerQuery, LambdaExpression outerKeySelector, LambdaExpression innerKeySelector, LambdaExpression resultSelector)
@@ -100,10 +127,16 @@ namespace nORM.Query
                 {
                     var outerKey = outerKeyReader(outer);
                     var matches = CreateRuntimeList(innerElementType, 0);
-                    foreach (var inner in inners)
+                    // A null-keyed outer gets an EMPTY group (SQL LEFT JOIN semantics), not a group of every
+                    // null-keyed inner — object.Equals(null,null) would otherwise collect them spuriously.
+                    if (!IsNullJoinKey(outerKey))
                     {
-                        if (object.Equals(outerKey, innerKeyReader(inner)))
-                            matches.Add(inner);
+                        foreach (var inner in inners)
+                        {
+                            var innerKey = innerKeyReader(inner);
+                            if (!IsNullJoinKey(innerKey) && object.Equals(outerKey, innerKey))
+                                matches.Add(inner);
+                        }
                     }
                     output.Add(projector(outer, matches));
                 }
