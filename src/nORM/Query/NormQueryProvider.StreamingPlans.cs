@@ -733,6 +733,28 @@ namespace nORM.Query
                 return windowCall.Update(windowCall.Object, windowArgs);
             }
 
+            // Take/Skip/TakeLast/SkipLast do NOT commute with a post-filter: an entity-typed row-limit reaches
+            // the base case (result type == source type, mapped, so neither branch above descended into it),
+            // which appends an OUTER Where AFTER the LIMIT/OFFSET. The window then runs over the UNFILTERED rows
+            // and the filter trims the window — silently dropping the caller's OWN rows (Take) or shifting the
+            // page (Skip); no foreign-tenant rows leak, but the caller loses its own data in pagination.
+            // Filtering DOES commute with OrderBy, so push the filter into the SOURCE, before the window —
+            // turning Take(OrderBy(root)) into Take(Where(OrderBy(root), filter)): order, filter, then limit.
+            if (expression is MethodCallExpression pagingCall &&
+                pagingCall.Method.DeclaringType == typeof(Queryable) &&
+                pagingCall.Method.Name is nameof(Queryable.Take) or nameof(Queryable.Skip)
+                    or nameof(Queryable.TakeLast) or nameof(Queryable.SkipLast) &&
+                pagingCall.Arguments.Count > 0 &&
+                typeof(IQueryable).IsAssignableFrom(pagingCall.Arguments[0].Type))
+            {
+                var filteredSource = ApplyGlobalFilters(pagingCall.Arguments[0], ignoreUserFilters);
+                if (ReferenceEquals(filteredSource, pagingCall.Arguments[0]))
+                    return expression;
+                var pagingArgs = pagingCall.Arguments.ToArray();
+                pagingArgs[0] = filteredSource;
+                return pagingCall.Update(pagingCall.Object, pagingArgs);
+            }
+
             var entityType = GetElementType(expression);
             // User global filters (soft-delete etc.) are skipped when IgnoreQueryFilters() is in the
             // query. The tenant predicate below is NEVER skipped.
