@@ -392,6 +392,18 @@ namespace nORM.Core
                         && map.UpdateColumns.Length == 0
                         && map.ManyToManyJoins.Count > 0;
                     var batchSize = CalculateBatchSize(entries.Count, paramsPerEntity);
+                    // A self-referential Added group with a generated key (DB-generated or convention
+                    // store-generated) must insert ONE row at a time. A child row's FK parameter is bound
+                    // before the multi-row INSERT command executes, so packing a parent and its
+                    // self-referencing child into one command binds the child's FK to the parent's
+                    // still-default key (0/NULL) — a silently wrong persisted FK, or an outright FK
+                    // violation under enforcement. Per-row inserts let each parent's INSERT hydrate its key
+                    // and PropagateGeneratedKeyToChildren update its in-memory children before the child row
+                    // binds its parameters. OrderSelfReferentialRows already places the parent first.
+                    if (state == EntityState.Added
+                        && (map.ConventionGeneratedKeyColumn != null || map.KeyColumns.Any(k => k.IsDbGenerated))
+                        && map.Relations.Values.Any(r => r.DependentType == map.Type))
+                        batchSize = 1;
                     var templateLength = isColumnlessModified ? 64 : EstimateTemplateLength(state, map);
 
                     // Reuse DbCommand and StringBuilder across batches: create ONE of each and

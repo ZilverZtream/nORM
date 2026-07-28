@@ -742,6 +742,49 @@ namespace nORM.Core
                     byPrincipal[FormatKey(principalKeys, e.Entity)] = e;
             }
 
+            // Key-value indexing (above) cannot order a generated-key self-reference: every row's key is
+            // still its type default at insert time, so parent and child collide on the same default key.
+            // Fall back to object-graph edges (identity, not value): a parent's collection navigation lists
+            // its children, and a child's reference navigation points at its parent. Either populated nav
+            // gives the dependency, independent of the not-yet-generated key values.
+            var parentByChildRef = new Dictionary<object, EntityEntry>(ReferenceEqualityComparer.Instance);
+            var entryByEntity = new Dictionary<object, EntityEntry>(ReferenceEqualityComparer.Instance);
+            foreach (var e in entries)
+                if (e.Entity != null)
+                    entryByEntity[e.Entity] = e;
+
+            // (a) principal collection navigation: parent.NavProp enumerates its children.
+            foreach (var e in entries)
+            {
+                if (e.Entity != null
+                    && selfRelation.NavProp.GetValue(e.Entity) is System.Collections.IEnumerable children
+                    && children is not string)
+                {
+                    foreach (var child in children)
+                        if (child != null && !parentByChildRef.ContainsKey(child))
+                            parentByChildRef[child] = e;
+                }
+            }
+
+            // (b) dependent reference navigation: child.<refNav> points at the parent. Covers the graph
+            // where only the reference side was set (the inverse collection may be empty).
+            var referenceNavToParent = map.ReferenceNavigations.FirstOrDefault(nav =>
+                ReferenceEquals(
+                    global::nORM.Query.ExpressionToSqlVisitor.FindReferenceNavForeignKey(map, nav.Name, nav.PropertyType, map),
+                    foreignKeys[0]));
+            if (referenceNavToParent != null)
+            {
+                foreach (var e in entries)
+                {
+                    if (e.Entity == null || parentByChildRef.ContainsKey(e.Entity))
+                        continue;
+                    if (referenceNavToParent.GetValue(e.Entity) is { } parentObj
+                        && entryByEntity.TryGetValue(parentObj, out var parentEntry)
+                        && !ReferenceEquals(parentEntry, e))
+                        parentByChildRef[e.Entity] = parentEntry;
+                }
+            }
+
             var ordered = new List<EntityEntry>(entries.Count);
             // 1 = on the current DFS path (cycle guard), 2 = emitted.
             var state = new Dictionary<EntityEntry, int>();
@@ -752,12 +795,27 @@ namespace nORM.Core
                     return; // already emitted, or on the current path (row-level cycle) — leave order to the DB.
 
                 state[node] = 1;
-                if (node.Entity != null && !AllKeyPartsNull(foreignKeys, node.Entity))
+                EntityEntry? parent = null;
+                // Object-graph edges (identity) are authoritative and are consulted FIRST: with generated
+                // keys every row's key is the same type default, so the key-value index below collides and
+                // would resolve a child to an arbitrary same-default row (not its real parent). Only when no
+                // navigation edge exists (the explicit-key case, where navs are typically unset) do we fall
+                // back to matching the FK value against principal keys.
+                if (node.Entity != null
+                    && parentByChildRef.TryGetValue(node.Entity, out var graphParent)
+                    && !ReferenceEquals(graphParent, node))
+                {
+                    parent = graphParent;
+                }
+                else if (node.Entity != null && !AllKeyPartsNull(foreignKeys, node.Entity))
                 {
                     var parentKey = FormatKey(foreignKeys, node.Entity);
-                    if (byPrincipal.TryGetValue(parentKey, out var parent) && !ReferenceEquals(parent, node))
-                        Visit(parent); // emit the parent first (post-order places it ahead of this node)
+                    if (byPrincipal.TryGetValue(parentKey, out var keyParent) && !ReferenceEquals(keyParent, node))
+                        parent = keyParent;
                 }
+
+                if (parent != null)
+                    Visit(parent); // emit the parent first (post-order places it ahead of this node)
 
                 state[node] = 2;
                 ordered.Add(node);
