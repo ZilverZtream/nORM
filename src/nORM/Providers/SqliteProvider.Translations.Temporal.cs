@@ -87,22 +87,30 @@ namespace nORM.Providers
                 return null;
             }
 
+            // A DateTimeOffset is stored as 'clock[.fffffff]±HH:MM'. Component
+            // extraction (Year/Hour/TimeOfDay/Millisecond/DayOfWeek/…) must read
+            // the WALL-CLOCK portion in the stored offset — NOT the raw text
+            // (whose trailing ±HH:MM offset corrupts strftime and inflates the
+            // length-based fractional guards) and NOT the UTC instant. For a
+            // DateTime receiver the clock IS the raw text, so this is a no-op.
+            var clock = declaringType == typeof(DateTimeOffset) ? DtoClock(args[0]) : args[0];
+
             return name switch
             {
-                nameof(DateTime.Year) => $"CAST(strftime('%Y', {args[0]}) AS INTEGER)",
-                nameof(DateTime.Month) => $"CAST(strftime('%m', {args[0]}) AS INTEGER)",
-                nameof(DateTime.Day) => $"CAST(strftime('%d', {args[0]}) AS INTEGER)",
-                nameof(DateTime.Hour) => $"CAST(strftime('%H', {args[0]}) AS INTEGER)",
-                nameof(DateTime.Minute) => $"CAST(strftime('%M', {args[0]}) AS INTEGER)",
-                nameof(DateTime.Second) => $"CAST(strftime('%S', {args[0]}) AS INTEGER)",
-                nameof(DateTime.DayOfYear) => $"CAST(strftime('%j', {args[0]}) AS INTEGER)",
+                nameof(DateTime.Year) => $"CAST(strftime('%Y', {clock}) AS INTEGER)",
+                nameof(DateTime.Month) => $"CAST(strftime('%m', {clock}) AS INTEGER)",
+                nameof(DateTime.Day) => $"CAST(strftime('%d', {clock}) AS INTEGER)",
+                nameof(DateTime.Hour) => $"CAST(strftime('%H', {clock}) AS INTEGER)",
+                nameof(DateTime.Minute) => $"CAST(strftime('%M', {clock}) AS INTEGER)",
+                nameof(DateTime.Second) => $"CAST(strftime('%S', {clock}) AS INTEGER)",
+                nameof(DateTime.DayOfYear) => $"CAST(strftime('%j', {clock}) AS INTEGER)",
                 // SQLite's date() returns 'YYYY-MM-DD' but ParameterManager
                 // serializes DateTime params as 'yyyy-MM-dd HH:mm:ss.fffffff'.
                 // A text comparison between those two formats never matches,
                 // so column.Date == constantDate silently returns zero rows.
                 // Emit the matching long format so Where round-trips; the
                 // materializer parses either form back to DateTime.
-                nameof(DateTime.Date) => $"strftime('%Y-%m-%d 00:00:00', {args[0]})",
+                nameof(DateTime.Date) => $"strftime('%Y-%m-%d 00:00:00', {clock})",
                 // DateTime.Ticks: (julianday(col) - julianday('0001-01-01')) *
                 // 86400 * 1e7 -- ticks since DateTime.MinValue. IEEE-754 double
                 // gives ~15 significant digits which is enough for comparison
@@ -143,30 +151,35 @@ namespace nORM.Providers
                     $"|| substr({args[0]}, length({args[0]}) - 4, 2) || ' hours', " +
                     $"(CASE WHEN substr({args[0]}, length({args[0]}) - 5, 1) = '+' THEN '-' ELSE '+' END) " +
                     $"|| substr({args[0]}, length({args[0]}) - 1, 2) || ' minutes')",
-                // TimeOfDay returns the time portion (TimeSpan). Microsoft.Data.Sqlite
-                // binds TimeSpan params as canonical 'HH:mm:ss' text (TimeSpan.ToString
-                // 'c' format for sub-day spans), so emitting strftime('%H:%M:%S', col)
-                // gives a string-comparable form that matches the param shape and
-                // round-trips back to TimeSpan via the materializer.
-                nameof(DateTime.TimeOfDay) => $"strftime('%H:%M:%S', {args[0]})",
-                // strftime('%f', col) returns 'SS.SSS' (seconds with millisecond
-                // precision). Multiplying by 1000 yields the integer ms portion of
-                // the minute; modulo 1000 strips the seconds component. ROUND
-                // guards against FP truncation (e.g. 45.456 * 1000 = 45455.99...
-                // would truncate to 455 instead of 456).
-                nameof(DateTime.Millisecond) => $"(CAST(ROUND(strftime('%f', {args[0]}) * 1000) AS INTEGER) % 1000)",
+                // TimeOfDay returns the time portion (TimeSpan) INCLUDING sub-second
+                // precision. The stored text is 'yyyy-MM-dd HH:mm:ss[.fffffff]', so
+                // substr(col, 12) yields 'HH:mm:ss[.fffffff]' — exactly the TimeSpan
+                // 'c' format Microsoft.Data.Sqlite binds params in and the materializer
+                // parses back. strftime('%H:%M:%S', col) TRUNCATED the fraction (a
+                // silent data loss: 12:00:00.5 read back as 12:00:00, and predicates
+                // like TimeOfDay > 12:00:00 dropped the sub-second row).
+                nameof(DateTime.TimeOfDay) => $"substr({clock}, 12)",
+                // Millisecond is the FLOOR of the sub-second fraction to 3 digits,
+                // matching .NET ((Ticks / TicksPerMillisecond) % 1000). strftime('%f')
+                // ROUNDED to millisecond precision (45.4569999 -> '45.457' -> 457),
+                // disagreeing with .NET's truncating 456. Read the fractional tail
+                // directly instead: the text is 'yyyy-MM-dd HH:mm:ss.fffffff' with the
+                // fraction at position 21; take its first three digits (right-padded so
+                // a short '.4' -> '400'). Absent fraction (length <= 20) -> 0.
+                nameof(DateTime.Millisecond) =>
+                    $"(CASE WHEN length({clock}) > 20 THEN CAST(substr(substr({clock}, 21) || '000', 1, 3) AS INTEGER) ELSE 0 END)",
                 // DateTime text format includes 'yyyy-MM-dd HH:mm:ss[.fffffff]'.
                 // The fractional 7-digit tail starts at position 21 (' ' at 11,
                 // hh at 12-13, ':' at 14, mm at 15-16, ':' at 17, ss at 18-19,
                 // '.' at 20, fffffff starts at 21). Digits 4..6 of the tail
                 // are the microsecond-within-millisecond.
                 nameof(DateTime.Microsecond) =>
-                    $"(CASE WHEN length({args[0]}) > 23 THEN CAST(substr({args[0]}, 24, 3) AS INTEGER) ELSE 0 END)",
+                    $"(CASE WHEN length({clock}) > 23 THEN CAST(substr({clock}, 24, 3) AS INTEGER) ELSE 0 END)",
                 // Digit 7 of the 7-digit fractional tail (position 27 of
                 // 'yyyy-MM-dd HH:mm:ss.fffffff') is the 100ns tick offset;
                 // multiply by 100 to get the .NET 0..900 Nanosecond.
                 nameof(DateTime.Nanosecond) =>
-                    $"(CASE WHEN length({args[0]}) > 26 THEN CAST(substr({args[0]}, 27, 1) AS INTEGER) * 100 ELSE 0 END)",
+                    $"(CASE WHEN length({clock}) > 26 THEN CAST(substr({clock}, 27, 1) AS INTEGER) * 100 ELSE 0 END)",
                 // AddDays/AddMonths/AddYears accept a delta in the second argument.
                 // SQLite's date modifier syntax accepts an unsigned-positive form
                 // ('7 days') and an explicitly-signed negative form ('-3 days'); the
@@ -235,7 +248,7 @@ namespace nORM.Providers
                 nameof(DateTime.AddTicks) when args.Length == 2 =>
                     AddTicksToDateTimeOffsetText(args[0], args[1]),
                 // SQLite strftime %w returns 0..6 (Sun..Sat); .NET DayOfWeek enum matches.
-                nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {args[0]}) AS INTEGER)",
+                nameof(DateTime.DayOfWeek) => $"CAST(strftime('%w', {clock}) AS INTEGER)",
                 // DateTime/DateTimeOffset.Parse(string) -- SQLite stores DateTime
                 // as TEXT and Microsoft.Data.Sqlite's GetDateTime parses the
                 // canonical text directly. Identity emission; the materializer
