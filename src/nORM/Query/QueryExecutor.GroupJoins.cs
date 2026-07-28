@@ -180,6 +180,13 @@ namespace nORM.Query
                     resultList.Add(result);
                 }
 
+                // Apply the client-side sequence tail (Select/Take/Skip/Distinct/OrderBy) that a group-join
+                // assembles AFTER materialization — a server LIMIT/OFFSET would truncate a parent's children
+                // mid-group, so these tails are deliberately client-side. Mirrors the sync MaterializeGroupJoin;
+                // omitting it made AsAsyncEnumerable (and ToListAsync on a true-async provider) silently return
+                // the untransformed group-join rows.
+                if (plan.PostMaterializeTransform != null)
+                    return plan.PostMaterializeTransform(_ctx, resultList);
                 return resultList;
             }, "MaterializeGroupJoinAsync", new Dictionary<string, object> { ["Sql"] = RedactSqlForLogging(cmd.CommandText) }).ConfigureAwait(false);
 
