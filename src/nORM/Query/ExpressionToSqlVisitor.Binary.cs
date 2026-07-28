@@ -24,6 +24,15 @@ namespace nORM.Query
             // as a parameter (the same treatment a plain captured constant gets).
             if (node.NodeType == ExpressionType.ArrayIndex && TryGetConstantValue(node, out var arrayIndexValue))
             {
+                // The fold binds only the resolved ELEMENT as a fixed parameter, but the parameter-value
+                // extractor still collects the captured array (and a captured index) as compiled-param VALUES.
+                // Reserve an _unused compiled-param slot for each captured operand so the value-list stays
+                // aligned with the compiled-param slots — otherwise, with any other captured closure in the
+                // predicate, the positional binder shifts the array/index onto a real @cp slot and returns the
+                // wrong rows. Same fix shape as the Contains / DateTime+TimeSpan folds. Reserve in document
+                // order (array then index) to match the extractor's collection order.
+                ReserveCompiledParamSlotIfClosure(this, node.Left);
+                ReserveCompiledParamSlotIfClosure(this, node.Right);
                 AppendConstant(arrayIndexValue, node.Type);
                 return node;
             }
