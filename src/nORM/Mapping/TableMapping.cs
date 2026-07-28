@@ -34,6 +34,13 @@ namespace nORM.Mapping
         /// <summary>Gets all mapped columns.</summary>
         public Column[] Columns { get; }
 
+        /// <summary>
+        /// True when any mapped column is a flattened owned-reference member (<c>OwnsOne</c> / <c>[Owned]</c>).
+        /// An INPC owner with such a column must still be snapshot-scanned by DetectChanges because a write to an
+        /// owned sub-property raises no <c>PropertyChanged</c> on the owner. Source-agnostic (fluent + attribute).
+        /// </summary>
+        internal bool HasOwnedReferenceColumns { get; }
+
         /// <summary>Gets a lookup of columns by logical model property name.</summary>
         public Dictionary<string, Column> ColumnsByName { get; }
 
@@ -428,6 +435,10 @@ namespace nORM.Mapping
             // token), and the discriminator (identity-defining, stamped once).
             StoreGeneratedReadBackColumns = Columns.Where(c => c.IsDbGenerated && !c.IsKey && !c.IsTimestamp
                 && !ReferenceEquals(c, DiscriminatorColumn)).ToArray();
+
+            // An INPC owner with any flattened owned-reference column stays on the snapshot-scan path (a write to
+            // an owned sub-property fires no PropertyChanged on the owner). Source-agnostic — covers [Owned].
+            HasOwnedReferenceColumns = Array.Exists(Columns, c => c.IsOwned);
 
             // Compute converter fingerprint for materializer cache differentiation
             int fp = 0;

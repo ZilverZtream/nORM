@@ -682,7 +682,10 @@ namespace nORM.Core
         private static bool RequiresChangeScanDespiteNotifications(TableMapping mapping)
             => mapping.ManyToManyJoins.Count > 0
                || mapping.OwnedCollections.Count > 0
-               || (mapping.FluentConfiguration?.OwnedNavigations.Count ?? 0) > 0;
+               // Owned-reference columns from BOTH fluent OwnsOne and the [Owned] attribute — keyed on the
+               // flattened columns (source-agnostic), not fluent registration, so an attribute-declared owned
+               // reference on an INPC owner is still scanned instead of silently dropping a sub-property edit.
+               || mapping.HasOwnedReferenceColumns;
 
         private void DetectChangesCore(bool allNonNotifying)
         {

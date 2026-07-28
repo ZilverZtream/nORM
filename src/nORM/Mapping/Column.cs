@@ -41,6 +41,14 @@ namespace nORM.Mapping
         public bool IsTimestamp { get; }
         /// <summary>Indicates whether this column represents a shadow property not defined on the entity type.</summary>
         public bool IsShadow { get; }
+        /// <summary>
+        /// True when this column is a flattened owned-REFERENCE member (an <c>OwnsOne</c> / <c>[Owned]</c>
+        /// sub-property, created with an owner-property prefix). A write to such a sub-property raises no
+        /// <see cref="System.ComponentModel.INotifyPropertyChanged"/> event on the owner, so an INPC owner that
+        /// has any owned-reference column must still be snapshot-scanned by DetectChanges. Source-agnostic:
+        /// true for both the fluent and attribute owned-reference declarations.
+        /// </summary>
+        public bool IsOwned { get; }
         /// <summary>Indicates whether the mapped value can be null according to CLR metadata.</summary>
         public bool IsNullable { get; }
         /// <summary>Name of the principal type if this column is a foreign key, otherwise <c>null</c>.</summary>
@@ -82,6 +90,7 @@ namespace nORM.Mapping
             Setter = source.Setter;
             SetterMethod = source.SetterMethod;
             Converter = source.Converter;
+            IsOwned = source.IsOwned;
         }
 
         /// <summary>
@@ -160,6 +169,8 @@ namespace nORM.Mapping
                     $"Property '{info.Property.DeclaringType?.Name}.{info.Property.Name}' has no public setter " +
                     "and cannot be used as a mapped column. Remove it from the mapping or make it read-write.");
             IsShadow = false;
+            // An owner-property prefix marks a flattened owned-reference sub-property (fluent or [Owned]).
+            IsOwned = prefix != null;
         }
 
         /// <summary>
@@ -218,6 +229,8 @@ namespace nORM.Mapping
                     $"Property '{pi.DeclaringType?.Name}.{pi.Name}' has no public setter " +
                     "and cannot be used as a mapped column. Remove it from the mapping or make it read-write.");
             IsShadow = false;
+            // An owner-property prefix marks a flattened owned-reference sub-property (fluent or [Owned]).
+            IsOwned = prefix != null;
         }
 
         /// <summary>
@@ -258,6 +271,7 @@ namespace nORM.Mapping
             Setter = (e, v) => ShadowPropertyStore.Set(e, name, v);
             SetterMethod = Methods.SetShadowValue;
             IsShadow = true;
+            IsOwned = false;
         }
 
         private static readonly NullabilityInfoContext? s_nullabilityContext = CreateNullabilityContext();
