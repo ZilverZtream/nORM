@@ -407,6 +407,13 @@ namespace nORM.Query
                 && !QueryTranslator.IsQueryRootedSubqueryTerminal(node)
                 && TryGetConstantValueSafe(node, out var constVal))
             {
+                // The fold bakes the whole call into a fixed parameter, but the parameter-value extractor
+                // still collects every closure member the call consumed (Math.Abs(captured), Math.Max(a, b),
+                // ...). Reserve one _unused compiled-param slot per such member so the value list stays aligned
+                // with the compiled-param slots (else a following captured scalar binds by position onto the
+                // wrong slot — silent wrong/empty rows). The _unused placeholders also mark the plan
+                // non-cacheable, so a changed capture re-folds instead of replaying the first run's baked value.
+                ReserveUnusedSlotsForFoldedClosures(node);
                 return CreateSafeParameter(constVal);
             }
             if (TryTranslateJsonValue(node))
@@ -433,6 +440,48 @@ namespace nORM.Query
             }
             throw new NormUnsupportedFeatureException($"Method '{node.Method.Name}' is not supported.",
                 NormUnsupportedReason.MethodUntranslatable);
+        }
+
+        /// <summary>
+        /// Reserves one <c>_unused</c> compiled-parameter placeholder for each closure member the given
+        /// (constant-folded) expression consumed — exactly as the parameter-value extractor collects them —
+        /// so the extractor's value list stays index-aligned with the compiled-param slots. A compound arg
+        /// (Math.Max(a, b), Math.Abs(a + b)) can consume more than one member, so a per-argument reservation
+        /// is insufficient; this counts per member. The placeholders also mark the fold non-cacheable.
+        /// </summary>
+        private void ReserveUnusedSlotsForFoldedClosures(Expression node)
+        {
+            var counter = new FoldedClosureMemberCounter();
+            counter.Visit(node);
+            for (var i = 0; i < counter.Count; i++)
+            {
+                var placeholder = $"{_provider.ParamPrefix}cp{_compiledParams.Count}_unused";
+                _params[placeholder] = DBNull.Value;
+                _compiledParams.Add(placeholder);
+            }
+        }
+
+        /// <summary>
+        /// Counts the closure members a subtree contributes to the parameter-value extractor. Mirrors
+        /// <c>ParameterValueExtractor.VisitMember</c> EXACTLY: a member that folds to a constant is one value
+        /// and its descent is suppressed (no double-count); constants contribute nothing; everything else
+        /// recurses. Keeping this in lock-step with the extractor is what guarantees the slot count matches.
+        /// </summary>
+        private sealed class FoldedClosureMemberCounter : System.Linq.Expressions.ExpressionVisitor
+        {
+            public int Count { get; private set; }
+
+            protected override Expression VisitConstant(System.Linq.Expressions.ConstantExpression node) => node;
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                if (QueryTranslator.TryGetConstantValue(node, out _))
+                {
+                    Count++;
+                    return node; // do not descend — matches the extractor's early return
+                }
+                return base.VisitMember(node);
+            }
         }
     }
 }
