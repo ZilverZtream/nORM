@@ -667,6 +667,25 @@ namespace nORM.Query
                 }
             }
 
+            // Window functions (WithRowNumber/WithRank/WithDenseRank/WithLag/WithLead) project the ranked
+            // rows into an unmapped result type, so neither branch above descends into them and the base case
+            // cannot express a filter over the anonymous shape — the window source table would be ranked with
+            // NO global/tenant predicate, leaking soft-deleted (or another tenant's) rows INTO the window and
+            // corrupting every rank. Recurse into the window SOURCE (argument 0 is the mapped entity query) so
+            // the filter lands before the window, then return: the result shape is unmapped, like a projection.
+            if (expression is MethodCallExpression windowCall &&
+                windowCall.Method.DeclaringType == typeof(WindowFunctionsExtensions) &&
+                windowCall.Arguments.Count > 0 &&
+                typeof(IQueryable).IsAssignableFrom(windowCall.Arguments[0].Type))
+            {
+                var filteredSource = ApplyGlobalFilters(windowCall.Arguments[0], ignoreUserFilters);
+                if (ReferenceEquals(filteredSource, windowCall.Arguments[0]))
+                    return expression;
+                var windowArgs = windowCall.Arguments.ToArray();
+                windowArgs[0] = filteredSource;
+                return windowCall.Update(windowCall.Object, windowArgs);
+            }
+
             var entityType = GetElementType(expression);
             // User global filters (soft-delete etc.) are skipped when IgnoreQueryFilters() is in the
             // query. The tenant predicate below is NEVER skipped.
