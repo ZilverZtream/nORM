@@ -55,7 +55,18 @@ namespace nORM.Query
                     "the fully-loaded set in one pass, or drop the eager-loaded collection and reissue the " +
                     "child query per root if streaming is required.",
                     NormUnsupportedReason.AsAsyncEnumerableIncludeUnsupported);
-            if (plan.PostMaterializeTransform != null || plan.PostReverse)
+            // OwnsMany owned collections are part of the entity AGGREGATE (not an opt-in Include) and are loaded
+            // by an independent SELECT over the full owner set AFTER materialization; the row-by-row loop never
+            // runs it, so a streamed owner would silently carry EMPTY owned collections. Unlike an Include —
+            // which is explicit and can fan out unboundedly — owned data is implicit and bounded by the result
+            // set, so buffer through MaterializeAsync (which loads owned, applies ClientProjection and tracking)
+            // to yield the correct fully-populated owners, matching ToListAsync. (OwnsOne inlines as owner
+            // columns and streams fine.)
+            var hasOwnedCollections = plan.ElementType.IsClass
+                && !plan.ElementType.Name.StartsWith("<>", StringComparison.Ordinal)
+                && _ctx.IsMapped(plan.ElementType)
+                && _ctx.GetMapping(plan.ElementType).OwnedCollections.Count > 0;
+            if (plan.PostMaterializeTransform != null || plan.PostReverse || hasOwnedCollections)
             {
                 // Client-tail reshapes and tail paging operate on the COMPLETE materialized
                 // list — Append attaches after the final row, Reverse and TakeLast need every
@@ -99,7 +110,19 @@ namespace nORM.Query
                 .ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
-                var entity = (T)await plan.Materializer(reader, ct).ConfigureAwait(false);
+                var materialized = await plan.Materializer(reader, ct).ConfigureAwait(false);
+                // A split (partially client-evaluated) projection materializes the ENTITY server-side, then a
+                // client transform produces the result type — every buffered path applies plan.ClientProjection
+                // for exactly this. Apply it per row here too; casting the entity straight to T otherwise throws
+                // InvalidCastException (or, when T is a supertype like object, silently yields raw entities).
+                // The projection result is not a tracked entity, so it bypasses the tracking/identity blocks.
+                if (plan.ClientProjection != null)
+                {
+                    count++;
+                    yield return (T)plan.ClientProjection(materialized);
+                    continue;
+                }
+                var entity = (T)materialized;
                 if (trackable)
                 {
                     var actualMap = _ctx.GetMapping(entity!.GetType());
