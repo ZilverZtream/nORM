@@ -229,6 +229,62 @@ namespace nORM.Query
         }
 
         /// <summary>
+        /// Materializes a projection that combines constructor arguments with member-init bindings —
+        /// <c>new Dto(x.A) { B = x.B }</c>. Reads the row columns in the SELECT order (constructor arguments
+        /// first, then bindings — the exact order the SELECT-clause visitor emits and
+        /// <see cref="ExtractColumnsFromProjection"/> lists them), invokes the parameterized constructor, and
+        /// applies the bindings via a compiled <c>Expression.MemberInit</c>. Collection-navigation
+        /// arguments/bindings carry no column: a constructor collection arg gets an empty mutable list, and a
+        /// collection binding is left for the split-query stitch to populate in place after construction.
+        /// </summary>
+        private static Func<DbDataReader, object> CreateProjectionMemberInitMaterializer(
+            MemberInitExpression memberInit,
+            ConstructorInfo ctor,
+            IReadOnlyList<Column> columns,
+            int startOffset,
+            TableMapping mapping)
+        {
+            var reader = Expression.Parameter(typeof(DbDataReader), "reader");
+            var cursor = 0;
+
+            Expression ReadNextColumn(Type targetType)
+            {
+                var col = columns[cursor];
+                var offset = cursor + startOffset;
+                cursor++;
+                var readValue = col.Converter != null
+                    ? BuildConverterReadExpression(reader, col.Converter!, targetType, offset)
+                    : GetOptimizedReaderCall(reader, targetType, offset);
+                var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(offset));
+                return Expression.Condition(isDbNull, Expression.Default(targetType), readValue);
+            }
+
+            var ctorArguments = memberInit.NewExpression.Arguments;
+            var ctorParams = ctor.GetParameters();
+            var args = new Expression[ctorParams.Length];
+            for (var i = 0; i < ctorParams.Length; i++)
+            {
+                args[i] = IsShapedOrBareNavigationCollection(ctorArguments[i], mapping)
+                    ? BuildEmptyProjectedCollection(ctorParams[i].ParameterType)
+                    : ReadNextColumn(ctorParams[i].ParameterType);
+            }
+
+            var bindings = new List<MemberBinding>(memberInit.Bindings.Count);
+            foreach (var binding in memberInit.Bindings)
+            {
+                if (binding is not MemberAssignment ma || ma.Member is not PropertyInfo prop)
+                    continue;
+                // A collection binding is populated in place by the split-query stitch after construction.
+                if (IsShapedOrBareNavigationCollection(ma.Expression, mapping))
+                    continue;
+                bindings.Add(Expression.Bind(prop, ReadNextColumn(prop.PropertyType)));
+            }
+
+            var body = Expression.Convert(Expression.MemberInit(Expression.New(ctor, args), bindings), typeof(object));
+            return Expression.Lambda<Func<DbDataReader, object>>(body, reader).Compile();
+        }
+
+        /// <summary>
         /// Builds an empty, mutable <see cref="List{T}"/> assignable to a projected collection member so a
         /// split-query stitch can populate it in place. The member type comes from the shaped collection's
         /// terminator: <c>ToList</c>/<c>AsEnumerable</c> yield a <c>List&lt;T&gt;</c>-assignable type. A

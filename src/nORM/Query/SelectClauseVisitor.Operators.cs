@@ -907,6 +907,21 @@ namespace nORM.Query
         {
             var sb = EnsureBuilder();
             bool firstColumn = true;
+            // Constructor arguments (`new Dto(x.A) { B = x.B }`) are emitted first — positionally, aliased
+            // __ctorN — then the member-init bindings; the materializer reads the row columns in this same
+            // order. A collection-nav constructor argument is populated by the split-query pipeline and emits
+            // no column, exactly like a collection binding below. Common case (parameterless ctor) has no
+            // constructor arguments, so this loop is a no-op and the emitted SQL is byte-identical.
+            var ctorArgs = node.NewExpression.Arguments;
+            for (int i = 0; i < ctorArgs.Count; i++)
+            {
+                if (TryMatchDetectedCollection(ctorArgs[i], out _, out _, out _, out _))
+                    continue;
+                if (!firstColumn) sb.Append(", ");
+                Visit(ctorArgs[i]);
+                sb.Append(" AS ").Append(_provider.Escape("__ctor" + i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                firstColumn = false;
+            }
             for (int i = 0; i < node.Bindings.Count; i++)
             {
                 if (node.Bindings[i] is MemberAssignment assignment)

@@ -42,7 +42,32 @@ namespace nORM.Query
             // property and whose Name matches the column we expect in the result row.
             if (projection.Body is MemberInitExpression memberInit)
             {
-                var cols = new List<Column>(memberInit.Bindings.Count);
+                var ctorArguments = memberInit.NewExpression.Arguments;
+                var cols = new List<Column>(ctorArguments.Count + memberInit.Bindings.Count);
+                // Constructor arguments come first, in the same order the SELECT emitted them (before the
+                // member-init bindings). A simple column argument carries the source column (and its converter);
+                // any computed/literal argument reserves one shadow column slot. Collection-nav arguments carry
+                // no column (populated by the split-query pipeline). Empty for the common parameterless-ctor DTO.
+                for (int ai = 0; ai < ctorArguments.Count; ai++)
+                {
+                    var ctorArg = ctorArguments[ai];
+                    if (IsShapedOrBareNavigationCollection(ctorArg, mapping))
+                        continue;
+                    if (ctorArg is MemberExpression camExpr
+                        && !IsNavigationCollection(camExpr, mapping)
+                        && mapping.TryGetColumnForMemberAccess(camExpr, out var camCol))
+                    {
+                        cols.Add(camCol);
+                    }
+                    else
+                    {
+                        // A computed/literal argument surfacing a converter column in value position would read
+                        // the raw stored value — fail loud, matching the binding and NewExpression paths.
+                        GuardComputedConverterProjection(ctorArg, mapping);
+                        var argName = "__ctor" + ai.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        cols.Add(new Column(argName, ctorArg.Type, mapping.Type, mapping.Provider, argName));
+                    }
+                }
                 foreach (var binding in memberInit.Bindings)
                 {
                     if (binding is MemberAssignment ma && ma.Member is PropertyInfo dtoProp)

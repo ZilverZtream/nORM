@@ -202,6 +202,18 @@ namespace nORM.Query
                 }
             }
 
+            // MemberInit WITH constructor arguments: `new Dto(x.A) { B = x.B }`. The setter-based path below
+            // uses the parameterless constructor and would silently drop the constructor arguments (A stays 0),
+            // so construct via the parameterized constructor AND apply the bindings. Guarded on a non-empty
+            // argument list, so a plain `new Dto { ... }` still takes the setter path unchanged.
+            if (projection?.Body is MemberInitExpression projectionMemberInit
+                && projectionMemberInit.NewExpression.Arguments.Count > 0
+                && projectionMemberInit.NewExpression.Constructor is { } memberInitCtor
+                && projectionMemberInit.Type == targetType)
+            {
+                return CreateProjectionMemberInitMaterializer(projectionMemberInit, memberInitCtor, columns, startOffset, mapping);
+            }
+
             var parameterlessCtor = _parameterlessCtorCache.GetOrAdd(targetType, t => t.GetConstructor(Type.EmptyTypes));
             bool hasConverters = columns.Any(c => c.Converter != null);
 
