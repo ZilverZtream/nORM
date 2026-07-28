@@ -143,7 +143,7 @@ namespace nORM.Core
                         {
                             // We won the insertion race — register the side-effect collections.
                             _entriesByReference.TryAdd(entity, newEntry);
-                            if (entity is not INotifyPropertyChanged)
+                            if (entity is not INotifyPropertyChanged || RequiresChangeScanDespiteNotifications(mapping))
                                 _nonNotifyingEntries.TryAdd(newEntry, 0);
                             return newEntry;
                         }
@@ -170,7 +170,7 @@ namespace nORM.Core
                                 var replacementEntry = new EntityEntry(entity, EntityState.Added, mapping, _options, this);
                                 typeEntries[pk] = replacementEntry;
                                 _entriesByReference.TryAdd(entity, replacementEntry);
-                                if (entity is not INotifyPropertyChanged)
+                                if (entity is not INotifyPropertyChanged || RequiresChangeScanDespiteNotifications(mapping))
                                     _nonNotifyingEntries.TryAdd(replacementEntry, 0);
                                 return replacementEntry;
                             }
@@ -215,7 +215,7 @@ namespace nORM.Core
                 if (_entriesByReference.TryAdd(entity, entry))
                 {
                     // Successfully added - set up additional tracking
-                    if (entity is not INotifyPropertyChanged)
+                    if (entity is not INotifyPropertyChanged || RequiresChangeScanDespiteNotifications(mapping))
                         _nonNotifyingEntries.TryAdd(entry, 0);
                     return entry;
                 }
@@ -237,7 +237,7 @@ namespace nORM.Core
                 // Defensive fallback: the entity was removed between TryAdd and TryGetValue.
                 // Re-add the entry we already constructed.
                 _entriesByReference.TryAdd(entity, entry);
-                if (entity is not INotifyPropertyChanged)
+                if (entity is not INotifyPropertyChanged || RequiresChangeScanDespiteNotifications(mapping))
                     _nonNotifyingEntries.TryAdd(entry, 0);
                 return entry;
             }
@@ -670,6 +670,19 @@ namespace nORM.Core
         /// </remarks>
         internal void DetectAllChanges()
             => DetectChangesCore(allNonNotifying: true);
+
+        // An entity that implements INotifyPropertyChanged is normally tracked by notifications alone and
+        // excluded from the snapshot scan (_nonNotifyingEntries). But scalar notifications cannot fire for an
+        // owned-collection add/remove, an owned-reference sub-property write, or a many-to-many association
+        // edit — none of those raise PropertyChanged on the OWNER. An INPC owner that HAS such navigations must
+        // therefore still be scanned, so DetectChanges consults HasOwnedCollectionChanges/HasManyToManyChanges
+        // and re-diffs the flattened owned-reference columns; otherwise a pure association/owned edit (with no
+        // co-occurring scalar edit to promote the owner to Modified) is silently lost. Pure-scalar INPC
+        // entities have no such navigation and stay on the notification-only fast path.
+        private static bool RequiresChangeScanDespiteNotifications(TableMapping mapping)
+            => mapping.ManyToManyJoins.Count > 0
+               || mapping.OwnedCollections.Count > 0
+               || (mapping.FluentConfiguration?.OwnedNavigations.Count ?? 0) > 0;
 
         private void DetectChangesCore(bool allNonNotifying)
         {
