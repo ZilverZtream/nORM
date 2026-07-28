@@ -845,11 +845,22 @@ namespace nORM.Query
                     return lam;
                 if (mce.Arguments.Count >= 1 && IsShapePreservingSetOpArmOperator(mce.Method.Name))
                     cur = mce.Arguments[0];
+                else if (mce.Arguments.Count == 2 && IsPlainSetOpMethod(mce.Method.Name))
+                    // A nested set-op chain (a.Union(b).Union(c)): the outer node's left arm is itself a set-op.
+                    // The whole compound adopts its LEFTMOST arm's member order (SQL matches columns
+                    // positionally, left-driven), so descend the left arm to find that canonical projection —
+                    // otherwise the outer node's right arm (c) is never reordered to match and its columns swap.
+                    cur = mce.Arguments[0];
                 else
                     return null;
             }
             return null;
         }
+
+        // Plain (non-keyed) binary set operators whose left arm drives the compound's column order.
+        private static bool IsPlainSetOpMethod(string methodName)
+            => methodName is nameof(Queryable.Union) or nameof(Queryable.Concat)
+                or nameof(Queryable.Intersect) or nameof(Queryable.Except);
 
         // Rebuilds a set-op arm with its base member-init Select's lambda replaced, preserving any
         // shape-preserving operators wrapped around it (walks to the same Select FindArmMemberInitProjection did).
