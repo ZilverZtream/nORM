@@ -162,17 +162,18 @@ namespace nORM.Query
                     return node;
                 }
 
-                // Scalar DateTimeOffset: .NET dedups by INSTANT; offset-suffixed TEXT
-                // storage dedups by representation. Mirror of the flat-path rewrite —
-                // select and group the canonical form (it still materializes as a
-                // DateTimeOffset). Identity-hook providers skip this branch.
-                if (elementType == typeof(DateTimeOffset)
-                    && TryGetSingleColumnSelectIdentifier(subPlanD.Sql, out var dtoCol)
-                    && t._provider.CanonicalizeDateTimeOffsetGroupKey(dtoCol) is { } canonicalDto)
+                // Scalar decimal / DateTime / TimeOnly / TimeSpan / DateTimeOffset: .NET dedups by
+                // VALUE (decimal/temporal) or INSTANT (DateTimeOffset), but TEXT storage dedups by raw
+                // representation ('10.5' vs '10.50', '12:00:00' vs '12:00:00.0000000', mixed offsets).
+                // Mirror the flat-path rewrite — select and group the canonical form (it still
+                // materializes as the original type). Identity-hook (native) providers skip this branch.
+                if (elementType != null
+                    && TryGetSingleColumnSelectIdentifier(subPlanD.Sql, out var scalarCol)
+                    && CanonicalizeWindowedDistinctKey(t, elementType, scalarCol) is { } canonicalScalar)
                 {
-                    t._sql.AppendFragment("SELECT ").Append(canonicalDto)
+                    t._sql.AppendFragment("SELECT ").Append(canonicalScalar)
                           .AppendFragment(" FROM (").Append(subPlanD.Sql).AppendFragment(") AS ").Append(winAliasD);
-                    t._groupBy.Add(canonicalDto);
+                    t._groupBy.Add(canonicalScalar);
                     t._isDistinct = true;
                     return node;
                 }
@@ -195,8 +196,7 @@ namespace nORM.Query
                         var outName = t._provider.Escape(shapeNew.Members[ci].Name);
                         var memberType = Nullable.GetUnderlyingType(shapeNew.Arguments[ci].Type) ?? shapeNew.Arguments[ci].Type;
                         if (ci > 0) t._sql.AppendFragment(", ");
-                        if (memberType == typeof(DateTimeOffset)
-                            && t._provider.CanonicalizeDateTimeOffsetGroupKey(outName) is { } canonicalMember)
+                        if (CanonicalizeWindowedDistinctKey(t, memberType, outName) is { } canonicalMember)
                         {
                             t._sql.Append(canonicalMember).AppendFragment(" AS ").Append(outName);
                         }
@@ -210,8 +210,7 @@ namespace nORM.Query
                     {
                         var outName = t._provider.Escape(shapeNew.Members[ci].Name);
                         var memberType = Nullable.GetUnderlyingType(shapeNew.Arguments[ci].Type) ?? shapeNew.Arguments[ci].Type;
-                        if (memberType == typeof(DateTimeOffset)
-                            && t._provider.CanonicalizeDateTimeOffsetGroupKey(outName) is { } canonicalMember)
+                        if (CanonicalizeWindowedDistinctKey(t, memberType, outName) is { } canonicalMember)
                         {
                             t._groupBy.Add(canonicalMember);
                             continue;
@@ -231,12 +230,33 @@ namespace nORM.Query
 
             /// <summary>
             /// True when a projected member of this type dedups incorrectly under a
-            /// plain DISTINCT on the current provider (CI-collated strings; text-stored
-            /// DateTimeOffset instants).
+            /// plain DISTINCT on the current provider (CI-collated strings; or a TEXT-stored
+            /// decimal / DateTime / TimeOnly / TimeSpan / DateTimeOffset that must dedup by value).
             /// </summary>
             private static bool NeedsDistinctKeyTreatment(QueryTranslator t, Type memberType)
                 => (memberType == typeof(string) && t._provider.DefaultStringEqualityIsCaseInsensitive)
-                   || (memberType == typeof(DateTimeOffset) && t._provider.CanonicalizeDateTimeOffsetGroupKey("x") != null);
+                   || CanonicalizeWindowedDistinctKey(t, memberType, "x") != null;
+
+            /// <summary>
+            /// The by-VALUE canonical group key for a windowed <c>Distinct()</c> member, or null when a
+            /// plain column already dedups correctly (native-typed providers, or a type needing no
+            /// canonicalization). decimal / DateTime / TimeOnly / TimeSpan route through the provider's
+            /// ExactKeySql (canonical TEXT — REAL or a different scale would mis-dedup); DateTimeOffset dedups by instant.
+            /// Mirrors the flat path (SelectClauseVisitor's ExactDecimalProjectionKeys) so the windowed wrap
+            /// dedups identically. The type checks probe the provider's canonical hooks with a dummy fragment.
+            /// </summary>
+            private static string? CanonicalizeWindowedDistinctKey(QueryTranslator t, Type memberType, string colSql)
+            {
+                if (memberType == typeof(DateTimeOffset))
+                    return t._provider.CanonicalizeDateTimeOffsetGroupKey(colSql);
+                bool canonicalized =
+                    memberType == typeof(decimal) ? t._provider.CanonicalDecimalTextForExactCompare("x") != null
+                    : memberType == typeof(DateTime) ? t._provider.CanonicalDateTimeTextForExactCompare("x") != null
+                    : memberType == typeof(TimeOnly) ? t._provider.CanonicalTimeOnlyTextForExactCompare("x") != null
+                    : memberType == typeof(TimeSpan) ? t._provider.CanonicalTimeSpanTextForExactCompare("x") != null
+                    : false;
+                return canonicalized ? t._provider.ExactKeySql(colSql, memberType) : null;
+            }
 
             /// <summary>
             /// Walks down through element-shape-preserving operators (Where, OrderBy,
