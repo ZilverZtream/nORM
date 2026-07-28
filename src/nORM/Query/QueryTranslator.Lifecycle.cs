@@ -34,6 +34,11 @@ namespace nORM.Query
         {
             Reset(ctx);
         }
+        public QueryTranslator(DbContext ctx, bool ignoreUserFilters)
+        {
+            Reset(ctx);
+            _ignoreUserFilters = ignoreUserFilters;
+        }
         private QueryTranslator(
             DbContext ctx,
             TableMapping mapping,
@@ -126,6 +131,7 @@ namespace nORM.Query
                 _estimatedTimeout = ctx.Options.TimeoutConfiguration.BaseTimeout;
                 _isCacheable = false;
                 _cacheExpiration = null;
+                _ignoreUserFilters = false;
                 _asOfTimestamp = null;
                 _detectedCollections = new List<PropertyInfo>();
                 _detectedCollectionFilters = new Dictionary<PropertyInfo, SelectClauseVisitor.RenderedCollectionFilter>();

@@ -241,7 +241,7 @@ namespace nORM.Query
                     // Convert to IList for EagerLoadAsync compatibility
                     IList iList = list;
                     foreach (var include in plan.Includes)
-                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, iList, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters).ConfigureAwait(false);
                 }
 
                 // M2M eager loading runs unconditionally (no SplitQuery requirement)
@@ -249,7 +249,7 @@ namespace nORM.Query
                 {
                     IList iList = list;
                     foreach (var m2mPlan in plan.M2MIncludes)
-                        await _includeProcessor.LoadManyToManyAsync(m2mPlan, iList, ct, plan.NoTracking).ConfigureAwait(false);
+                        await _includeProcessor.LoadManyToManyAsync(m2mPlan, iList, ct, plan.NoTracking, plan.IgnoreUserFilters).ConfigureAwait(false);
                 }
 
                 // Load owned collections (OwnsMany) — this path serves entity roots too, and an
@@ -364,7 +364,7 @@ namespace nORM.Query
                 {
                     foreach (var include in plan.Includes)
                     {
-                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams).ConfigureAwait(false);
+                        await _includeProcessor.EagerLoadAsync(include, list, ct, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters).ConfigureAwait(false);
                     }
                 }
 
@@ -372,13 +372,13 @@ namespace nORM.Query
                 if (plan.M2MIncludes != null && plan.M2MIncludes.Count > 0)
                 {
                     foreach (var m2mPlan in plan.M2MIncludes)
-                        await _includeProcessor.LoadManyToManyAsync(m2mPlan, list, ct, plan.NoTracking).ConfigureAwait(false);
+                        await _includeProcessor.LoadManyToManyAsync(m2mPlan, list, ct, plan.NoTracking, plan.IgnoreUserFilters).ConfigureAwait(false);
                 }
 
                 // Execute dependent queries for nested collections (split query for projections)
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
-                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, plan.AsOfTimestamp, ct).ConfigureAwait(false);
+                    await ExecuteDependentQueriesAsync(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, plan.AsOfTimestamp, plan.IgnoreUserFilters, ct).ConfigureAwait(false);
                 }
 
                 // Load owned collections (OwnsMany) for all materialized entities — including
@@ -529,7 +529,7 @@ namespace nORM.Query
                     foreach (var include in plan.Includes)
                     {
                         // Truly synchronous eager load - no GetAwaiter().GetResult().
-                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams);
+                        _includeProcessor.EagerLoad(include, list, plan.NoTracking, plan.AsOfTimestamp, includeFilterParams, plan.IgnoreUserFilters);
                     }
                 }
 
@@ -537,14 +537,14 @@ namespace nORM.Query
                 if (plan.M2MIncludes != null && plan.M2MIncludes.Count > 0)
                 {
                     foreach (var m2mPlan in plan.M2MIncludes)
-                        _includeProcessor.LoadManyToMany(m2mPlan, list, plan.NoTracking);
+                        _includeProcessor.LoadManyToMany(m2mPlan, list, plan.NoTracking, plan.IgnoreUserFilters);
                 }
 
                 // Execute dependent queries for nested collections (split query for projections).
                 if (plan.DependentQueries != null && plan.DependentQueries.Count > 0)
                 {
                     // Truly synchronous dependent query execution - no GetAwaiter().GetResult().
-                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, plan.AsOfTimestamp);
+                    ExecuteDependentQueries(plan.DependentQueries, list, plan.NoTracking, dependentFilterParams, plan.AsOfTimestamp, plan.IgnoreUserFilters);
                 }
 
                 // Load owned collections (OwnsMany) for all materialized entities — symmetric with the async

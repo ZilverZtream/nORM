@@ -262,10 +262,17 @@ namespace nORM.Query
                 // the temporal scope's. The pre-scan opens the window before any arm
                 // translates so translation order never decides which arms get windowed.
                 var ownsTemporalScope = ownsTableScope;
+                // The outermost translation publishes its IgnoreQueryFilters() decision to the thread so nested
+                // sub-translations (ApplySubqueryRootFilters → WrapSubqueryRoot) drop the user filters too. Save
+                // and restore the prior value rather than force-clear so a re-entrant outer translation is intact.
+                var prevIgnoreScope = t_ignoreUserFiltersScope;
                 try
                 {
                     if (ownsTemporalScope)
+                    {
                         TryOpenTemporalScopeForTranslation(e);
+                        t_ignoreUserFiltersScope = _ignoreUserFilters;
+                    }
                     return new TranslationBuilder(this, e)
                         .Validate()
                         .Setup()
@@ -281,6 +288,7 @@ namespace nORM.Query
                     {
                         EndTemporalTableSourceScope();
                         _asOfTagResolution = null;
+                        t_ignoreUserFiltersScope = prevIgnoreScope;
                     }
                 }
             }

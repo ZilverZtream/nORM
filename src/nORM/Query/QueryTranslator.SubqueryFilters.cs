@@ -10,6 +10,23 @@ namespace nORM.Query
 {
     internal sealed partial class QueryTranslator
     {
+        // Set for the duration of the OUTERMOST translation (Translate owns it, gated on ownsTemporalScope) when
+        // the query carries IgnoreQueryFilters(); read by WrapSubqueryRoot so translator-built correlated
+        // subqueries drop the USER global filters too — the tenant equality below and the TPH discriminator stay.
+        // ThreadStatic because nested sub-translations (pool-fresh or not) must all observe the root's decision,
+        // and translation is fully synchronous so no async continuation ever escapes the scope.
+        [ThreadStatic] private static bool t_ignoreUserFiltersScope;
+        private bool _ignoreUserFilters;
+
+        /// <summary>
+        /// True while the OUTERMOST translation of an IgnoreQueryFilters() query is in flight on this thread.
+        /// Translation-phase visibility builders (GlobalFilterFragment.Combine and every nav-aggregate/subquery
+        /// site that flows through it) read this so they drop the user's global filters without each call site
+        /// having to thread the flag. Always false at execution time — eager loaders pass plan.IgnoreUserFilters
+        /// to Build explicitly instead.
+        /// </summary>
+        internal static bool IgnoreUserFiltersInScope => t_ignoreUserFiltersScope;
+
         // ── Global/tenant filters inside correlated subqueries ─────────────────
         //
         // NormQueryProvider.ApplyGlobalFilters rewrites the TOP-LEVEL expression
@@ -69,6 +86,9 @@ namespace nORM.Query
 
             List<Expression>? bodies = null;
             ParameterExpression? param = null;
+            // IgnoreQueryFilters() drops the USER's global filters here too (same intent as the root and the
+            // eager loaders); the tenant equality below is a security boundary and stays unconditionally.
+            if (!t_ignoreUserFiltersScope)
             foreach (var kvp in ctx.Options.GlobalFilters)
             {
                 if (!kvp.Key.IsAssignableFrom(elementType)) continue;

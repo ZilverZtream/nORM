@@ -154,7 +154,7 @@ namespace nORM.Query
             return $"(SELECT {cols} FROM {history} {innerAlias} WHERE {pn} >= {innerAlias}.{validFrom} AND {pn} < {innerAlias}.{validTo})";
         }
 
-        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd, DateTime? asOf = null, IReadOnlyList<IncludeFilter?>? filters = null, Dictionary<string, object?>? filterParams = null, IReadOnlyList<IncludeOrdering?>? orderings = null)
+        private string BuildSql(IReadOnlyList<TableMapping.Relation> path, TableMapping[] mappings, List<string> paramNames, List<string[]> paramGroups, DbCommand cmd, DateTime? asOf = null, IReadOnlyList<IncludeFilter?>? filters = null, Dictionary<string, object?>? filterParams = null, IReadOnlyList<IncludeOrdering?>? orderings = null, bool ignoreUserFilters = false)
         {
             var tenantActive = _ctx.Options.TenantProvider != null;
             if (tenantActive)
@@ -194,7 +194,7 @@ namespace nORM.Query
                     // Apply the general global filters (e.g. soft-delete) to each eager-loaded level.
                     // ApplyGlobalFilters only filters the root LINQ tree; this hand-built Include SQL must
                     // repeat the predicate or a soft-deleted / cross-tenant child leaks into the graph.
-                    var globalFilterSql = GlobalFilterFragment.Build(_ctx, map, alias, cmd);
+                    var globalFilterSql = GlobalFilterFragment.Build(_ctx, map, alias, cmd, ignoreUserFilters);
                     if (globalFilterSql != null)
                         where.Append(" AND ").Append(globalFilterSql);
 

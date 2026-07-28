@@ -26,12 +26,12 @@ namespace nORM.Query
         /// applies to the type. Parameter numbering starts after the command's existing parameters so it
         /// cannot collide with FK-IN or tenant parameters already added.
         /// </summary>
-        internal static string? Build(DbContext ctx, TableMapping map, string qualifier, DbCommand cmd)
+        internal static string? Build(DbContext ctx, TableMapping map, string qualifier, DbCommand cmd, bool ignoreUserFilters = false)
         {
             // NOTE: do not early-return on GlobalFilters.Count == 0 — a TPH subtype dependent has no global
             // filter yet still needs its discriminator predicate (folded into Combine below), or the eager /
             // split-query loader folds in sibling subtypes (a Cat sharing the FK loads as a Dog).
-            var combined = Combine(ctx, map.Type);
+            var combined = Combine(ctx, map.Type, ignoreUserFilters);
             if (combined == null)
                 return null;
 
@@ -61,9 +61,9 @@ namespace nORM.Query
         /// subquery's rows. Entities without a tenant column are shared tables and get only
         /// their global filters.
         /// </summary>
-        internal static LambdaExpression? CombineWithTenant(DbContext ctx, Type entityType)
+        internal static LambdaExpression? CombineWithTenant(DbContext ctx, Type entityType, bool ignoreUserFilters = false)
         {
-            var combined = Combine(ctx, entityType);
+            var combined = Combine(ctx, entityType, ignoreUserFilters);
             if (ctx.Options.TenantProvider == null)
                 return combined;
             // Do NOT swallow a GetMapping failure: silently returning without the tenant predicate would drop the
@@ -90,10 +90,18 @@ namespace nORM.Query
         /// so translator-built correlated subqueries can add the same filter as a <c>Where</c> clause.
         /// Returns <c>null</c> when no filter applies.
         /// </summary>
-        internal static LambdaExpression? Combine(DbContext ctx, Type entityType)
+        internal static LambdaExpression? Combine(DbContext ctx, Type entityType, bool ignoreUserFilters = false)
         {
             List<Expression>? bodies = null;
             ParameterExpression? param = null;
+            // IgnoreQueryFilters() bypasses the USER's AddGlobalFilter predicates for the whole query — root and
+            // every secondary load — but never the TPH discriminator below (intrinsic subtype visibility, not an
+            // opt-out filter) nor the tenant boundary (applied by CombineWithTenant / the loaders separately).
+            // Translation-phase callers (nav-aggregate / correlated-subquery visitors) don't thread the flag
+            // explicitly — they run inside the outermost translation, so honor its scope here. Execution-phase
+            // Build passes plan.IgnoreUserFilters directly (the scope is already closed by then).
+            ignoreUserFilters |= QueryTranslator.IgnoreUserFiltersInScope;
+            if (!ignoreUserFilters)
             foreach (var kvp in ctx.Options.GlobalFilters)
             {
                 if (!kvp.Key.IsAssignableFrom(entityType)) continue;

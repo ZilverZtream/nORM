@@ -17,7 +17,7 @@ namespace nORM.Query
         /// Eagerly loads a many-to-many relationship for the given parent entities by
         /// querying the join table and then loading the related entities.
         /// </summary>
-        public async Task LoadManyToManyAsync(M2MIncludePlan plan, IList parents, CancellationToken ct, bool noTracking)
+        public async Task LoadManyToManyAsync(M2MIncludePlan plan, IList parents, CancellationToken ct, bool noTracking, bool ignoreUserFilters = false)
         {
             if (parents.Count == 0) return;
             var jtm = plan.JoinTable;
@@ -122,7 +122,7 @@ namespace nORM.Query
             // The right entity's global filters (soft-delete) restrict which related rows
             // are visible — the same rule the regular include levels apply. Without this,
             // filtered-out rows leak into the loaded collections.
-            var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+            var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2, ignoreUserFilters);
             if (rightGlobalFilter != null)
                 cmd2.CommandText += $" AND {rightGlobalFilter}";
             cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
@@ -189,7 +189,7 @@ namespace nORM.Query
         /// <c>Materialize</c> code path. Uses synchronous reader APIs so the sync path stays
         /// truly synchronous without any <c>GetAwaiter().GetResult()</c> calls.
         /// </summary>
-        public void LoadManyToMany(M2MIncludePlan plan, IList parents, bool noTracking)
+        public void LoadManyToMany(M2MIncludePlan plan, IList parents, bool noTracking, bool ignoreUserFilters = false)
         {
             if (parents.Count == 0) return;
             var jtm = plan.JoinTable;
@@ -284,7 +284,7 @@ namespace nORM.Query
             // The right entity's global filters (soft-delete) restrict which related rows
             // are visible — the same rule the regular include levels apply. Without this,
             // filtered-out rows leak into the loaded collections.
-            var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+            var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2, ignoreUserFilters);
             if (rightGlobalFilter != null)
                 cmd2.CommandText += $" AND {rightGlobalFilter}";
             cmd2.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd2.CommandText);
@@ -354,7 +354,7 @@ namespace nORM.Query
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("A many-to-many shaped projection may compile an element projection at runtime; not NativeAOT-compatible.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("A many-to-many shaped projection reflects over the projected type; trimming may remove the required members.")]
-        public void LoadManyToManyProjection(DependentQueryDefinition depQuery, IList parents, Dictionary<string, object?>? filterParams = null)
+        public void LoadManyToManyProjection(DependentQueryDefinition depQuery, IList parents, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false)
         {
             if (parents.Count == 0) return;
             var jtm = depQuery.M2M!;
@@ -447,7 +447,7 @@ namespace nORM.Query
                     rsql.Append($" AND {rightTenantCol.EscCol} = {rtp}");
                     cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many shaped projection right side"));
                 }
-                var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+                var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2, ignoreUserFilters);
                 if (rightGlobalFilter != null) rsql.Append($" AND {rightGlobalFilter}");
                 // Shaped-projection per-element filter (Tags = p.Tags.Where(pred).ToList()): the predicate was
                 // rendered at plan build against rightMapping.EscTable — the same unaliased FROM used here, so its
@@ -494,7 +494,7 @@ namespace nORM.Query
         /// </summary>
         [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("A many-to-many shaped projection may compile an element projection at runtime; not NativeAOT-compatible.")]
         [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("A many-to-many shaped projection reflects over the projected type; trimming may remove the required members.")]
-        public async Task LoadManyToManyProjectionAsync(DependentQueryDefinition depQuery, IList parents, Dictionary<string, object?>? filterParams, CancellationToken ct)
+        public async Task LoadManyToManyProjectionAsync(DependentQueryDefinition depQuery, IList parents, Dictionary<string, object?>? filterParams, CancellationToken ct, bool ignoreUserFilters = false)
         {
             if (parents.Count == 0) return;
             var jtm = depQuery.M2M!;
@@ -587,7 +587,7 @@ namespace nORM.Query
                     rsql.Append($" AND {rightTenantCol.EscCol} = {rtp}");
                     cmd2.AddParam(rtp, _ctx.GetRequiredTenantId(rightMapping, "many-to-many shaped projection right side"));
                 }
-                var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2);
+                var rightGlobalFilter = GlobalFilterFragment.Build(_ctx, rightMapping, rightMapping.EscTable, cmd2, ignoreUserFilters);
                 if (rightGlobalFilter != null) rsql.Append($" AND {rightGlobalFilter}");
                 QueryExecutor.AppendDependentFilter(cmd2, rsql, depQuery, filterParams);
                 cmd2.CommandText = rsql.ToString();

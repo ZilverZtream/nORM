@@ -150,7 +150,14 @@ namespace nORM.Query
         // stored column value, so ConvertFromProvider must run on the raw scalar to yield the MODEL value
         // (Max(o => o.Score) over a +1000 converter returns 9, not 1009). Null for every other query:
         // Sum/Average aggregate across rows and do not correspond to a single stored value.
-        nORM.Mapping.IValueConverter? ScalarResultConverter = null
+        nORM.Mapping.IValueConverter? ScalarResultConverter = null,
+        // IgnoreQueryFilters() was applied to the root query: the USER's global filters (soft-delete etc.) are
+        // dropped for the WHOLE query — the root tree (via ApplyGlobalFilters), translator-built correlated
+        // subqueries (via the translation-scoped flag), AND every secondary load below. Eager loaders read this
+        // and pass it to GlobalFilterFragment.Build so an Include/split/M2M child is not silently over-filtered.
+        // The tenant boundary and TPH discriminator are NEVER dropped. Part of the plan-cache fingerprint so an
+        // ignore query and a normal query with an otherwise-identical tree do not share a plan.
+        bool IgnoreUserFilters = false
     );
 
     internal sealed record BulkCudQueryShape(

@@ -40,7 +40,7 @@ namespace nORM.Query
         /// Eagerly loads all relations defined in the <paramref name="include"/> for the given <paramref name="parents"/>
         /// using a single round trip per batch of keys.
         /// </summary>
-        public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null)
+        public async Task EagerLoadAsync(IncludePlan include, IList parents, CancellationToken ct, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false)
         {
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
@@ -106,7 +106,7 @@ namespace nORM.Query
                     paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams, include.Orderings);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams, include.Orderings, ignoreUserFilters);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 await using var reader = await cmd.ExecuteReaderWithInterceptionAsync(_ctx, CommandBehavior.Default, ct).ConfigureAwait(false);
@@ -129,7 +129,7 @@ namespace nORM.Query
         /// Called from the synchronous <c>Materialize</c> code path to eliminate
         /// sync-over-async anti-pattern.
         /// </summary>
-        public void EagerLoad(IncludePlan include, IList parents, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null)
+        public void EagerLoad(IncludePlan include, IList parents, bool noTracking, DateTime? asOf = null, Dictionary<string, object?>? filterParams = null, bool ignoreUserFilters = false)
         {
             if (parents.Count == 0 || include.Path.Count == 0)
                 return;
@@ -191,7 +191,7 @@ namespace nORM.Query
                     paramGroups.Add(group);
                 }
 
-                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams, include.Orderings);
+                cmd.CommandText = BuildSql(include.Path, mappings, paramNames, paramGroups, cmd, asOf, include.Filters, filterParams, include.Orderings, ignoreUserFilters);
                 cmd.CommandTimeout = SafeAdaptiveTimeoutSeconds(AdaptiveTimeoutManager.OperationType.ComplexSelect, cmd.CommandText);
 
                 using var reader = cmd.ExecuteReaderWithInterceptionAndCommandDispose(_ctx, System.Data.CommandBehavior.Default);

@@ -150,6 +150,14 @@ namespace nORM.Query
                 // global filters share a fingerprint and replay each other's plans.
                 .Extend(_ctx.GetGlobalFiltersHash());
 
+            // IgnoreQueryFilters() over a filter defined on a CHILD/related type leaves the ROOT tree byte-for-byte
+            // identical to the non-ignore query (the filter only ever reached the secondary loads and correlated
+            // subqueries, never the root), so `filtered` — hence the structural fingerprint — is the same for both.
+            // Fold the flag in so the ignore plan (subqueries + eager loads run unfiltered) never reuses, or is
+            // reused as, the normal plan. Only extend when set so the far-more-common non-ignore path is unchanged.
+            if (ignoreUserFilters)
+                fingerprint = fingerprint.Extend(unchecked((int)0x1_9F_1C_5D));
+
             // FromSqlRaw supplies the FROM source as a raw SQL string that the expression-structure
             // fingerprint can't see, so distinct raw SQL (and raw-vs-mapped queries) would otherwise share a
             // plan. Fold its hash into the key so the lookup can never return the wrong plan.
@@ -185,19 +193,20 @@ namespace nORM.Query
             QueryPlan plan;
             if (bypassPlanCache)
             {
-                using var freshTranslator = new QueryTranslator(_ctx);
+                using var freshTranslator = new QueryTranslator(_ctx, ignoreUserFilters);
                 var p = freshTranslator.Translate(localFiltered);
                 plan = p with
                 {
                     Fingerprint = fingerprint,
                     Parameters = new Dictionary<string, object>(p.Parameters),
-                    CompiledParameters = new List<string>(p.CompiledParameters)
+                    CompiledParameters = new List<string>(p.CompiledParameters),
+                    IgnoreUserFilters = ignoreUserFilters
                 };
                 parameterValues = ResolveParameterValues(collectedParamValues, plan, filtered);
                 return plan;
             }
             {
-                using var translator = new QueryTranslator(_ctx);
+                using var translator = new QueryTranslator(_ctx, ignoreUserFilters);
                 var before = GC.GetAllocatedBytesForCurrentThread();
                 var p = translator.Translate(localFiltered);
                 var after = GC.GetAllocatedBytesForCurrentThread();
@@ -210,7 +219,8 @@ namespace nORM.Query
                 {
                     Fingerprint = fingerprint,
                     Parameters = clonedParams,
-                    CompiledParameters = clonedCompiledParams
+                    CompiledParameters = clonedCompiledParams,
+                    IgnoreUserFilters = ignoreUserFilters
                 };
             }
 

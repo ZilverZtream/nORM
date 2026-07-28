@@ -29,6 +29,7 @@ namespace nORM.Query
             bool noTracking,
             Dictionary<string, object?>? filterParams,
             DateTime? asOf,
+            bool ignoreUserFilters,
             CancellationToken ct)
         {
             if (parents.Count == 0)
@@ -40,7 +41,7 @@ namespace nORM.Query
 
                 if (depQuery.M2M != null)
                 {
-                    await _includeProcessor.LoadManyToManyProjectionAsync(depQuery, parents, filterParams, ct).ConfigureAwait(false);
+                    await _includeProcessor.LoadManyToManyProjectionAsync(depQuery, parents, filterParams, ct, ignoreUserFilters).ConfigureAwait(false);
                     continue;
                 }
 
@@ -85,7 +86,7 @@ namespace nORM.Query
 
                     var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
                     var batchIds = parentIdList.GetRange(i, batchCount);
-                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, filterParams, asOf, ct).ConfigureAwait(false);
+                    var batchChildren = await FetchChildrenBatchAsync(depQuery, batchIds, noTracking, filterParams, asOf, ignoreUserFilters, ct).ConfigureAwait(false);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -103,7 +104,8 @@ namespace nORM.Query
             IList parents,
             bool noTracking,
             Dictionary<string, object?>? filterParams,
-            DateTime? asOf)
+            DateTime? asOf,
+            bool ignoreUserFilters)
         {
             if (parents.Count == 0)
                 return;
@@ -112,7 +114,7 @@ namespace nORM.Query
             {
                 if (depQuery.M2M != null)
                 {
-                    _includeProcessor.LoadManyToManyProjection(depQuery, parents, filterParams);
+                    _includeProcessor.LoadManyToManyProjection(depQuery, parents, filterParams, ignoreUserFilters);
                     continue;
                 }
 
@@ -146,7 +148,7 @@ namespace nORM.Query
                 {
                     var batchCount = Math.Min(maxBatchSize, parentIdList.Count - i);
                     var batchIds = parentIdList.GetRange(i, batchCount);
-                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking, filterParams, asOf);
+                    var batchChildren = FetchChildrenBatch(depQuery, batchIds, noTracking, filterParams, asOf, ignoreUserFilters);
                     allChildren.AddRange(batchChildren);
                 }
 
@@ -292,7 +294,8 @@ namespace nORM.Query
             DependentQueryDefinition depQuery,
             List<object> parentIds,
             Dictionary<string, object?>? filterParams,
-            DateTime? asOf)
+            DateTime? asOf,
+            bool ignoreUserFilters)
         {
             var fromSource = BuildDependentFromSource(depQuery, cmd, asOf);
 
@@ -307,7 +310,7 @@ namespace nORM.Query
                 where.Append($" AND {tenantCol.EscCol}={tenantParam}");
                 cmd.AddParam(tenantParam, _ctx.GetRequiredTenantId(depQuery.TargetMapping, "split-query child load"));
             }
-            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd);
+            var globalFilterSql = GlobalFilterFragment.Build(_ctx, depQuery.TargetMapping, depQuery.TargetMapping.EscTable, cmd, ignoreUserFilters);
             if (globalFilterSql != null)
                 where.Append(" AND ").Append(globalFilterSql);
             AppendDependentFilter(cmd, where, depQuery, filterParams);
@@ -347,14 +350,15 @@ namespace nORM.Query
             List<object> parentIds,
             bool noTracking,
             Dictionary<string, object?>? filterParams,
-            DateTime? asOf)
+            DateTime? asOf,
+            bool ignoreUserFilters)
         {
             var children = new List<object>();
 
             _ctx.EnsureConnection();
             using var cmd = _ctx.CreateCommand();
 
-            cmd.CommandText = BuildDependentChildSql(cmd, depQuery, parentIds, filterParams, asOf);
+            cmd.CommandText = BuildDependentChildSql(cmd, depQuery, parentIds, filterParams, asOf, ignoreUserFilters);
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
                 cmd.CommandText).TotalSeconds;
@@ -397,6 +401,7 @@ namespace nORM.Query
             bool noTracking,
             Dictionary<string, object?>? filterParams,
             DateTime? asOf,
+            bool ignoreUserFilters,
             CancellationToken ct)
         {
             var children = new List<object>();
@@ -407,7 +412,7 @@ namespace nORM.Query
             // SELECT the child rows WHERE the FK is in the parent batch, scoped by tenant/global/element
             // filters; ordered / top-N projections wrap the filtered set with a ROW_NUMBER window. Under AsOf
             // the FROM is the reconstructed history window aliased AS the table (see BuildDependentFromSource).
-            cmd.CommandText = BuildDependentChildSql(cmd, depQuery, parentIds, filterParams, asOf);
+            cmd.CommandText = BuildDependentChildSql(cmd, depQuery, parentIds, filterParams, asOf, ignoreUserFilters);
             cmd.CommandTimeout = (int)_ctx.GetAdaptiveTimeout(
                 AdaptiveTimeoutManager.OperationType.ComplexSelect,
                 cmd.CommandText).TotalSeconds;
