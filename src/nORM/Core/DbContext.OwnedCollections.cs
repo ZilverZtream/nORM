@@ -659,14 +659,18 @@ namespace nORM.Core
             }
         }
 
-        /// <summary>Converts a DB value to the target CLR type using safe fallback logic.</summary>
+        /// <summary>Converts a DB value to the target CLR type for an owned-collection column.</summary>
         private static object? ConvertSimple(object raw, Type targetType)
         {
             if (raw == null || raw == DBNull.Value) return null;
             var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
             if (raw.GetType() == underlying) return raw;
-            try { return Convert.ChangeType(raw, underlying); }
-            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException) { return raw; }
+            // Route through the main materializer's invariant, type-aware conversion so an owned-collection
+            // column reads back exactly like a main-entity column. Convert.ChangeType(object, Type) alone uses
+            // the CURRENT culture (turning a decimal TEXT '1234.56' into 123456 on de-DE / throwing on sv-SE)
+            // and cannot handle a Guid / DateTimeOffset / DateOnly / TimeOnly / TimeSpan stored as TEXT on
+            // SQLite — the exact hazards ConvertDbValue already handles for every other read path.
+            return nORM.Query.MaterializerFactory.ConvertDbValue(raw, targetType);
         }
     }
 }

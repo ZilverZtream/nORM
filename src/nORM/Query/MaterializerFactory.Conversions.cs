@@ -189,7 +189,7 @@ namespace nORM.Query
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static object? ConvertDbValue(object dbValue, Type targetType)
+        internal static object? ConvertDbValue(object dbValue, Type targetType)
         {
             if (dbValue == null || dbValue is DBNull)
             {
