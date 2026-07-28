@@ -69,7 +69,12 @@ namespace nORM.Core
                     var getter = NonKeyColumns[i].Getter;
                     Getters[i] = getter;
                     HashGetters[i] = e => ContentHashCode(getter(e));
-                    PropertyIndex[NonKeyColumns[i].Prop.Name] = i;
+                    // Key by the column's unique logical name (PropName), NOT the CLR Prop.Name: two owned members
+                    // of the SAME value-object type (Subtotal/Tax : Money) map to distinct prefixed columns
+                    // (Subtotal_Amount, Tax_Amount) that share ONE PropertyInfo, so keying by Prop.Name collides
+                    // both onto one snapshot slot and mis-resolves OriginalValues / IsModified. PropName equals
+                    // Prop.Name for every non-owned column, so this is byte-identical for ordinary entities.
+                    PropertyIndex[NonKeyColumns[i].PropName] = i;
                 }
             }
         }
@@ -388,7 +393,7 @@ namespace nORM.Core
                 return ReadOriginalKeyComponent(col);
             if (col.IsTimestamp)
                 return OriginalToken;
-            if (_propertyIndex != null && _propertyIndex.TryGetValue(col.Prop.Name, out var idx))
+            if (_propertyIndex != null && _propertyIndex.TryGetValue(col.PropName, out var idx))
                 return _originalValues![idx];
             // No snapshot slot (e.g. a computed column not tracked for changes) — fall back to current.
             return Entity != null ? col.Getter(Entity) : null;
@@ -417,7 +422,7 @@ namespace nORM.Core
             }
             if (col.IsKey)
                 throw new InvalidOperationException($"The original key value of '{col.PropName}' cannot be changed.");
-            if (_propertyIndex != null && _propertyIndex.TryGetValue(col.Prop.Name, out var idx))
+            if (_propertyIndex != null && _propertyIndex.TryGetValue(col.PropName, out var idx))
                 _originalValues![idx] = coerced;
             else
                 throw new InvalidOperationException($"'{col.PropName}' has no original-value slot to set.");
@@ -1056,7 +1061,7 @@ namespace nORM.Core
             var entity = Entity;
             if (entity is null || _propertyIndex is null)
                 return false;
-            if (!_propertyIndex.TryGetValue(column.Prop.Name, out var idx))
+            if (!_propertyIndex.TryGetValue(column.PropName, out var idx))
                 return false;
             return !ValuesEqual(_getValues![idx](entity), _originalValues![idx]);
         }
@@ -1095,7 +1100,7 @@ namespace nORM.Core
         {
             UpgradeToFullTracking();
             var entity = Entity;
-            if (entity is null || _propertyIndex is null || !_propertyIndex.TryGetValue(column.Prop.Name, out var idx))
+            if (entity is null || _propertyIndex is null || !_propertyIndex.TryGetValue(column.PropName, out var idx))
                 return false;
             if (_hasNotifiedChange && _changedProperties != null)
                 return _changedProperties[idx];
@@ -1120,9 +1125,9 @@ namespace nORM.Core
             if (State is EntityState.Added or EntityState.Deleted or EntityState.Detached)
                 throw new InvalidOperationException(
                     $"Cannot set a property's modified state while the entry is {State}; it applies to a tracked Unchanged/Modified entity.");
-            if (_propertyIndex is null || !_propertyIndex.TryGetValue(column.Prop.Name, out var idx))
+            if (_propertyIndex is null || !_propertyIndex.TryGetValue(column.PropName, out var idx))
                 throw new InvalidOperationException(
-                    $"Property '{column.Prop.Name}' is a key or concurrency-token column; its modified state cannot be set " +
+                    $"Property '{column.PropName}' is a key or concurrency-token column; its modified state cannot be set " +
                     "(keys are never updated and the concurrency token is managed automatically).");
             // Capture sibling columns' value-based change flags before switching to explicit tracking, so a real
             // edit elsewhere on the entity is not lost when the flags are frozen below.
