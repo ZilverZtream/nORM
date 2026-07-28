@@ -242,10 +242,37 @@ namespace nORM.Query
                         {
                             var col = colsSnapshot[i];
                             int ordinal;
-                            try { ordinal = reader.GetOrdinal(col.Name); }
-                            catch (IndexOutOfRangeException) { continue; } // column not found (ADO.NET standard)
-                            catch (ArgumentOutOfRangeException) { continue; } // column not found (Microsoft.Data.Sqlite variant)
-                            if (reader.IsDBNull(ordinal)) continue;
+                            if (col.IsShadow)
+                            {
+                                // Shadow columns are appended and may be absent from a given result set —
+                                // resolve them by name (their ordinal is not the column's position).
+                                try { ordinal = reader.GetOrdinal(col.Name); }
+                                catch (IndexOutOfRangeException) { continue; } // column not found (ADO.NET standard)
+                                catch (ArgumentOutOfRangeException) { continue; } // column not found (Microsoft.Data.Sqlite variant)
+                            }
+                            else
+                            {
+                                // A mapped column sits at its fixed position in the SELECT at this entity's
+                                // offset. Resolving by NAME (GetOrdinal) mis-binds in a multi-entity result set
+                                // (GroupJoin materializes the outer at offset 0 and the inner after it, with
+                                // DUPLICATED column names) — GetOrdinal returns the LAST match, so the outer
+                                // entity silently bound to the inner's like-named columns. Use the ordinal, like
+                                // every other entity-materialization path (CreateOptimizedMaterializer).
+                                ordinal = i + startOffset;
+                                if (ordinal >= reader.FieldCount) continue;
+                            }
+                            if (reader.IsDBNull(ordinal))
+                            {
+                                // A NULL into a non-nullable value-type member is silent-wrong (it would leave
+                                // the member at default(T)); fail loud like every other materializer path. A
+                                // nullable member or reference type legitimately stays null (skip).
+                                var propType = col.Prop.PropertyType;
+                                if (propType.IsValueType && Nullable.GetUnderlyingType(propType) == null)
+                                    throw new InvalidOperationException(
+                                        $"Column '{col.Name}' is NULL but {targetType.Name}.{col.Prop.Name} is a " +
+                                        $"non-nullable {propType.Name}. Make the property nullable or ensure the column is NOT NULL.");
+                                continue;
+                            }
                             var rawValue = reader.GetValue(ordinal);
                             try
                             {
