@@ -323,6 +323,12 @@ namespace nORM.Core
         /// <summary>A bulk update/delete operation is not supported by the active provider.</summary>
         public const string BulkOperationProviderUnsupported = "bulk-operation-provider-unsupported";
 
+        /// <summary>
+        /// Bulk insert/update was given an aggregate with populated owned-collection children or many-to-many
+        /// relationships, which the columns-only bulk fast path cannot persist. Use SaveChanges for such graphs.
+        /// </summary>
+        public const string BulkAggregateChildrenUnsupported = "bulk-aggregate-children-unsupported";
+
         /// <summary>AsAsyncEnumerable does not support Include (eager-load paths issue dependent queries).</summary>
         public const string AsAsyncEnumerableIncludeUnsupported = "asasyncenumerable-include-unsupported";
 

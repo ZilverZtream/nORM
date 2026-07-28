@@ -852,6 +852,41 @@ namespace nORM.Core
         private static readonly Func<bool> s_nonIdempotentNoRetry = static () => true;
 
         /// <summary>
+        /// True when <paramref name="entity"/> carries populated nORM-managed children — a non-empty owned
+        /// collection or a non-empty many-to-many navigation — that the columns-only bulk insert/update fast
+        /// path cannot persist (they need the owner's key and per-owner child sync, which only SaveChanges
+        /// performs). Empty collections return false so an aggregate with no children keeps the fast path.
+        /// Silently dropping such children is data loss, so the bulk entry points refuse loudly instead.
+        /// </summary>
+        private static bool HasPopulatedNormManagedChildren(object entity, TableMapping map)
+        {
+            foreach (var oc in map.OwnedCollections)
+                if (oc.CollectionGetter(entity) is System.Collections.IEnumerable owned && HasAnyItem(owned))
+                    return true;
+            foreach (var jtm in map.ManyToManyJoins)
+                if (jtm.LeftCollectionGetter(entity) is { Count: > 0 })
+                    return true;
+            return false;
+
+            static bool HasAnyItem(System.Collections.IEnumerable e)
+            {
+                foreach (var _ in e) return true;
+                return false;
+            }
+        }
+
+        private static void GuardBulkAggregateChildren(object entity, TableMapping map, string method)
+        {
+            if ((map.OwnedCollections.Count > 0 || map.ManyToManyJoins.Count > 0)
+                && HasPopulatedNormManagedChildren(entity, map))
+                throw new NormUnsupportedFeatureException(
+                    $"{method} writes only the owner's own columns and cannot persist owned-collection children " +
+                    "or many-to-many relationships (they need the owner's key and per-owner child sync). Use " +
+                    "SaveChanges for aggregates with populated owned/related children.",
+                    NormUnsupportedReason.BulkAggregateChildrenUnsupported);
+        }
+
+        /// <summary>
         /// Efficiently inserts a collection of entities using provider specific bulk
         /// techniques. Validation and tenant checks are applied to each entity before
         /// execution.
@@ -875,6 +910,7 @@ namespace nORM.Core
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Insert);
+                    GuardBulkAggregateChildren(entity, map, "BulkInsertAsync");
                     // Stamp the TPH discriminator from the entity's RUNTIME type (not the compile-time typeof(T)):
                     // a base-typed batch (List<Base> { new Derived(), ... }) must stamp each row's own subtype
                     // discriminator, else the base mapping's no-op ApplyDiscriminator leaves discriminator=0 and
@@ -910,6 +946,7 @@ namespace nORM.Core
                 {
                     NormValidator.ValidateEntity(entity, nameof(entities));
                     ValidateTenantContext(entity, map, WriteOperation.Update);
+                    GuardBulkAggregateChildren(entity, map, "BulkUpdateAsync");
                 }
                 return await _p.BulkUpdateAsync(ctx, map, entityList, token).ConfigureAwait(false);
             }, s_nonIdempotentNoRetry, ct);
