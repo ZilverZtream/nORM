@@ -51,6 +51,28 @@ namespace nORM.Query
             // side's alias; forcing (_mapping, alias) would override it with the inner alias.
             var (selMapping, selAlias) = _correlatedParams.TryGetValue(selParam, out var selCorr) ? selCorr : (_mapping, alias);
 
+            // A value converter maps model<->provider per value. A grouped SUM/AVG/MIN/MAX runs over the STORED
+            // (provider) column values and the projection materializer reads the result back UNCONVERTED, so the
+            // grouped result is silently wrong (MAX over a +1000 offset converter returned 1009 not 9; SUM
+            // returned the stored total). The top-level scalar path converts Min/Max and fails loud on Sum/Avg
+            // (QueryTranslator.PlanGeneration.cs); the grouped materializer does neither. Correct translation is
+            // impossible for a non-linear/non-monotonic converter, so reject fail-loud rather than corrupt —
+            // mirroring the scalar Sum/Avg guard. Bare-member operand only (matches the scalar resolution).
+            var aggOperandBody = selector.Body;
+            while (aggOperandBody is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } aggConv)
+                aggOperandBody = aggConv.Operand;
+            if (aggOperandBody is MemberExpression aggOperandMember
+                && selMapping.TryGetColumnForMemberAccess(aggOperandMember, out var aggOperandCol)
+                && aggOperandCol.Converter != null)
+            {
+                throw new NormUnsupportedFeatureException(
+                    $"{sqlAgg}(...) over the value-converter column '{aggOperandCol.Name}' inside a GroupBy " +
+                    "projection cannot be translated: the aggregate runs on the stored provider values and the " +
+                    "result is not round-tripped through the converter, so it would be silently wrong. Materialise " +
+                    "the rows (e.g. AsEnumerable()) and aggregate client-side.",
+                    NormUnsupportedReason.NavAggregateValueConverterColumn);
+            }
+
             var vctxSel = new VisitorContext(_ctx, selMapping, _provider, selParam, selAlias, _correlatedParams, _compiledParams, _paramConverters, _paramMap, _recursionDepth, _params.Count);
             var visitor = FastExpressionVisitorPool.Get(in vctxSel);
             var columnSql = visitor.Translate(selector.Body);
