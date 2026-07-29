@@ -239,6 +239,26 @@ namespace nORM.Query
                 return node;
             }
 
+            // A bitwise operator on a flags enum persisted via a value converter as a NON-integer (typically
+            // its name string) can't be bit-tested server-side: `('Read, Write' & 2)` coerces the TEXT to 0
+            // and silently matches nothing (or projects garbage). Mirror the HasFlag / bitwise-projection
+            // guards — fail loud with an actionable message rather than return silently-wrong rows.
+            if (node.NodeType is ExpressionType.And or ExpressionType.Or or ExpressionType.ExclusiveOr
+                or ExpressionType.LeftShift or ExpressionType.RightShift)
+            {
+                foreach (var bitOperand in new[] { node.Left, node.Right })
+                {
+                    if (TryGetConverterColumn(StripConvert(bitOperand), out var bitCol)
+                        && bitCol.Converter != null && !IsIntegralTargetType(bitCol.Converter.ProviderType))
+                        throw new NormUnsupportedFeatureException(
+                            $"A bitwise operation on the flags enum column '{bitCol.PropName}' isn't supported: it is " +
+                            $"stored via a value converter as {bitCol.Converter.ProviderType.Name}, not an integer, so a " +
+                            "server-side bitwise test would silently match nothing. Store the flags enum as its integer " +
+                            "value, or evaluate the flag check client-side (e.g. after ToList()).",
+                            NormUnsupportedReason.MethodUntranslatable);
+                }
+            }
+
             // Bitwise XOR needs provider-specific syntax — SQLite has no `^` operator and
             // PostgreSQL uses `#`. Route through DatabaseProvider.GetBitwiseXorSql which
             // hands back the right token (or a synthesised `(a|b) - (a&b)` on SQLite).
