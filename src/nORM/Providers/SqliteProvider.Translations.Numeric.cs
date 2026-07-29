@@ -216,8 +216,13 @@ namespace nORM.Providers
             // are already integral (from-string and from-int callers unaffected).
             return name switch
             {
-                "ToInt32" when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
-                "ToInt64" when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
+                // All integral Convert.ToXxx targets map to SQLite INTEGER and use banker's rounding
+                // (.NET Convert rounds half-to-even). SQLite has no narrower int type, so ToInt16/ToByte/
+                // ToSByte/ToUInt* share the same emit as ToInt32 — listing them here keeps the translatability
+                // PROBE in step with the SCV emitter (TryVisitConvertToIntegral), which already supports them
+                // (else a supported projection spuriously fell to client-eval and threw under the Throw policy).
+                "ToInt32" or "ToInt64" or "ToInt16" or "ToByte" or "ToSByte" or "ToUInt16" or "ToUInt32" or "ToUInt64"
+                    when args.Length == 1 => $"CAST({BankersRoundIntegralSql(args[0], "INTEGER")} AS INTEGER)",
                 "ToDouble" when args.Length == 1 => $"CAST({args[0]} AS REAL)",
                 // ToDecimal must NOT go through REAL: SQLite has no exact decimal type, so CAST AS REAL
                 // silently collapses a TEXT-stored decimal to double precision. Pass the operand through;

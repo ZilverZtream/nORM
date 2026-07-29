@@ -225,30 +225,29 @@ public class TypeConversionCastSilentWrongHuntTests
         Assert.Equal(new[] { 1 }, ids);
     }
 
-    // Fail-loud inconsistency: top-level Convert.ToInt16/ToByte/ToSByte projection throws under the
-    // default Throw policy (the translatability PROBE routes through provider TranslateFunction, which
-    // only lists ToInt32/ToInt64), even though the SelectClauseVisitor emitter DOES support them and
-    // Convert.ToInt32 in the same shape works. Fail-loud, not silent-wrong. Asserted here as-is.
+    // Convert.ToInt16/ToByte/ToSByte projection now translates server-side under the default Throw policy,
+    // consistent with Convert.ToInt32 (the translatability probe listed only ToInt32/ToInt64; now includes
+    // the narrower + unsigned integral targets, matching the SelectClauseVisitor emitter). Banker's rounding.
     [Fact]
-    public async Task ConvertToInt16_double_projection_fails_loud_inconsistent_with_ToInt32()
+    public async Task ConvertToInt16_double_projection_translates_bankers_rounds()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         using var ctx = NewNumCtx(cn);
         ctx.Add(new NumRow { Id = 1, D = 2.5, M = 0m, L = 0, I = 0, B = false, S = "" });
         await ctx.SaveChangesAsync();
-        Assert.ThrowsAny<Exception>(() =>
-            ctx.Query<NumRow>().OrderBy(x => x.Id).Select(x => Convert.ToInt16(x.D)).ToList());
+        var r = ctx.Query<NumRow>().OrderBy(x => x.Id).Select(x => Convert.ToInt16(x.D)).ToList().Single();
+        Assert.Equal(Convert.ToInt16(2.5), r);   // 2 (banker's), translated server-side under Throw policy
     }
 
     [Fact]
-    public async Task ConvertToByte_double_projection_fails_loud_inconsistent_with_ToInt32()
+    public async Task ConvertToByte_double_projection_translates_bankers_rounds()
     {
         using var cn = new SqliteConnection("Data Source=:memory:");
         using var ctx = NewNumCtx(cn);
         ctx.Add(new NumRow { Id = 1, D = 2.5, M = 0m, L = 0, I = 0, B = false, S = "" });
         await ctx.SaveChangesAsync();
-        Assert.ThrowsAny<Exception>(() =>
-            ctx.Query<NumRow>().OrderBy(x => x.Id).Select(x => Convert.ToByte(x.D)).ToList());
+        var r = ctx.Query<NumRow>().OrderBy(x => x.Id).Select(x => Convert.ToByte(x.D)).ToList().Single();
+        Assert.Equal(Convert.ToByte(2.5), r);   // 2 (banker's), translated server-side under Throw policy
     }
 
     // Probe: under Allow policy the ToByte projection runs client-side and yields the CORRECT
