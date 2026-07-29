@@ -302,6 +302,30 @@ namespace nORM.Query
                 return base.VisitParameter(node);
             }
 
+            // A MemberInit binding's TARGET member (e.g. `new Dto { A = ..., B = ... }`) is NOT visited by the
+            // base ExpressionVisitor — it recurses only into the assigned VALUE. Two projections that map the
+            // same source columns onto a PERMUTED set of target properties (`{ A=Col1, B=Col2 }` vs
+            // `{ B=Col1, A=Col2 }`) therefore hashed identically and the second silently reused the first's
+            // cached plan (SQL + materializer), returning the wrong field mapping. Fold the target member id
+            // into the hash so a binding-target permutation produces a distinct fingerprint.
+            protected override MemberAssignment VisitMemberAssignment(MemberAssignment node)
+            {
+                AppendInt(GetStableMemberId(node.Member));
+                return base.VisitMemberAssignment(node);
+            }
+
+            protected override MemberMemberBinding VisitMemberMemberBinding(MemberMemberBinding node)
+            {
+                AppendInt(GetStableMemberId(node.Member));
+                return base.VisitMemberMemberBinding(node);
+            }
+
+            protected override MemberListBinding VisitMemberListBinding(MemberListBinding node)
+            {
+                AppendInt(GetStableMemberId(node.Member));
+                return base.VisitMemberListBinding(node);
+            }
+
             protected override Expression VisitLambda<T>(Expression<T> node)
             {
                 AppendInt(node.Parameters.Count);
