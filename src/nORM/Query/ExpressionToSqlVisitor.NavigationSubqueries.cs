@@ -884,9 +884,36 @@ namespace nORM.Query
                 && (valueClrType == typeof(string) || valueClrType == typeof(char));
             string OrdinalLeft(string sql) => ordinalStringSubquery ? _provider.ForceCaseSensitiveStringComparison(sql) : sql;
 
+            // A subquery that projects a value-converter column (Select(i => i.ConvCol).Contains(value)) yields
+            // the STORED provider values, so a tested constant/closure/parameter must bind the PROVIDER
+            // representation or the IN silently matches nothing. A tested value that is itself a converter column
+            // already renders provider-side (via GetSql), so only convert a bindable constant/parameter/closure.
+            var subConvCol = ResolveContainsProjectedConverterColumn(source);
+            var strippedValue = StripConvert(value);
+            var testedIsInlineConstant = strippedValue is ConstantExpression { Value: not null };
+            var testedIsFreeParameter = strippedValue is ParameterExpression tpe
+                && !_parameterMappings.ContainsKey(tpe) && !_groupingKeys.ContainsKey(tpe);
+            nORM.Mapping.IValueConverter? testedConverter = null;
+            if (subConvCol?.Converter != null && !TryGetConverterColumn(value, out _)
+                && (testedIsInlineConstant || testedIsFreeParameter || TryGetConstantValue(value, out _)))
+                testedConverter = subConvCol.Converter;
+
+            string RenderTestedValue()
+            {
+                if (testedConverter == null)
+                    return GetSql(value);
+                // EmitConvertedValueOperand appends the converted constant / a converter-registered param slot;
+                // capture that SQL and rewind so the caller can position it (the nullable branch reuses it twice).
+                var start = _sql.Length;
+                EmitConvertedValueOperand(strippedValue, testedConverter, testedIsInlineConstant, testedIsFreeParameter);
+                var rendered = _sql.ToString(start, _sql.Length - start);
+                _sql.TruncateTo(start);
+                return rendered;
+            }
+
             if (!isNullable)
             {
-                var nnValueSql = GetSql(value);
+                var nnValueSql = RenderTestedValue();
                 _sql.Append(OrdinalLeft(nnValueSql));
                 _sql.Append(" IN (");
                 _sql.Append(subPlan.Sql);
@@ -895,7 +922,7 @@ namespace nORM.Query
             }
 
             // Runtime nullable: (val IN (subq) OR (val IS NULL AND EXISTS(null-filtered subq)))
-            var valueSql = GetSql(value);
+            var valueSql = RenderTestedValue();
             _sql.Append("(");
             _sql.Append(OrdinalLeft(valueSql));
             _sql.Append(" IN (");

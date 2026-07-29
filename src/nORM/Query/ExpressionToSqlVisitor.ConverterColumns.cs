@@ -170,6 +170,30 @@ namespace nORM.Query
             return (null, null);
         }
 
+        /// <summary>
+        /// Resolves the value-converter column a Contains-subquery projects — <c>Query&lt;Inner&gt;()
+        /// .Select(i =&gt; i.ConvCol).Contains(value)</c>. The subquery yields the STORED provider values, so a
+        /// tested constant/closure/parameter value must be bound in the provider representation; this surfaces
+        /// the projected column (and thus its converter) so <see cref="BuildIn"/> can convert the tested value.
+        /// Returns null when the subquery projects no single converter column.
+        /// </summary>
+        private Column? ResolveContainsProjectedConverterColumn(Expression source)
+        {
+            if (_ctx == null || StripConvert(source) is not MethodCallExpression mce)
+                return null;
+            var (elementType, member) = ResolveSubqueryProjectedMember(mce);
+            if (elementType == null || member == null)
+                return null;
+            try
+            {
+                var mapping = _ctx.GetMapping(elementType);
+                if (mapping.TryGetColumnForMemberAccess(member, out var col) && col.Converter != null)
+                    return col;
+            }
+            catch { }
+            return null;
+        }
+
         private static ExpressionType FlipComparison(ExpressionType op) => op switch
         {
             ExpressionType.GreaterThan => ExpressionType.LessThan,
