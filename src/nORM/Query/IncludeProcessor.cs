@@ -247,7 +247,7 @@ namespace nORM.Query
                 if (IsCollectionNavigation(relation))
                 {
                     var childList = QueryExecutor.CreateList(relation.DependentType, 0);
-                    if (pk != null && childGroups.TryGetValue(pk, out var c))
+                    if (pk != null && TryGetChildGroup(childGroups, pk, out var c))
                     {
                         foreach (var item in c)
                             childList.Add(item);
@@ -291,7 +291,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var child = pk != null && childGroups.TryGetValue(pk, out var c)
+                    var child = pk != null && TryGetChildGroup(childGroups, pk, out var c)
                         ? c.FirstOrDefault()
                         : null;
                     relation.NavProp.SetValue(p, child);
@@ -460,7 +460,7 @@ namespace nORM.Query
                 if (IsCollectionNavigation(relation))
                 {
                     var childList = QueryExecutor.CreateList(relation.DependentType, 0);
-                    if (pk != null && childGroups.TryGetValue(pk, out var c))
+                    if (pk != null && TryGetChildGroup(childGroups, pk, out var c))
                     {
                         foreach (var item in c)
                             childList.Add(item);
@@ -504,7 +504,7 @@ namespace nORM.Query
                 }
                 else
                 {
-                    var child = pk != null && childGroups.TryGetValue(pk, out var c)
+                    var child = pk != null && TryGetChildGroup(childGroups, pk, out var c)
                         ? c.FirstOrDefault()
                         : null;
                     relation.NavProp.SetValue(p, child);
@@ -524,6 +524,39 @@ namespace nORM.Query
         /// Returns <c>default</c> if no match is found. Skips null string representations
         /// to avoid false-positive matches between unrelated DBNull/null values.
         /// </summary>
+        /// <summary>
+        /// Looks up a parent's children in <paramref name="childGroups"/> (keyed by the child's boxed FK value).
+        /// A single principal key whose CLR width differs from the dependent FK — e.g. a <c>long</c> PK against an
+        /// <c>int</c> FK box — boxes to a different type, so the exact-match lookup (<c>object.Equals((long)1,
+        /// (int)1) == false</c>) misses and the navigation silently loads EMPTY though the child rows exist. Falls
+        /// back to a value-normalized (invariant string) match for scalar keys. Composite <see cref="RelationKey"/>
+        /// keys keep the exact-match lookup — their default string form isn't unique — so the coercion never
+        /// false-matches across composite parents.
+        /// </summary>
+        private static bool TryGetChildGroup(Dictionary<object, List<object>> childGroups, object pk, out List<object> children)
+        {
+            if (childGroups.TryGetValue(pk, out children!))
+                return true;
+            if (pk is RelationKey)
+                return false;
+            var pkStr = Convert.ToString(pk, System.Globalization.CultureInfo.InvariantCulture);
+            if (pkStr != null)
+            {
+                foreach (var kvp in childGroups)
+                {
+                    if (kvp.Key is RelationKey) continue;
+                    var candStr = Convert.ToString(kvp.Key, System.Globalization.CultureInfo.InvariantCulture);
+                    if (candStr != null && candStr == pkStr)
+                    {
+                        children = kvp.Value;
+                        return true;
+                    }
+                }
+            }
+            children = null!;
+            return false;
+        }
+
         private static TValue? CoercedLookup<TValue>(Dictionary<object, TValue> dict, object key)
         {
             var keyStr = Convert.ToString(key, System.Globalization.CultureInfo.InvariantCulture);

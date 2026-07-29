@@ -367,8 +367,15 @@ namespace nORM.Navigation
                         continue;
                     }
                     var key = GetPrincipalKeyValue(relation, entity);
-                    var related = key != null && grouped.TryGetValue(key, out var list) ? list : new List<object>();
-                    tcs.TrySetResult(related);
+                    List<object>? list = null;
+                    if (key != null && !grouped.TryGetValue(key, out list) && key is not RelationKey)
+                        // A single principal key whose CLR width differs from the dependent FK (e.g. long PK vs
+                        // int FK) boxes to a different type, so the dictionary lookup — object.Equals((long)1,
+                        // (int)1) == false — misses and the collection silently loads EMPTY though the rows
+                        // exist. Fall back to a value-normalized match (mirrors IncludeProcessor.CoercedLookup).
+                        // Composite RelationKeys keep the exact-match lookup (their string form isn't unique).
+                        list = CoercedListLookup(grouped, key);
+                    tcs.TrySetResult(list ?? new List<object>());
                 }
             }
             catch (OperationCanceledException oce)
@@ -491,6 +498,28 @@ namespace nORM.Navigation
             }
 
             return new RelationKey(values);
+        }
+
+        /// <summary>
+        /// Value-normalized fallback lookup for a single (non-composite) key whose CLR width differs
+        /// between the principal key and the dependent FK — e.g. a <c>long</c> PK grouped against an
+        /// <c>int</c> FK box, where <see cref="object.Equals(object, object)"/> reports inequality and
+        /// the direct dictionary lookup misses. Compares the invariant string form so <c>(long)1</c>
+        /// and <c>(int)1</c> match. Only ever called for scalar keys (composite <see cref="RelationKey"/>
+        /// keeps its exact-match lookup), so the string form is unambiguous.
+        /// </summary>
+        private static List<object>? CoercedListLookup(Dictionary<object, List<object>> grouped, object key)
+        {
+            var keyStr = Convert.ToString(key, System.Globalization.CultureInfo.InvariantCulture);
+            if (keyStr == null) return null;
+            foreach (var candidate in grouped.Keys)
+            {
+                if (candidate is RelationKey) continue;
+                var candidateStr = Convert.ToString(candidate, System.Globalization.CultureInfo.InvariantCulture);
+                if (candidateStr != null && candidateStr == keyStr)
+                    return grouped[candidate];
+            }
+            return null;
         }
 
         private string BuildNavigationWhereClause(DbCommand cmd, TableMapping.Relation relation, List<object?> chunk)
