@@ -12,12 +12,36 @@ namespace nORM.Migration
                 .Concat(diff.AddedColumns
                     .Where(static item => RequiresRecreateForAddedColumn(item.Column))
                     .Select(static item => item.Table.Name))
+                .Concat(GetRenameNameReuseTableNames(diff))
                 .Concat(diff.DroppedColumns.Select(static item => item.Table.Name))
                 .Concat(diff.AddedForeignKeys.Select(static item => item.Table.Name))
                 .Concat(diff.DroppedForeignKeys.Select(static item => item.Table.Name))
                 .Concat(diff.AddedCheckConstraints.Select(static item => item.Table.Name))
                 .Concat(diff.DroppedCheckConstraints.Select(static item => item.Table.Name))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // A NEW column that reuses a name FREED by a same-table [RenameColumn] cannot be applied by native
+        // ALTER: ADD COLUMN would collide with the not-yet-renamed old column ("duplicate column name"), and
+        // ordering renames-before-adds is fragile across up/down. Route the whole table through the recreate,
+        // which builds the correct final schema and copies BY NAME atomically — the renamed column sources from
+        // its old name and the reused-name column is a genuine add (NULL / its default), not the old data.
+        private static IEnumerable<string> GetRenameNameReuseTableNames(SchemaDiff diff)
+        {
+            var result = new List<string>();
+            foreach (var (aTable, aCol) in diff.AddedColumns)
+            {
+                foreach (var (rTable, rOldName, _) in diff.RenamedColumns)
+                {
+                    if (string.Equals(rTable.Name, aTable.Name, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(rOldName, aCol.Name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Add(aTable.Name);
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
 
         private static HashSet<string> GetDownRecreatedTableNames(SchemaDiff diff)
             => diff.AlteredColumns.Select(static item => item.Table.Name)

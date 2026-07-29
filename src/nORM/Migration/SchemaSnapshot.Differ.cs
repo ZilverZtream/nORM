@@ -73,9 +73,17 @@ namespace nORM.Migration
                 // Build O(1) column lookup for the old table.
                 var oldColByName = oldTable.Columns.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
 
-                // Collect the set of old column names that are consumed by a [RenameColumn] declaration
-                // so that the dropped-column loop skips them (they are not truly dropped).
+                // Pre-pass: collect the set of old column names consumed by a [RenameColumn] whose referenced
+                // old column exists. Computed BEFORE classification (a single-pass check would be order-
+                // dependent on where the rename column sits relative to a name-reusing new column) so that: the
+                // dropped-column loop skips these (they are not truly dropped), AND a NEW column that reuses a
+                // freed old name is classified as ADDED rather than a spurious ALTER of the old column.
                 var renamedOldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var col in newTable.Columns)
+                {
+                    if (col.PreviousName != null && oldColByName.ContainsKey(col.PreviousName))
+                        renamedOldNames.Add(col.PreviousName);
+                }
 
                 foreach (var col in newTable.Columns)
                 {
@@ -84,7 +92,6 @@ namespace nORM.Migration
                     if (col.PreviousName != null && oldColByName.TryGetValue(col.PreviousName, out var renamedOld))
                     {
                         diff.RenamedColumns.Add((newTable, col.PreviousName, col));
-                        renamedOldNames.Add(col.PreviousName);
                         // [RenameColumn] asserts identity, NOT that the definition is unchanged. If the renamed
                         // column also changed type / nullability / default / precision / ..., emit an alter
                         // (keyed on the NEW name) so the change is applied after the rename — otherwise the
@@ -94,7 +101,11 @@ namespace nORM.Migration
                         continue;
                     }
 
-                    if (!oldColByName.TryGetValue(col.Name, out var oldCol))
+                    // A new column whose name reuses one freed by a [RenameColumn] (the old column's data moved
+                    // to the rename target) is an ADD, not an ALTER of that old column. Without the
+                    // renamedOldNames guard the table-rebuild copied the renamed-away data into the brand-new
+                    // column (silent corruption), or a same-type match emitted no ADD at all (missing column).
+                    if (!oldColByName.TryGetValue(col.Name, out var oldCol) || renamedOldNames.Contains(col.Name))
                         diff.AddedColumns.Add((newTable, col));
                     else if (ColumnDefinitionChanged(oldCol, col))
                         diff.AlteredColumns.Add((newTable, col, oldCol));
