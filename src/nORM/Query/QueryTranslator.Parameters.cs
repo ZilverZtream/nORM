@@ -171,6 +171,47 @@ namespace nORM.Query
             return false;
         }
 
+        /// <summary>
+        /// Translates a paging count (Take/Skip argument) that is neither a bare bound parameter nor a
+        /// compile-time constant — the common compiled-query <c>pageIndex * PageSize [+ n]</c> idiom — into SQL
+        /// over bound leaf parameters, so the LIMIT/OFFSET slot computes the value at execution (EF parity)
+        /// rather than silently emitting no LIMIT/OFFSET. Only +/-/* over bindable params / int constants;
+        /// anything else declines so the caller fails loud. Leaf params are NOT value-clamped here — the caller
+        /// wraps the whole expression in <c>ClampNonNegativeLimitExpression</c> for the non-negative window.
+        /// </summary>
+        private bool TryTranslatePagingExpression(Expression expression, out string sql)
+        {
+            while (expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } convert)
+                expression = convert.Operand;
+
+            if (TryBindPagingParameter(expression, out var paramName))
+            {
+                sql = paramName;
+                return true;
+            }
+            if (QueryTranslator.TryGetIntValue(expression, out var literal))
+            {
+                sql = literal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            }
+            if (expression is BinaryExpression be
+                && be.NodeType is ExpressionType.Add or ExpressionType.Subtract or ExpressionType.Multiply
+                && TryTranslatePagingExpression(be.Left, out var left)
+                && TryTranslatePagingExpression(be.Right, out var right))
+            {
+                var op = be.NodeType switch
+                {
+                    ExpressionType.Add => "+",
+                    ExpressionType.Subtract => "-",
+                    _ => "*"
+                };
+                sql = $"({left} {op} {right})";
+                return true;
+            }
+            sql = string.Empty;
+            return false;
+        }
+
         private bool HasUncorrelatedParameterRoot(MemberExpression member)
         {
             Expression? current = member.Expression;

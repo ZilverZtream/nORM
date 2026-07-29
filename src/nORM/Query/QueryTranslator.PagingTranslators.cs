@@ -82,6 +82,19 @@ namespace nORM.Query
                     t._take = take;
                     t._takeParam = null;
                 }
+                else if (t.TryTranslatePagingExpression(node.Arguments[1], out var takeExpr))
+                {
+                    // Computed count over compiled-query parameters (e.g. Take(pageIndex * PageSize)): emit the
+                    // arithmetic as the LIMIT expression instead of falling through and silently dropping the LIMIT.
+                    t._takeParam = t._ctx.RawProvider.ClampNonNegativeLimitExpression(takeExpr);
+                    t._take = null;
+                }
+                else
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Take argument could not be reduced to a parameter, a constant, or a translatable arithmetic expression over compiled-query parameters.",
+                        NormUnsupportedReason.PagingArgumentUnbindable);
+                }
                 return source;
             }
         }
@@ -116,10 +129,19 @@ namespace nORM.Query
                     skipForLiteral = Math.Max(0, skipForLiteral);
                     var originalTake = t._take.Value;
                     t._take = Math.Max(0, originalTake - skipForLiteral);
-                    // Preserve any literal offset an earlier Skip already set — Skip(a).Take(n).Skip(b) skips
-                    // a+b — rather than replacing it, which dropped the earlier offset.
-                    t._skip = (t._skipParam == null ? (t._skip ?? 0) : 0) + skipForLiteral;
-                    t._skipParam = null;
+                    // Preserve any offset an earlier Skip already set — Skip(a).Take(n).Skip(b) skips a+b —
+                    // rather than replacing it. When the earlier Skip was PARAMETERIZED, combine into a composite
+                    // offset expression instead of zeroing the base (which silently discarded the parameter).
+                    if (t._skipParam != null)
+                    {
+                        t._skip = null;
+                        t._skipParam = t._ctx.RawProvider.ClampNonNegativeLimitExpression($"({t._skipParam} + {skipForLiteral})");
+                    }
+                    else
+                    {
+                        t._skip = (t._skip ?? 0) + skipForLiteral;
+                        t._skipParam = null;
+                    }
                     return source;
                 }
                 // Take(n).Skip(m) with a runtime parameter on either side: emit a
@@ -130,6 +152,7 @@ namespace nORM.Query
                 {
                     var existingTakeExpr = t._takeParam ?? t._take!.Value.ToString();
                     string skipExpr;
+                    int? skipLiteral = null;
                     if (t.TryBindPagingParameter(node.Arguments[1], out var sParam))
                     {
                         skipExpr = sParam;
@@ -137,12 +160,17 @@ namespace nORM.Query
                     }
                     else if (QueryTranslator.TryGetIntValue(node.Arguments[1], out int skipLit))
                     {
-                        skipExpr = Math.Max(0, skipLit).ToString();
+                        skipLiteral = Math.Max(0, skipLit);
+                        skipExpr = skipLiteral.Value.ToString();
+                    }
+                    else if (t.TryTranslatePagingExpression(node.Arguments[1], out var skipComputed))
+                    {
+                        skipExpr = skipComputed;
                     }
                     else
                     {
                         throw new NormUnsupportedFeatureException(
-                            "Skip argument could not be bound to a parameter or literal.",
+                            "Skip argument could not be reduced to a parameter, a constant, or a translatable arithmetic expression over compiled-query parameters.",
                             NormUnsupportedReason.PagingArgumentUnbindable);
                     }
                     // Reset the existing take fields and emit (take - skip) as the new limit
@@ -152,8 +180,22 @@ namespace nORM.Query
                     // expression-level hook.
                     t._take = null;
                     t._takeParam = t._ctx.RawProvider.ClampNonNegativeLimitExpression($"({existingTakeExpr} - {skipExpr})");
-                    t._skip = null;
-                    t._skipParam = skipExpr;
+                    // OFFSET = any earlier offset PLUS this skip. Keep it a plain literal int when BOTH the earlier
+                    // offset and this skip are literals (a param-less slot); only use the composite-expression slot
+                    // when a param/computed operand is present — EnsureValidParameterName requires a '@' inside a
+                    // '('-prefixed slot. Earlier code pinned the offset to just this skip and stuffed a literal into
+                    // the param slot, which both dropped the earlier offset AND failed that validation.
+                    if (t._skipParam == null && skipLiteral.HasValue)
+                    {
+                        t._skip = (t._skip ?? 0) + skipLiteral.Value;
+                        t._skipParam = null;
+                    }
+                    else
+                    {
+                        var existingOffsetExpr = t._skipParam ?? (t._skip ?? 0).ToString();
+                        t._skip = null;
+                        t._skipParam = t._ctx.RawProvider.ClampNonNegativeLimitExpression($"({existingOffsetExpr} + {skipExpr})");
+                    }
                     return source;
                 }
                 if (t.TryBindPagingParameter(node.Arguments[1], out var sName))
@@ -172,6 +214,20 @@ namespace nORM.Query
                     // Inline literal Skip values directly in SQL (same rationale as Take).
                     t._skip = skip;
                     t._skipParam = null;
+                }
+                else if (t.TryTranslatePagingExpression(node.Arguments[1], out var skipExpr))
+                {
+                    // Computed offset over compiled-query parameters — the canonical Skip(pageIndex * PageSize)
+                    // paging idiom. Emit the arithmetic as the OFFSET expression instead of falling through and
+                    // silently dropping the OFFSET (which returned page 0 for every page).
+                    t._skipParam = t._ctx.RawProvider.ClampNonNegativeLimitExpression(skipExpr);
+                    t._skip = null;
+                }
+                else
+                {
+                    throw new NormUnsupportedFeatureException(
+                        "Skip argument could not be reduced to a parameter, a constant, or a translatable arithmetic expression over compiled-query parameters.",
+                        NormUnsupportedReason.PagingArgumentUnbindable);
                 }
                 return source;
             }
