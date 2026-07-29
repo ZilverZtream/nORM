@@ -439,6 +439,31 @@ namespace nORM.Query
         private static long ToUnixTimeMicroseconds(DateTimeOffset value)
             => (value.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) / 10;
 
+        // Binds a free (compiled-query) DateTimeOffset/DateTime parameter as the UTC-epoch-microseconds long the
+        // column comparison uses, so a compiled `Dto <op> @p` compares instant-to-instant like the constant path.
+        // Without it the raw param binds as offset-suffixed TEXT and mis-compares against the column's epoch
+        // integer (on SQLite an INTEGER always sorts before TEXT, so `Dto < @p` matched every row).
+        private sealed class DateTimeOffsetToEpochMicrosecondsConverter : nORM.Mapping.IValueConverter
+        {
+            public static readonly DateTimeOffsetToEpochMicrosecondsConverter Instance = new();
+            public Type ModelType => typeof(DateTimeOffset);
+            public Type ProviderType => typeof(long);
+            public object? ConvertToProvider(object? modelValue)
+            {
+                if (modelValue is null || modelValue is DBNull) return null;
+                DateTimeOffset utcInstant;
+                if (modelValue is DateTimeOffset dto) utcInstant = dto;
+                else if (modelValue is DateTime dt)
+                    utcInstant = dt.Kind == DateTimeKind.Utc
+                        ? new DateTimeOffset(dt, TimeSpan.Zero)
+                        : new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified),
+                            TimeZoneInfo.Local.GetUtcOffset(DateTime.SpecifyKind(dt, DateTimeKind.Unspecified)));
+                else throw new InvalidCastException($"Cannot convert '{modelValue.GetType().Name}' to a DateTimeOffset epoch.");
+                return ToUnixTimeMicroseconds(utcInstant);
+            }
+            public object? ConvertFromProvider(object? providerValue) => providerValue;
+        }
+
         // dtoCol [==/!=] dateTimeLiteral — see Bxxxx commit message: SQLite text
         // storage of DTOs needs UTC-instant comparison, not byte equality of
         // canonical text. Unspecified / Local DateTime literals use the local offset
@@ -475,7 +500,32 @@ namespace nORM.Query
                 peeled = u2.Operand;
 
             if (!TryGetConstantValue(peeled, out var raw) || raw == null)
+            {
+                // A free (compiled-query) parameter isn't constant-foldable, so it reached here unlowered and the
+                // generic path would compare the column's epoch integer against the param's raw offset-suffixed
+                // TEXT — silently wrong. Bind the param's value through the same UTC-epoch-microseconds mapping as
+                // the column, for BOTH relational and equality operators (equality by instant, cross-offset-safe).
+                if (peeled is ParameterExpression freeParam
+                    && !_parameterMappings.ContainsKey(freeParam)
+                    && !_groupingKeys.ContainsKey(freeParam))
+                {
+                    var colEpochSql = _provider.GetDateTimeOffsetUtcEpochMicrosecondsSql(GetSql(colSide));
+                    _sql.Append("(");
+                    if (columnOnLeft)
+                    {
+                        _sql.Append(colEpochSql).Append(ComparisonSql(node.NodeType));
+                        EmitConvertedValueOperand(peeled, DateTimeOffsetToEpochMicrosecondsConverter.Instance, isInlineConstant: false, isFreeParameter: true);
+                    }
+                    else
+                    {
+                        EmitConvertedValueOperand(peeled, DateTimeOffsetToEpochMicrosecondsConverter.Instance, isInlineConstant: false, isFreeParameter: true);
+                        _sql.Append(ComparisonSql(node.NodeType)).Append(colEpochSql);
+                    }
+                    _sql.Append(")");
+                    return true;
+                }
                 return false;
+            }
 
             DateTimeOffset utcInstant;
             if (raw is DateTime dt)
