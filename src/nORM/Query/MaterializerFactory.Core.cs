@@ -65,7 +65,10 @@ namespace nORM.Query
                                 return startOffset + Array.IndexOf(mapping.Columns, baseCol);
                             return UnmappedOrdinal; // column not found in base mapping
                         }).ToArray();
-                        var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i], 0)).ToArray();
+                        // Pass c.Converter so a converter-backed subtype column read polymorphically (via
+                        // Query<Base>() / OfType<Derived>()) is round-tripped through ConvertFromProvider like
+                        // every other materializer path — omitting it returns the raw stored provider value.
+                        var getters = dmap.Columns.Select((c, i) => CreateReaderGetter(c.Prop.PropertyType, indices[i], 0, c.Converter)).ToArray();
                         var ctor = _parameterlessCtorDelegates.GetOrAdd(dmap.Type, t =>
                         {
                             var newExpr = Expression.New(t);
