@@ -111,67 +111,57 @@ namespace nORM.Query
             var args = new Expression[parameters.Length];
             int cursor = startOffset;
 
-            for (int i = 0; i < parameters.Length; i++)
+            // Reads one projection argument, recursing through ARBITRARILY-DEEP nested anonymous / tuple blocks.
+            // The SELECT-clause visitor flattens every nesting level into sequential prefixed columns, so the
+            // materializer must recurse in lock-step, reading each LEAF column in SELECT order. The prior version
+            // descended only one level: it read a nested block as a single scalar column and cast it to the anon
+            // type, throwing InvalidCastException for a 2+-level projection (new { A, Inner = new { B, Deep = new
+            // { C, D } } }). `argExpr` is null when recursing into a type-only level reached through a nested
+            // reference (a composite grouping Key or a transparent-identifier parameter), which carries no
+            // sub-expression to recurse into — that level recurses by the constructor's parameter types.
+            Expression BuildArg(Expression? argExpr, Type argType)
             {
-                var arg = body.Arguments[i];
-                var paramType = parameters[i].ParameterType;
-
-                // Explicit nested anonymous payload: the projection itself has a `new {...}`
-                // sub-expression. The SQL side emitted one flat column per sub-arg with a
-                // prefixed alias; read them sequentially and call the inner anon ctor.
-                if (arg is NewExpression nestedNew && IsNestedMultiColumnType(arg.Type))
+                // Explicit nested `new {...}` sub-expression: recurse by its constructor arguments.
+                if (argExpr is NewExpression nestedNew && IsNestedMultiColumnType(argType))
                 {
-                    var nestedCtor = nestedNew.Constructor ?? paramType.GetConstructors()[0];
+                    var nestedCtor = nestedNew.Constructor ?? argType.GetConstructors()[0];
                     var nestedParams = nestedCtor.GetParameters();
                     var nestedArgs = new Expression[nestedParams.Length];
                     for (int j = 0; j < nestedParams.Length; j++)
-                    {
-                        var subType = nestedParams[j].ParameterType;
-                        var subRead = GetOptimizedReaderCall(reader, subType, cursor);
-                        var subDefault = Expression.Default(subType);
-                        var subIsNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
-                        nestedArgs[j] = Expression.Condition(subIsNull, subDefault, subRead);
-                        cursor++;
-                    }
-                    args[i] = Expression.New(nestedCtor, nestedArgs);
-                    continue;
+                        nestedArgs[j] = BuildArg(nestedNew.Arguments[j], nestedParams[j].ParameterType);
+                    return Expression.New(nestedCtor, nestedArgs);
                 }
 
-                bool isNestedAnonRef = IsNestedMultiColumnType(arg.Type)
-                    && (
-                        (arg is MemberExpression me
-                         && me.Member.Name == "Key"
-                         && me.Expression is ParameterExpression mep
-                         && mep.Type.IsGenericType
-                         && mep.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>))
-                        || (arg is ParameterExpression pe && IsNestedMultiColumnType(pe.Type))
-                    );
-
-                if (isNestedAnonRef)
+                // Nested multi-column REFERENCE (composite grouping Key / transparent-identifier parameter), or a
+                // deeper type-only level reached from one — no NewExpression, so recurse by parameter types.
+                bool isNestedRef = IsNestedMultiColumnType(argType)
+                    && (argExpr == null
+                        || (argExpr is MemberExpression me
+                            && me.Member.Name == "Key"
+                            && me.Expression is ParameterExpression mep
+                            && mep.Type.IsGenericType
+                            && mep.Type.GetGenericTypeDefinition() == typeof(System.Linq.IGrouping<,>))
+                        || (argExpr is ParameterExpression pe && IsNestedMultiColumnType(pe.Type)));
+                if (isNestedRef)
                 {
-                    var nestedCtor = paramType.GetConstructors()[0];
+                    var nestedCtor = argType.GetConstructors()[0];
                     var nestedParams = nestedCtor.GetParameters();
                     var nestedArgs = new Expression[nestedParams.Length];
                     for (int j = 0; j < nestedParams.Length; j++)
-                    {
-                        var subType = nestedParams[j].ParameterType;
-                        var subRead = GetOptimizedReaderCall(reader, subType, cursor);
-                        var subDefault = Expression.Default(subType);
-                        var subIsNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
-                        nestedArgs[j] = Expression.Condition(subIsNull, subDefault, subRead);
-                        cursor++;
-                    }
-                    args[i] = Expression.New(nestedCtor, nestedArgs);
+                        nestedArgs[j] = BuildArg(null, nestedParams[j].ParameterType);
+                    return Expression.New(nestedCtor, nestedArgs);
                 }
-                else
-                {
-                    var readValue = GetOptimizedReaderCall(reader, paramType, cursor);
-                    var defaultValue = Expression.Default(paramType);
-                    var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
-                    args[i] = Expression.Condition(isDbNull, defaultValue, readValue);
-                    cursor++;
-                }
+
+                // Leaf column.
+                var readValue = GetOptimizedReaderCall(reader, argType, cursor);
+                var isDbNull = Expression.Call(reader, Methods.IsDbNull, Expression.Constant(cursor));
+                var result = Expression.Condition(isDbNull, Expression.Default(argType), readValue);
+                cursor++;
+                return result;
             }
+
+            for (int i = 0; i < parameters.Length; i++)
+                args[i] = BuildArg(body.Arguments[i], parameters[i].ParameterType);
 
             var bodyExpr = Expression.Convert(Expression.New(ctor, args), typeof(object));
             return Expression.Lambda<Func<DbDataReader, object>>(bodyExpr, reader).Compile();
