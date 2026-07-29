@@ -253,10 +253,41 @@ namespace nORM.Query
                             childList.Add(item);
                     }
 
-                    relation.NavProp.SetValue(p, childList);
-                    // Record the loaded children so a later removal from the collection is
-                    // detected as a real disassociation and the child's FK is severed on save.
-                    _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
+                    var pEntry = _ctx.ChangeTracker.GetEntryOrDefault(p);
+                    var existingSnapshot = pEntry?.CollectionNavSnapshots != null
+                        && pEntry.CollectionNavSnapshots.TryGetValue(relation.NavProp.Name, out var snap) ? snap : null;
+                    var existingColl = existingSnapshot != null ? relation.NavProp.GetValue(p) as System.Collections.IList : null;
+                    if (existingSnapshot != null && existingColl != null && !existingColl.IsReadOnly && !existingColl.IsFixedSize)
+                    {
+                        // Tracked parent whose collection was ALREADY Include-loaded (has a snapshot). Only when
+                        // the user has PENDING EDITS — the current collection differs from the load-time
+                        // snapshot — must those be preserved: overwriting with a DB-only list silently dropped a
+                        // pending Added child and reverted a user severance (the removed child re-appeared,
+                        // losing the orphan-delete). In that case add only genuinely-new DB children (not
+                        // present AND not previously snapshotted); a removed child stays removed, an Added child
+                        // stays. With NO pending edit, replace outright — a re-run may carry a different filter
+                        // or reflect external DB changes and must return the fresh set.
+                        var present = new HashSet<object>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+                        foreach (var e in existingColl) if (e != null) present.Add(e);
+                        if (present.Count == existingSnapshot.Count && present.SetEquals(existingSnapshot))
+                        {
+                            relation.NavProp.SetValue(p, childList);
+                            pEntry!.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
+                        }
+                        else
+                        {
+                            foreach (var item in childList)
+                                if (!present.Contains(item) && existingSnapshot.Add(item))
+                                    existingColl.Add(item);
+                        }
+                    }
+                    else
+                    {
+                        relation.NavProp.SetValue(p, childList);
+                        // Record the loaded children so a later removal from the collection is
+                        // detected as a real disassociation and the child's FK is severed on save.
+                        pEntry?.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
+                    }
                 }
                 else
                 {
@@ -435,10 +466,41 @@ namespace nORM.Query
                             childList.Add(item);
                     }
 
-                    relation.NavProp.SetValue(p, childList);
-                    // Record the loaded children so a later removal from the collection is
-                    // detected as a real disassociation and the child's FK is severed on save.
-                    _ctx.ChangeTracker.GetEntryOrDefault(p)?.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
+                    var pEntry = _ctx.ChangeTracker.GetEntryOrDefault(p);
+                    var existingSnapshot = pEntry?.CollectionNavSnapshots != null
+                        && pEntry.CollectionNavSnapshots.TryGetValue(relation.NavProp.Name, out var snap) ? snap : null;
+                    var existingColl = existingSnapshot != null ? relation.NavProp.GetValue(p) as System.Collections.IList : null;
+                    if (existingSnapshot != null && existingColl != null && !existingColl.IsReadOnly && !existingColl.IsFixedSize)
+                    {
+                        // Tracked parent whose collection was ALREADY Include-loaded (has a snapshot). Only when
+                        // the user has PENDING EDITS — the current collection differs from the load-time
+                        // snapshot — must those be preserved: overwriting with a DB-only list silently dropped a
+                        // pending Added child and reverted a user severance (the removed child re-appeared,
+                        // losing the orphan-delete). In that case add only genuinely-new DB children (not
+                        // present AND not previously snapshotted); a removed child stays removed, an Added child
+                        // stays. With NO pending edit, replace outright — a re-run may carry a different filter
+                        // or reflect external DB changes and must return the fresh set.
+                        var present = new HashSet<object>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+                        foreach (var e in existingColl) if (e != null) present.Add(e);
+                        if (present.Count == existingSnapshot.Count && present.SetEquals(existingSnapshot))
+                        {
+                            relation.NavProp.SetValue(p, childList);
+                            pEntry!.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
+                        }
+                        else
+                        {
+                            foreach (var item in childList)
+                                if (!present.Contains(item) && existingSnapshot.Add(item))
+                                    existingColl.Add(item);
+                        }
+                    }
+                    else
+                    {
+                        relation.NavProp.SetValue(p, childList);
+                        // Record the loaded children so a later removal from the collection is
+                        // detected as a real disassociation and the child's FK is severed on save.
+                        pEntry?.CaptureCollectionNavSnapshot(relation.NavProp.Name, childList);
+                    }
                 }
                 else
                 {
