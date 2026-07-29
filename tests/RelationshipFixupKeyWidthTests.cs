@@ -326,4 +326,60 @@ public sealed class RelationshipFixupKeyWidthTests
 
         Assert.Equal((long)parent.Id, FkScalar(cn, "SELECT ParentId FROM W52f_Child WHERE Tag='c6'"));
     }
+
+    // ════════════════════════════════════════════════════════════════════════════════════════
+    // Scenario 7: editing a tracked dependent's FK to point at another TRACKED principal must
+    // reconcile the reference nav to that principal — even across a long-PK / int-FK width gap.
+    // The identity-map lookup keyed by the long PK must match the coerced int FK, not miss and
+    // silently null the navigation (the FK itself always persists correctly).
+    // ════════════════════════════════════════════════════════════════════════════════════════
+    [Table("W52k_Prin")]
+    public sealed class S7Prin
+    {
+        [Key] public long Id { get; set; }               // long PK
+        public string Name { get; set; } = "";
+        public List<S7Dep> Deps { get; set; } = new();
+    }
+
+    [Table("W52k_Dep")]
+    public sealed class S7Dep
+    {
+        [Key] [DatabaseGenerated(DatabaseGeneratedOption.Identity)] public int Id { get; set; }
+        public int PrinId { get; set; }                  // int FK vs long PK
+        public S7Prin? Prin { get; set; }
+        public string Tag { get; set; } = "";
+    }
+
+    [Fact]
+    public async Task ReferenceNav_reconciles_to_tracked_principal_after_fk_edit_across_key_width()
+    {
+        using var cn = Open(
+            "CREATE TABLE W52k_Prin (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL);" +
+            "CREATE TABLE W52k_Dep (Id INTEGER PRIMARY KEY AUTOINCREMENT, PrinId INTEGER NOT NULL, Tag TEXT NOT NULL);" +
+            "INSERT INTO W52k_Prin (Id,Name) VALUES (1,'p1'),(2,'p2');" +
+            "INSERT INTO W52k_Dep (Id,PrinId,Tag) VALUES (10,1,'d');");
+        var opts = new DbContextOptions
+        {
+            OnModelCreating = mb =>
+            {
+                mb.Entity<S7Prin>().HasKey(p => p.Id);
+                mb.Entity<S7Dep>().HasKey(d => d.Id);
+                mb.Entity<S7Prin>().HasMany(p => p.Deps).WithOne(d => d.Prin!).HasForeignKey(d => d.PrinId);
+            }
+        };
+        await using var ctx = new DbContext(cn, new SqliteProvider(), opts, ownsConnection: false);
+
+        var dep = await ctx.Query<S7Dep>().Include(d => d.Prin).FirstAsync();
+        var p2 = await ctx.Query<S7Prin>().FirstAsync(p => p.Id == 2L); // track principal 2
+        Assert.Equal("p1", dep.Prin!.Name);
+
+        dep.PrinId = 2;                                   // repoint the FK at principal 2
+        await ctx.SaveChangesAsync();
+
+        // FK persists correctly regardless of the nav reconciliation.
+        Assert.Equal(2L, FkScalar(cn, "SELECT PrinId FROM W52k_Dep WHERE Tag='d'"));
+        // Nav must resolve to the tracked principal 2, not be silently cleared to null.
+        Assert.NotNull(dep.Prin);
+        Assert.Same(p2, dep.Prin);
+    }
 }

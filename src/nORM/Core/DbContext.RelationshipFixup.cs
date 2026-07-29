@@ -543,8 +543,11 @@ namespace nORM.Core
                         // edited FK and the edit is no longer visible. Point it at
                         // the tracked principal the FK now references, or null it.
                         var editedFk = fk.Getter(dependent);
+                        // Coerce the FK to the principal key's CLR width before the identity-map lookup: the map
+                        // is keyed by the principal's key box (e.g. long), so a narrower FK box (int) would miss
+                        // and silently null the navigation even though the target principal is tracked.
                         object? editedPrincipal = editedFk != null
-                            ? ChangeTracker.GetEntryByKey(principalMap.Type, editedFk)?.Entity
+                            ? ChangeTracker.GetEntryByKey(principalMap.Type, pkColumn.CoerceToClrType(editedFk)!)?.Entity
                             : null;
                         try { navProp.SetValue(dependent, editedPrincipal); }
                         catch { /* read-only navigation — leave the stale reference */ }
