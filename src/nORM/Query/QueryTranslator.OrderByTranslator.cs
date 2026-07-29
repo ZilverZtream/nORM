@@ -78,9 +78,21 @@ namespace nORM.Query
                         t._params[kvp.Key] = kvp.Value;
                     if (t._params.Count > t._parameterManager.Index)
                         t._parameterManager.Index = t._params.Count;
+                    // Read the effective comparable type (a converter key sorts by its PROVIDER type)
+                    // before the visitor returns to the pool, then apply the SAME coercion the forward /
+                    // Reverse / TakeLast ORDER-BY paths use. Without it the outer ORDER BY over the derived
+                    // window runs under BINARY collation and a TEXT-stored decimal/TimeSpan/DateTimeOffset
+                    // key sorts LEXICALLY ('10' < '9') — silent-wrong ordering.
+                    var comparableType = visitor.EffectiveComparableType(keySel.Body, keySel.Body.Type);
                     FastExpressionVisitorPool.Return(visitor);
                     var ascending = !node.Method.Name.Contains("Descending");
-                    t._orderBy.Add((keySql, ascending));
+                    var keyType = keySel.Body.Type;
+                    // C# sorts NULL keys smallest; providers that default the opposite (PostgreSQL) need an
+                    // explicit null-rank entry with the same direction — mirror the forward AddOrderKey path.
+                    if (t._provider.RequiresExplicitNullOrderingForNullableKeys
+                        && (!keyType.IsValueType || Nullable.GetUnderlyingType(keyType) != null))
+                        t._orderBy.Add(($"({keySql} IS NOT NULL)", ascending));
+                    t._orderBy.Add((t.CoerceOrderKeySql(keySql, comparableType, keySel.Body), ascending));
                 }
                 return node;
             }
