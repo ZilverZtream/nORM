@@ -93,6 +93,13 @@ namespace nORM.Query
             if (equalsInstanceCi != null) dict.Add(equalsInstanceCi, HandleStringEqualsInstanceWithComparison);
             var equalsStaticCi = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(string), typeof(StringComparison) });
             if (equalsStaticCi != null) dict.Add(equalsStaticCi, HandleStringEqualsStaticWithComparison);
+            // The comparison-less overloads use ORDINAL semantics (like the `==` operator). Without these the
+            // very common `x.Text.Equals("v")` / `string.Equals(a, b)` fell through to the string-method tail
+            // and threw NormUnsupportedFeatureException, though `==` and the with-comparison forms both worked.
+            var equalsInstanceOrdinal = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string) });
+            if (equalsInstanceOrdinal != null) dict.Add(equalsInstanceOrdinal, HandleStringEqualsInstanceOrdinal);
+            var equalsStaticOrdinal = typeof(string).GetMethod(nameof(string.Equals), new[] { typeof(string), typeof(string) });
+            if (equalsStaticOrdinal != null) dict.Add(equalsStaticOrdinal, HandleStringEqualsStaticOrdinal);
             // char-needle overloads: identical semantics to a one-character string, so they
             // share the string handlers — EmitLikePredicate parameterizes the needle and the
             // char value binds like any pattern. Without these registrations the shape fell

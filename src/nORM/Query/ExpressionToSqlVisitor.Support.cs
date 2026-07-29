@@ -588,6 +588,14 @@ namespace nORM.Query
             ReserveCompiledParamSlotIfClosure(visitor, node.Arguments[2]);
         }
 
+        // Comparison-less string.Equals: ORDINAL, null-safe — identical to the `==` operator. No trailing
+        // StringComparison arg, so (unlike the with-comparison forms) there is no extra slot to reserve.
+        private static void HandleStringEqualsInstanceOrdinal(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitEqualityPredicate(visitor, node.Object!, node.Arguments[0], ignoreCase: false);
+
+        private static void HandleStringEqualsStaticOrdinal(ExpressionToSqlVisitor visitor, MethodCallExpression node)
+            => EmitEqualityPredicate(visitor, node.Arguments[0], node.Arguments[1], ignoreCase: false);
+
         // ParameterValueExtractor walks every closure MemberExpression in the
         // predicate; when a handler folds a closure-captured arg inline without
         // reserving a compiled-param slot, the value-list shifts and downstream
