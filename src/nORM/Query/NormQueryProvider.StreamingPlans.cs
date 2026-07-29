@@ -92,7 +92,14 @@ namespace nORM.Query
                     yield return item;
                 yield break;
             }
-            var trackable = !plan.NoTracking &&
+            // Honour the context tracking DEFAULT, not just an explicit .AsNoTracking(): the buffered/fast
+            // read paths gate tracking on `!plan.NoTracking && !(DefaultTrackingBehavior==NoTracking &&
+            // !ForceTracking)`, but the streaming path checked only plan.NoTracking. So under a NoTracking
+            // context default, AsAsyncEnumerable silently TRACKED every streamed row (unlike ToListAsync) —
+            // an edit then persisted on the next SaveChanges, and the ChangeTracker grew O(rows), defeating
+            // the bounded-memory purpose of streaming. Fold the same read-only gate in here.
+            var isReadOnly = _ctx.Options.DefaultTrackingBehavior == QueryTrackingBehavior.NoTracking && !plan.ForceTracking;
+            var trackable = !plan.NoTracking && !isReadOnly &&
                              plan.ElementType.IsClass &&
                              !plan.ElementType.Name.StartsWith("<>", StringComparison.Ordinal) &&
                              plan.ElementType.GetConstructor(Type.EmptyTypes) != null &&

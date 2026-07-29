@@ -25,11 +25,16 @@ namespace nORM.Query
         private GroupJoinMaterializationState PrepareGroupJoinMaterialization(QueryPlan plan)
         {
             var info = plan.GroupJoinInfo!;
+            // Honour the context tracking DEFAULT, not just an explicit .AsNoTracking(): like the other read
+            // paths, a NoTracking default (with no ForceTracking) must leave the materialized outer/inner
+            // entities untracked — otherwise a GroupJoin under a NoTracking context silently tracked them and
+            // an edit persisted on the next SaveChanges.
+            var isReadOnly = IsReadOnlyQuery() && !plan.ForceTracking;
             var trackOuter = info.OuterIsEntity
-                             && !plan.NoTracking
+                             && !plan.NoTracking && !isReadOnly
                              && info.OuterType.IsClass
                              && !info.OuterType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
-            var trackInner = !plan.NoTracking
+            var trackInner = !plan.NoTracking && !isReadOnly
                              && info.InnerType.IsClass
                              && !info.InnerType.Name.StartsWith(AnonymousTypePrefix, StringComparison.Ordinal);
 
