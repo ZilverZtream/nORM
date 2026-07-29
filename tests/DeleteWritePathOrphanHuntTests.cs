@@ -14,12 +14,12 @@ using Xunit;
 namespace nORM.Tests;
 
 /// <summary>
-/// DELETE write path — set-based ExecuteDeleteAsync vs active-record DeleteAsync for nORM-MANAGED children
-/// (owned-collection rows, many-to-many join rows). nORM manages these client-side (SQLite does not enforce
-/// FK cascade at runtime), so a set-based delete cannot cascade them. Rather than SILENTLY ORPHAN them,
-/// ExecuteDeleteAsync now REFUSES LOUDLY when the target has owned/m2m children (mirrors the Bulk*
-/// aggregate-children guard); DeleteAsync/BulkDeleteAsync DO cascade via CleanupNormManagedChildrenOnDeleteAsync
-/// (positive controls below). Full set-based child cleanup in ExecuteDelete is a tracked follow-up.
+/// DELETE write path — set-based ExecuteDeleteAsync cascades nORM-MANAGED children (owned-collection rows,
+/// many-to-many join rows) for the common single-table single-key shape via a set-based child DELETE
+/// (`... WHERE fk IN (SELECT owner-key ...)`), atomic with the owner delete. nORM manages these client-side
+/// (SQLite does not enforce FK cascade at runtime), so without this they would be silently orphaned. Paged /
+/// joined / composite-key shapes with managed children still fail loud (rare). DeleteAsync/BulkDeleteAsync
+/// also cascade (positive controls below).
 /// </summary>
 [Trait("Category", TestCategory.Fast)]
 public class DeleteWritePathOrphanHuntTests
@@ -60,18 +60,42 @@ public class DeleteWritePathOrphanHuntTests
     { using var cmd = k.CreateCommand(); cmd.CommandText = $"SELECT COUNT(*) FROM {table} WHERE Id = {id}"; return Convert.ToInt32(cmd.ExecuteScalar()); }
 
     [Fact]
-    public async Task ExecuteDelete_owner_with_owned_children_fails_loud_not_orphans()
+    public async Task ExecuteDelete_owner_cascades_owned_collection_children()
     {
         using var keeper = SetupOwned(out var make);
         await using var ctx = make();
-        // Set-based ExecuteDelete cannot cascade nORM-managed owned children; it refuses loudly rather than
-        // orphan them. (DeleteAsync/BulkDeleteAsync cascade — see positive control below.)
+        var deleted = await ctx.Query<EdOwPost>().Where(p => p.Id == 1).ExecuteDeleteAsync();
+        Assert.Equal(1, deleted);
+        Assert.Equal(0, PostCount(keeper, "EdOwPost", 1));   // owner deleted
+        Assert.Equal(0, OwnedTagCount(keeper, 1));           // its 2 owned rows cascaded (not orphaned)
+        Assert.Equal(1, OwnedTagCount(keeper, 2));           // sibling owner's child untouched
+    }
+
+    [Fact]
+    public async Task ExecuteDelete_multiple_matched_owners_cascades_all_their_children()
+    {
+        using var keeper = SetupOwned(out var make);
+        await using var ctx = make();
+        // Set-based predicate matching BOTH owners — the owner-key subquery must cascade every matched
+        // owner's children, not just one (the differentiator from per-entity cleanup).
+        var deleted = await ctx.Query<EdOwPost>().Where(p => p.Id <= 2).ExecuteDeleteAsync();
+        Assert.Equal(2, deleted);
+        Assert.Equal(0, OwnedTagCount(keeper, 1));
+        Assert.Equal(0, OwnedTagCount(keeper, 2));
+        using var cmd = keeper.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM EdOwTag";
+        Assert.Equal(0, Convert.ToInt32(cmd.ExecuteScalar()));   // all owned rows cascaded
+    }
+
+    [Fact]
+    public async Task ExecuteDelete_paged_owner_with_children_fails_loud()
+    {
+        using var keeper = SetupOwned(out var make);
+        await using var ctx = make();
+        // The paged owner-key subquery isn't wired for child cascade yet — fail loud rather than orphan.
         await Assert.ThrowsAsync<NormUnsupportedFeatureException>(
-            async () => await ctx.Query<EdOwPost>().Where(p => p.Id == 1).ExecuteDeleteAsync());
-        // Nothing deleted — no partial corruption: owner and its children all intact.
-        Assert.Equal(1, PostCount(keeper, "EdOwPost", 1));   // owner NOT deleted
-        Assert.Equal(2, OwnedTagCount(keeper, 1));           // children NOT orphaned/deleted
-        Assert.Equal(1, OwnedTagCount(keeper, 2));
+            async () => await ctx.Query<EdOwPost>().OrderBy(p => p.Id).Take(1).ExecuteDeleteAsync());
+        Assert.Equal(3, OwnedTagCount(keeper, 1) + OwnedTagCount(keeper, 2));   // nothing deleted (2 + 1 tags)
     }
 
     // ---------- bidirectional m2m ----------
@@ -116,15 +140,15 @@ public class DeleteWritePathOrphanHuntTests
     }
 
     [Fact]
-    public async Task ExecuteDelete_m2m_entity_fails_loud_not_dangles()
+    public async Task ExecuteDelete_m2m_entity_cascades_join_rows()
     {
         using var keeper = SetupBi(out var make);
         await using var ctx = make();
-        await Assert.ThrowsAsync<NormUnsupportedFeatureException>(
-            async () => await ctx.Query<EdBiPost>().Where(p => p.Id == 1).ExecuteDeleteAsync());
-        // Nothing deleted — all join rows and posts intact (no dangling m2m rows, no orphaned owner).
-        Assert.Equal(new List<(int, int)> { (1, 1), (1, 2), (2, 1) }, JoinRows(keeper));
-        Assert.Equal(1, PostCount(keeper, "EdBiPost", 1));
+        var deleted = await ctx.Query<EdBiPost>().Where(p => p.Id == 1).ExecuteDeleteAsync();
+        Assert.Equal(1, deleted);
+        // Post #1's two join rows cascaded; post #2's single join row survives (no dangling rows).
+        Assert.Equal(new List<(int, int)> { (2, 1) }, JoinRows(keeper));
+        Assert.Equal(0, PostCount(keeper, "EdBiPost", 1));
     }
 
     // ---------- POSITIVE CONTROL: active-record DeleteAsync of the SAME owner cleans up ----------

@@ -157,19 +157,24 @@ namespace nORM.Query
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             EnsureWritableMapping(mapping, "ExecuteDeleteAsync");
-            // ExecuteDelete is a set-based DELETE over the owner table only; it cannot cascade nORM-managed
-            // children (owned collections / m2m join rows). SQLite does not enforce foreign keys at runtime,
-            // so those children would be SILENTLY ORPHANED (owned rows left, or m2m join rows dangling at the
-            // freed PK). Refuse loudly rather than corrupt — mirrors GuardBulkAggregateChildren. The tracked
-            // DeleteAsync and entity BulkDeleteAsync paths DO cascade these (CleanupNormManagedChildrenOn
-            // DeleteAsync), so aggregate deletes must route through them or delete the children first.
-            if (mapping.OwnedCollections.Count > 0 || mapping.ManyToManyJoins.Count > 0)
+            // Set-based ExecuteDelete cascades nORM-managed children (owned-collection rows, m2m join rows)
+            // itself — SQLite does not enforce foreign keys at runtime, so otherwise they would be silently
+            // ORPHANED. Cascade is implemented for the common single-table, single-key, non-paged shape (a child
+            // DELETE ... WHERE fk IN (SELECT owner-key ...), atomic with the owner delete). Paged / joined /
+            // composite-key shapes with managed children still fail loud (rare; their owner-key subquery isn't
+            // wired yet) rather than orphan.
+            var hasManagedChildren = mapping.OwnedCollections.Count > 0 || mapping.ManyToManyJoins.Count > 0;
+            bool simpleOwnerShape = plan.Tables.Count == 1 && plan.BulkCudShape != null
+                && !plan.BulkCudShape.HasPaging && mapping.KeyColumns.Length == 1;
+            if (hasManagedChildren && !simpleOwnerShape)
                 throw new NormUnsupportedFeatureException(
-                    $"ExecuteDeleteAsync cannot delete '{mapping.Type.Name}': it has nORM-managed owned-collection " +
-                    "or many-to-many children that a set-based DELETE would orphan (SQLite does not enforce foreign " +
-                    "keys at runtime). Use DeleteAsync / BulkDeleteAsync (which cascade them), or delete the children first.",
+                    $"ExecuteDeleteAsync cannot yet cascade '{mapping.Type.Name}' owned-collection / many-to-many " +
+                    "children for a paged, joined, or composite-key delete shape. Use a single-key predicate, or " +
+                    "DeleteAsync / BulkDeleteAsync (which cascade), or delete the children first.",
                     NormUnsupportedReason.BulkAggregateChildrenUnsupported);
+
             string finalSql;
+            string? ownerKeySelect = null;
             if (plan.Tables.Count != 1)
             {
                 ValidateJoinedCudShape(plan.BulkCudShape);
@@ -189,14 +194,72 @@ namespace nORM.Query
                 {
                     var whereClause = _cudBuilder.GetWhereClauseWithOuterQualifier(plan.BulkCudShape, mapping.EscTable);
                     finalSql = $"DELETE FROM {mapping.EscTable}{whereClause}";
+                    if (hasManagedChildren)
+                        // The owner keys matched by this delete — child rows FK-ing to any of them are removed.
+                        ownerKeySelect = $"SELECT {mapping.EscTable}.{mapping.KeyColumns[0].EscCol} FROM {mapping.EscTable}{whereClause}";
                 }
             }
+
             await _ctx.EnsureConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = _ctx.CreateCommand();
-            cmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
-            cmd.CommandText = finalSql;
-            BindPlanParameters(cmd, plan, paramValues);
-            var affected = await cmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+
+            async Task<int> RunDeleteAsync(string sql)
+            {
+                await using var runCmd = _ctx.CreateCommand();
+                runCmd.CommandTimeout = (int)plan.CommandTimeout.TotalSeconds;
+                runCmd.CommandText = sql;
+                BindPlanParameters(runCmd, plan, paramValues);
+                return await runCmd.ExecuteNonQueryWithInterceptionAsync(_ctx, ct).ConfigureAwait(false);
+            }
+
+            int affected;
+            if (ownerKeySelect != null)
+            {
+                // Children hold the FK, so remove them BEFORE the owner rows, atomically with the owner delete —
+                // establish a transaction when the caller isn't managing one (mirrors BulkDeleteAsync). The child
+                // DELETEs reuse the plan's WHERE (via the owner-key subquery) and the same bound parameters.
+                var ownTx = _ctx.CurrentTransaction == null;
+                System.Data.Common.DbTransaction? delTx = null;
+                if (ownTx)
+                {
+                    delTx = await _ctx.RawConnection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                    _ctx.CurrentTransaction = delTx;
+                }
+                try
+                {
+                    foreach (var oc in mapping.OwnedCollections)
+                        await RunDeleteAsync($"DELETE FROM {oc.EscTable} WHERE {oc.EscForeignKeyColumn} IN ({ownerKeySelect})").ConfigureAwait(false);
+                    foreach (var jtm in mapping.ManyToManyJoins)
+                        await RunDeleteAsync($"DELETE FROM {jtm.EscTableName} WHERE {jtm.EscLeftFkColumn} IN ({ownerKeySelect})").ConfigureAwait(false);
+                    affected = await RunDeleteAsync(finalSql).ConfigureAwait(false);
+                    if (delTx != null) await delTx.CommitAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    if (delTx != null) await delTx.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    throw;
+                }
+                finally
+                {
+                    if (delTx != null)
+                    {
+                        _ctx.CurrentTransaction = null;
+                        await delTx.DisposeAsync().ConfigureAwait(false);
+                    }
+                }
+                // Owned/m2m child tables aren't in map.Relations, so InvalidateResultCacheForDeletedTable
+                // (below) won't cover them — invalidate their tags explicitly.
+                var childCache = _ctx.Options.CacheProvider;
+                if (childCache != null)
+                {
+                    foreach (var oc in mapping.OwnedCollections) childCache.InvalidateTag(oc.TableName);
+                    foreach (var jtm in mapping.ManyToManyJoins) childCache.InvalidateTag(jtm.TableName);
+                }
+            }
+            else
+            {
+                affected = await RunDeleteAsync(finalSql).ConfigureAwait(false);
+            }
+
             sw?.Stop();
             _ctx.Options.Logger?.LogQuery(finalSql, EnsureParameterDictionary(plan, paramValues), sw?.Elapsed ?? default, affected);
             // Set-based DELETE persists changes just like SaveChanges and the Bulk* ops, so the result cache
