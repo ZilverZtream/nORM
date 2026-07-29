@@ -70,8 +70,9 @@ namespace nORM.Core
 
                         // Set the FK from the principal's PK. Correct immediately when the principal's key
                         // is already assigned; re-propagated after insert for DB-generated principal keys.
+                        // SetCoerced normalizes a width mismatch (e.g. int FK / long PK) the setter can't unbox.
                         for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
-                            relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
+                            relation.ForeignKeys[i].SetCoerced(child, relation.PrincipalKeys[i].Getter(principal));
 
                         if (childEntry.Mapping.Relations.Count > 0 || childEntry.Mapping.ReferenceNavigations.Length > 0)
                             queue.Enqueue(childEntry);
@@ -257,7 +258,7 @@ namespace nORM.Core
                 var fkCol = relation.ForeignKeys[i];
                 if (!ChangeTracker.IsDefaultKeyValue(fkCol.Getter(child), fkCol.Prop.PropertyType))
                     continue;
-                fkCol.Setter(child, principalKey);
+                fkCol.SetCoerced(child, principalKey);
             }
         }
 
@@ -552,7 +553,7 @@ namespace nORM.Core
                     entry.SetStateInternal(EntityState.Modified);
                     entry.MarkExplicitlyModified();
                 }
-                fk.Setter(dependent, pkValue);
+                fk.SetCoerced(dependent, pkValue);
             }
         }
     }

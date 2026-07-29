@@ -117,6 +117,42 @@ namespace nORM.Mapping
         public IValueConverter? Converter { get; set; }
 
         /// <summary>
+        /// Assigns <paramref name="value"/> to this column's property, first normalizing an integer/enum/decimal
+        /// box-WIDTH mismatch via <see cref="CoerceToClrType"/> so a foreign key of a different CLR width than
+        /// its principal key (e.g. an <c>int</c> FK receiving a boxed <c>long</c> principal key) does not throw.
+        /// The compiled <see cref="Setter"/> unboxes with a hard cast (<c>Expression.Convert(object, int)</c>),
+        /// which throws <see cref="InvalidCastException"/> across widths; relationship fixup copies a principal
+        /// key of a potentially different width into a dependent FK and so must normalize the box first.
+        /// </summary>
+        public void SetCoerced(object entity, object? value) => Setter(entity, CoerceToClrType(value));
+
+        /// <summary>
+        /// Coerces a boxed value to this column's CLR property type when it differs only by numeric width or
+        /// enum backing (e.g. a boxed <c>long</c> for an <c>int</c> property). Returns the value unchanged when
+        /// the types already match or the difference is not a numeric/enum mismatch the setter needs help with;
+        /// on a failed coercion (e.g. an out-of-range narrowing) it also returns the original value so the
+        /// <see cref="Setter"/> applies its normal fail-loud behavior rather than swallowing the error.
+        /// </summary>
+        public object? CoerceToClrType(object? value)
+        {
+            if (value == null) return null;
+            var target = Nullable.GetUnderlyingType(Prop.PropertyType) ?? Prop.PropertyType;
+            if (value.GetType() == target) return value;
+            try
+            {
+                if (target.IsEnum)
+                    return value is IConvertible ? Enum.ToObject(target, value) : value;
+                if (value is IConvertible && (target.IsPrimitive || target == typeof(decimal)))
+                    return System.Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
+            {
+                return value;
+            }
+            return value;
+        }
+
+        /// <summary>
         /// Initializes a new mapping using cached property metadata produced by the mapping cache.
         /// </summary>
         /// <param name="info">Precomputed property metadata.</param>

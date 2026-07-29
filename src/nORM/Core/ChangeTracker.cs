@@ -868,7 +868,7 @@ namespace nORM.Core
                 var (principal, dependent, foreignKey, principalKey) = pending[i];
                 if (!ReferenceEquals(principal, insertedPrincipal))
                     continue;
-                foreignKey.Setter(dependent, principalKey.Getter(insertedPrincipal));
+                foreignKey.SetCoerced(dependent, principalKey.Getter(insertedPrincipal));
                 pending.RemoveAt(i);
             }
         }
@@ -927,7 +927,7 @@ namespace nORM.Core
                     if (childEntry == null || childEntry.State != EntityState.Added)
                         continue;
                     for (int i = 0; i < relation.ForeignKeys.Count && i < relation.PrincipalKeys.Count; i++)
-                        relation.ForeignKeys[i].Setter(child, relation.PrincipalKeys[i].Getter(principal));
+                        relation.ForeignKeys[i].SetCoerced(child, relation.PrincipalKeys[i].Getter(principal));
                 }
             }
         }

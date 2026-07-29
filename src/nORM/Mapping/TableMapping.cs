@@ -747,8 +747,20 @@ namespace nORM.Mapping
             var keyCol = KeyColumns.FirstOrDefault(k => k.IsDbGenerated) ?? ConventionGeneratedKeyColumn;
             if (keyCol != null)
             {
-                var targetType = Nullable.GetUnderlyingType(keyCol.Prop.PropertyType) ?? keyCol.Prop.PropertyType;
-                var convertedValue = ConvertGeneratedKeyValue(value, targetType);
+                object? convertedValue;
+                if (keyCol.Converter != null)
+                {
+                    // A value-converter-backed generated key (e.g. a strongly-typed ID) is read back in the
+                    // PROVIDER representation; run it through the converter to reach the MODEL value. The
+                    // converter itself coerces the provider box (SQLite's Int64 -> the converter's provider
+                    // type), so Convert.ChangeType — which can't reach a non-IConvertible model type — is bypassed.
+                    convertedValue = keyCol.Converter.ConvertFromProvider(value);
+                }
+                else
+                {
+                    var targetType = Nullable.GetUnderlyingType(keyCol.Prop.PropertyType) ?? keyCol.Prop.PropertyType;
+                    convertedValue = ConvertGeneratedKeyValue(value, targetType);
+                }
                 keyCol.Setter(entity, convertedValue);
             }
         }
