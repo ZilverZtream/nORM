@@ -186,9 +186,22 @@ namespace nORM.Core
                 if (reader.IsDBNull(ordinal)) continue;
                 var raw = reader.GetValue(ordinal);
                 var propType = Nullable.GetUnderlyingType(col.Prop.PropertyType) ?? col.Prop.PropertyType;
-                if (raw.GetType() != propType)
-                    raw = CoerceRawValue(raw, propType);
-                col.Setter(instance, raw);
+                object? value;
+                if (col.Converter != null)
+                {
+                    // Immediate raw-SQL materialization must apply the value converter (provider -> model)
+                    // exactly like the composable MaterializerFactory path — otherwise it stores the raw
+                    // PROVIDER value (a negated int, an enum's stored name, a custom-encoded decimal/TEXT)
+                    // straight onto the model property: silent data corruption on every provider.
+                    value = col.Converter.ConvertFromProvider(raw);
+                    if (value != null && value.GetType() != propType)
+                        value = CoerceRawValue(value, propType);
+                }
+                else
+                {
+                    value = raw.GetType() != propType ? CoerceRawValue(raw, propType) : raw;
+                }
+                col.Setter(instance, value);
             }
             return instance;
         }
