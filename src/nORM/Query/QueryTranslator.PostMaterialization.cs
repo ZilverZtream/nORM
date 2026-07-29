@@ -368,7 +368,7 @@ namespace nORM.Query
                         foreach (var child in EnumerateQuery(ctx, relation.DependentType))
                         {
                             var fk = GetHydrationRelationKeyValue(relation.ForeignKeys, child);
-                            if (object.Equals(pk, fk))
+                            if (KeysEqualCoerced(pk, fk))
                                 loaded.Add(child);
                         }
                         relation.NavProp.SetValue(value, loaded);
@@ -393,7 +393,7 @@ namespace nORM.Query
                         var fk = fkProp.GetValue(value);
                         foreach (var related in EnumerateQuery(ctx, navType))
                         {
-                            if (object.Equals(fk, relatedMap.KeyColumns[0].Getter(related)))
+                            if (KeysEqualCoerced(fk, relatedMap.KeyColumns[0].Getter(related)))
                             {
                                 prop.SetValue(value, related);
                                 HydratePostMaterializeObject(ctx, related, seen);
@@ -412,7 +412,7 @@ namespace nORM.Query
                         var pk = map.KeyColumns[0].Getter(value);
                         foreach (var related in EnumerateQuery(ctx, navType))
                         {
-                            if (object.Equals(pk, inverseFk.Getter(related)))
+                            if (KeysEqualCoerced(pk, inverseFk.Getter(related)))
                             {
                                 prop.SetValue(value, related);
                                 HydratePostMaterializeObject(ctx, related, seen);
@@ -444,6 +444,25 @@ namespace nORM.Query
         {
             var queryMethod = typeof(NormQueryable).GetMethod(nameof(NormQueryable.Query))!.MakeGenericMethod(entityType);
             return (System.Collections.IEnumerable)queryMethod.Invoke(null, new object[] { ctx })!;
+        }
+
+        /// <summary>
+        /// Equality for hydration key values that tolerates a CLR box-type mismatch between a principal key
+        /// and a dependent FK of differing width — e.g. a <c>long</c> PK vs an <c>int</c> FK, which box to
+        /// different runtime types so <c>object.Equals</c> reports inequality for logically-equal values and
+        /// the navigation would silently hydrate EMPTY. Composite <see cref="HydrationRelationKey"/> keys keep
+        /// exact-match (their default string form isn't unique); scalar keys fall back to an invariant-string
+        /// value compare. Mirrors <c>IncludeProcessor.TryGetChildGroup</c> / <c>BatchedNavigationLoader</c>.
+        /// </summary>
+        private static bool KeysEqualCoerced(object? a, object? b)
+        {
+            if (object.Equals(a, b))
+                return true;
+            if (a == null || b == null || a is HydrationRelationKey || b is HydrationRelationKey)
+                return false;
+            var sa = Convert.ToString(a, System.Globalization.CultureInfo.InvariantCulture);
+            var sb = Convert.ToString(b, System.Globalization.CultureInfo.InvariantCulture);
+            return sa != null && sa == sb;
         }
 
         private static object? GetHydrationRelationKeyValue(IReadOnlyList<Column> columns, object entity)
