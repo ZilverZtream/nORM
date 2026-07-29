@@ -409,6 +409,27 @@ namespace nORM.Query
             { if (node == _target) _onFound(); return node; }
         }
 
+        // Reference equality only: both columns unconverted (null == null) or wired to the EXACT same converter
+        // instance. Two same-typed converter instances could still be parameterized differently (e.g. a scale
+        // factor), so treating them as interchangeable would risk a silent-wrong provider copy — reject instead.
+        private static bool SameConversionContract(IValueConverter? a, IValueConverter? b) => ReferenceEquals(a, b);
+
+        // A computed (row-referencing) SetProperty value is translated to SQL over the STORED (provider) column
+        // values. A value converter can't be inverted in SQL, so a converter column can never participate in an
+        // arithmetic/function operand, and a computed result can never be assigned to a converter target, without
+        // silently corrupting the model value (e.g. `x => x.Balance + 5m` on a dollars→cents converter adds 5
+        // cents, not $5). Such forms are rejected fail-loud. The literal/captured path (converter applied to a
+        // bound parameter), a bare copy between columns sharing the same converter (exact provider copy), and
+        // plain converter-free expressions remain supported — this only trips on genuinely un-invertible shapes.
+        private static NormUnsupportedFeatureException ConverterComputedNotSupported(Column targetColumn) =>
+            new NormUnsupportedFeatureException(
+                $"A computed ExecuteUpdate SetProperty involving the value-converted column '{targetColumn.Name}' " +
+                "cannot be translated: the arithmetic/copy would run on the stored provider representation and is " +
+                "never converted back, silently corrupting the value. Use a literal or captured value (the converter " +
+                "is applied), a bare copy between columns with the same converter, or update the entity through the " +
+                "tracked SaveChanges path.",
+                NormUnsupportedReason.SetPropertyValueUnsupported);
+
         /// <summary>
         /// Translates an UPDATE-side value expression to SQL using unprefixed column names
         /// (UPDATE statements reference columns of the table being updated directly, with
@@ -438,6 +459,19 @@ namespace nORM.Query
                             throw new NormUnsupportedFeatureException(
                                 $"Member '{me.Member.Name}' is not a mapped column on '{mapping.TableName}'.",
                                 NormUnsupportedReason.SetPropertyTargetNotMappedColumn);
+                        // A column emits its STORED (provider) value. In value position it is a direct copy into
+                        // the target — exact only when both share the same converter (provider→provider). As an
+                        // arithmetic/function operand it can't take part in provider-space math and be converted
+                        // back. Either mismatch would silently corrupt the model value, so reject fail-loud.
+                        if (valuePosition)
+                        {
+                            if (!SameConversionContract(col.Converter, targetColumn.Converter))
+                                throw ConverterComputedNotSupported(targetColumn);
+                        }
+                        else if (col.Converter != null)
+                        {
+                            throw ConverterComputedNotSupported(targetColumn);
+                        }
                         return col.EscCol;
 
                     case ConstantExpression ce:
@@ -456,6 +490,10 @@ namespace nORM.Query
                         // Delegate Math.*, string.*, and Convert.* to the provider's
                         // TranslateFunction so SetProperty value expressions can use
                         // server-side functions like Math.Abs / Math.Min / string.Trim.
+                        // A function result is a provider-space value; assigning it to a converter target would
+                        // store it unconverted (the operands are already guarded against converter columns).
+                        if (targetColumn.Converter != null)
+                            throw ConverterComputedNotSupported(targetColumn);
                         var fnArgs = new string[mc.Arguments.Count + (mc.Object != null ? 1 : 0)];
                         int ai = 0;
                         if (mc.Object != null) fnArgs[ai++] = Render(mc.Object, valuePosition: false);
@@ -475,14 +513,21 @@ namespace nORM.Query
                             && be.Left.Type == typeof(string)
                             && be.Right.Type == typeof(string))
                         {
+                            if (targetColumn.Converter != null)
+                                throw ConverterComputedNotSupported(targetColumn);
                             return _ctx.RawProvider.GetNullSafeConcatSql(Render(be.Left, valuePosition: false), Render(be.Right, valuePosition: false));
                         }
                         // Null-coalesce: `??` lowers to BinaryExpression(Coalesce). Emit COALESCE. Both
-                        // operands can be the assigned value (col ?? fallback), so keep the value position.
+                        // operands can be the assigned value (col ?? fallback), so keep the value position —
+                        // each branch is guarded as a value-position copy, so no result-level check is needed.
                         if (be.NodeType == ExpressionType.Coalesce)
                         {
                             return $"COALESCE({Render(be.Left, valuePosition)}, {Render(be.Right, valuePosition)})";
                         }
+                        // Arithmetic produces a provider-space value; assigning it to a converter target would
+                        // store it unconverted (operands are already guarded against converter columns via R1).
+                        if (targetColumn.Converter != null)
+                            throw ConverterComputedNotSupported(targetColumn);
                         var op = be.NodeType switch
                         {
                             ExpressionType.Add => "+",
@@ -529,7 +574,10 @@ namespace nORM.Query
                         // Navigation-collection aggregate inside a SET clause (e.g.
                         // `SetProperty(r => r.Total, r => r.Items.Sum(i => i.Amount))`) emits a
                         // correlated subquery against the dependent table, correlated to the outer
-                        // row being updated.
+                        // row being updated. The aggregate is a provider-space value, so a converter
+                        // target would store it unconverted.
+                        if (targetColumn.Converter != null)
+                            throw ConverterComputedNotSupported(targetColumn);
                         return RenderNavigationAggregate(navAgg, navAggMember, navRelation);
 
                     default:
