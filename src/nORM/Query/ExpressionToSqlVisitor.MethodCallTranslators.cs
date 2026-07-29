@@ -67,9 +67,12 @@ namespace nORM.Query
                         _params[placeholder] = DBNull.Value;
                         _compiledParams.Add(placeholder);
                     }
-                    double secondsPerUnit = node.Method.Name == nameof(TimeOnly.AddHours) ? 3600.0 : 60.0;
-                    var secondsLiteral = ((long)(scalar * secondsPerUnit)).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    var arithSql0 = _provider.AddSecondsToTimeOnlySql(timeSql, secondsLiteral);
+                    // Tick-exact delta (preserves sub-second on providers whose TimeOnly is TEXT); native-TIME
+                    // providers fall back to the whole-second seconds hook.
+                    var deltaTicks0 = (node.Method.Name == nameof(TimeOnly.AddHours) ? TimeSpan.FromHours(scalar) : TimeSpan.FromMinutes(scalar)).Ticks;
+                    var inv0 = System.Globalization.CultureInfo.InvariantCulture;
+                    var arithSql0 = _provider.AddTicksToTimeOnlySql(timeSql, deltaTicks0.ToString(inv0))
+                        ?? _provider.AddSecondsToTimeOnlySql(timeSql, (deltaTicks0 / 10000000L).ToString(inv0));
                     if (arithSql0 != null) { _sql.Append(arithSql0); return true; }
                     throw new NormUnsupportedFeatureException(
                         $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +
@@ -84,8 +87,9 @@ namespace nORM.Query
                         _params[placeholder] = DBNull.Value;
                         _compiledParams.Add(placeholder);
                     }
-                    var secondsLiteral = ((long)span.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    var arithSql = _provider.AddSecondsToTimeOnlySql(timeSql, secondsLiteral);
+                    var inv1 = System.Globalization.CultureInfo.InvariantCulture;
+                    var arithSql = _provider.AddTicksToTimeOnlySql(timeSql, span.Ticks.ToString(inv1))
+                        ?? _provider.AddSecondsToTimeOnlySql(timeSql, ((long)span.TotalSeconds).ToString(inv1));
                     if (arithSql != null) { _sql.Append(arithSql); return true; }
                     throw new NormUnsupportedFeatureException(
                         $"{_provider.GetType().Name} does not implement AddSecondsToTimeOnlySql; " +

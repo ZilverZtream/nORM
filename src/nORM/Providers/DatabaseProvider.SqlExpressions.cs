@@ -776,6 +776,14 @@ namespace nORM.Providers
         public virtual string? AddSecondsToTimeOnlySql(string timeOnlySql, string secondsSqlFragment) => null;
 
         /// <summary>
+        /// Adds a TICK delta (100ns units, the finest .NET resolution) to a TimeOnly SQL fragment,
+        /// wrapping around midnight like .NET TimeOnly arithmetic. Providers that store TimeOnly as
+        /// whole-second-truncating TEXT override this to stay sub-second exact; the visitors fall back to
+        /// <see cref="AddSecondsToTimeOnlySql"/> when this returns null (native-TIME providers).
+        /// </summary>
+        internal virtual string? AddTicksToTimeOnlySql(string timeOnlySql, string ticksDeltaSqlFragment) => null;
+
+        /// <summary>
         /// Adds (or subtracts) a TimeSpan-typed column to a TimeOnly SQL
         /// expression. Sister of AddTimeSpanColumnToDateTimeSql. Each provider
         /// uses its TIME storage primitive without parsing text.

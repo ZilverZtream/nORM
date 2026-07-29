@@ -528,17 +528,21 @@ namespace nORM.Query
                     && timeScalarVal is double timeScalar)
                 {
                     ReserveUnusedCompiledSlotForClosure(node.Arguments[0]);
-                    var perUnit = node.Method.Name == nameof(TimeOnly.AddHours) ? 3600.0 : 60.0;
-                    timeArith = _provider.AddSecondsToTimeOnlySql(
-                        timeOnlySql, ((long)(timeScalar * perUnit)).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    // Tick-exact delta (sub-second-preserving on TEXT-TimeOnly providers); native-TIME
+                    // providers fall back to the whole-second seconds hook.
+                    var dTicks = (node.Method.Name == nameof(TimeOnly.AddHours) ? TimeSpan.FromHours(timeScalar) : TimeSpan.FromMinutes(timeScalar)).Ticks;
+                    var invTs = System.Globalization.CultureInfo.InvariantCulture;
+                    timeArith = _provider.AddTicksToTimeOnlySql(timeOnlySql, dTicks.ToString(invTs))
+                        ?? _provider.AddSecondsToTimeOnlySql(timeOnlySql, (dTicks / 10000000L).ToString(invTs));
                 }
                 else if (node.Method.Name == nameof(TimeOnly.Add)
                     && QueryTranslator.TryGetConstantValue(node.Arguments[0], out var timeSpanVal)
                     && timeSpanVal is TimeSpan timeSpan)
                 {
                     ReserveUnusedCompiledSlotForClosure(node.Arguments[0]);
-                    timeArith = _provider.AddSecondsToTimeOnlySql(
-                        timeOnlySql, ((long)timeSpan.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    var invSpan = System.Globalization.CultureInfo.InvariantCulture;
+                    timeArith = _provider.AddTicksToTimeOnlySql(timeOnlySql, timeSpan.Ticks.ToString(invSpan))
+                        ?? _provider.AddSecondsToTimeOnlySql(timeOnlySql, ((long)timeSpan.TotalSeconds).ToString(invSpan));
                 }
                 else if (node.Method.Name == nameof(TimeOnly.Add))
                 {

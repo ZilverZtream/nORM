@@ -592,6 +592,24 @@ namespace nORM.Providers
             => $"strftime('%H:%M:%S', '1900-01-01 ' || {timeOnlySql}, ({secondsSqlFragment}) || ' seconds')";
 
         /// <summary>
+        /// Sub-second-EXACT TimeOnly add: strftime('%H:%M:%S', …' seconds') drops the fraction (both the
+        /// receiver's and the delta's). Parse 'HH:mm:ss[.fffffff]' to ticks-within-day (full 100ns
+        /// precision), add the tick delta, wrap modulo one day (864000000000 ticks) like .NET TimeOnly, and
+        /// re-render — the whole-second part via strftime(unixepoch), the fraction trimmed to the
+        /// Microsoft.Data.Sqlite serialization ('HH:mm:ss[.fffffff]' with trailing zeros/dot trimmed).
+        /// </summary>
+        internal override string AddTicksToTimeOnlySql(string timeOnlySql, string ticksDeltaSqlFragment)
+        {
+            var recTicks =
+                $"((CAST(substr({timeOnlySql},1,2) AS INTEGER)*3600 + CAST(substr({timeOnlySql},4,2) AS INTEGER)*60 " +
+                $"+ CAST(substr({timeOnlySql},7,2) AS INTEGER)) * 10000000 " +
+                $"+ (CASE WHEN length({timeOnlySql}) > 9 THEN CAST(substr(substr({timeOnlySql},10) || '0000000',1,7) AS INTEGER) ELSE 0 END))";
+            var wrapped = $"((({recTicks} + ({ticksDeltaSqlFragment})) % 864000000000 + 864000000000) % 864000000000)";
+            return $"(strftime('%H:%M:%S', {wrapped} / 10000000, 'unixepoch') || " +
+                   $"RTRIM(RTRIM('.' || printf('%07d', {wrapped} % 10000000), '0'), '.'))";
+        }
+
+        /// <summary>
         /// SQLite TimeSpan columns are 'HH:mm:ss' text; parse seconds via
         /// substr/CAST and feed to AddSecondsToTimeOnlySql for the strftime
         /// modifier emit.

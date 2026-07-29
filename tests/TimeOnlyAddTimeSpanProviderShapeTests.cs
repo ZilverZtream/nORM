@@ -42,10 +42,11 @@ public sealed class TimeOnlyAddTimeSpanProviderShapeTests : TestBase
         var (sql, _) = Translate<TocItem>(expr, connection, provider);
 
         var col = $"{provider.Escape("T0")}.{provider.Escape("Start")}";
-        // TimeOnly.Add folds the constant TimeSpan to a literal total-seconds
-        // value (3600 for 1 hour) and embeds inline -- assert against the
-        // literal-fragment shape per provider.
-        var expectedArith = provider.AddSecondsToTimeOnlySql(col, "3600");
+        // TimeOnly.Add folds the constant TimeSpan to a literal delta and embeds it inline. SQLite uses the
+        // tick-exact hook (1h = 36000000000 ticks, sub-second-preserving); native-TIME providers fall back to
+        // the whole-second seconds hook (3600) — mirror the visitor's tick-first-then-seconds selection.
+        var expectedArith = provider.AddTicksToTimeOnlySql(col, "36000000000")
+            ?? provider.AddSecondsToTimeOnlySql(col, "3600");
         Assert.NotNull(expectedArith);
         Assert.Contains(expectedArith!, sql);
     }

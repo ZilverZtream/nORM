@@ -411,9 +411,10 @@ namespace nORM.Providers
                     $"CAST(substr({args[0]}, 4, 2) AS INTEGER) * 600000000 + " +
                     $"CAST(substr({args[0]}, 7, 2) AS INTEGER) * 10000000 + " +
                     $"CASE WHEN length({args[0]}) > 9 THEN CAST(substr({args[0]}, 10, 7) AS INTEGER) ELSE 0 END)",
-                // FromDateTime(dt) / FromTimeSpan(ts) drop everything but
-                // the time portion. SQLite's time() emits 'HH:mm:ss'.
-                nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"time({args[0]})",
+                // FromDateTime(dt) / FromTimeSpan(ts) drop everything but the time portion. SQLite's time()
+                // emits 'HH:mm:ss', truncating the sub-second fraction — take the wall-clock time substring
+                // instead ('yyyy-MM-dd HH:mm:ss[.fffffff]' → 'HH:mm:ss[.fffffff]'), as DateTime.TimeOfDay does.
+                nameof(TimeOnly.FromDateTime) when args.Length == 1 => $"substr({args[0]}, 12)",
                 nameof(TimeOnly.FromTimeSpan) when args.Length == 1 => args[0],
                 // IsBetween(start, end): .NET defines this as
                 //   if (start <= end) start <= this < end
