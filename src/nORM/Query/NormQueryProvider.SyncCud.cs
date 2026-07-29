@@ -157,6 +157,18 @@ namespace nORM.Query
             var rootType = GetElementType(filtered);
             var mapping = _ctx.GetMapping(rootType);
             EnsureWritableMapping(mapping, "ExecuteDeleteAsync");
+            // ExecuteDelete is a set-based DELETE over the owner table only; it cannot cascade nORM-managed
+            // children (owned collections / m2m join rows). SQLite does not enforce foreign keys at runtime,
+            // so those children would be SILENTLY ORPHANED (owned rows left, or m2m join rows dangling at the
+            // freed PK). Refuse loudly rather than corrupt — mirrors GuardBulkAggregateChildren. The tracked
+            // DeleteAsync and entity BulkDeleteAsync paths DO cascade these (CleanupNormManagedChildrenOn
+            // DeleteAsync), so aggregate deletes must route through them or delete the children first.
+            if (mapping.OwnedCollections.Count > 0 || mapping.ManyToManyJoins.Count > 0)
+                throw new NormUnsupportedFeatureException(
+                    $"ExecuteDeleteAsync cannot delete '{mapping.Type.Name}': it has nORM-managed owned-collection " +
+                    "or many-to-many children that a set-based DELETE would orphan (SQLite does not enforce foreign " +
+                    "keys at runtime). Use DeleteAsync / BulkDeleteAsync (which cascade them), or delete the children first.",
+                    NormUnsupportedReason.BulkAggregateChildrenUnsupported);
             string finalSql;
             if (plan.Tables.Count != 1)
             {
