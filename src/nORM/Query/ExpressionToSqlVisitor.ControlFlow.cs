@@ -82,6 +82,15 @@ namespace nORM.Query
                     _sql.Append("(-1.0 * ").Append(_provider.GetTimeSpanColumnSecondsSql(operandSql)).Append(')');
                     return node;
                 }
+                // Raw decimal column/literal negation: -(text) coerces to REAL and loses precision. Flip the
+                // sign on TEXT via the provider hook (identity -(...) on native-DECIMAL providers). Computed
+                // decimals (arithmetic) are already REAL and keep -(...).
+                if (operandType == typeof(decimal)
+                    && node.Operand is MemberExpression or ConstantExpression or ParameterExpression)
+                {
+                    _sql.Append(_provider.NegateDecimalStorageSql(GetSql(node.Operand)));
+                    return node;
+                }
 
                 _sql.Append("-(");
                 Visit(node.Operand);

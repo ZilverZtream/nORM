@@ -488,6 +488,18 @@ namespace nORM.Providers
             => $"({TimeSpanColumnTotalSecondsSql(timeSpanColumnSql)} * 1.0)";
 
         /// <summary>
+        /// Decimal is stored as invariant TEXT on SQLite, so <c>-(operand)</c> would coerce it to REAL and drop
+        /// precision past ~15-16 significant figures. A sign flip needs no arithmetic — flip it on the TEXT:
+        /// a value with no non-zero digit (zero) is unchanged (avoids '-0'); a leading '-' is stripped; otherwise
+        /// a '-' is prepended. Byte-for-byte the precision-preserving TEXT Abs path, exact to 28+ digits. NULL
+        /// falls through the CASE to <c>'-' || NULL</c> = NULL, matching negation of a null decimal.
+        /// </summary>
+        public override string NegateDecimalStorageSql(string operandSql)
+            => $"(CASE WHEN NOT ({operandSql} GLOB '*[1-9]*') THEN {operandSql} " +
+               $"WHEN substr({operandSql}, 1, 1) = '-' THEN substr({operandSql}, 2) " +
+               $"ELSE '-' || {operandSql} END)";
+
+        /// <summary>
         /// SQLite TimeSpan columns are canonical-c-format TEXT; parse into a
         /// fractional-seconds expression via <see cref="TimeSpanColumnTotalSecondsSql"/>
         /// (which handles multi-day spans and signed values) and feed to

@@ -844,6 +844,14 @@ namespace nORM.Providers
                 NormUnsupportedReason.TimeSpanColumnArithmeticUnsupported);
 
         /// <summary>
+        /// Negates a raw (non-computed) decimal storage operand. A sign flip needs no arithmetic, so on a
+        /// native-DECIMAL provider the plain <c>-(operand)</c> is precision-exact. Overridden by providers that
+        /// store decimal as TEXT (SQLite), where <c>-(operand)</c> would coerce the TEXT to REAL and drop
+        /// precision — those flip the sign on the TEXT directly, mirroring the TEXT Abs/Floor/Ceiling path.
+        /// </summary>
+        public virtual string NegateDecimalStorageSql(string operandSql) => $"(-({operandSql}))";
+
+        /// <summary>
         /// Returns SQL evaluating <paramref name="dtoSql"/> (a DateTimeOffset column or
         /// expression) re-rendered at <paramref name="offset"/>. Implements
         /// <see cref="DateTimeOffset.ToOffset(TimeSpan)"/>: the UTC instant is invariant,

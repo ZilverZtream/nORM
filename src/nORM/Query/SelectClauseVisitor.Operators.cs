@@ -831,6 +831,19 @@ namespace nORM.Query
                     sb.Append("(-1.0 * ").Append(_provider.GetTimeSpanColumnSecondsSql(tsColSql)).Append(')');
                     return node;
                 }
+                // Raw decimal column/literal negation: -(text) coerces to REAL and loses precision. Flip the
+                // sign on TEXT via the provider hook (identity -(...) on native-DECIMAL providers). Computed
+                // decimals (arithmetic) are already REAL and keep -(...).
+                if (opTypeNeg == typeof(decimal)
+                    && node.Operand is MemberExpression or ConstantExpression or ParameterExpression)
+                {
+                    var dStart = sb.Length;
+                    Visit(node.Operand);
+                    var dColSql = sb.ToString(dStart, sb.Length - dStart);
+                    sb.Length = dStart;
+                    sb.Append(_provider.NegateDecimalStorageSql(dColSql));
+                    return node;
+                }
                 sb.Append("-(");
                 Visit(node.Operand);
                 sb.Append(')');

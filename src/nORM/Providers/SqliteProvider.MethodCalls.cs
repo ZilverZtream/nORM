@@ -255,16 +255,17 @@ namespace nORM.Providers
             // (never exponential) invariant TEXT, so compute these by TEXT/INTEGER instead.
             // Gated to raw storage: a COMPUTED decimal operand is already REAL (nORM's decimal
             // arithmetic runs in REAL) and keeps the existing REAL FLOOR/CEIL/ABS.
-            if ((node.Method.Name is nameof(Math.Abs) or nameof(Math.Floor) or nameof(Math.Ceiling))
+            if ((node.Method.Name is nameof(Math.Abs) or nameof(Math.Floor) or nameof(Math.Ceiling)
+                    or nameof(Math.Truncate))
                 && (declType == typeof(Math) || declType == typeof(decimal))
                 && node.Arguments.Count == 1
                 && (Nullable.GetUnderlyingType(node.Type) ?? node.Type) == typeof(decimal)
                 && IsRawDecimalStorageOperand(node.Arguments[0]))
             {
                 var a = args[0];
-                // Toward-zero integer part: SQLite CAST(TEXT AS INTEGER) reads the leading
-                // integer prefix, stopping at '.', exact within INT64 (matches decimal.Truncate).
-                var trunc = $"CAST({a} AS INTEGER)";
+                // Toward-zero integer part read straight off the TEXT (everything before the '.'), so magnitudes
+                // beyond Int64 round-trip EXACTLY — a CAST(TEXT AS INTEGER) would CLAMP to 9223372036854775807.
+                var intPart = $"(CASE WHEN instr({a}, '.') > 0 THEN substr({a}, 1, instr({a}, '.') - 1) ELSE {a} END)";
                 var isNeg = $"substr({a}, 1, 1) = '-'";
                 // A nonzero fractional digit is present (guards Floor/Ceiling's +/-1 adjustment).
                 var hasFrac = $"(instr({a}, '.') > 0 AND substr({a}, instr({a}, '.') + 1) GLOB '*[1-9]*')";
@@ -272,12 +273,27 @@ namespace nORM.Providers
                 {
                     // Sign strip, precision-exact (no arithmetic): drop a leading '-'.
                     nameof(Math.Abs) => $"(CASE WHEN {isNeg} THEN substr({a}, 2) ELSE {a} END)",
-                    // Floor rounds toward -inf: negatives with a fraction drop by one.
-                    nameof(Math.Floor) => $"({trunc} - (CASE WHEN {isNeg} AND {hasFrac} THEN 1 ELSE 0 END))",
+                    // Truncate toward zero == the integer part.
+                    nameof(Math.Truncate) => intPart,
+                    // Floor rounds toward -inf: negatives with a fraction drop by one. The no-adjust branch
+                    // returns the full-precision TEXT integer part (exact at any magnitude); the +/-1 adjust
+                    // stays within Int64 for any decimal whose integer part fits (the fraction only exists there).
+                    nameof(Math.Floor) => $"(CASE WHEN {isNeg} AND {hasFrac} THEN (CAST({intPart} AS INTEGER) - 1) ELSE {intPart} END)",
                     // Ceiling rounds toward +inf: positives with a fraction rise by one.
-                    nameof(Math.Ceiling) => $"({trunc} + (CASE WHEN NOT ({isNeg}) AND {hasFrac} THEN 1 ELSE 0 END))",
+                    nameof(Math.Ceiling) => $"(CASE WHEN NOT ({isNeg}) AND {hasFrac} THEN (CAST({intPart} AS INTEGER) + 1) ELSE {intPart} END)",
                     _ => null
                 };
+            }
+
+            // decimal.Negate over a raw decimal column: a sign flip needs no arithmetic, so flip on TEXT to
+            // preserve full precision — the string-only decimal path emits -(...) which coerces to REAL and
+            // drops digits (same TEXT-precision concern as Abs above).
+            if (node.Method.Name == nameof(decimal.Negate)
+                && declType == typeof(decimal)
+                && node.Arguments.Count == 1
+                && IsRawDecimalStorageOperand(node.Arguments[0]))
+            {
+                return NegateDecimalStorageSql(args[0]);
             }
 
             // Math.Round and decimal.Round share identical overload semantics
